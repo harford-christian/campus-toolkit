@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live Stream</title>
+<style>
+  :root { --gold:#D4AF37; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; background: #06140a; }
+  .field {
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(90deg, #1f7a3a 0 8%, #1a6d34 8% 16%),
+      linear-gradient(180deg, #2b8c46 0%, #176030 100%);
+  }
+  .field::after { /* stadium vignette + lights */
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(1200px 500px at 50% -10%, rgba(255,255,255,.28), transparent 60%);
+  }
+  .players { position: absolute; inset: 0; }
+  .ball { position: absolute; left: 52%; top: 58%; width: 2.2vw; height: 2.2vw; border-radius: 50%; background: #fff; box-shadow: 0 .4vw .8vw rgba(0,0,0,.4); animation: roll 4s ease-in-out infinite alternate; }
+  @keyframes roll { from { left: 40%; top: 62%; } to { left: 62%; top: 48%; } }
+  .dot { position: absolute; width: 2.4vw; height: 2.4vw; border-radius: 50%; box-shadow: 0 .4vw .6vw rgba(0,0,0,.35); }
+  .home { background: #B22222; } .away { background: #1c3faa; }
+  /* LIVE badge */
+  .live { position: absolute; top: 4vh; left: 4vw; display: flex; align-items: center; gap: 1vw; background: rgba(0,0,0,.55); padding: 1.2vh 1.6vw; border-radius: 999px; }
+  .live .rec { width: 1.4vw; height: 1.4vw; border-radius: 50%; background: #ff2d2d; animation: pulse 1.1s ease-in-out infinite; }
+  .live span { color: #fff; font-weight: 800; font-size: 2.4vw; letter-spacing: .12em; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+  /* scoreboard */
+  .score { position: absolute; bottom: 4vh; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; background: rgba(4,6,11,.82); border-radius: 14px; overflow: hidden; box-shadow: 0 1vh 3vh rgba(0,0,0,.45); }
+  .score .team { padding: 1.4vh 2.4vw; text-align: center; color: #fff; }
+  .score .team .name { font-weight: 800; font-size: 1.8vw; letter-spacing: .04em; }
+  .score .team .pts { font-weight: 800; font-size: 3.4vw; line-height: 1; margin-top: .4vh; color: var(--gold); }
+  .score .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.4vh 1.8vw; background: rgba(255,255,255,.06); }
+  .score .mid .clk { font-weight: 800; font-size: 2.2vw; color: #fff; }
+  .score .mid .lbl { font-size: 1.1vw; color: #cbd0da; letter-spacing: .14em; text-transform: uppercase; margin-top: .3vh; }
+</style>
+</head>
+<body>
+  <div class="field"></div>
+  <div class="players">
+    <div class="dot home" style="left:30%;top:55%"></div>
+    <div class="dot home" style="left:44%;top:40%"></div>
+    <div class="dot home" style="left:38%;top:70%"></div>
+    <div class="dot away" style="left:60%;top:52%"></div>
+    <div class="dot away" style="left:66%;top:38%"></div>
+    <div class="dot away" style="left:56%;top:68%"></div>
+    <div class="ball"></div>
+  </div>
+  <div class="live"><span class="rec"></span><span>LIVE</span></div>
+  <div class="score">
+    <div class="team"><div class="name">EAGLES</div><div class="pts">2</div></div>
+    <div class="mid"><div class="clk" id="clk">67:14</div><div class="lbl">2nd Half</div></div>
+    <div class="team"><div class="name">RIVERDALE</div><div class="pts">1</div></div>
+  </div>
+<script>
+  var s = 67 * 60 + 14;
+  setInterval(function () {
+    s++; var m = Math.floor(s / 60), ss = s % 60;
+    document.getElementById('clk').textContent = m + ':' + (ss < 10 ? '0' : '') + ss;
+  }, 1000);
+</script>
+</body>
+</html>

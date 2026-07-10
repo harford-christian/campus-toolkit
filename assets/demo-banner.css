@@ -1,0 +1,42 @@
+/* demo-banner.css — the small, non-intrusive floating chrome added to every demo.
+   Rendered by demo-banner.js from window.DEMO_META. Stays out of the app's way. */
+.sc-demo-back,
+.sc-demo-tag {
+  position: fixed;
+  bottom: 16px;
+  z-index: 2147483000;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .28);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.sc-demo-back {
+  left: 16px;
+  padding: 10px 16px;
+  background: #1b1b1f;
+  color: #fff;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, .18);
+  transition: transform .1s ease, background .12s ease;
+}
+.sc-demo-back:hover { transform: translateY(-2px); background: #2c2c33; }
+.sc-demo-tag {
+  right: 16px;
+  padding: 10px 16px;
+  background: #C79A3D;           /* HCS gold */
+  color: #322400;
+  cursor: default;
+  user-select: none;
+}
+.sc-demo-tag .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #322400; opacity: .55;
+}
+@media print { .sc-demo-back, .sc-demo-tag { display: none; } }
+@media (max-width: 560px) {
+  .sc-demo-back, .sc-demo-tag { bottom: 10px; font-size: 12px; padding: 8px 12px; }
+}

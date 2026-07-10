@@ -1,0 +1,2265 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nest Express</title>
+  <!-- shared/SharedStyles.html — brand tokens, display font, and shared keyframes
+     for every public-facing page (kiosk / TV / KDS). Values ported verbatim
+     from the production kiosk (legacy/ipad-pos/iPad_Kiosk.html). -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
+
+  :root {
+    --hcs-maroon: #800000;
+    --hcs-gold: #FFD700;
+    --hcs-green: #28a745;
+    --page-bg: #000000;
+    --container-bg: #808080;
+    --active-bg: #fff9f9;
+    --cooking-blue: #007bff;
+  }
+
+  /* Pulsing border on the stage-1 name input. */
+  @keyframes pulse-border {
+    0%   { border-color: white; box-shadow: 0 0 0px white; }
+    50%  { border-color: var(--hcs-maroon); box-shadow: 0 0 15px var(--hcs-maroon); }
+    100% { border-color: white; box-shadow: 0 0 0px white; }
+  }
+
+  /* Pulsing glow on the blue "IN THE OVEN" badge. */
+  @keyframes pulse-blue {
+    0%   { box-shadow: 0 0 0px var(--cooking-blue); }
+    50%  { box-shadow: 0 0 10px var(--cooking-blue); }
+    100% { box-shadow: 0 0 0px var(--cooking-blue); }
+  }
+
+  /* Strobing maroon/white attendant banner ("Time to Pay"). */
+  @keyframes strobe-alert {
+    0%, 100% { background: var(--hcs-maroon); color: white; border-color: white; }
+    50%      { background: white; color: var(--hcs-maroon); border-color: var(--hcs-maroon); }
+  }
+
+  /* Flashing red/white low-stock warning. */
+  @keyframes flash-red-white {
+    from { background-color: #ff0000; color: #ffffff; }
+    to   { background-color: #ffffff; color: #ff0000; }
+  }
+
+  /* Loading spinner rotation. */
+  @keyframes spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+
+  <!-- kiosk/KioskStyles.html — kiosk page styles, ported faithfully from
+     legacy/ipad-pos/iPad_Kiosk.html plus the rebuild's new chrome (queue
+     banner, toast, conflict modal, card flash, test tag). Brand tokens and
+     shared keyframes come from shared/SharedStyles.html. -->
+<style>
+  body {
+    font-family: sans-serif; background-color: var(--page-bg); padding: 10px;
+    text-align: center; margin: 0; overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 95%; margin: 20px auto; background: var(--container-bg);
+    padding: 25px; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    min-height: 85vh; color: white; display: flex; flex-direction: column;
+    position: relative;
+  }
+
+  .main-title {
+    font-family: 'Bangers', system-ui;
+    color: white; font-size: 52px; margin-bottom: 20px;
+    text-transform: uppercase; letter-spacing: 2px;
+    text-shadow: 3px 3px 0px var(--hcs-maroon), 5px 5px 0px var(--hcs-gold);
+  }
+
+  .hidden { display: none !important; }
+
+  /* ---------- stage 1: name entry ---------- */
+
+  .name-row { display: flex; gap: 15px; margin-bottom: 20px; justify-content: center; }
+  .name-input {
+    flex: 1; max-width: 600px; padding: 22px; font-size: 24px; border-radius: 10px;
+    border: 4px solid white; color: #000000; font-weight: bold; text-align: center;
+    outline: none; transition: 0.3s; animation: pulse-border 2s infinite;
+  }
+
+  .logo-box {
+    margin-top: 30px;
+    display: flex; justify-content: center; align-items: center;
+    max-height: 38vh;
+    overflow: hidden;
+  }
+  .entry-logo {
+    max-width: 65%;
+    height: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
+  }
+
+  .item-active {
+    border: 4px solid var(--hcs-maroon) !important; background-color: var(--active-bg) !important;
+    color: var(--hcs-maroon) !important; animation: none !important;
+  }
+
+  /* ---------- stage 2: menu grid ---------- */
+
+  .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px; width: 100%; }
+  .menu-loading { grid-column: 1 / -1; color: white; font-weight: bold; font-size: 24px; padding: 40px 0; }
+
+  /* No overflow:hidden — red badges 'hang' off the box (legacy fix). */
+  .item-card {
+    position: relative;
+    border: 4px solid transparent;
+    border-radius: 12px;
+    padding: 15px;
+    background: #ffffff;
+    color: black;
+    transition: 0.2s;
+  }
+
+  /* Gold half-off banner; border-radius keeps it inside the rounded card. */
+  .discount-banner {
+    position: absolute; top: 0; left: 0; background: var(--hcs-gold); color: var(--hcs-maroon);
+    width: 100%; font-family: 'Bangers', sans-serif; font-size: 16px; font-weight: bold;
+    padding: 4px 0; letter-spacing: 1px; z-index: 5; border-bottom: 2px solid var(--hcs-maroon);
+    border-top-left-radius: 8px; border-top-right-radius: 8px;
+  }
+
+  .sold-out { opacity: 0.5; filter: grayscale(1); pointer-events: none !important; }
+
+  .stock-badge {
+    position: absolute; top: -12px; right: -5px; background: #ff4444; color: white;
+    padding: 5px 10px; border-radius: 8px; font-size: 14px; font-weight: 900;
+    border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 20;
+    font-family: 'Bangers', sans-serif; letter-spacing: 1px; line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .cooking-badge { background: var(--cooking-blue) !important; animation: pulse-blue 1.5s infinite; }
+  .cooking-ready { color: var(--cooking-blue); font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+
+  .card-title { font-weight: bold; font-size: 18px; color: black; }
+  .card-title-lg { font-size: 22px; }
+  .card-title.pushed-down { margin-top: 20px; }
+  .card-price { color: black; }
+
+  .qty-row { display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 8px; }
+  .qty-btn { width: 45px; height: 45px; border-radius: 50%; border: none; font-size: 24px; font-weight: bold; cursor: pointer; background: #eee; }
+  .plus { background: var(--hcs-maroon); color: white; }
+  .qty-btn:disabled { background: #ccc !important; opacity: 0.5; cursor: not-allowed; }
+  .card-qty { font-weight: bold; font-size: 22px; }
+  .card-qty-lg { font-size: 26px; }
+
+  /* Combo / flavor drawers */
+  .drawer { background: #f9f9f9; padding: 10px; margin-top: 10px; border-radius: 8px; }
+  .sub-item-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; color: black; font-weight: bold; }
+  .sub-label { text-align: left; }
+  .sub-ctrl { display: flex; align-items: center; gap: 8px; }
+  .sub-btn { width: 40px; height: 40px; border-radius: 8px; border: none; font-size: 20px; font-weight: bold; cursor: pointer; background: #eee; }
+  .sub-plus { background: var(--hcs-maroon); color: white; }
+  .sub-btn:disabled { background: #ccc !important; opacity: 0.5; cursor: not-allowed; }
+  .sub-qty { min-width: 24px; display: inline-block; text-align: center; font-weight: bold; color: black; }
+
+  /* Conflict-review flash on changed cards */
+  @keyframes card-flash {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,0); }
+    50%      { box-shadow: 0 0 0 6px var(--hcs-gold); }
+  }
+  .card-flash { animation: card-flash 0.7s ease-in-out 3; }
+
+  /* Checkout footer */
+  .checkout-row { margin-top: 30px; border-top: 2px solid rgba(255,255,255,0.2); padding-top: 20px; }
+  .validation-msg { color: #ffeb3b; font-weight: bold; margin-bottom: 10px; min-height: 24px; }
+  .total-row { font-size: 38px; font-weight: bold; }
+
+  /* ---------- buttons ---------- */
+
+  .action-btn { width: 100%; padding: 22px; border: none; border-radius: 12px; font-size: 24px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-top: 15px; }
+  .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .red-btn { background: var(--hcs-maroon); color: white; }
+  .back-btn { background: #444; color: white; padding: 12px 24px; font-size: 18px; margin-bottom: 20px; border-radius: 8px; border: none; cursor: pointer; align-self: flex-start; }
+
+  /* ---------- stage 3: PIN ---------- */
+
+  .attendant-banner {
+    background: var(--hcs-maroon); color: white; border: 4px solid white;
+    padding: 30px; border-radius: 15px; font-size: 40px; font-weight: 900;
+    text-transform: uppercase; margin-bottom: 20px;
+    animation: strobe-alert 0.8s infinite step-start;
+  }
+
+  .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 380px; margin: 20px auto; }
+  .key { padding: 30px; background: #eee; border-radius: 12px; font-size: 32px; font-weight: bold; color: black; box-shadow: 0 4px 0 #ccc; cursor: pointer; display: flex; align-items: center; justify-content: center; aspect-ratio: 1 / 1; }
+  .key-total { font-size: 26px; }
+  .keypad.verifying .key { opacity: 0.5; pointer-events: none; }
+  .pin-display { font-size: 45px; letter-spacing: 15px; margin: 20px 0; height: 60px; color: white; font-weight: bold; }
+  .pin-error { color: #ff5252 !important; letter-spacing: 2px !important; font-size: 32px !important; }
+
+  .flashing-warning {
+    font-weight: bold; font-size: 22px; padding: 15px; border-radius: 10px;
+    margin-top: 20px; border: 4px solid white;
+    animation: flash-red-white 0.5s infinite alternate;
+    text-transform: uppercase; font-family: 'Bangers', sans-serif;
+    letter-spacing: 1px;
+  }
+
+  /* ---------- overlays & modals ---------- */
+
+  .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 1000; background: rgba(0,0,0,0.85); }
+  .processing-box, .timeout-box, .verify-box { background: white; padding: 40px; border-radius: 20px; max-width: 400px; width: 90%; color: black; border: 8px solid var(--hcs-gold); }
+  .verify-box { max-width: 480px; padding: 30px; }
+  .spinner { border: 8px solid #f3f3f3; border-top: 8px solid var(--hcs-maroon); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+
+  .overlay-title { font-family: 'Bangers', sans-serif; font-size: 36px; color: var(--hcs-maroon); margin-bottom: 10px; }
+  .overlay-sub { font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+  .modal-title { color: var(--hcs-maroon); font-size: 32px; font-family: 'Bangers', sans-serif; }
+  .modal-title-big { font-size: 42px; }
+  .modal-text { font-weight: bold; color: black; }
+  .modal-list { text-align: left; font-size: 22px; font-weight: bold; margin: 15px 0 15px 25px; }
+
+  .sent-overlay { background: var(--container-bg); }
+  .sent-title { color: #4CAF50; font-size: 72px; font-family: 'Bangers', sans-serif; }
+
+  .strikethrough { text-decoration: line-through; opacity: 0.6; font-size: 0.8em; }
+  .included-label { color: var(--hcs-green); font-weight: bold; font-size: 0.9em; }
+
+  /* ---------- rebuild chrome ---------- */
+
+  .test-tag {
+    position: absolute; top: 10px; right: 10px; z-index: 30;
+    background: var(--hcs-gold); color: var(--hcs-maroon);
+    font-family: 'Bangers', sans-serif; font-size: 18px; letter-spacing: 1px;
+    padding: 4px 14px; border-radius: 8px; border: 2px solid var(--hcs-maroon);
+  }
+
+  .queue-banner {
+    background: var(--hcs-maroon); color: white; border: 4px solid white;
+    padding: 14px; border-radius: 12px; font-size: 22px; font-weight: 900;
+    text-transform: uppercase; margin-bottom: 15px;
+    font-family: 'Bangers', sans-serif; letter-spacing: 1px;
+    animation: strobe-alert 0.8s infinite step-start;
+  }
+
+  .toast {
+    position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.9); color: white; font-weight: bold;
+    padding: 14px 22px; border-radius: 10px; border: 2px solid var(--hcs-gold);
+    max-width: 90%; z-index: 2000; font-size: 16px;
+  }
+
+  @media (orientation: portrait) {
+    .container { margin: 10px auto; padding: 15px; }
+    .main-title { font-size: 32px; }
+  }
+</style>
+
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Nest Express — Kiosk (POS)" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <div id="testModeTag" class="test-tag hidden">TEST MODE</div>
+    <h1 class="main-title">The Nest Express</h1>
+
+    <div id="queueBanner" class="queue-banner hidden"></div>
+
+    <!-- Stage 1: name entry -->
+    <div id="stage1">
+      <div class="name-row">
+        <input type="text" id="orderName" class="name-input" placeholder="Name for the Order" autocomplete="off" autocorrect="off">
+      </div>
+      <button class="action-btn red-btn" id="startOrderBtn" data-action="start-order">START ORDER</button>
+      <div class="logo-box">
+        <div class="entry-logo" style="font-size:64px;line-height:1;text-align:center;" role="img" aria-label="Eagles Logo">🦅</div>
+      </div>
+    </div>
+
+    <!-- Stage 2: menu grid -->
+    <div id="stage2" class="hidden">
+      <button class="back-btn" data-action="back-to-name">&larr; Back to Order Name</button>
+      <div class="menu-grid" id="menuContainer"></div>
+      <div class="checkout-row">
+        <div id="validationMsg" class="validation-msg"></div>
+        <div class="total-row">Total: <span id="liveTotal">$0.00</span></div>
+        <button class="action-btn red-btn" id="completeBtn" data-action="complete-order" disabled>Complete Order</button>
+      </div>
+    </div>
+
+    <!-- Stage 3: PIN keypad -->
+    <div id="stage3" class="hidden">
+      <button class="back-btn" data-action="back-to-menu">&larr; Back to Menu</button>
+      <div class="attendant-banner">Time to Pay.<br>Please pass iPad back to Attendant</div>
+      <div class="pin-display" id="pinDisplay"></div>
+      <div class="keypad" id="keypad">
+        <div class="key" data-action="pin-key" data-key="1">1</div>
+        <div class="key" data-action="pin-key" data-key="2">2</div>
+        <div class="key" data-action="pin-key" data-key="3">3</div>
+        <div class="key" data-action="pin-key" data-key="4">4</div>
+        <div class="key" data-action="pin-key" data-key="5">5</div>
+        <div class="key" data-action="pin-key" data-key="6">6</div>
+        <div class="key" data-action="pin-key" data-key="7">7</div>
+        <div class="key" data-action="pin-key" data-key="8">8</div>
+        <div class="key" data-action="pin-key" data-key="9">9</div>
+        <div class="key" data-action="pin-backspace">&larr;</div>
+        <div class="key" data-action="pin-key" data-key="0">0</div>
+        <div class="key key-total" data-action="pin-key" data-key="T"><span id="keyTotalDisplay">$0</span></div>
+      </div>
+      <div id="lowStockWarning" class="hidden"></div>
+    </div>
+
+    <!-- Submit-machine overlays -->
+    <div id="processingOverlay" class="overlay hidden">
+      <div class="processing-box">
+        <h2 class="overlay-title">SENDING ORDER...</h2>
+        <div class="spinner"></div>
+        <p class="overlay-sub">Syncing with Kitchen Hub</p>
+      </div>
+    </div>
+
+    <div id="retryingOverlay" class="overlay hidden">
+      <div class="processing-box">
+        <h2 class="overlay-title">CONNECTION HICCUP</h2>
+        <div class="spinner"></div>
+        <p class="overlay-sub">Retrying &mdash; do not close</p>
+      </div>
+    </div>
+
+    <div id="savedOverlay" class="overlay hidden">
+      <div class="processing-box">
+        <h2 class="overlay-title">ORDER SAVED</h2>
+        <p class="overlay-sub">Order saved &mdash; will send automatically</p>
+      </div>
+    </div>
+
+    <div id="sentOverlay" class="overlay sent-overlay hidden">
+      <h1 class="sent-title">ORDER SENT!</h1>
+    </div>
+
+    <!-- Inactivity modal -->
+    <div id="timeoutModal" class="overlay hidden">
+      <div class="timeout-box">
+        <h2 class="modal-title">STILL THERE?</h2>
+        <p class="modal-text">Order will reset soon.</p>
+        <button id="keepActiveBtn" class="action-btn red-btn" data-action="keep-active">YES, KEEP ACTIVE (15s)</button>
+      </div>
+    </div>
+
+    <!-- Low-stock verification (before payment) -->
+    <div id="stockVerification" class="overlay hidden">
+      <div class="verify-box">
+        <h2 class="modal-title modal-title-big">LOW STOCK ALERT!</h2>
+        <p class="modal-text">Verify stock before taking payment.</p>
+        <ul id="lowStockItems" class="modal-list"></ul>
+        <button class="action-btn red-btn" data-action="stock-verified">STOCK IS VERIFIED</button>
+      </div>
+    </div>
+
+    <!-- Stock/menu conflict from the server on submit -->
+    <div id="conflictModal" class="overlay hidden">
+      <div class="verify-box">
+        <h2 class="modal-title modal-title-big">MENU CHANGED</h2>
+        <p class="modal-text">Some items changed while this order was being placed. The order has been adjusted:</p>
+        <ul id="conflictList" class="modal-list"></ul>
+        <button class="action-btn red-btn" data-action="review-order">REVIEW ORDER</button>
+      </div>
+    </div>
+
+    <!-- Server rejected the order outright -->
+    <div id="errorModal" class="overlay hidden">
+      <div class="verify-box">
+        <h2 class="modal-title modal-title-big">ORDER NOT PLACED</h2>
+        <p id="errorText" class="modal-text"></p>
+        <button class="action-btn red-btn" data-action="error-back">BACK TO MENU</button>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script>var KIOSK_ID = 'kiosk-' + '1';</script>
+  <!-- GENERATED FILE — DO NOT HAND-EDIT.
+ * Source of truth: logic.js (unit-tested in Node).
+ * Regenerate with: npm run build -->
+<script>
+/**
+ * CartEngine — pure cart, pricing, validation, and badge logic for the
+ * Eagles Nest / Nest Express kiosk.
+ *
+ * Runs unchanged in three places: Node (npm test), the browser (kiosk client,
+ * wrapped into a script-tag partial by tools/wrap.js), and Apps Script
+ * (server repricing). Therefore: no DOM, no google.script.run, no Date.now() — time is
+ * always passed in. No import/export syntax; one global namespace + a
+ * module.exports shim.
+ *
+ * HOUSE RULES (see docs/BEHAVIOR-CONTRACT.md — do not "clean up"):
+ *  - Cart/pricing logic stays as explicit, readable branches per item type.
+ *    A past refactor that abstracted these broke the flavor engine in production.
+ *  - All money is INTEGER CENTS. Prices are absolute values from config —
+ *    never computed as base × 0.5 or component + upcharge (the $4.50 bug).
+ *  - Mutators treat inputs as immutable and return { cart: <new cart> }.
+ *    A rejected mutation returns the ORIGINAL cart object (=== comparable).
+ */
+var CartEngine = (function () {
+
+  // ---------- construction & lookup helpers ----------
+
+  function emptyCart() {
+    return { lines: {} };
+  }
+
+  function emptyLine(itemId) {
+    return { itemId: itemId, qty: 0, subs: {}, comboAlloc: {} };
+  }
+
+  function getItem(config, itemId) {
+    for (var i = 0; i < config.items.length; i++) {
+      if (config.items[i].id === itemId) return config.items[i];
+    }
+    return null;
+  }
+
+  function getLine(cart, itemId) {
+    return cart.lines[itemId] || null;
+  }
+
+  function cloneCart(cart) {
+    return JSON.parse(JSON.stringify(cart));
+  }
+
+  function sumValues(obj) {
+    var total = 0;
+    for (var k in obj) {
+      total += obj[k];
+    }
+    return total;
+  }
+
+  function findComboOption(item, optionId) {
+    if (!item.combo || !item.combo.options) return null;
+    for (var i = 0; i < item.combo.options.length; i++) {
+      if (item.combo.options[i].id === optionId) return item.combo.options[i];
+    }
+    return null;
+  }
+
+  // ---------- pricing lookups (absolute values only) ----------
+
+  function unitPriceCents(config, item) {
+    if (config.halfOff === true && item.discountable === true && typeof item.halfPriceCents === 'number') {
+      return item.halfPriceCents;
+    }
+    return item.priceCents;
+  }
+
+  function comboOptionPriceCents(config, option) {
+    if (config.halfOff === true && typeof option.halfPriceCents === 'number') {
+      return option.halfPriceCents;
+    }
+    return option.priceCents;
+  }
+
+  // ---------- internal in-place helpers (used by the public mutators) ----------
+
+  // Contract §3: soda flavor pruning, verbatim port of production updateCart.
+  function pruneFlavorsInPlace(line, newQty) {
+    var flavorsWithQty = [];
+    for (var f in line.subs) {
+      if (line.subs[f] > 0) flavorsWithQty.push(f);
+    }
+
+    if (newQty === 0) {
+      // qty reached 0 → every flavor resets
+      for (var a = 0; a < flavorsWithQty.length; a++) {
+        line.subs[flavorsWithQty[a]] = 0;
+      }
+    } else if (flavorsWithQty.length > 1) {
+      // multiple flavors selected → ALL reset to 0
+      for (var b = 0; b < flavorsWithQty.length; b++) {
+        line.subs[flavorsWithQty[b]] = 0;
+      }
+    } else if (flavorsWithQty.length === 1) {
+      // exactly one flavor → clamp it to the new qty
+      var only = flavorsWithQty[0];
+      if (line.subs[only] > newQty) {
+        line.subs[only] = newQty;
+      }
+    }
+    // zero flavors selected → nothing to prune
+  }
+
+  // Contract §2: combo drink picks mirror into the general drink cart line.
+  function mirrorIncludedInPlace(cart, config, option, deltaUnits) {
+    var itemId = option.includesItemId;
+    var item = getItem(config, itemId);
+    if (!item) return;
+    if (!cart.lines[itemId]) cart.lines[itemId] = emptyLine(itemId);
+    var line = cart.lines[itemId];
+    var prevQty = line.qty;
+    var units = (typeof option.includesQty === 'number') ? option.includesQty : 1;
+    var newQty = prevQty + deltaUnits * units;
+    if (newQty < 0) newQty = 0;
+    line.qty = newQty;
+    if (item.type === 'flavored' && newQty < prevQty) {
+      pruneFlavorsInPlace(line, newQty);
+    }
+  }
+
+  // Contract §3 [BUG — fix in rebuild]: production never pruned combo drink
+  // allocations on combo decrement, leaving orphaned allocations that
+  // overcharged. This implements the blueprint-intended behavior: trim excess
+  // allocations following combo.pruneOrder (CFA: soda first, then water),
+  // cascading each trimmed unit through the mirrored drink line so soda
+  // flavor pruning fires too.
+  function pruneComboAllocInPlace(cart, config, comboItemId) {
+    var item = getItem(config, comboItemId);
+    if (!item || !item.combo) return;
+    var line = cart.lines[comboItemId];
+    if (!line) return;
+
+    var order;
+    if (item.combo.pruneOrder && item.combo.pruneOrder.length > 0) {
+      order = item.combo.pruneOrder;
+    } else {
+      order = [];
+      for (var i = 0; i < item.combo.options.length; i++) {
+        order.push(item.combo.options[i].id);
+      }
+    }
+
+    var excess = sumValues(line.comboAlloc) - line.qty;
+    while (excess > 0) {
+      var trimmed = false;
+      for (var j = 0; j < order.length; j++) {
+        var optionId = order[j];
+        if ((line.comboAlloc[optionId] || 0) > 0) {
+          line.comboAlloc[optionId] = line.comboAlloc[optionId] - 1;
+          var option = findComboOption(item, optionId);
+          if (option) {
+            mirrorIncludedInPlace(cart, config, option, -1);
+          }
+          excess--;
+          trimmed = true;
+          break;
+        }
+      }
+      if (!trimmed) break; // nothing left to trim; avoid infinite loop
+    }
+  }
+
+  // ---------- public mutators ----------
+
+  function updateItemQty(cart, config, itemId, delta) {
+    var item = getItem(config, itemId);
+    if (!item) return { cart: cart };
+
+    var existing = getLine(cart, itemId);
+    var currentQty = existing ? existing.qty : 0;
+
+    // Contract §2: increments blocked at stock unless the item is cooking
+    // (cooking items are orderable at any stock, including 0).
+    if (delta > 0 && !item.cooking && currentQty >= item.stock) {
+      return { cart: cart };
+    }
+
+    var next = cloneCart(cart);
+    if (!next.lines[itemId]) next.lines[itemId] = emptyLine(itemId);
+    var line = next.lines[itemId];
+    var prevQty = line.qty;
+    var newQty = prevQty + delta;
+    if (newQty < 0) newQty = 0;
+    line.qty = newQty;
+
+    if (item.type === 'simple') {
+      // no sub-state to maintain
+    } else if (item.type === 'flavored') {
+      if (newQty < prevQty) {
+        pruneFlavorsInPlace(line, newQty);
+      }
+    } else if (item.type === 'combo') {
+      if (newQty < prevQty) {
+        pruneComboAllocInPlace(next, config, itemId);
+      }
+    }
+
+    return { cart: next };
+  }
+
+  function updateFlavorQty(cart, config, itemId, flavorName, delta) {
+    var item = getItem(config, itemId);
+    if (!item || item.type !== 'flavored') return { cart: cart };
+
+    var existing = getLine(cart, itemId);
+    if (!existing) return { cart: cart };
+
+    // Contract §3: flavor increments blocked when sum(flavors) >= item qty.
+    if (delta > 0 && sumValues(existing.subs) >= existing.qty) {
+      return { cart: cart };
+    }
+
+    var next = cloneCart(cart);
+    var line = next.lines[itemId];
+    var current = line.subs[flavorName] || 0;
+    var newSub = current + delta;
+    if (newSub < 0) newSub = 0;
+    line.subs[flavorName] = newSub;
+
+    return { cart: next };
+  }
+
+  function updateComboOption(cart, config, comboItemId, optionId, delta) {
+    var item = getItem(config, comboItemId);
+    if (!item || item.type !== 'combo') return { cart: cart };
+    var option = findComboOption(item, optionId);
+    if (!option) return { cart: cart };
+
+    var existing = getLine(cart, comboItemId);
+    var comboQty = existing ? existing.qty : 0;
+    var currentAllocs = existing ? sumValues(existing.comboAlloc) : 0;
+
+    if (delta > 0) {
+      // Contract §2: allocations capped by combo qty…
+      if (currentAllocs >= comboQty) {
+        return { cart: cart };
+      }
+      // …and blocked when the included drink's stock is exhausted by its
+      // cart line (unless the drink is cooking).
+      var incItem = getItem(config, option.includesItemId);
+      var incLine = getLine(cart, option.includesItemId);
+      var incQty = incLine ? incLine.qty : 0;
+      if (incItem && !incItem.cooking && incItem.stock <= incQty) {
+        return { cart: cart };
+      }
+    }
+
+    var next = cloneCart(cart);
+    if (!next.lines[comboItemId]) next.lines[comboItemId] = emptyLine(comboItemId);
+    var line = next.lines[comboItemId];
+    var prev = line.comboAlloc[optionId] || 0;
+    var newAlloc = prev + delta;
+    if (newAlloc < 0) newAlloc = 0;
+    var applied = newAlloc - prev;
+    if (applied === 0) {
+      return { cart: cart };
+    }
+    line.comboAlloc[optionId] = newAlloc;
+
+    // Mirror the change into the included drink line (production behavior).
+    mirrorIncludedInPlace(next, config, option, applied);
+
+    return { cart: next };
+  }
+
+  // Public, pure versions of the pruning rules (spec surface for tests).
+  function pruneFlavors(line, newQty) {
+    var copy = JSON.parse(JSON.stringify(line));
+    copy.qty = newQty;
+    pruneFlavorsInPlace(copy, newQty);
+    return copy;
+  }
+
+  function pruneComboAlloc(cart, config, comboItemId) {
+    var next = cloneCart(cart);
+    pruneComboAllocInPlace(next, config, comboItemId);
+    return { cart: next };
+  }
+
+  // ---------- derived / read-only ----------
+
+  // Contract §2: included-drink accounting is DERIVED, never stored.
+  function getComboIncludedUnits(cart, config) {
+    var included = {};
+    for (var itemId in cart.lines) {
+      var item = getItem(config, itemId);
+      if (!item || item.type !== 'combo' || !item.combo) continue;
+      var line = cart.lines[itemId];
+      for (var i = 0; i < item.combo.options.length; i++) {
+        var option = item.combo.options[i];
+        var alloc = line.comboAlloc[option.id] || 0;
+        if (alloc <= 0) continue;
+        var units = (typeof option.includesQty === 'number') ? option.includesQty : 1;
+        var target = option.includesItemId;
+        included[target] = (included[target] || 0) + alloc * units;
+      }
+    }
+    return included;
+  }
+
+  // Contract §1. Explicit branch per item type — keep it that way.
+  function calculateTotal(cart, config) {
+    var included = getComboIncludedUnits(cart, config);
+    var totalCents = 0;
+    var lines = [];
+
+    for (var itemId in cart.lines) {
+      var line = cart.lines[itemId];
+      var item = getItem(config, itemId);
+      if (!item) continue;
+      if (line.qty <= 0 && sumValues(line.comboAlloc) <= 0) continue;
+
+      if (item.type === 'combo') {
+        // Combos charge ONLY the absolute option rates for allocated units.
+        // Unallocated combo units bill $0 — checkout stays blocked until
+        // every combo has a drink type (validateCheckout).
+        var comboBreakdown = [];
+        var comboTotal = 0;
+        for (var i = 0; i < item.combo.options.length; i++) {
+          var option = item.combo.options[i];
+          var alloc = line.comboAlloc[option.id] || 0;
+          var rate = comboOptionPriceCents(config, option);
+          comboTotal += alloc * rate;
+          comboBreakdown.push({ optionId: option.id, qty: alloc, unitPriceCents: rate });
+        }
+        totalCents += comboTotal;
+        lines.push({
+          itemId: itemId,
+          qty: line.qty,
+          billableQty: sumValues(line.comboAlloc),
+          includedQty: 0,
+          unitPriceCents: null,
+          lineTotalCents: comboTotal,
+          comboBreakdown: comboBreakdown
+        });
+      } else if (item.type === 'flavored' || item.type === 'simple') {
+        // Drink lines bill only the excess over combo-included units.
+        var inc = included[itemId] || 0;
+        var billable = line.qty - inc;
+        if (billable < 0) billable = 0;
+        var unit = unitPriceCents(config, item);
+        var lineTotal = billable * unit;
+        totalCents += lineTotal;
+        lines.push({
+          itemId: itemId,
+          qty: line.qty,
+          billableQty: billable,
+          includedQty: (inc < line.qty) ? inc : line.qty,
+          unitPriceCents: unit,
+          lineTotalCents: lineTotal,
+          comboBreakdown: null
+        });
+      }
+    }
+
+    if (totalCents < 0) totalCents = 0;
+    return { totalCents: totalCents, lines: lines };
+  }
+
+  // Contract §4. Message precedence preserved from production: the combo
+  // message overwrites the soda message when both fail (combo errors are
+  // evaluated after flavored errors; `message` is the last non-empty one).
+  function validateCheckout(cart, config) {
+    var errors = [];
+
+    for (var itemId in cart.lines) {
+      var line = cart.lines[itemId];
+      var item = getItem(config, itemId);
+      if (!item || line.qty <= 0) continue;
+      if (item.type !== 'flavored') continue;
+      var picked = sumValues(line.subs);
+      if (picked < line.qty) {
+        var label = item.flavorLabel || item.name;
+        errors.push({
+          itemId: itemId,
+          code: 'FLAVORS_INCOMPLETE',
+          message: 'Pick ' + (line.qty - picked) + ' more options for ' + label + '.'
+        });
+      }
+    }
+
+    for (var comboId in cart.lines) {
+      var comboLine = cart.lines[comboId];
+      var comboItem = getItem(config, comboId);
+      if (!comboItem || comboItem.type !== 'combo') continue;
+      if (comboLine.qty > sumValues(comboLine.comboAlloc)) {
+        errors.push({
+          itemId: comboId,
+          code: 'COMBO_OPTION_MISSING',
+          message: comboItem.combo.prompt
+        });
+      }
+    }
+
+    var totals = calculateTotal(cart, config);
+    if (totals.totalCents <= 0) {
+      errors.push({ itemId: null, code: 'EMPTY_CART', message: '' });
+    }
+
+    var message = '';
+    for (var e = 0; e < errors.length; e++) {
+      if (errors[e].message) message = errors[e].message;
+    }
+
+    return { ok: errors.length === 0, errors: errors, message: message };
+  }
+
+  // Contract §5. Pure badge derivation; the renderer decides visuals.
+  function getBadge(item, inCartQty, nowMs) {
+    if (item.cooking && item.cooking.readyAtMs) {
+      var msLeft = item.cooking.readyAtMs - nowMs;
+      if (msLeft <= 0) {
+        // Client should refetch menu data when it sees this.
+        return { type: 'COOKING_EXPIRED', minutes: 0, remainingMs: 0, inCart: inCartQty > 0 };
+      }
+      // Production math: whole seconds, then ceil to minutes.
+      var secondsLeft = Math.floor(msLeft / 1000);
+      var minutes = Math.ceil(secondsLeft / 60);
+      return { type: 'COOKING', minutes: minutes, remainingMs: msLeft, inCart: inCartQty > 0 };
+    }
+
+    if (item.stock <= 0) {
+      return { type: 'SOLD_OUT' };
+    }
+    var remaining = item.stock - inCartQty;
+    if (remaining <= 0) {
+      return { type: 'LIMIT_REACHED' };
+    }
+    var threshold = (typeof item.lowStockThreshold === 'number') ? item.lowStockThreshold : 3;
+    if (remaining <= threshold) {
+      return { type: 'ONLY_N_LEFT', n: remaining };
+    }
+    return null;
+  }
+
+  // Reconcile a cart against fresh menu data (background refresh and the
+  // submit-CONFLICT path). Clamps every line to new stock, cascading the
+  // same prune rules as user-driven decrements, and reports plain-language
+  // changes for the conflict modal.
+  function applyStockUpdate(cart, config, newConfig) {
+    var next = cloneCart(cart);
+    var changes = [];
+
+    // Pass 1: remove lines whose item vanished; clamp line qty to new stock.
+    var itemIds = [];
+    for (var id in next.lines) itemIds.push(id);
+
+    for (var a = 0; a < itemIds.length; a++) {
+      var itemId = itemIds[a];
+      var line = next.lines[itemId];
+      var hadQty = line.qty > 0 || sumValues(line.comboAlloc) > 0;
+      var newItem = getItem(newConfig, itemId);
+
+      if (!newItem) {
+        if (hadQty) {
+          var oldItem = getItem(config, itemId);
+          var goneName = oldItem ? oldItem.name : itemId;
+          changes.push({
+            itemId: itemId,
+            kind: 'REMOVED',
+            message: goneName + ' is no longer available — removed from this order.'
+          });
+        }
+        delete next.lines[itemId];
+        continue;
+      }
+
+      var limit = newItem.cooking ? Infinity : newItem.stock;
+      if (line.qty > limit) {
+        var target = limit > 0 ? limit : 0;
+        // Decrement one unit at a time through the real mutator path so
+        // combo-alloc and flavor pruning cascade exactly as they would for
+        // a user-driven decrement.
+        while (next.lines[itemId] && next.lines[itemId].qty > target) {
+          var res = updateItemQty(next, newConfig, itemId, -1);
+          next = res.cart;
+        }
+        if (target === 0) {
+          changes.push({
+            itemId: itemId,
+            kind: 'REMOVED',
+            message: newItem.name + ' sold out while you were ordering — removed from this order.'
+          });
+        } else {
+          changes.push({
+            itemId: itemId,
+            kind: 'REDUCED',
+            message: newItem.name + ': only ' + target + ' left — quantity reduced.'
+          });
+        }
+      }
+
+      // Price-change notice (informational; server reprices anyway).
+      var oldItemStill = getItem(config, itemId);
+      if (oldItemStill && hadQty && next.lines[itemId]) {
+        var oldUnit = unitPriceCents(config, oldItemStill);
+        var newUnit = unitPriceCents(newConfig, newItem);
+        if (newItem.type !== 'combo' && oldUnit !== newUnit) {
+          changes.push({
+            itemId: itemId,
+            kind: 'PRICE_CHANGED',
+            message: newItem.name + ' price changed.'
+          });
+        }
+      }
+    }
+
+    // Pass 2: combo allocations must not exceed what their (possibly clamped)
+    // included-drink lines still hold. Trim allocs WITHOUT re-decrementing the
+    // drink line (it was already clamped above).
+    for (var comboId in next.lines) {
+      var comboItem = getItem(newConfig, comboId);
+      if (!comboItem || comboItem.type !== 'combo' || !comboItem.combo) continue;
+      var comboLine = next.lines[comboId];
+
+      for (var o = 0; o < comboItem.combo.options.length; o++) {
+        var option = comboItem.combo.options[o];
+        var drinkLine = next.lines[option.includesItemId];
+        var drinkQty = drinkLine ? drinkLine.qty : 0;
+        var included = getComboIncludedUnits(next, newConfig)[option.includesItemId] || 0;
+        while (included > drinkQty && (comboLine.comboAlloc[option.id] || 0) > 0) {
+          comboLine.comboAlloc[option.id] = comboLine.comboAlloc[option.id] - 1;
+          included -= (typeof option.includesQty === 'number') ? option.includesQty : 1;
+          changes.push({
+            itemId: comboId,
+            kind: 'REDUCED',
+            message: comboItem.name + ' ' + option.label + ' selection reduced — drink stock changed.'
+          });
+        }
+      }
+    }
+
+    return { cart: next, changes: changes };
+  }
+
+  return {
+    emptyCart: emptyCart,
+    emptyLine: emptyLine,
+    getItem: getItem,
+    getLine: getLine,
+    sumValues: sumValues,
+    unitPriceCents: unitPriceCents,
+    comboOptionPriceCents: comboOptionPriceCents,
+    updateItemQty: updateItemQty,
+    updateFlavorQty: updateFlavorQty,
+    updateComboOption: updateComboOption,
+    pruneFlavors: pruneFlavors,
+    pruneComboAlloc: pruneComboAlloc,
+    getComboIncludedUnits: getComboIncludedUnits,
+    calculateTotal: calculateTotal,
+    validateCheckout: validateCheckout,
+    getBadge: getBadge,
+    applyStockUpdate: applyStockUpdate
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = CartEngine;
+}
+
+/**
+ * Rules — alias resolution, recipe expansion (inventory deductions), and
+ * derived stock computation. Pure data in → data out; the SheetGateway
+ * (Phase 2) parses the Config_* sheets into the shapes consumed here.
+ *
+ * Recipe shape:  { <menuItemId>: [ { component, source, qtyPerUnit } ] }
+ *   component: row name in the Inventory or Game Day Specials sheet
+ *   source:    'Inventory' | 'Specials'
+ *   qtyPerUnit: units of component consumed per menu-item unit
+ *               (Pizza slice = 0.125 pie; Hot Dog = 1 bun + 1 meat)
+ * An item with NO recipe rows deducts itself 1:1 from its stockSource.
+ *
+ * DEDUCTION CONTRACT (§6, bug fixes approved by Josh):
+ *  - Drinks deduct exactly once. Payload drink lines already include the
+ *    combo-mirrored units, so combo expansion deducts ONLY the combo's own
+ *    recipe (e.g. CFA Sandwich) and never the drink — the drink line covers it.
+ *    (Production double-deducted Water and never deducted Soda at all.)
+ */
+var Rules = (function () {
+
+  function resolveAlias(name, aliasMap) {
+    if (aliasMap && Object.prototype.hasOwnProperty.call(aliasMap, name)) {
+      return aliasMap[name];
+    }
+    return name;
+  }
+
+  function defaultRecipeRow(item) {
+    return {
+      component: item.stockComponent || item.name,
+      source: item.stockSource || 'Inventory',
+      qtyPerUnit: 1
+    };
+  }
+
+  /**
+   * Expand payload lines into an aggregated deduction list:
+   *   [ { source: 'Inventory'|'Specials', component, qty } ]
+   */
+  function expandDeductions(payloadLines, config, recipes) {
+    var totals = {}; // "source|component" -> qty
+
+    function add(source, component, qty) {
+      var key = source + '|' + component;
+      totals[key] = (totals[key] || 0) + qty;
+    }
+
+    for (var i = 0; i < payloadLines.length; i++) {
+      var line = payloadLines[i];
+      var item = null;
+      for (var c = 0; c < config.items.length; c++) {
+        if (config.items[c].id === line.itemId) { item = config.items[c]; break; }
+      }
+      if (!item) continue;
+      if (line.qty <= 0) continue;
+
+      var rows = recipes[item.id];
+
+      if (item.type === 'combo') {
+        // Combo recipe rows (e.g. CFA Sandwich from Specials) scale with the
+        // combo qty. Drinks are NOT deducted here — the mirrored drink lines
+        // in the payload deduct them exactly once (see header contract).
+        if (rows && rows.length > 0) {
+          for (var r = 0; r < rows.length; r++) {
+            add(rows[r].source, rows[r].component, line.qty * rows[r].qtyPerUnit);
+          }
+        }
+      } else {
+        if (rows && rows.length > 0) {
+          for (var r2 = 0; r2 < rows.length; r2++) {
+            add(rows[r2].source, rows[r2].component, line.qty * rows[r2].qtyPerUnit);
+          }
+        } else {
+          var d = defaultRecipeRow(item);
+          add(d.source, d.component, line.qty * d.qtyPerUnit);
+        }
+      }
+    }
+
+    var out = [];
+    for (var key in totals) {
+      var sep = key.indexOf('|');
+      out.push({
+        source: key.slice(0, sep),
+        component: key.slice(sep + 1),
+        qty: totals[key]
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Available stock for a menu item, generalizing the legacy special cases:
+   *   Hot Dog = min(buns, meat)  → recipe rows → min(floor(avail / qtyPerUnit))
+   *   Specials-backed items      → Specials remaining
+   *   Plain items                → Inventory count
+   *   Unknown                    → 999 (legacy "untracked" sentinel)
+   */
+  function computeAvailableStock(item, recipes, inventoryMap, specialsMap) {
+    function availOf(source, component) {
+      if (source === 'Specials') {
+        if (specialsMap && Object.prototype.hasOwnProperty.call(specialsMap, component)) {
+          var rem = specialsMap[component];
+          return rem > 0 ? rem : 0;
+        }
+        return 0;
+      }
+      if (inventoryMap && Object.prototype.hasOwnProperty.call(inventoryMap, component)) {
+        return inventoryMap[component];
+      }
+      return null; // untracked
+    }
+
+    var rows = recipes[item.id];
+    if (rows && rows.length > 0) {
+      var minStock = Infinity;
+      for (var i = 0; i < rows.length; i++) {
+        var avail = availOf(rows[i].source, rows[i].component);
+        if (avail === null) continue; // untracked component doesn't cap stock
+        var units = Math.floor(avail / rows[i].qtyPerUnit);
+        if (units < minStock) minStock = units;
+      }
+      return minStock === Infinity ? 999 : minStock;
+    }
+
+    var d = defaultRecipeRow(item);
+    var plain = availOf(d.source, d.component);
+    return plain === null ? 999 : plain;
+  }
+
+  return {
+    resolveAlias: resolveAlias,
+    expandDeductions: expandDeductions,
+    computeAvailableStock: computeAvailableStock
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Rules;
+}
+
+/**
+ * Pricing — server-side authoritative repricing of an order payload.
+ * The server reconstructs a cart from the client's structured lines and
+ * prices it with the SAME CartEngine the kiosk used, from the server's own
+ * config. A tampered or stale client can therefore never set prices; a
+ * mismatch with clientTotalCents surfaces as a CONFLICT, not a charge.
+ */
+var Pricing = (function () {
+  var Engine;
+  if (typeof CartEngine !== 'undefined') {
+    Engine = CartEngine;
+  } else if (typeof require !== 'undefined') {
+    Engine = require('./cartEngine.js');
+  }
+
+  function cartFromPayloadLines(payloadLines) {
+    var cart = Engine.emptyCart();
+    for (var i = 0; i < payloadLines.length; i++) {
+      var pl = payloadLines[i];
+      var line = Engine.emptyLine(pl.itemId);
+      line.qty = pl.qty || 0;
+      if (pl.subs) {
+        for (var f in pl.subs) line.subs[f] = pl.subs[f];
+      }
+      if (pl.comboAlloc) {
+        for (var o in pl.comboAlloc) line.comboAlloc[o] = pl.comboAlloc[o];
+      }
+      cart.lines[pl.itemId] = line;
+    }
+    return cart;
+  }
+
+  /**
+   * -> { ok, totalCents, lines, validation, problems }
+   * problems collects structural rejects (unknown item, allocs > qty) that a
+   * well-behaved client can never produce; validation is the same checkout
+   * validation the kiosk ran.
+   */
+  function priceOrderPayload(payloadLines, config) {
+    var problems = [];
+
+    for (var i = 0; i < payloadLines.length; i++) {
+      var pl = payloadLines[i];
+      var item = Engine.getItem(config, pl.itemId);
+      if (!item) {
+        problems.push({ itemId: pl.itemId, code: 'UNKNOWN_ITEM' });
+        continue;
+      }
+      if (pl.qty < 0) {
+        problems.push({ itemId: pl.itemId, code: 'NEGATIVE_QTY' });
+      }
+      if (item.type === 'combo') {
+        var allocSum = 0;
+        if (pl.comboAlloc) {
+          for (var o in pl.comboAlloc) {
+            if (pl.comboAlloc[o] < 0) problems.push({ itemId: pl.itemId, code: 'NEGATIVE_ALLOC' });
+            allocSum += pl.comboAlloc[o];
+          }
+        }
+        if (allocSum > pl.qty) {
+          problems.push({ itemId: pl.itemId, code: 'ALLOC_EXCEEDS_QTY' });
+        }
+      }
+      if (item.type === 'flavored' && pl.subs) {
+        var subSum = 0;
+        for (var f in pl.subs) {
+          if (pl.subs[f] < 0) problems.push({ itemId: pl.itemId, code: 'NEGATIVE_SUB' });
+          subSum += pl.subs[f];
+        }
+        if (subSum > pl.qty) {
+          problems.push({ itemId: pl.itemId, code: 'SUBS_EXCEED_QTY' });
+        }
+      }
+    }
+
+    var cart = cartFromPayloadLines(payloadLines);
+    var totals = Engine.calculateTotal(cart, config);
+    var validation = Engine.validateCheckout(cart, config);
+
+    return {
+      ok: problems.length === 0 && validation.ok,
+      totalCents: totals.totalCents,
+      lines: totals.lines,
+      validation: validation,
+      problems: problems
+    };
+  }
+
+  return {
+    cartFromPayloadLines: cartFromPayloadLines,
+    priceOrderPayload: priceOrderPayload
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Pricing;
+}
+
+/**
+ * Payload — order payload construction, the human-readable order blob
+ * (volunteer display format preserved from production), and KDS line
+ * formatting. Pure: no DOM, no Date.now(); time and IDs are passed in.
+ */
+var Payload = (function () {
+  var Engine;
+  if (typeof CartEngine !== 'undefined') {
+    Engine = CartEngine;
+  } else if (typeof require !== 'undefined') {
+    Engine = require('./cartEngine.js');
+  }
+
+  // Contract §6: customer name TEST (case-insensitive, trimmed) → test order.
+  function isTestName(name) {
+    return (name || '').trim().toUpperCase() === 'TEST';
+  }
+
+  function buildOrderPayload(cart, config, customerName, nowMs, orderId, kioskId) {
+    var lines = [];
+    for (var itemId in cart.lines) {
+      var line = cart.lines[itemId];
+      var hasAlloc = Engine.sumValues(line.comboAlloc) > 0;
+      if (line.qty <= 0 && !hasAlloc) continue;
+
+      var out = { itemId: itemId, qty: line.qty };
+      var subs = {};
+      var hasSubs = false;
+      for (var f in line.subs) {
+        if (line.subs[f] > 0) { subs[f] = line.subs[f]; hasSubs = true; }
+      }
+      if (hasSubs) out.subs = subs;
+
+      var alloc = {};
+      var hasAllocOut = false;
+      for (var o in line.comboAlloc) {
+        if (line.comboAlloc[o] > 0) { alloc[o] = line.comboAlloc[o]; hasAllocOut = true; }
+      }
+      if (hasAllocOut) out.comboAlloc = alloc;
+
+      lines.push(out);
+    }
+
+    var totals = Engine.calculateTotal(cart, config);
+
+    return {
+      orderId: orderId,
+      kioskId: kioskId || 'kiosk-1',
+      customerName: (customerName || '').trim(),
+      isTest: isTestName(customerName),
+      createdAtMs: nowMs,
+      menuVersion: config.version || null,
+      lines: lines,
+      clientTotalCents: totals.totalCents
+    };
+  }
+
+  /**
+   * Human-readable order text, format preserved from production
+   * submitFinalOrder (contract §9): combo option lines first (drawer display
+   * order, e.g. "1x CFA Water Combo" before "2x CFA Soda Combo"), then every
+   * non-combo cart line as "Nx Name (1x Coke, 2x Sprite)". Mirrored drink
+   * lines appear here exactly as production wrote them — this blob is
+   * DISPLAY ONLY and is never parsed for deductions.
+   */
+  function buildOrderDetailsText(cart, config) {
+    var details = [];
+
+    for (var comboId in cart.lines) {
+      var comboItem = Engine.getItem(config, comboId);
+      if (!comboItem || comboItem.type !== 'combo' || !comboItem.combo) continue;
+      var comboLine = cart.lines[comboId];
+      for (var i = 0; i < comboItem.combo.options.length; i++) {
+        var option = comboItem.combo.options[i];
+        var alloc = comboLine.comboAlloc[option.id] || 0;
+        if (alloc > 0) {
+          var name = option.detailsName || (comboItem.name + ' ' + option.label);
+          details.push(alloc + 'x ' + name);
+        }
+      }
+    }
+
+    for (var itemId in cart.lines) {
+      var item = Engine.getItem(config, itemId);
+      if (!item || item.type === 'combo') continue;
+      var line = cart.lines[itemId];
+      if (line.qty <= 0) continue;
+
+      var subParts = [];
+      for (var f in line.subs) {
+        if (line.subs[f] > 0) subParts.push(line.subs[f] + 'x ' + f);
+      }
+      var suffix = subParts.length > 0 ? ' (' + subParts.join(', ') + ')' : '';
+      details.push(line.qty + 'x ' + item.name + suffix);
+    }
+
+    return details.join('\n');
+  }
+
+  /**
+   * Kitchen display lines from a payload. Combos flatten to kitchen language
+   * ("CFA Combo w/ Soda ×2"); flavored items list their flavors
+   * ("Soda/Gatorade ×2 — Coke ×2"). Drink units already included in a combo
+   * are not repeated as standalone lines.
+   */
+  function formatKitchenLines(payloadLines, config) {
+    var out = [];
+    var includedByItem = {};
+
+    for (var i = 0; i < payloadLines.length; i++) {
+      var pl = payloadLines[i];
+      var item = Engine.getItem(config, pl.itemId);
+      if (!item) continue;
+      if (item.type !== 'combo' || !item.combo) continue;
+      for (var o = 0; o < item.combo.options.length; o++) {
+        var option = item.combo.options[o];
+        var alloc = (pl.comboAlloc && pl.comboAlloc[option.id]) || 0;
+        if (alloc > 0) {
+          out.push(item.name + ' ' + option.label + ' ×' + alloc);
+          var units = (typeof option.includesQty === 'number') ? option.includesQty : 1;
+          includedByItem[option.includesItemId] =
+            (includedByItem[option.includesItemId] || 0) + alloc * units;
+        }
+      }
+    }
+
+    for (var j = 0; j < payloadLines.length; j++) {
+      var line = payloadLines[j];
+      var it = Engine.getItem(config, line.itemId);
+      if (!it || it.type === 'combo') continue;
+
+      var standalone = line.qty - (includedByItem[line.itemId] || 0);
+      if (standalone <= 0) continue;
+
+      var text = it.name + ' ×' + standalone;
+      if (line.subs) {
+        var flavorParts = [];
+        for (var f in line.subs) {
+          if (line.subs[f] > 0) flavorParts.push(f + ' ×' + line.subs[f]);
+        }
+        if (flavorParts.length > 0) text += ' — ' + flavorParts.join(', ');
+      }
+      out.push(text);
+    }
+
+    return out;
+  }
+
+  return {
+    isTestName: isTestName,
+    buildOrderPayload: buildOrderPayload,
+    buildOrderDetailsText: buildOrderDetailsText,
+    formatKitchenLines: formatKitchenLines
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Payload;
+}
+
+</script>
+
+  <script>
+/**
+ * KioskUI — the render layer. Reads state, writes DOM. Every number shown
+ * comes from CartEngine/Payload — no cart or pricing math lives here.
+ *
+ * The menu grid is rendered generically from config.items with
+ * data-item-id / data-action attributes; one delegated click listener
+ * (see bind) drives all interaction. No item-specific element ids.
+ */
+var KioskUI = (function () {
+
+  function $(id) { return document.getElementById(id); }
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function money(cents) { return '$' + (cents / 100).toFixed(2); }
+
+  // ---------- menu grid ----------
+
+  function badgeHtml(badge) {
+    if (!badge) return '';
+    if (badge.type === 'COOKING') {
+      var unit = badge.minutes === 1 ? 'minute' : 'minutes';
+      if (badge.inCart) {
+        return '<div class="cooking-ready">Ready in ' + badge.minutes + ' ' + unit + '</div>';
+      }
+      return '<div class="stock-badge cooking-badge">IN THE OVEN (' + badge.minutes + 'm)</div>';
+    }
+    if (badge.type === 'COOKING_EXPIRED') return ''; // flow refetches; show nothing
+    if (badge.type === 'SOLD_OUT') return '<div class="stock-badge">SOLD OUT</div>';
+    if (badge.type === 'LIMIT_REACHED') return '<div class="stock-badge">LIMIT REACHED</div>';
+    if (badge.type === 'ONLY_N_LEFT') return '<div class="stock-badge">ONLY ' + badge.n + ' LEFT</div>';
+    return '';
+  }
+
+  function comboDrawerHtml(state, item, line) {
+    var config = state.config;
+    var allocSum = CartEngine.sumValues(line.comboAlloc);
+    var html = '<div class="drawer">';
+    // combo.options array order IS the drawer display order
+    for (var i = 0; i < item.combo.options.length; i++) {
+      var option = item.combo.options[i];
+      var rate = CartEngine.comboOptionPriceCents(config, option);
+      var count = line.comboAlloc[option.id] || 0;
+      // Mirror the engine's increment guards so the + looks dead when it is:
+      // allocations capped by combo qty; included drink capped by its stock
+      // (unless that drink is cooking).
+      var incItem = CartEngine.getItem(config, option.includesItemId);
+      var incLine = state.cart.lines[option.includesItemId];
+      var incQty = incLine ? incLine.qty : 0;
+      var plusDead = allocSum >= line.qty ||
+        !!(incItem && !incItem.cooking && incItem.stock <= incQty);
+      html +=
+        '<div class="sub-item-row">' +
+          '<span class="sub-label">' + esc(option.label) + ' (' + money(rate) + ')</span>' +
+          '<div class="sub-ctrl">' +
+            '<button class="sub-btn" data-action="combo-minus" data-item-id="' + esc(item.id) + '" data-option-id="' + esc(option.id) + '">-</button>' +
+            '<span class="sub-qty">' + count + '</span>' +
+            '<button class="sub-btn sub-plus" data-action="combo-plus" data-item-id="' + esc(item.id) + '" data-option-id="' + esc(option.id) + '"' + (plusDead ? ' disabled' : '') + '>+</button>' +
+          '</div>' +
+        '</div>';
+    }
+    return html + '</div>';
+  }
+
+  function flavorDrawerHtml(item, line) {
+    var picked = CartEngine.sumValues(line.subs);
+    var plusDead = picked >= line.qty;
+    var html = '<div class="drawer">';
+    for (var i = 0; i < item.flavors.length; i++) {
+      var flavor = item.flavors[i];
+      var count = line.subs[flavor] || 0;
+      html +=
+        '<div class="sub-item-row">' +
+          '<span class="sub-label">' + esc(flavor) + '</span>' +
+          '<div class="sub-ctrl">' +
+            '<button class="sub-btn" data-action="flavor-minus" data-item-id="' + esc(item.id) + '" data-flavor="' + esc(flavor) + '">-</button>' +
+            '<span class="sub-qty">' + count + '</span>' +
+            '<button class="sub-btn sub-plus" data-action="flavor-plus" data-item-id="' + esc(item.id) + '" data-flavor="' + esc(flavor) + '"' + (plusDead ? ' disabled' : '') + '>+</button>' +
+          '</div>' +
+        '</div>';
+    }
+    return html + '</div>';
+  }
+
+  function cardHtml(state, item, includedUnits, nowMs) {
+    var config = state.config;
+    var line = state.cart.lines[item.id] || null;
+    var qty = line ? line.qty : 0;
+    var badge = CartEngine.getBadge(item, qty, nowMs);
+    var soldOut = !!(badge && badge.type === 'SOLD_OUT');
+    var plusDead = !!(badge && (badge.type === 'SOLD_OUT' || badge.type === 'LIMIT_REACHED'));
+    var discounted = config.halfOff === true && item.discountable === true;
+
+    var classes = 'item-card';
+    if (soldOut) classes += ' sold-out';
+    if (qty > 0) classes += ' item-active';
+    if (state.ui.flashItemIds.indexOf(item.id) !== -1) classes += ' card-flash';
+
+    var html = '<div class="' + classes + '" data-item-id="' + esc(item.id) + '">';
+    if (discounted) html += '<div class="discount-banner">1/2 Off!</div>';
+    html += badgeHtml(badge);
+
+    // Legacy sizing: the combo (CFA) card used the larger title/qty type.
+    var titleClass = (item.type === 'combo') ? 'card-title card-title-lg' : 'card-title';
+    if (discounted) titleClass += ' pushed-down';
+    html += '<div class="' + titleClass + '">' + esc(item.name) + '</div>';
+
+    // Combos carry their prices on the drawer options, not the card.
+    if (item.type !== 'combo') {
+      var unit = CartEngine.unitPriceCents(config, item);
+      var included = includedUnits[item.id] || 0;
+      if (qty > 0 && included >= qty) {
+        html += '<div class="card-price"><span class="strikethrough">' + money(unit) + '</span> <span class="included-label">(Included)</span></div>';
+      } else {
+        html += '<div class="card-price">' + money(unit) + '</div>';
+      }
+    }
+
+    var qtyClass = (item.type === 'combo') ? 'card-qty card-qty-lg' : 'card-qty';
+    html +=
+      '<div class="qty-row">' +
+        '<button class="qty-btn" data-action="item-minus" data-item-id="' + esc(item.id) + '">-</button>' +
+        '<span class="' + qtyClass + '">' + qty + '</span>' +
+        '<button class="qty-btn plus" data-action="item-plus" data-item-id="' + esc(item.id) + '"' + (plusDead ? ' disabled' : '') + '>+</button>' +
+      '</div>';
+
+    // Drawers open while the line has quantity.
+    if (qty > 0 && item.type === 'combo' && item.combo) {
+      html += comboDrawerHtml(state, item, line);
+    }
+    if (qty > 0 && item.type === 'flavored' && item.flavors && item.flavors.length > 0) {
+      html += flavorDrawerHtml(item, line);
+    }
+
+    return html + '</div>';
+  }
+
+  function renderMenu(state) {
+    if (!state.config) {
+      $('menuContainer').innerHTML = '<div class="menu-loading">Loading menu&hellip;</div>';
+      return;
+    }
+    var nowMs = Date.now() + state.net.clockSkewMs; // server-clock time
+    var includedUnits = CartEngine.getComboIncludedUnits(state.cart, state.config);
+    var html = '';
+    for (var i = 0; i < state.config.items.length; i++) {
+      html += cardHtml(state, state.config.items[i], includedUnits, nowMs);
+    }
+    $('menuContainer').innerHTML = html;
+  }
+
+  // ---------- helpers ----------
+
+  function show(id, visible) { $(id).classList.toggle('hidden', !visible); }
+
+  function renderList(id, messages) {
+    var html = '';
+    for (var i = 0; i < messages.length; i++) html += '<li>' + esc(messages[i]) + '</li>';
+    $(id).innerHTML = html;
+  }
+
+  // ---------- main render ----------
+
+  function render(state) {
+    var ui = state.ui;
+    var config = state.config;
+
+    show('stage1', ui.stage === 1);
+    show('stage2', ui.stage === 2);
+    show('stage3', ui.stage === 3);
+
+    // TEST MODE tag on stages 2-3 only
+    var isTest = Payload.isTestName(state.order.customerName);
+    show('testModeTag', isTest && (ui.stage === 2 || ui.stage === 3));
+
+    // Attendant banner + new-order blocking when the offline queue backs up
+    var queued = state.net.queue.length;
+    show('queueBanner', queued >= 2);
+    if (queued >= 2) {
+      $('queueBanner').textContent = 'Connection problem — ' + queued + ' orders waiting';
+    }
+    $('startOrderBtn').disabled = queued >= 2;
+
+    var totalCents = config ? CartEngine.calculateTotal(state.cart, config).totalCents : 0;
+
+    if (ui.stage === 2) {
+      renderMenu(state);
+      $('liveTotal').textContent = money(totalCents);
+      if (config) {
+        var v = CartEngine.validateCheckout(state.cart, config);
+        $('validationMsg').textContent = v.message;
+        $('completeBtn').disabled = !v.ok;
+      } else {
+        $('validationMsg').textContent = '';
+        $('completeBtn').disabled = true;
+      }
+    }
+
+    if (ui.stage === 3) {
+      // The hidden-sequence total key shows the whole-dollar total.
+      $('keyTotalDisplay').textContent = '$' + Math.round(totalCents / 100);
+
+      var pinEl = $('pinDisplay');
+      if (ui.pinError) {
+        pinEl.textContent = 'WRONG PIN';
+        pinEl.classList.add('pin-error');
+      } else {
+        var visibleCount = ui.pinBuffer.replace(/T/g, '').length;
+        var dots = '';
+        for (var d = 0; d < visibleCount; d++) dots += '* ';
+        pinEl.textContent = dots;
+        pinEl.classList.remove('pin-error');
+      }
+      $('keypad').classList.toggle('verifying', ui.pinVerifying);
+
+      var warn = $('lowStockWarning');
+      if (ui.lowStockNames.length > 0) {
+        warn.textContent = 'LOW STOCK: Confirm ' + ui.lowStockNames.join(' & ') + ' in hand!';
+        warn.classList.remove('hidden');
+        warn.classList.add('flashing-warning');
+      } else {
+        warn.classList.add('hidden');
+        warn.classList.remove('flashing-warning');
+      }
+    }
+
+    // Submit machine overlays
+    show('processingOverlay', ui.submitStatus === 'submitting');
+    show('retryingOverlay', ui.submitStatus === 'retrying');
+    show('savedOverlay', ui.submitStatus === 'saved');
+    show('sentOverlay', ui.submitStatus === 'sent');
+
+    // Modals
+    show('timeoutModal', ui.timeoutOpen);
+    if (ui.timeoutOpen) {
+      $('keepActiveBtn').textContent = 'YES, KEEP ACTIVE (' + ui.timeoutSecondsLeft + 's)';
+    }
+
+    show('stockVerification', ui.stockVerifyOpen);
+    if (ui.stockVerifyOpen) renderList('lowStockItems', ui.lowStockNames);
+
+    show('conflictModal', !!ui.conflict);
+    if (ui.conflict) renderList('conflictList', ui.conflict.messages);
+
+    show('errorModal', !!ui.errorMessage);
+    if (ui.errorMessage) $('errorText').textContent = ui.errorMessage;
+
+    // Passive toast (background stock changes etc.)
+    show('toast', !!ui.toast);
+    if (ui.toast) $('toast').textContent = ui.toast;
+  }
+
+  function resetNameInput() {
+    var input = $('orderName');
+    input.value = '';
+    input.classList.remove('item-active');
+  }
+
+  // ---------- events ----------
+
+  function bind(actions) {
+    // One delegated listener for every tappable control on the page.
+    document.addEventListener('click', function (e) {
+      var target = (e.target && e.target.closest) ? e.target.closest('[data-action]') : null;
+      if (!target || target.disabled) return;
+      var action = target.getAttribute('data-action');
+      var itemId = target.getAttribute('data-item-id');
+      var optionId = target.getAttribute('data-option-id');
+      var flavor = target.getAttribute('data-flavor');
+
+      if (action === 'start-order') actions.startOrder($('orderName').value);
+      else if (action === 'back-to-name') actions.backToName();
+      else if (action === 'item-plus') actions.itemDelta(itemId, 1);
+      else if (action === 'item-minus') actions.itemDelta(itemId, -1);
+      else if (action === 'flavor-plus') actions.flavorDelta(itemId, flavor, 1);
+      else if (action === 'flavor-minus') actions.flavorDelta(itemId, flavor, -1);
+      else if (action === 'combo-plus') actions.comboDelta(itemId, optionId, 1);
+      else if (action === 'combo-minus') actions.comboDelta(itemId, optionId, -1);
+      else if (action === 'complete-order') actions.completeOrder();
+      else if (action === 'back-to-menu') actions.backToMenu();
+      else if (action === 'pin-key') actions.pinKey(target.getAttribute('data-key'));
+      else if (action === 'pin-backspace') actions.pinBackspace();
+      else if (action === 'keep-active') actions.keepActive();
+      else if (action === 'stock-verified') actions.stockVerified();
+      else if (action === 'review-order') actions.reviewOrder();
+      else if (action === 'error-back') actions.errorBack();
+    });
+
+    // Name input pulses until it has content (legacy checkName behavior).
+    $('orderName').addEventListener('input', function () {
+      this.classList.toggle('item-active', this.value.trim().length > 0);
+    });
+
+    // Any touch resets the inactivity timer.
+    document.addEventListener('mousedown', actions.activity);
+    document.addEventListener('touchstart', actions.activity, { passive: true });
+  }
+
+  return { render: render, bind: bind, resetNameInput: resetNameInput };
+})();
+</script>
+
+  <script>
+/**
+ * KioskFlow — owns ALL state, the stage machine, timers, audio, and the
+ * submit/retry machine. Rendering reads state (KioskUI.render); every cart
+ * mutation goes through CartEngine; every server call goes through
+ * google.script.run. The kiosk never computes prices or prunes carts itself.
+ */
+var KioskFlow = (function () {
+
+  var MENU_CACHE_KEY = 'nest_menu_cache';
+  var QUEUE_KEY = 'nest_order_queue';
+  var QUEUE_CAP = 3;
+  var MENU_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // don't revive ancient menus
+  var STAGE2_IDLE_MS = 30000;
+  var STAGE3_IDLE_MS = 120000;
+  var NET_RETRY_DELAYS_MS = [2000, 5000, 10000];
+
+  var state = {
+    config: null,                                // MenuState from the server
+    cart: CartEngine.emptyCart(),
+    order: { customerName: '', orderId: null },
+    ui: {
+      stage: 1,                                  // 1 name | 2 menu | 3 pin
+      submitStatus: 'idle',                      // idle|submitting|retrying|saved|sent
+      timeoutOpen: false,
+      timeoutSecondsLeft: 15,
+      stockVerifyOpen: false,
+      lowStockNames: [],
+      conflict: null,                            // { messages: [...] } or null
+      errorMessage: null,
+      pinBuffer: '',
+      pinError: false,
+      pinVerifying: false,
+      flashItemIds: [],
+      toast: null
+    },
+    net: {
+      queue: [],                                 // [{ payload }] persisted offline orders
+      clockSkewMs: 0,                            // serverNow - Date.now() at fetch
+      fetching: false,
+      currentPayload: null,
+      busyCount: 0,
+      failCount: 0,
+      lastExpiredRefreshMs: 0
+    }
+  };
+
+  var inactivityTimer = null;
+  var timeoutCountdown = null;
+  var toastTimer = null;
+  var flashTimer = null;
+  var audioCtx = null;
+  var flushing = false;
+
+  function render() { KioskUI.render(state); }
+
+  // ---------- localStorage (kiosk Safari can deny storage; never throw) ----------
+
+  function storageGet(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function storageSet(key, value) {
+    try { window.localStorage.setItem(key, value); } catch (e) {}
+  }
+
+  function loadQueue() {
+    var raw = storageGet(QUEUE_KEY);
+    if (!raw) return;
+    try {
+      var q = JSON.parse(raw);
+      if (Object.prototype.toString.call(q) === '[object Array]') {
+        state.net.queue = q.slice(0, QUEUE_CAP);
+      }
+    } catch (e) {}
+  }
+  function saveQueue() { storageSet(QUEUE_KEY, JSON.stringify(state.net.queue)); }
+
+  function saveMenuCache(menu) {
+    storageSet(MENU_CACHE_KEY, JSON.stringify({ savedAtMs: Date.now(), menu: menu }));
+  }
+  function loadMenuCache() {
+    var raw = storageGet(MENU_CACHE_KEY);
+    if (!raw) return;
+    try {
+      var cached = JSON.parse(raw);
+      if (!cached || !cached.menu || !cached.menu.items) return;
+      if (Date.now() - cached.savedAtMs > MENU_CACHE_MAX_AGE_MS) return;
+      state.config = cached.menu; // stale-while-revalidate: fetch will replace
+      // Skew measured at save time still holds on the same device.
+      if (typeof cached.menu.serverNow === 'number') {
+        state.net.clockSkewMs = cached.menu.serverNow - cached.savedAtMs;
+      }
+    } catch (e) {}
+  }
+
+  // ---------- audio (contract §8: sine 880Hz, 0.5s envelope) ----------
+
+  function playBeep() {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0, audioCtx.currentTime);
+      gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {}
+  }
+
+  // ---------- menu fetching ----------
+
+  function fetchMenu() {
+    if (state.net.fetching) return;
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+    state.net.fetching = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        state.net.fetching = false;
+        if (res && res.ok === true && res.data) {
+          applyMenu(res.data);
+        } else if (!state.config) {
+          setTimeout(fetchMenu, 5000); // first load has to land eventually
+        }
+      })
+      .withFailureHandler(function () {
+        state.net.fetching = false;
+        if (!state.config) setTimeout(fetchMenu, 5000);
+      })
+      .api_getMenuState();
+  }
+
+  function cartHasContent() {
+    for (var id in state.cart.lines) {
+      var line = state.cart.lines[id];
+      if (line.qty > 0 || CartEngine.sumValues(line.comboAlloc) > 0) return true;
+    }
+    return false;
+  }
+
+  function applyMenu(menu) {
+    // Never rewrite the cart/config mid-submit; the conflict path owns that.
+    if (state.ui.submitStatus !== 'idle') return;
+    state.net.clockSkewMs = menu.serverNow - Date.now();
+    saveMenuCache(menu);
+
+    var cartOpen = (state.ui.stage === 2 || state.ui.stage === 3);
+    if (cartOpen && cartHasContent() && state.config) {
+      var upd = CartEngine.applyStockUpdate(state.cart, state.config, menu);
+      state.cart = upd.cart;
+      state.config = menu;
+      if (upd.changes.length > 0) {
+        var msgs = [];
+        for (var i = 0; i < upd.changes.length; i++) msgs.push(upd.changes[i].message);
+        showToast(msgs.join(' ')); // passive — never blocks the customer
+      }
+    } else {
+      state.config = menu;
+    }
+    render();
+  }
+
+  // One 1s interval: cooking countdown redraws + expiry-triggered refresh.
+  function cookingTick() {
+    if (!state.config) return;
+    var now = Date.now() + state.net.clockSkewMs;
+    var anyCooking = false;
+    var anyExpired = false;
+    for (var i = 0; i < state.config.items.length; i++) {
+      var cooking = state.config.items[i].cooking;
+      if (cooking && cooking.readyAtMs) {
+        anyCooking = true;
+        if (cooking.readyAtMs <= now) anyExpired = true;
+      }
+    }
+    // Throttled so a server that still reports an expired cook doesn't loop us.
+    if (anyExpired && state.ui.submitStatus === 'idle' &&
+        Date.now() - state.net.lastExpiredRefreshMs > 10000) {
+      state.net.lastExpiredRefreshMs = Date.now();
+      fetchMenu();
+    }
+    if (anyCooking && state.ui.stage === 2) render();
+  }
+
+  // ---------- toast ----------
+
+  function showToast(message) {
+    state.ui.toast = message;
+    render();
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { state.ui.toast = null; render(); }, 4000);
+  }
+
+  // ---------- inactivity (contract §8) ----------
+
+  function resetInactivityTimer() {
+    clearTimeout(inactivityTimer);
+    if (state.ui.stage === 1) return;                 // no timer on stage 1
+    if (state.ui.submitStatus !== 'idle') return;     // nor while sending/sent
+    var windowMs = (state.ui.stage === 3) ? STAGE3_IDLE_MS : STAGE2_IDLE_MS;
+    inactivityTimer = setTimeout(showTimeoutPrompt, windowMs);
+  }
+
+  function showTimeoutPrompt() {
+    if (state.ui.submitStatus !== 'idle') return;
+    state.ui.timeoutOpen = true;
+    state.ui.timeoutSecondsLeft = 15;
+    playBeep();
+    render();
+    clearInterval(timeoutCountdown);
+    timeoutCountdown = setInterval(function () {
+      state.ui.timeoutSecondsLeft--;
+      if (state.ui.timeoutSecondsLeft <= 0) {
+        clearInterval(timeoutCountdown);
+        resetToStage1();
+        return;
+      }
+      render();
+    }, 1000);
+  }
+
+  // ---------- PIN (contract §7 — verified server-side, never shipped down) ----------
+
+  function verifyPin(digits) {
+    state.ui.pinVerifying = true;
+    render();
+    google.script.run
+      .withSuccessHandler(function (res) {
+        state.ui.pinVerifying = false;
+        if (res && res.ok === true) {
+          state.ui.pinBuffer = '';
+          render();
+          beginSubmit();
+        } else {
+          wrongPin();
+        }
+      })
+      .withFailureHandler(function () {
+        state.ui.pinVerifying = false;
+        state.ui.pinBuffer = '';
+        showToast('Connection problem — please try again.');
+        render();
+      })
+      .api_verifyPin(digits);
+  }
+
+  function wrongPin() {
+    state.ui.pinError = true;
+    render();
+    setTimeout(function () {
+      state.ui.pinError = false;
+      state.ui.pinBuffer = '';
+      render();
+    }, 1500);
+  }
+
+  // ---------- low-stock verification (contract §7, generalized) ----------
+
+  function computeLowStock() {
+    var names = [];
+    for (var i = 0; i < state.config.items.length; i++) {
+      var item = state.config.items[i];
+      var line = state.cart.lines[item.id];
+      var qty = line ? line.qty : 0;
+      if (qty <= 0 || item.confirmLowStock !== true) continue;
+      var threshold = (typeof item.lowStockThreshold === 'number') ? item.lowStockThreshold : 3;
+      if (item.stock <= threshold) names.push(item.name);
+    }
+    state.ui.lowStockNames = names;
+    state.ui.stockVerifyOpen = names.length > 0; // overlay first, banner stays
+  }
+
+  // ---------- submit machine (contract §9 of the build spec) ----------
+
+  function newOrderId() {
+    var hex = Math.floor(Math.random() * 65536).toString(16);
+    while (hex.length < 4) hex = '0' + hex;
+    return KIOSK_ID + '-' + Date.now() + '-' + hex;
+  }
+
+  function beginSubmit() {
+    // One orderId per attempt series; BUSY/network retries reuse it so the
+    // server's idempotency cache absorbs duplicates.
+    if (!state.order.orderId) state.order.orderId = newOrderId();
+    state.net.currentPayload = Payload.buildOrderPayload(
+      state.cart, state.config, state.order.customerName,
+      Date.now(), state.order.orderId, KIOSK_ID);
+    state.net.busyCount = 0;
+    state.net.failCount = 0;
+    state.ui.submitStatus = 'submitting';
+    state.ui.timeoutOpen = false;
+    clearInterval(timeoutCountdown);
+    clearTimeout(inactivityTimer);
+    render();
+    // Drain any saved offline orders first so they land in order.
+    flushQueue(function () { sendAttempt(); });
+  }
+
+  function sendAttempt() {
+    google.script.run
+      .withSuccessHandler(onSubmitResult)
+      .withFailureHandler(onSubmitNetworkFail)
+      .api_placeOrder(state.net.currentPayload);
+  }
+
+  function onSubmitResult(res) {
+    if (!res || !res.status) { onSubmitNetworkFail(); return; }
+
+    if (res.status === 'OK') {
+      state.ui.submitStatus = 'sent';
+      render();
+      setTimeout(function () { resetToStage1(); }, 2000);
+      return;
+    }
+
+    if (res.status === 'CONFLICT') { handleConflict(res); return; }
+
+    if (res.status === 'BUSY') {
+      state.net.busyCount++;
+      if (state.net.busyCount >= 3) {
+        failToQueue(); // 3 tries exhausted — treat as failure
+      } else {
+        state.ui.submitStatus = 'submitting';
+        render();
+        setTimeout(sendAttempt, 2000);
+      }
+      return;
+    }
+
+    // ERROR: the server rejected the payload outright and cached that answer
+    // for this orderId — a future attempt must mint a fresh id.
+    state.ui.submitStatus = 'idle';
+    state.ui.errorMessage = res.message || 'Order could not be placed. Please review and try again.';
+    state.order.orderId = null;
+    render();
+    resetInactivityTimer();
+  }
+
+  function handleConflict(res) {
+    var menu = res.menu;
+    var upd = CartEngine.applyStockUpdate(state.cart, state.config || menu, menu);
+    state.cart = upd.cart;
+    state.config = menu;
+    if (menu && typeof menu.serverNow === 'number') {
+      state.net.clockSkewMs = menu.serverNow - Date.now();
+      saveMenuCache(menu);
+    }
+    var messages = (res.messages || []).slice();
+    var flashIds = [];
+    for (var i = 0; i < upd.changes.length; i++) {
+      messages.push(upd.changes[i].message);
+      if (upd.changes[i].itemId && flashIds.indexOf(upd.changes[i].itemId) === -1) {
+        flashIds.push(upd.changes[i].itemId);
+      }
+    }
+    state.ui.flashItemIds = flashIds;
+    state.ui.conflict = { messages: messages };
+    state.ui.submitStatus = 'idle';        // never auto-resubmit
+    state.order.orderId = null;            // cart changed — next submit is new
+    render();
+  }
+
+  function onSubmitNetworkFail() {
+    state.net.failCount++;
+    if (state.net.failCount <= NET_RETRY_DELAYS_MS.length) {
+      state.ui.submitStatus = 'retrying';
+      render();
+      setTimeout(sendAttempt, NET_RETRY_DELAYS_MS[state.net.failCount - 1]);
+    } else {
+      failToQueue();
+    }
+  }
+
+  function failToQueue() {
+    state.net.queue.push({ payload: state.net.currentPayload });
+    while (state.net.queue.length > QUEUE_CAP) state.net.queue.shift(); // keep newest
+    saveQueue();
+    state.order.orderId = null;
+    state.ui.submitStatus = 'saved';
+    render();
+    setTimeout(function () { resetToStage1(); }, 3000); // unlock the kiosk
+  }
+
+  // Flush the offline queue: on load and before each new submit. Sequential,
+  // silent; stops on the first entry the network still can't deliver.
+  function flushQueue(done) {
+    if (flushing || state.net.queue.length === 0) {
+      if (done) done();
+      return;
+    }
+    flushing = true;
+    function finish() {
+      flushing = false;
+      saveQueue();
+      render();
+      if (done) done();
+    }
+    function step() {
+      if (state.net.queue.length === 0) { finish(); return; }
+      var entry = state.net.queue[0];
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (res && res.status === 'OK') {
+            state.net.queue.shift();
+            step();
+          } else if (res && (res.status === 'ERROR' || res.status === 'CONFLICT')) {
+            // Unsendable as-is; holding it would jam the queue forever.
+            state.net.queue.shift();
+            showToast('A saved order could not be sent — attendant review needed.');
+            step();
+          } else {
+            finish(); // BUSY or unknown — leave it queued, try later
+          }
+        })
+        .withFailureHandler(function () { finish(); })
+        .api_placeOrder(entry.payload);
+    }
+    step();
+  }
+
+  // ---------- reset ----------
+
+  function resetToStage1() {
+    clearInterval(timeoutCountdown);
+    clearTimeout(inactivityTimer);
+    clearTimeout(flashTimer);
+    state.cart = CartEngine.emptyCart();
+    state.order.customerName = '';
+    state.order.orderId = null;
+    state.ui.stage = 1;
+    state.ui.submitStatus = 'idle';
+    state.ui.timeoutOpen = false;
+    state.ui.stockVerifyOpen = false;
+    state.ui.lowStockNames = [];
+    state.ui.conflict = null;
+    state.ui.errorMessage = null;
+    state.ui.pinBuffer = '';
+    state.ui.pinError = false;
+    state.ui.pinVerifying = false;
+    state.ui.flashItemIds = [];
+    KioskUI.resetNameInput();
+    render();
+    fetchMenu(); // fresh menu for the next customer
+  }
+
+  // ---------- actions (wired to KioskUI's delegated listener) ----------
+
+  var actions = {
+    activity: function () {
+      if (state.ui.timeoutOpen) return; // the modal countdown owns the clock
+      resetInactivityTimer();
+    },
+
+    startOrder: function (rawName) {
+      var name = (rawName || '').trim();
+      if (!name) return;
+      if (state.net.queue.length >= 2) return; // blocked; banner explains why
+      state.order.customerName = name;
+      state.ui.stage = 2;
+      resetInactivityTimer();
+      render();
+    },
+
+    // Legacy "Back to Order Name" is a full reset with a menu refetch.
+    backToName: function () { resetToStage1(); },
+
+    itemDelta: function (itemId, delta) {
+      if (state.ui.stage !== 2 || !state.config) return;
+      var res = CartEngine.updateItemQty(state.cart, state.config, itemId, delta);
+      if (res.cart === state.cart) return; // rejected — skip re-render
+      state.cart = res.cart;
+      render();
+    },
+
+    flavorDelta: function (itemId, flavor, delta) {
+      if (state.ui.stage !== 2 || !state.config) return;
+      var res = CartEngine.updateFlavorQty(state.cart, state.config, itemId, flavor, delta);
+      if (res.cart === state.cart) return;
+      state.cart = res.cart;
+      render();
+    },
+
+    comboDelta: function (itemId, optionId, delta) {
+      if (state.ui.stage !== 2 || !state.config) return;
+      var res = CartEngine.updateComboOption(state.cart, state.config, itemId, optionId, delta);
+      if (res.cart === state.cart) return;
+      state.cart = res.cart;
+      render();
+    },
+
+    completeOrder: function () {
+      if (state.ui.stage !== 2 || !state.config) return;
+      var v = CartEngine.validateCheckout(state.cart, state.config);
+      if (!v.ok) return;
+      state.ui.stage = 3;
+      state.ui.pinBuffer = '';
+      state.ui.pinError = false;
+      state.ui.pinVerifying = false;
+      computeLowStock();
+      playBeep();
+      resetInactivityTimer();
+      render();
+    },
+
+    backToMenu: function () {
+      if (state.ui.stage !== 3) return;
+      state.ui.stage = 2;
+      state.ui.pinBuffer = '';
+      state.ui.pinError = false;
+      state.ui.stockVerifyOpen = false;
+      resetInactivityTimer();
+      render();
+    },
+
+    pinKey: function (key) {
+      if (state.ui.stage !== 3 || state.ui.pinVerifying || state.ui.pinError) return;
+      if (state.ui.pinBuffer.length >= 5) return;
+      state.ui.pinBuffer += key;
+      if (state.ui.pinBuffer.length === 5) {
+        // Hidden sequence: total key first, then the 4-digit PIN.
+        if (/^T[0-9]{4}$/.test(state.ui.pinBuffer)) {
+          verifyPin(state.ui.pinBuffer.slice(1));
+        } else {
+          wrongPin();
+        }
+      }
+      render();
+    },
+
+    pinBackspace: function () {
+      if (state.ui.stage !== 3 || state.ui.pinVerifying || state.ui.pinError) return;
+      if (state.ui.pinBuffer.length === 0) return;
+      state.ui.pinBuffer = state.ui.pinBuffer.slice(0, -1);
+      render();
+    },
+
+    keepActive: function () {
+      clearInterval(timeoutCountdown);
+      state.ui.timeoutOpen = false;
+      resetInactivityTimer();
+      render();
+    },
+
+    stockVerified: function () {
+      state.ui.stockVerifyOpen = false; // flashing banner stays on stage 3
+      render();
+    },
+
+    reviewOrder: function () {
+      state.ui.conflict = null;
+      state.ui.stage = 2; // cart already adjusted, name kept
+      state.ui.pinBuffer = '';
+      state.ui.pinError = false;
+      state.ui.stockVerifyOpen = false;
+      resetInactivityTimer();
+      render();
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(function () {
+        state.ui.flashItemIds = [];
+        if (state.ui.stage === 2) render();
+      }, 2500);
+    },
+
+    errorBack: function () {
+      state.ui.errorMessage = null;
+      state.ui.stage = 2;
+      resetInactivityTimer();
+      render();
+    }
+  };
+
+  // ---------- boot ----------
+
+  function init() {
+    loadQueue();
+    loadMenuCache();        // stale menu → stage 2 can render instantly
+    KioskUI.bind(actions);
+    render();               // stage 1 paints immediately, before any network
+    fetchMenu();
+    flushQueue(null);       // flush saved orders on load
+    setInterval(function () {
+      if (state.ui.stage === 1) fetchMenu(); // background refresh on stage 1
+    }, 60000);
+    setInterval(cookingTick, 1000);
+  }
+
+  init();
+
+  return {
+    getState: function () { return state; } // debugging hook only
+  };
+})();
+</script>
+
+</body>
+</html>

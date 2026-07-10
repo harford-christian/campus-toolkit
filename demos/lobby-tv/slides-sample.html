@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Announcement Slides</title>
+<style>
+  :root { --crimson:#B22222; --gold:#D4AF37; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #05070b; overflow: hidden; }
+  .deck { position: absolute; inset: 0; }
+  .slide {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 6vh 8vw;
+    opacity: 0; transition: opacity .8s ease; color: #fff;
+  }
+  .slide.on { opacity: 1; }
+  .slide .kicker { font-size: 2.4vw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin-bottom: 2.2vh; }
+  .slide h1 { font-size: 6vw; font-weight: 800; line-height: 1.05; margin: 0 0 2.4vh; text-shadow: 0 4px 24px rgba(0,0,0,.5); }
+  .slide p { font-size: 3vw; font-weight: 600; margin: 0; opacity: .92; }
+  .s1 { background: radial-gradient(1200px 700px at 50% -10%, #7a1414 0%, #05070b 70%); }
+  .s2 { background: radial-gradient(1200px 700px at 80% 120%, #2a2a55 0%, #05070b 70%); }
+  .s3 { background: radial-gradient(1200px 700px at 10% 10%, #3a2a08 0%, #05070b 70%); }
+  .s4 { background: radial-gradient(1200px 700px at 90% 10%, #14342a 0%, #05070b 70%); }
+  .s5 { background: radial-gradient(1200px 700px at 50% 110%, #4a1030 0%, #05070b 70%); }
+  .dots { position: absolute; bottom: 3vh; left: 0; right: 0; display: flex; gap: 1.2vw; justify-content: center; }
+  .dots i { width: 1.1vw; height: 1.1vw; border-radius: 50%; background: rgba(255,255,255,.3); }
+  .dots i.on { background: var(--gold); }
+</style>
+</head>
+<body>
+  <div class="deck" id="deck">
+    <div class="slide s1 on"><div class="kicker">Harford Christian School</div><h1>Welcome, Eagles!</h1><p>Doors open at 7:30 · First bell 8:00</p></div>
+    <div class="slide s2"><div class="kicker">This Week</div><h1>Spirit Week — Oct 14–18</h1><p>Pajama Day · Decades Day · Class Colors · Eagle Pride</p></div>
+    <div class="slide s3"><div class="kicker">Arts</div><h1>Fall Musical Auditions</h1><p>Friday after school in the auditorium — all grades welcome</p></div>
+    <div class="slide s4"><div class="kicker">Congratulations</div><h1>National Merit Semifinalists</h1><p>Three seniors recognized — we're proud of you!</p></div>
+    <div class="slide s5"><div class="kicker">Families</div><h1>Parent–Teacher Conferences</h1><p>Next Thursday · Sign up through the parent portal</p></div>
+  </div>
+  <div class="dots" id="dots"></div>
+<script>
+  var slides = document.querySelectorAll('.slide'), i = 0;
+  var dots = document.getElementById('dots');
+  slides.forEach(function () { dots.insertAdjacentHTML('beforeend', '<i></i>'); });
+  var dotEls = dots.querySelectorAll('i'); dotEls[0].classList.add('on');
+  setInterval(function () {
+    slides[i].classList.remove('on'); dotEls[i].classList.remove('on');
+    i = (i + 1) % slides.length;
+    slides[i].classList.add('on'); dotEls[i].classList.add('on');
+  }, 6000);
+</script>
+</body>
+</html>

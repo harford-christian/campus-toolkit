@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Status — Harford Christian School</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* =====================================================================
+     HCS shared design system (inlined — same token layer as Dashboard.html).
+     Self-contained HtmlService template (NOT included into Index). READ-ONLY.
+     Layout: "Option 3 refined" — Campus Schedule summary rail + a board that
+     leads with a door-windows timeline, then an Open-now list.
+     ===================================================================== */
+  :root {
+    --hcs-red:#B22222; --hcs-red-dark:#8f1b1b; --hcs-red-soft:#fff5f5;
+    --hcs-gold:#D4AF37; --hcs-gold-dark:#a9821f; --hcs-gold-soft:#fffdf4;
+    --hcs-ink:#23272e; --hcs-muted:#6b7280; --hcs-line:#e7e9ee;
+    --hcs-bg:#f6f7f9; --hcs-surface:#ffffff; --hcs-surface-2:#f7f8fa;
+    --hcs-ok:#1f8a4c; --hcs-ok-bg:#e9f7ef; --hcs-ok-line:#bfe6cd;
+    --hcs-warn:#b5751a; --hcs-warn-bg:#fdf3e2; --hcs-warn-line:#f1d9a8;
+    --hcs-closed:#8a8f98; --hcs-closed-bg:#f1f0ee; --hcs-closed-line:#e0ddd9;
+    --hcs-church:#6d28d9; --hcs-church-bg:#ede9fe;
+    /* CMS day-type state colors (match EventScheduler stateClass): green=Normal/in-session,
+       blue=Summer, amber=delay/release/exam, gray=closed. Orange = extra events (Open Gym/sports). */
+    --hcs-summer:#2563eb; --hcs-summer-bg:#e8f0fe;
+    --hcs-alt:#b5751a;    --hcs-alt-bg:#fdf3e2; --hcs-alt-line:#f1d9a8;
+    --hcs-event:#e8730c;  --hcs-event-bg:#fff1e3; --hcs-event-line:#f7cfa6;
+    --r-sm:8px; --r:12px; --r-lg:16px; --r-xl:18px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--hcs-bg); color: var(--hcs-ink); min-height: 100vh; -webkit-font-smoothing: antialiased;
+  }
+
+  .nav { background: var(--hcs-surface); padding: 13px 22px; display: flex; align-items: center; gap: 11px;
+    border-bottom: 1px solid var(--hcs-line); position: sticky; top: 0; z-index: 100; }
+  .crest { width: 34px; height: 34px; border-radius: 9px; flex: none;
+    background: linear-gradient(135deg, var(--hcs-red), var(--hcs-red-dark)); color: #fff; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; font-size: 0.95rem;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.18); }
+  .nav h1 { font-size: 1.04rem; font-weight: 800; color: var(--hcs-ink); letter-spacing: -0.01em; line-height: 1.15; }
+  .nav .sub { font-size: 0.76rem; font-weight: 600; color: var(--hcs-muted); }
+
+  .toggle-bar { background: var(--hcs-surface); border-bottom: 1px solid var(--hcs-line);
+    padding: 10px 22px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1.5px solid var(--hcs-line); border-radius: 999px; overflow: hidden; background: var(--hcs-surface); }
+  .seg button { background: none; border: none; color: var(--hcs-muted); padding: 7px 17px; cursor: pointer;
+    font-size: 0.84rem; font-weight: 700; transition: all 0.15s; font-family: inherit; }
+  .seg button:not(:last-child) { border-right: 1.5px solid var(--hcs-line); }
+  .seg button.active { background: var(--hcs-red); color: #fff; }
+  .seg button:hover:not(.active) { background: var(--hcs-red-soft); color: var(--hcs-red); }
+  .btn-refresh { margin-left: auto; background: var(--hcs-red); color: #fff; border: 1px solid var(--hcs-red);
+    border-radius: 9px; padding: 7px 15px; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    transition: all 0.15s; font-family: inherit; }
+  .btn-refresh:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: var(--hcs-red-dark); border-color: var(--hcs-red-dark); }
+  .btn-refresh:disabled { background: var(--hcs-surface-2); color: var(--hcs-muted); border-color: var(--hcs-line); cursor: default; box-shadow: none; }
+  .btn-spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid transparent;
+    border-top-color: currentColor; border-right-color: currentColor; border-radius: 50%;
+    animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 5px; }
+
+  /* Full-bleed: fill the browser window (was capped at 1000px and centered). */
+  main { padding: 22px 26px; }
+  #loading, #error-msg { text-align: center; padding: 60px 20px; color: var(--hcs-muted); font-size: 0.95rem; }
+  #error-msg { color: var(--hcs-red); }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--hcs-line); border-top-color: var(--hcs-red);
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #content { display: none; }
+
+  /* ── single-day split panel ─────────────────────────────────────────── */
+  .panel { background: var(--hcs-surface); border: 1px solid var(--hcs-line); border-radius: var(--r-xl);
+    overflow: hidden; box-shadow: 0 1px 2px rgba(20,20,40,0.04); display: grid; grid-template-columns: 280px 1fr; }
+  .rail { background: linear-gradient(180deg, #fbfbfc, #f4f5f7); border-right: 1px solid var(--hcs-line); padding: 22px 20px; }
+  .rail .ey { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.11em; color: var(--hcs-muted); font-weight: 700; }
+  .rail h2 { margin: 4px 0 18px; font-size: 1.32rem; letter-spacing: -0.02em; }
+  .sum { display: flex; flex-direction: column; gap: 13px; }
+  .sumrow { display: flex; align-items: flex-start; gap: 11px; }
+  .sumrow .ic { width: 30px; height: 30px; border-radius: 8px; background: #fff; border: 1px solid var(--hcs-line);
+    display: flex; align-items: center; justify-content: center; font-size: 0.95rem; flex: none; }
+  .sumrow .lab { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--hcs-muted); font-weight: 700; }
+  .sumrow .val { font-weight: 700; font-size: 0.96rem; display: flex; align-items: center; gap: 7px; line-height: 1.3; }
+  .check { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px;
+    background: var(--hcs-ok); color: #fff; font-size: 0.6rem; font-weight: 900; flex: none; }
+  .val.muted { color: var(--hcs-muted); font-weight: 600; }
+  .note { margin-top: 18px; padding: 12px 13px; background: var(--hcs-gold-soft); border: 1px solid var(--hcs-warn-line);
+    border-radius: var(--r); font-size: 0.8rem; color: #7a5a14; line-height: 1.4; }
+  .note b { color: var(--hcs-ink); }
+
+  .board { padding: 22px; }
+
+  /* ── timeline ───────────────────────────────────────────────────────── */
+  .tlttl { font-size: 0.95rem; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 14px; }
+  .tl { background: var(--hcs-surface-2); border: 1px solid var(--hcs-line); border-radius: var(--r-lg); padding: 18px 18px 16px; }
+  .tl-track { position: relative; height: 14px; background: #fff; border: 1px solid var(--hcs-line); border-radius: 999px; margin: 24px 0 0; }
+  .tl-bar { position: absolute; height: 12px; top: 0; border-radius: 999px; }
+  /* school-day bar colored by CMS day-type state; events bar = orange */
+  .tl-bar.s-ok     { background: var(--hcs-ok); }
+  .tl-bar.s-summer { background: var(--hcs-summer); }
+  .tl-bar.s-alt    { background: var(--hcs-alt); }
+  .tl-bar.s-closed { background: var(--hcs-closed); }
+  .tl-bar.evt      { background: var(--hcs-event); }
+  .tl-now { position: absolute; top: -8px; bottom: -8px; width: 2px; background: var(--hcs-red); z-index: 2; }
+  .tl-now::after { content: "now"; position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 0.64rem; font-weight: 800; color: var(--hcs-red); white-space: nowrap; }
+  .tl-ticks { display: flex; justify-content: space-between; margin-top: 8px; color: var(--hcs-muted);
+    font-size: 0.68rem; font-variant-numeric: tabular-nums; }
+  .tl-lanes { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+  .tl-lane { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 600; }
+  .tl-lane i { width: 14px; height: 9px; border-radius: 999px; flex: none; }
+  .tl-lane .t { margin-left: auto; color: var(--hcs-muted); font-weight: 600; font-size: 0.8rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sw-ok     { background: var(--hcs-ok); }
+  .sw-summer { background: var(--hcs-summer); }
+  .sw-alt    { background: var(--hcs-alt); }
+  .sw-closed { background: var(--hcs-closed); }
+  .sw-evt    { background: var(--hcs-event); }
+
+  /* ── open-now list ──────────────────────────────────────────────────── */
+  .opensec { margin-top: 24px; }
+  .bhead { display: flex; align-items: center; gap: 9px; font-size: 0.78rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--hcs-ok); margin-bottom: 12px; }
+  .bhead .n { margin-left: auto; }
+  .dot { width: 10px; height: 10px; border-radius: 999px; flex: none; background: var(--hcs-ok); box-shadow: 0 0 0 3px var(--hcs-ok-bg); }
+  .openlist { display: flex; flex-direction: column; gap: 9px; }
+  .oline { display: flex; align-items: center; gap: 12px; padding: 12px 15px; background: #fff; border: 1px solid var(--hcs-line);
+    border-left: 3px solid var(--hcs-ok); border-radius: var(--r); }
+  .oline .nm { font-weight: 700; font-size: 0.93rem; }
+  .oline .rs { color: var(--hcs-muted); font-size: 0.8rem; margin-top: 2px; }
+  .oline .ti { margin-left: auto; font-size: 0.8rem; font-weight: 700; color: var(--hcs-ok); white-space: nowrap; padding-left: 8px; }
+  .ev-tag { display: inline-block; font-size: 0.64rem; font-weight: 700; padding: 1px 7px; border-radius: 6px;
+    text-transform: uppercase; letter-spacing: 0.04em; margin-left: 7px; vertical-align: middle; }
+  .ev-church { background: var(--hcs-church-bg); color: var(--hcs-church); }
+  .empty-state { color: var(--hcs-muted); font-size: 0.85rem; font-style: italic; padding: 14px 15px; background: #fff;
+    border: 1px dashed var(--hcs-line); border-radius: var(--r); }
+
+  /* ── week stack (collapsible day cards) ─────────────────────────────── */
+  .wkcard { background: var(--hcs-surface); border: 1px solid var(--hcs-line); border-left: 4px solid var(--hcs-gold);
+    border-radius: var(--r-lg); margin-bottom: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(20,20,40,0.04); }
+  .wkhead { padding: 15px 18px; cursor: pointer; display: flex; align-items: center; gap: 11px; flex-wrap: wrap; user-select: none; }
+  .wkhead:hover { background: var(--hcs-gold-soft); }
+  .wktitle { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; margin-right: auto; }
+  .wktitle .d { display: block; font-size: 0.74rem; font-weight: 600; color: var(--hcs-muted); margin-top: 2px; }
+  .caret { font-size: 0.78rem; color: var(--hcs-muted); transition: transform 0.15s; margin-left: 4px; }
+  .wkcard.open .caret { transform: rotate(90deg); }
+  .wkbody { display: none; border-top: 1px solid var(--hcs-line); padding: 20px; background: var(--hcs-surface-2); }
+  .wkcard.open .wkbody { display: block; }
+  .wkbody .tl { background: #fff; }
+  .wkbody .oline { background: var(--hcs-surface-2); }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px;
+    font-size: 0.76rem; font-weight: 700; }
+  .badge-church { background: var(--hcs-church-bg); color: var(--hcs-church); }
+  /* CMS day-type state colors (shared by week badges + rail text) */
+  .badge-ok     { background: var(--hcs-ok-bg);     color: var(--hcs-ok); }
+  .badge-summer { background: var(--hcs-summer-bg); color: var(--hcs-summer); }
+  .badge-alt    { background: var(--hcs-alt-bg);    color: var(--hcs-alt); border: 1px solid var(--hcs-alt-line); }
+  .badge-closed { background: var(--hcs-closed-bg); color: var(--hcs-closed); }
+  .st-ok     { color: var(--hcs-ok); }
+  .st-summer { color: var(--hcs-summer); }
+  .st-alt    { color: var(--hcs-alt); }
+  .st-closed { color: var(--hcs-closed); }
+  .chip-open { background: var(--hcs-ok-bg); color: var(--hcs-ok); border: 1px solid var(--hcs-ok-line);
+    font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+
+  /* ── Sensors category in the rail (Water Leak / Fridge-Freezer roll-ups) ─ */
+  .railcat { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.11em; color: var(--hcs-muted);
+    font-weight: 700; margin: 18px 0 12px; padding-top: 15px; border-top: 1px solid var(--hcs-line); }
+  .st-alert { color: var(--hcs-red); font-weight: 700; }
+  .mon-sub { color: var(--hcs-muted); font-size: 0.78rem; margin-top: 2px; font-weight: 600; line-height: 1.35; }
+  .mon-click { cursor: pointer; border-radius: 9px; padding: 6px 8px; margin: 0 -8px; transition: background 0.12s; }
+  .mon-click:hover { background: var(--hcs-surface-2); }
+  .mon-view { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--hcs-muted); border: 1px solid var(--hcs-line); border-radius: 5px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+
+  /* ── sensor detail popup ─────────────────────────────────────────────── */
+  .sp-overlay { position: fixed; inset: 0; background: rgba(20,20,30,0.5); display: flex; align-items: center;
+    justify-content: center; z-index: 200; padding: 20px; }
+  .sp-card { background: #fff; border-radius: var(--r-lg); max-width: 430px; width: 100%; max-height: 82vh;
+    overflow: auto; box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+  .sp-head { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--hcs-line);
+    position: sticky; top: 0; background: #fff; }
+  .sp-title { font-size: 1.05rem; font-weight: 800; }
+  .sp-x { margin-left: auto; background: none; border: none; font-size: 1.6rem; line-height: 1; color: var(--hcs-muted);
+    cursor: pointer; padding: 0 4px; font-family: inherit; }
+  .sp-statusline { padding: 13px 18px 5px; }
+  .sp-badge { font-size: 0.78rem; font-weight: 700; padding: 4px 11px; border-radius: 999px; }
+  .sp-badge-ok { background: var(--hcs-ok-bg); color: var(--hcs-ok); border: 1px solid var(--hcs-ok-line); }
+  .sp-badge-alert { background: #fde8e8; color: var(--hcs-red); border: 1px solid #f5c2c2; }
+  .sp-list { padding: 6px 18px 4px; }
+  .sp-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hcs-line); font-size: 0.88rem; }
+  .sp-row:last-child { border-bottom: none; }
+  .sp-dot { width: 9px; height: 9px; border-radius: 999px; flex: none; background: var(--hcs-closed); }
+  .sp-ok .sp-dot { background: var(--hcs-ok); }
+  .sp-alert .sp-dot { background: var(--hcs-red); }
+  .sp-off .sp-dot { background: var(--hcs-closed); }
+  .sp-nm { font-weight: 700; }
+  .sp-alert .sp-nm { color: var(--hcs-red); }
+  .sp-sm { margin-left: auto; color: var(--hcs-muted); font-size: 0.8rem; text-align: right; padding-left: 10px; }
+  .sp-checked { padding: 6px 18px 16px; color: var(--hcs-muted); font-size: 0.72rem; }
+  .sp-empty { padding: 14px 0; color: var(--hcs-muted); }
+
+  @media (max-width: 720px) {
+    .panel { grid-template-columns: 1fr; }
+    .rail { border-right: none; border-bottom: 1px solid var(--hcs-line); }
+    main { padding: 13px; }
+    .board { padding: 18px 16px; }
+    .nav h1 { font-size: 0.98rem; }
+  }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Door Automation — Leadership" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="crest">HC</div>
+  <div>
+    <h1>Campus Status</h1>
+    <div class="sub">Harford Christian School &middot; door &amp; bell status</div>
+  </div>
+</nav>
+
+<div class="toggle-bar">
+  <div class="seg" id="seg">
+    <button data-mode="today"    class="active" onclick="setMode('today', this)">Today</button>
+    <button data-mode="tomorrow"             onclick="setMode('tomorrow', this)">Tomorrow</button>
+    <button data-mode="week"                 onclick="setMode('week', this)">This Week</button>
+  </div>
+  <button class="btn-refresh" id="btn-refresh" onclick="loadData()">Refresh</button>
+</div>
+
+<main>
+  <div id="lockdown-banner" style="display:none"></div>
+  <div id="loading"><div class="spinner"></div>Loading campus status&hellip;</div>
+  <div id="error-msg" style="display:none"></div>
+  <div id="content"></div>
+</main>
+
+<div id="sensor-popup" class="sp-overlay" style="display:none" onclick="if(event.target===this)closeSensor()">
+  <div class="sp-card">
+    <div class="sp-head">
+      <div class="sp-title" id="sp-title"></div>
+      <button class="sp-x" onclick="closeSensor()" aria-label="Close">&times;</button>
+    </div>
+    <div id="sp-status" class="sp-statusline"></div>
+    <div id="sp-body" class="sp-list"></div>
+    <div id="sp-checked" class="sp-checked"></div>
+  </div>
+</div>
+
+<script>
+  var _mode = 'today';
+  var _mon = null;   // Campus Monitoring roll-ups (NOW state) — rendered in the rail by monSensors()
+
+  function setMode(mode, btn) {
+    _mode = mode;
+    var seg = document.getElementById('seg');
+    Array.prototype.forEach.call(seg.querySelectorAll('button'), function(b) { b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    loadData();
+  }
+
+  function loadData() {
+    var btn = document.getElementById('btn-refresh');
+    if (btn) { btn.disabled = true; btn._origHtml = btn.innerHTML; btn.innerHTML = '<span class="btn-spinner"></span>Loading&hellip;'; }
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('content').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'none';
+    google.script.run.withSuccessHandler(onData).withFailureHandler(onError).getLeadershipStatus(_mode);
+  }
+
+  function onData(resp) {
+    var btn = document.getElementById('btn-refresh');
+    if (btn) { btn.disabled = false; btn.innerHTML = btn._origHtml || 'Refresh'; }
+    document.getElementById('loading').style.display = 'none';
+    if (!resp || !resp.success) { showError((resp && resp.error) || 'Unknown error from server.'); return; }
+    renderLockdown(resp.lockdown);
+    _mon = resp.monitoring || null;   // NOW state (not per-day); rendered inside the rail via monSensors()
+    render(resp.days || []);
+    document.getElementById('content').style.display = 'block';
+  }
+
+  // The "Sensors" category shown in the single-day rail, below "Affecting doors". Fed by the Campus
+  // Monitoring project (Water Leak / Fridge-Freezer roll-ups); hidden when no data is available.
+  function monSensors() {
+    if (!_mon || !_mon.available) return '';
+    return '<div class="railcat">Sensors</div><div class="sum">' +
+        monRow('&#128167;', 'Water Leak', _mon.leak, 'leak') +
+        monRow('&#129482;', 'Fridge / Freezer', _mon.fridge, 'fridge') +
+      '</div>' +
+      (_mon.checkedAt ? '<div class="mon-sub" style="margin-top:9px">Checked ' + esc(monAgo(_mon.checkedAt)) + '</div>' : '');
+  }
+  function monRow(icon, label, r, key) {
+    var alert = !!(r && r.alert);
+    var names = (r && r.names) || [];
+    var val = alert
+      ? '<span class="st-alert">Alert Detected' + (r.count ? ' &middot; ' + r.count : '') + '</span>'
+      : '<span class="st-ok">Normal</span> <span class="check">&#10003;</span>';
+    var sub = (alert && names.length) ? '<div class="mon-sub">' + names.map(esc).join(', ') + '</div>' : '';
+    return '<div class="sumrow mon-click" role="button" tabindex="0" onclick="openSensor(\'' + key + '\')">' +
+      '<div class="ic">' + icon + '</div>' +
+      '<div style="flex:1"><div class="lab">' + esc(label) + '<span class="mon-view">view</span></div>' +
+      '<div class="val">' + val + '</div>' + sub + '</div></div>';
+  }
+
+  // Click-popup listing every device in the category (alerts first), fed by the roll-up's `devices` list.
+  // Falls back to the alerting names if an older roll-up (no devices list) is still in the sheet.
+  function openSensor(key) {
+    if (!_mon || !_mon.available) return;
+    var r = _mon[key]; if (!r) return;
+    var meta = (key === 'leak')
+      ? { icon: '&#128167;', title: 'Water Leak' }
+      : { icon: '&#129482;', title: 'Fridge / Freezer' };
+    var devices = (r.devices && r.devices.length) ? r.devices.slice()
+      : (r.names || []).map(function(n) { return { name: n, status: 'alert', summary: 'Alert' }; });
+    devices.sort(function(a, b) {
+      if ((a.status === 'alert') !== (b.status === 'alert')) return a.status === 'alert' ? -1 : 1;
+      return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0);
+    });
+    var rows = devices.length ? devices.map(function(d) {
+      var cls = d.status === 'alert' ? 'sp-alert' : (d.status === 'offline' ? 'sp-off' : 'sp-ok');
+      return '<div class="sp-row ' + cls + '"><span class="sp-dot"></span>' +
+        '<span class="sp-nm">' + esc(d.name) + '</span>' +
+        '<span class="sp-sm">' + esc(d.summary || '') + '</span></div>';
+    }).join('') : '<div class="sp-empty">No devices reported.</div>';
+    document.getElementById('sp-title').innerHTML = meta.icon + ' ' + meta.title;
+    document.getElementById('sp-status').innerHTML = r.alert
+      ? '<span class="sp-badge sp-badge-alert">Alert Detected' + (r.count ? ' &middot; ' + r.count : '') + '</span>'
+      : '<span class="sp-badge sp-badge-ok">All Normal</span>';
+    document.getElementById('sp-body').innerHTML = rows;
+    document.getElementById('sp-checked').textContent = _mon.checkedAt ? ('Checked ' + monAgo(_mon.checkedAt)) : '';
+    document.getElementById('sensor-popup').style.display = 'flex';
+  }
+  function closeSensor() { document.getElementById('sensor-popup').style.display = 'none'; }
+  function monAgo(iso) {
+    try {
+      var mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+      if (mins < 1)  return 'just now';
+      if (mins < 60) return mins + ' min ago';
+      var h = Math.round(mins / 60);
+      return h + (h === 1 ? ' hr ago' : ' hrs ago');
+    } catch (e) { return ''; }
+  }
+
+  function renderLockdown(ld) {
+    var el = document.getElementById('lockdown-banner');
+    if (!el) return;
+    if (!ld || !ld.active) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    var isTest = !!ld.test;
+    el.style.cssText = 'display:block;margin:0 0 16px;padding:14px 16px;border-radius:12px;font-weight:700;' +
+      'text-align:center;color:#fff;box-shadow:0 2px 0 rgba(0,0,0,.15);background:' + (isTest ? '#b7791f' : '#B22222');
+    el.innerHTML = (isTest ? '&#129514; MAINTENANCE TEST LOCKDOWN' : '&#128274; CAMPUS LOCKDOWN IN EFFECT')
+      + (ld.scoped ? ' (partial)' : '')
+      + (ld.since ? '<span style="display:block;font-weight:400;font-size:.85em;margin-top:2px">Since ' + ld.since + '</span>' : '');
+  }
+
+  function onError(err) {
+    var btn = document.getElementById('btn-refresh');
+    if (btn) { btn.disabled = false; btn.innerHTML = btn._origHtml || 'Refresh'; }
+    document.getElementById('loading').style.display = 'none';
+    showError('Failed to load campus status: ' + (err && err.message ? err.message : err));
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // Day-type → CMS state color class (mirrors EventScheduler stateClass): gray=closed/none/no-bells,
+  // blue=summer, amber=delay/release/exam, green=normal/in-session. Used for door + bell day-types.
+  function doorState(v) {
+    v = String(v == null ? '' : v);
+    if (v === '' || /weekend_holiday/i.test(v) || /^closed$/i.test(v) || /^no[_\s]*bells$/i.test(v) ||
+        v === 'None' || v === 'N/A' || /unavailable/i.test(v)) return 'closed';
+    if (/summer/i.test(v))                  return 'summer';
+    if (/delay|release|exam/i.test(v))      return 'alt';
+    return 'ok';
+  }
+
+  // ── summary rail (single-day) ──
+  function railHtml(d) {
+    var doorVal = '<span class="st-' + doorState(d.doorType) + '">' + esc(d.doorType) + '</span>' +
+                  (d.doorActive ? ' <span class="check">&#10003;</span>' : '');
+    var bellVal = '<span class="st-' + doorState(d.bellName) + '">' + esc(d.bellName) + '</span>' +
+                  (d.bellActive ? ' <span class="check">&#10003;</span>' : '');
+    var evtVal = d.eventCount > 0
+      ? esc(d.eventCount) + (d.eventCount === 1 ? ' event' : ' events')
+      : '<span class="val muted">None</span>';
+    return '<div class="rail">' +
+      '<div class="ey">' + esc(d.dateLabel) + '</div>' +
+      '<h2>Campus Schedule</h2>' +
+      '<div class="sum">' +
+        sumRow('&#128682;', 'Doors', doorVal) +
+        sumRow('&#128276;', 'Bells', bellVal) +
+        sumRow('&#9962;', 'Church', d.churchMeets ? esc(d.church) : '<span class="val muted">' + esc(d.church) + '</span>') +
+        sumRow('&#128197;', 'Affecting doors', evtVal) +
+      '</div>' +
+      monSensors() +
+      (d.note ? '<div class="note"><b>Heads up:</b> ' + esc(d.note) + '</div>' : '') +
+    '</div>';
+  }
+  function sumRow(icon, lab, valHtml) {
+    return '<div class="sumrow"><div class="ic">' + icon + '</div>' +
+      '<div><div class="lab">' + lab + '</div><div class="val">' + valHtml + '</div></div></div>';
+  }
+
+  // ── timeline ──
+  function pct(min, tl) {
+    var span = tl.axisEndMin - tl.axisStartMin;
+    if (span <= 0) return 0;
+    var p = (min - tl.axisStartMin) / span * 100;
+    return Math.max(0, Math.min(100, p));
+  }
+  function timelineHtml(tl) {
+    if (!tl) return '<div class="empty-state">Campus is closed — no door windows scheduled.</div>';
+    var bars = '';
+    var sState = tl.school ? doorState(tl.school.label) : 'ok';
+    // One bar per MERGED school interval and per MERGED event interval — locked gaps between windows stay
+    // unshaded (a door that closes then reopens shows two bars). Per-window detail is in the lanes list.
+    (tl.schoolBars || []).forEach(function(b) {
+      var l = pct(b.startMin, tl), w = pct(b.endMin, tl) - l;
+      bars += '<div class="tl-bar s-' + sState + '" style="left:' + l + '%;width:' + Math.max(w, 0.6) + '%;"></div>';
+    });
+    (tl.eventBars || []).forEach(function(b) {
+      var l = pct(b.startMin, tl), w = pct(b.endMin, tl) - l;
+      bars += '<div class="tl-bar evt" style="left:' + l + '%;width:' + Math.max(w, 0.6) + '%;"></div>';
+    });
+    var now = (tl.nowMin !== null && tl.nowMin !== undefined)
+      ? '<div class="tl-now" style="left:' + pct(tl.nowMin, tl) + '%;"></div>' : '';
+    var ticks = (tl.ticks || []).map(function(t){ return '<span>' + esc(t.label) + '</span>'; }).join('');
+
+    var lanes = '';
+    if (tl.school) {
+      lanes += '<div class="tl-lane"><i class="sw-' + sState + '"></i> ' + esc(tl.school.label) +
+        ' <span class="t">' + esc(tl.school.timeText) + '</span></div>';
+    }
+    (tl.events || []).forEach(function(e) {
+      lanes += '<div class="tl-lane"><i class="sw-evt"></i> ' + esc(e.name) +
+        (e.category === 'Church' ? '<span class="ev-tag ev-church">Church</span>' : '') +
+        ' <span class="t">' + esc(e.timeText) + '</span></div>';
+    });
+
+    return '<div class="tl">' +
+      '<div class="tl-track">' + bars + now + '</div>' +
+      '<div class="tl-ticks">' + ticks + '</div>' +
+      '<div class="tl-lanes">' + lanes + '</div>' +
+    '</div>';
+  }
+
+  // ── open-now / scheduled-to-open list ──
+  function openHtml(d) {
+    var head = '<div class="bhead"><span class="dot"></span> ' + esc(d.openLabel) + ' <span class="n">' + (d.open ? d.open.length : 0) + '</span></div>';
+    if (!d.open || !d.open.length) {
+      var msg = d.isToday ? 'No doors are open right now.' : 'No scheduled openings.';
+      return '<div class="opensec">' + head + '<div class="empty-state">' + msg + '</div></div>';
+    }
+    var rows = d.open.map(function(o) {
+      var churchTag = (o.category === 'Church' || o.category === 'Both') ? '<span class="ev-tag ev-church">Church</span>' : '';
+      return '<div class="oline">' +
+        '<span class="dot"></span>' +
+        '<div><div class="nm">' + esc(o.name) + churchTag + '</div>' +
+        (o.groups ? '<div class="rs">' + esc(o.groups) + '</div>' : '') + '</div>' +
+        '<span class="ti">until ' + esc(o.until) + '</span>' +
+      '</div>';
+    }).join('');
+    return '<div class="opensec">' + head + '<div class="openlist">' + rows + '</div></div>';
+  }
+
+  // board = timeline + open list (shared by single-day panel and week cards)
+  function boardHtml(d) {
+    return '<div class="tlttl">' + (d.isToday ? "Today's door activities" : 'Door activities') + '</div>' +
+      timelineHtml(d.timeline) + openHtml(d);
+  }
+
+  // ── week header badges ──
+  function doorBadge(d) { return '<span class="badge badge-' + doorState(d.doorType) + '">&#128682; ' + esc(d.doorType) + '</span>'; }
+  function bellBadge(d) { return '<span class="badge badge-' + doorState(d.bellName) + '">&#128276; ' + esc(d.bellName) + '</span>'; }
+  function churchBadge(d) {
+    if (!d.churchMeets) return '';
+    var cls = (d.church === 'Meets today') ? 'badge-church' : 'badge-closed';
+    return '<span class="badge ' + cls + '">&#9962; ' + esc(d.church) + '</span>';
+  }
+
+  function render(days) {
+    var el = document.getElementById('content');
+    if (!days.length) { el.innerHTML = '<div class="empty-state" style="text-align:center;padding:40px">No data.</div>'; return; }
+
+    if (days.length === 1) {
+      var d = days[0];
+      el.innerHTML = '<div class="panel">' + railHtml(d) + '<div class="board">' + boardHtml(d) + '</div></div>';
+      return;
+    }
+
+    // Week: collapsible day cards (today expanded).
+    el.innerHTML = days.map(function(d, i) {
+      var openCls = (i === 0) ? ' open' : '';
+      var openChip = (d.open && d.open.length) ? '<span class="chip-open">' + d.open.length + ' open</span>' : '';
+      return '<div class="wkcard' + openCls + '" data-idx="' + i + '">' +
+        '<div class="wkhead" onclick="toggleDay(' + i + ')">' +
+          '<div class="wktitle">' + esc(d.dow) + '<span class="d">' + esc(d.dateLabel) + '</span></div>' +
+          doorBadge(d) + bellBadge(d) + churchBadge(d) + openChip +
+          '<span class="caret">&#9654;</span>' +
+        '</div>' +
+        '<div class="wkbody">' + boardHtml(d) + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function toggleDay(i) {
+    var card = document.querySelector('.wkcard[data-idx="' + i + '"]');
+    if (card) card.classList.toggle('open');
+  }
+
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSensor(); });
+
+  loadData();
+</script>
+</body>
+</html>

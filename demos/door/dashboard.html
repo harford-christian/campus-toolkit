@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Door Automation — Dashboard</title>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<!-- Bootstrap 5.3 + Inter (CDN) so this page wears the shared HCS "Eagle Eye" look. -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* =====================================================================
+     HCS shared design system (inlined from design/system/hcs-ui.css).
+     This page is a self-contained HtmlService template (NOT included into
+     Index), so the token layer is inlined here rather than shared. The
+     Dashboard APP layer follows AFTER this block and keeps its EXISTING
+     class names (nav, window-bar, kpi-card, card, badge-*, data-table,
+     action-item, btn-action, btn-refresh, …) because the inline script
+     builds/queries them by name — only their STYLING is re-skinned to the
+     shared token system. Legacy :root tokens are re-aliased to the hcs
+     tokens so every literal var(--x) reference is byte-untouched.
+     ===================================================================== */
+  :root {
+    --hcs-red:#B22222; --hcs-red-dark:#8f1b1b; --hcs-red-soft:#fff5f5;
+    --hcs-gold:#D4AF37; --hcs-gold-soft:#fffdf4;
+    --hcs-ink:#23272e; --hcs-muted:#6b7280; --hcs-line:#e7e9ee;
+    --hcs-bg:#f6f7f9; --hcs-surface:#ffffff; --hcs-surface-2:#f7f8fa;
+    --hcs-ok:#1f8a4c; --hcs-ok-bg:#e9f7ef; --hcs-ok-line:#bfe6cd;
+    --hcs-warn:#b5751a; --hcs-warn-bg:#fdf3e2; --hcs-warn-line:#f1d9a8;
+    --hcs-closed:#8a8f98; --hcs-closed-bg:#f1f0ee;
+    --hcs-radius-sm:8px; --hcs-radius:12px; --hcs-radius-lg:16px; --hcs-radius-xl:18px;
+
+    /* ---- legacy-token aliases ----
+       The markup + chart options still read these `var(--x)` names; alias
+       each onto an hcs token so the palette becomes the shared one while
+       all that markup/JS stays byte-untouched. */
+    --bg:          var(--hcs-bg);
+    --surface:     var(--hcs-surface);
+    --surface2:    var(--hcs-surface-2);
+    --border:      var(--hcs-line);
+    --accent:      var(--hcs-red);     /* brand chrome → hcs red */
+    --accent2:     var(--hcs-muted);
+    --accent-red:  var(--hcs-red);
+    --text:        var(--hcs-ink);
+    --muted:       var(--hcs-muted);
+    --green:       var(--hcs-ok);
+    --red:         var(--hcs-red);
+    --yellow:      var(--hcs-warn);
+    --radius:      var(--hcs-radius-lg);
+    --glow-yellow: 0 2px 8px rgba(178,34,34,0.12);
+    --glow-green:  0 2px 8px rgba(31,138,76,0.18);
+    --glow-red:    0 2px 8px rgba(178,34,34,0.18);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--hcs-bg);
+    color: var(--hcs-ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Nav (shared HCS brand bar) */
+  .nav {
+    background: var(--hcs-surface);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--hcs-line);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .nav h1 {
+    font-size: 1.12rem;
+    font-weight: 800;
+    padding: 0;
+    margin-right: 24px;
+    color: var(--hcs-ink);
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+  }
+  .nav-btn {
+    background: none;
+    border: 1.5px solid var(--hcs-red);
+    color: var(--hcs-red);
+    padding: 7px 15px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 700;
+    border-radius: 999px;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .nav-btn:hover { background: var(--hcs-red); color: #fff; }
+
+  /* Window selector bar */
+  .window-bar {
+    background: var(--hcs-surface);
+    border-bottom: 1px solid var(--hcs-line);
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: var(--hcs-muted);
+  }
+  .window-bar label { font-weight: 700; color: var(--hcs-muted); }
+  .window-bar select {
+    border: 1.5px solid var(--hcs-line);
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 0.85rem;
+    color: var(--hcs-ink);
+    background: var(--hcs-surface);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .window-bar select:focus { border-color: var(--hcs-red); box-shadow: 0 0 0 3px rgba(178,34,34,0.12); }
+  .window-bar select option { background: #fff; }
+  .btn-refresh {
+    margin-left: auto;
+    background: var(--hcs-red);
+    color: #fff;
+    border: 1px solid var(--hcs-red);
+    border-radius: 9px;
+    padding: 7px 16px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: all 0.15s;
+  }
+  .btn-refresh:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: var(--hcs-red-dark); border-color: var(--hcs-red-dark); }
+  .btn-refresh:disabled { background: var(--hcs-surface-2); color: var(--hcs-muted); border-color: var(--hcs-line); cursor: default; box-shadow: none; transform: none; }
+  .btn-spinner {
+    display: inline-block; width: 11px; height: 11px;
+    border: 2px solid transparent; border-top-color: currentColor; border-right-color: currentColor;
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+    vertical-align: middle; margin-right: 5px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+
+  /* Loading / error state */
+  #loading, #error-msg {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--hcs-muted);
+    font-size: 0.95rem;
+  }
+  #error-msg { color: var(--hcs-red); }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--hcs-line);
+    border-top-color: var(--hcs-red);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #dashboard { display: none; }
+
+  /* KPI cards */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--hcs-surface);
+    border-radius: var(--hcs-radius-lg);
+    padding: 20px;
+    border: 1px solid var(--hcs-line);
+    border-left: 4px solid var(--hcs-gold);
+    box-shadow: 0 1px 2px rgba(20,20,40,0.04);
+  }
+  .kpi-card.green  { border-left-color: var(--hcs-ok); }
+  .kpi-card.red    { border-left-color: var(--hcs-red); }
+  .kpi-card.orange { border-left-color: var(--hcs-warn); }
+  .kpi-card.blue   { border-left-color: var(--hcs-gold); }
+  .kpi-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--hcs-muted); margin-bottom: 6px;
+  }
+  .kpi-value { font-size: 2rem; font-weight: 800; line-height: 1; color: var(--hcs-ink); }
+  .kpi-sub   { font-size: 0.75rem; color: var(--hcs-muted); margin-top: 4px; }
+
+  /* Section cards (signature gold-accent surface) */
+  .card {
+    background: var(--hcs-surface);
+    border-radius: var(--hcs-radius-lg);
+    border: 1px solid var(--hcs-line);
+    box-shadow: 0 1px 2px rgba(20,20,40,0.04);
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--hcs-line);
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: var(--hcs-ink);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-left: 4px solid var(--hcs-gold);
+  }
+  .card-body { padding: 20px; }
+
+  /* Chart */
+  #trend-chart { width: 100%; height: 260px; }
+
+  /* Tables */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  .data-table th {
+    text-align: left;
+    padding: 9px 12px;
+    background: var(--hcs-surface-2);
+    color: var(--hcs-muted);
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--hcs-line);
+  }
+  .data-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--hcs-line);
+    vertical-align: top;
+    color: var(--hcs-ink);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tbody tr:nth-child(even) td { background: #fafbfc; }
+  .data-table tr:hover td { background: var(--hcs-gold-soft); }
+
+  /* Badges (HCS 4-state palette) */
+  .badge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: var(--hcs-radius-sm);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .badge-success { background: var(--hcs-ok-bg);     color: var(--hcs-ok); }
+  .badge-failed  { background: var(--hcs-red-soft);  color: var(--hcs-red); }
+  .badge-skipped { background: #eef2f7;              color: #516074; }
+  .badge-pending { background: var(--hcs-warn-bg);   color: var(--hcs-warn); }
+
+  /* Action type breakdown grid */
+  .action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
+  .action-item {
+    background: var(--hcs-surface-2);
+    border-radius: var(--hcs-radius-sm);
+    padding: 12px 14px;
+    border: 1px solid var(--hcs-line);
+  }
+  .action-item-name {
+    font-size: 0.72rem; font-weight: 800; color: var(--hcs-ink);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px;
+  }
+  .action-item-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat-pill { font-size: 0.73rem; padding: 2px 8px; border-radius: var(--hcs-radius-sm); font-weight: 700; }
+  .stat-success { background: var(--hcs-ok-bg);    color: var(--hcs-ok); }
+  .stat-failed  { background: var(--hcs-red-soft); color: var(--hcs-red); }
+  .stat-skipped { background: #eef2f7;             color: #516074; }
+  .action-item-total { font-size: 0.7rem; color: var(--hcs-muted); margin-top: 6px; }
+
+  /* Two-col layout */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+  .empty-state {
+    color: var(--hcs-muted); font-size: 0.83rem; font-style: italic;
+    text-align: center; padding: 20px 0;
+  }
+
+  .generated-at {
+    text-align: right; font-size: 0.72rem;
+    color: var(--hcs-muted); margin-top: 8px;
+  }
+  .notes-cell { max-width: 320px; word-break: break-word; }
+
+  /* Scheduling action buttons */
+  .action-btns { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn-action {
+    background: var(--hcs-surface);
+    color: var(--hcs-red);
+    border: 1.5px solid var(--hcs-red);
+    border-radius: 11px;
+    padding: 10px 18px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .btn-action:hover { background: var(--hcs-red); color: #fff; border-color: var(--hcs-red); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .btn-action:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+  .action-feedback { font-size: 0.8rem; color: var(--hcs-muted); margin-top: 10px; min-height: 18px; }
+  .action-feedback.ok  { color: var(--hcs-ok); }
+  .action-feedback.err { color: var(--hcs-red); }
+
+  @media (max-width: 640px) { main { padding: 12px; } }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Door Automation — Dashboard" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+
+<nav class="nav">
+  <h1>&#x1F511; Door Automation — Dashboard</h1>
+  <a id="cp-link" class="nav-btn" style="margin-left:auto;" href="index.html" target="_top">To Control Panel</a>
+</nav>
+
+<div class="window-bar">
+  <label for="window-select">Showing last</label>
+  <select id="window-select">
+    <option value="7">7 days</option>
+    <option value="30" selected>30 days</option>
+    <option value="60">60 days</option>
+    <option value="90">90 days</option>
+  </select>
+  <span id="generated-at-header" style="font-size:0.78rem;"></span>
+  <button class="btn-refresh" id="btn-refresh" onclick="loadData()">Refresh</button>
+</div>
+
+<main>
+  <div id="loading">
+    <div class="spinner"></div>
+    Loading dashboard data…
+  </div>
+  <div id="error-msg" style="display:none"></div>
+  <div id="dashboard">
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- Trend Chart -->
+    <div class="card">
+      <div class="card-header">Door Actions — Daily Trend</div>
+      <div class="card-body">
+        <div id="trend-chart"></div>
+      </div>
+    </div>
+
+    <!-- Action Type Breakdown + Sports side by side -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">Action Type Breakdown</div>
+        <div class="card-body">
+          <div class="action-grid" id="action-grid"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">Sports Sync Health</div>
+        <div class="card-body" id="sports-card"></div>
+      </div>
+    </div>
+
+    <!-- Recent Failures -->
+    <div class="card">
+      <div class="card-header">Recent Failures (last 20)</div>
+      <div class="card-body" id="failures-card"></div>
+    </div>
+
+    <!-- Emergency Operations -->
+    <div class="card">
+      <div class="card-header">Emergency Operations (all time)</div>
+      <div class="card-body" id="emergency-card"></div>
+    </div>
+
+    <!-- Scheduling Actions -->
+    <div class="card">
+      <div class="card-header">Scheduling Actions</div>
+      <div class="card-body">
+        <div class="action-btns">
+          <button class="btn-action" onclick="runAction(this, 'scanEventCalendar', 'Scanning…')">&#128197; Scan Event Calendar</button>
+          <button class="btn-action" onclick="runAction(this, 'syncSportsCalendar', 'Syncing…')">&#127944; Sync Sports Calendar</button>
+          <button class="btn-action" onclick="runAction(this, 'syncTodaySchedule', 'Rebuilding…')">&#128260; Rebuild Today Schedule</button>
+        </div>
+        <div class="action-feedback" id="action-feedback"></div>
+      </div>
+    </div>
+
+    <div class="generated-at" id="generated-at"></div>
+  </div>
+</main>
+
+<script>
+google.charts.load('current', {packages: ['corechart']});
+google.charts.setOnLoadCallback(loadData);
+
+var CSRF = 'demo-csrf-0';
+var _data = null;
+
+function loadData() {
+  var btn = document.getElementById('btn-refresh');
+  if (btn) {
+    btn.disabled = true;
+    btn._origHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="btn-spinner"></span>Refreshing…';
+  }
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+
+  var days = parseInt(document.getElementById('window-select').value, 10);
+  google.script.run
+    .withSuccessHandler(onData)
+    .withFailureHandler(onError)
+    .processPost({ action: 'getDashboardData', days: days });
+}
+
+function onData(resp) {
+  var btn = document.getElementById('btn-refresh');
+  if (btn) { btn.disabled = false; btn.innerHTML = btn._origHtml || 'Refresh'; }
+  document.getElementById('loading').style.display = 'none';
+
+  if (!resp || !resp.success) {
+    showError((resp && resp.error) || 'Unknown error from server.');
+    return;
+  }
+
+  _data = resp;
+  render(_data);
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+function onError(err) {
+  var btn = document.getElementById('btn-refresh');
+  if (btn) { btn.disabled = false; btn.innerHTML = btn._origHtml || 'Refresh'; }
+  document.getElementById('loading').style.display = 'none';
+  showError('Failed to load data: ' + (err.message || err));
+}
+
+function showError(msg) {
+  var el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function render(d) {
+  renderKPIs(d);
+  renderTrendChart(d.dailyTrends);
+  renderActionGrid(d.byActionType);
+  renderSports(d.sportsSyncStats);
+  renderFailures(d.recentFailures);
+  renderEmergency(d.emergencyOps);
+  document.getElementById('generated-at').textContent = 'Generated at ' + d.generatedAt;
+  document.getElementById('generated-at-header').textContent = '— as of ' + d.generatedAt;
+}
+
+function renderKPIs(d) {
+  var rate = d.successRate !== null ? d.successRate + '%' : '—';
+  var fail = d.failRate    !== null ? d.failRate + '%'    : '—';
+  var rateColor = (d.successRate !== null && d.successRate >= 95) ? 'green' : 'orange';
+  var failColor = (d.failRate    !== null && d.failRate    === 0)  ? 'green' : 'red';
+
+  var skippedNote = d.doorOpsSkipped > 0 ? ' (' + d.doorOpsSkipped + ' skipped)' : '';
+  var cards = [
+    { label: 'Door Action Success Rate', value: rate,
+      sub: d.doorOpsAttempted + ' attempted' + skippedNote + ' — of ops that ran',   color: rateColor },
+    { label: 'Door Action Fail Rate',    value: fail,
+      sub: d.doorOpsFailed + ' failed of ' + d.doorOpsAttempted + ' attempted',       color: failColor },
+    { label: 'Scheduling Errors', value: d.schedulingErrors,
+      sub: 'invalid schedule type or build failure',   color: d.schedulingErrors  === 0 ? 'green' : 'red'    },
+    { label: 'Remediations',    value: d.remediationCount,   sub: 'auto-corrections in window', color: d.remediationCount   === 0 ? 'green' : 'orange' },
+    { label: 'Stale Triggers',  value: d.staleTriggersCount, sub: 'missed-fire events in window', color: d.staleTriggersCount === 0 ? 'green' : 'red'   },
+    { label: 'Device Offline',  value: d.deviceOfflineCount, sub: 'offline events in window',   color: d.deviceOfflineCount  === 0 ? 'green' : 'red'    },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = cards.map(function(c) {
+    return '<div class="kpi-card ' + c.color + '">' +
+           '<div class="kpi-label">' + escHtml(c.label) + '</div>' +
+           '<div class="kpi-value">' + escHtml(String(c.value)) + '</div>' +
+           '<div class="kpi-sub">'   + escHtml(c.sub) + '</div>' +
+           '</div>';
+  }).join('');
+}
+
+function fmtChartDate(d) {
+  if (!d || typeof d !== 'string') return '';
+  var p = d.split('-');
+  if (p.length < 3) return d;
+  var mo = parseInt(p[1], 10);
+  var dy = parseInt(p[2], 10);
+  if (isNaN(mo) || isNaN(dy)) return d;
+  var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return (m[mo - 1] || '') + ' ' + dy;
+}
+
+function renderTrendChart(trends) {
+  if (!trends || trends.length === 0) {
+    document.getElementById('trend-chart').innerHTML =
+      '<p class="empty-state">No door action data in the selected window.</p>';
+    return;
+  }
+  var dataTable = new google.visualization.DataTable();
+  dataTable.addColumn('string', 'Date');
+  dataTable.addColumn('number', 'Success');
+  dataTable.addColumn('number', 'Failed');
+  trends.forEach(function(row) {
+    dataTable.addRow([fmtChartDate(row.date), row.success, row.failed]);
+  });
+  var options = {
+    chartArea: { left: 44, right: 20, top: 20, bottom: 40 },
+    colors: ['#2d6a2d', '#b91c1c'],
+    lineWidth: 2,
+    pointSize: 4,
+    legend: { position: 'top', textStyle: { color: '#9b9189', fontSize: 12 } },
+    hAxis: { textStyle: { color: '#9b9189', fontSize: 11 } },
+    vAxis: { textStyle: { color: '#9b9189', fontSize: 11 }, minValue: 0, format: '0',
+             gridlines: { color: '#d9d0c4' }, baselineColor: '#d9d0c4' },
+    backgroundColor: '#ffffff',
+    tooltip: { trigger: 'both', isHtml: false },
+  };
+  var chart = new google.visualization.LineChart(document.getElementById('trend-chart'));
+  chart.draw(dataTable, options);
+}
+
+function renderActionGrid(byType) {
+  var LABELS = {
+    UNLOCK: 'Unlock', LOCK: 'Lock', FIRE_BATCH: 'Fire Batch',
+    POST_OP_CHECK: 'Post-op Check', STATE_CHECK: 'State Check',
+    REBUILD: 'Rebuild', DAILY_RESET: 'Daily Reset', STALE_TRIGGERS: 'Stale Triggers',
+    UPDATE_TRIGGERS: 'Update Triggers', BUILD_DAY_EVENTS: 'Build Day Events',
+    CE_SYNC: 'Custom Event Sync', EVENT_SYNC: 'Event Calendar Sync',
+    INVALID_SCHEDULE_TYPE: 'Invalid Schedule Type', BUILD_ACTIONS: 'Build Actions'
+  };
+  var html = Object.keys(byType).map(function(at) {
+    var s = byType[at];
+    if (s.total === 0) return '';
+    var pills = '';
+    if (s.success > 0) pills += '<span class="stat-pill stat-success">✓ ' + s.success + '</span>';
+    if (s.failed  > 0) pills += '<span class="stat-pill stat-failed">✗ '  + s.failed  + '</span>';
+    if (s.skipped > 0) pills += '<span class="stat-pill stat-skipped">— ' + s.skipped + '</span>';
+    return '<div class="action-item">' +
+           '<div class="action-item-name">' + escHtml(LABELS[at] || at) + '</div>' +
+           '<div class="action-item-stats">' + pills + '</div>' +
+           '<div class="action-item-total">' + s.total + ' total</div>' +
+           '</div>';
+  }).join('');
+  document.getElementById('action-grid').innerHTML = html || '<p class="empty-state">No data in window.</p>';
+}
+
+function renderSports(s) {
+  var html = '<table class="data-table">' +
+    '<tr><td>Games created</td><td><span class="badge badge-success">' + s.created + '</span></td></tr>' +
+    '<tr><td>Games canceled</td><td><span class="badge badge-skipped">' + s.canceled + '</span></td></tr>' +
+    '<tr><td>Sync errors</td><td>' +
+      (s.syncFailed > 0
+        ? '<span class="badge badge-failed">' + s.syncFailed + '</span>'
+        : '<span class="badge badge-success">0</span>') +
+    '</td></tr>' +
+    '</table>';
+  document.getElementById('sports-card').innerHTML = html;
+}
+
+function renderFailures(failures) {
+  if (!failures || failures.length === 0) {
+    document.getElementById('failures-card').innerHTML = '<p class="empty-state">No failures on record.</p>';
+    return;
+  }
+  var rows = failures.map(function(f) {
+    return '<tr>' +
+      '<td>' + escHtml(f.timestamp) + '</td>' +
+      '<td>' + escHtml(f.action) + '</td>' +
+      '<td>' + escHtml(f.doors || '—') + '</td>' +
+      '<td class="notes-cell">' + escHtml(f.notes || '—') + '</td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('failures-card').innerHTML =
+    '<table class="data-table">' +
+    '<thead><tr><th>Timestamp</th><th>Action</th><th>Doors</th><th>Notes</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+function renderEmergency(ops) {
+  if (!ops || ops.length === 0) {
+    document.getElementById('emergency-card').innerHTML = '<p class="empty-state">No emergency operations on record.</p>';
+    return;
+  }
+  var rows = ops.map(function(op) {
+    var badge = op.result === 'SUCCESS'
+      ? '<span class="badge badge-success">Success</span>'
+      : '<span class="badge badge-failed">' + escHtml(op.result) + '</span>';
+    return '<tr>' +
+      '<td>' + escHtml(op.timestamp) + '</td>' +
+      '<td>' + escHtml(op.action) + '</td>' +
+      '<td>' + badge + '</td>' +
+      '<td class="notes-cell">' + escHtml(op.notes || '—') + '</td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('emergency-card').innerHTML =
+    '<table class="data-table">' +
+    '<thead><tr><th>Timestamp</th><th>Operation</th><th>Result</th><th>Notes</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;');
+}
+
+function runAction(btn, action, loadText) {
+  var fb = document.getElementById('action-feedback');
+  btn.disabled = true;
+  btn._origHtml = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-spinner"></span>' + loadText;
+  fb.textContent = '';
+  fb.className = 'action-feedback';
+  google.script.run
+    .withSuccessHandler(function(r) {
+      btn.disabled = false;
+      btn.innerHTML = btn._origHtml;
+      if (r && r.csrfToken) CSRF = r.csrfToken;
+      if (r && r.error) {
+        fb.textContent = r.error;
+        fb.className = 'action-feedback err';
+      } else {
+        fb.textContent = 'Done.';
+        fb.className = 'action-feedback ok';
+        setTimeout(function() { fb.textContent = ''; fb.className = 'action-feedback'; }, 4000);
+      }
+    })
+    .withFailureHandler(function(e) {
+      btn.disabled = false;
+      btn.innerHTML = btn._origHtml;
+      fb.textContent = e.message || 'Error';
+      fb.className = 'action-feedback err';
+    })
+    .processPost({ action: action, csrf: CSRF });
+}
+</script>
+</body>
+</html>

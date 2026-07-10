@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>📚 HCS Library Catalog</title>
+<!-- ===== Showcase demo shim (added for the standalone portfolio build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Library Catalog", tagline: "Student-facing book discovery" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Harford Christian School brand palette */
+    --maroon: #B40005;        /* primary */
+    --maroon-dark: #7d0003;   /* depth / shadow */
+    --maroon-bright: #d51f24; /* highlight */
+    --gold: #C79A3D;          /* accent */
+    --cream: #E9DEA6;         /* light gold */
+    --navy: #B40005;          /* structural dark-brand -> maroon */
+    --blue: #C79A3D;          /* accent (focus/loading/spinner) -> gold */
+    --ink: #0c0922;
+    --ink-soft: #707b7b;
+    --paper: #ffffff;
+    --sky: #faf1cf;           /* soft cream (fact panels) */
+    --sun: #C79A3D;           /* accent gold (was yellow) */
+    --grass: #06d6a0;
+    --berry: #ef476f;
+    --grape: #9b5de5;
+    --tangerine: #ff924c;
+    --shadow: 0 10px 24px rgba(80, 0, 4, 0.14);
+    --shadow-lg: 0 18px 44px rgba(80, 0, 4, 0.2);
+    --radius: 22px;
+    --radius-lg: 30px;
+    --focus: 0 0 0 4px #fff, 0 0 0 8px var(--gold);
+    --head-font: 'Baloo 2', 'Trebuchet MS', 'Comic Sans MS', system-ui, sans-serif;
+    --body-font: 'Quicksand', 'Trebuchet MS', system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    font-family: var(--body-font);
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #ffe9c2 0%, transparent 60%),
+      radial-gradient(1100px 700px at 100% 0%, #d9f4ff 0%, transparent 55%),
+      linear-gradient(180deg, #fff8ee 0%, #f3f9ff 100%);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .head { font-family: var(--head-font); }
+  button { font-family: inherit; }
+
+  .skip-link {
+    position: absolute; left: -999px; top: 0; z-index: 200;
+    background: var(--navy); color: #fff; padding: 12px 18px;
+    border-radius: 0 0 14px 0; font-family: var(--head-font); font-weight: 700;
+  }
+  .skip-link:focus { left: 0; }
+
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px 90px; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ---------- Portal nav (links to other portal views) ---------- */
+  .portal-nav {
+    max-width: 1240px; margin: 0 auto; padding: 16px 20px 0;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .portal-nav a {
+    text-decoration: none; padding: 10px 20px; border-radius: 999px;
+    font-family: var(--head-font); font-weight: 700; font-size: .98rem;
+    color: var(--navy); background: #fff; box-shadow: var(--shadow);
+    min-height: 44px; display: inline-flex; align-items: center;
+    transition: transform .1s, box-shadow .12s;
+  }
+  .portal-nav a:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .portal-nav a:focus-visible { outline: none; box-shadow: var(--focus); }
+  .portal-nav a.active { background: var(--blue); color: #fff; }
+
+  /* ============================================================
+     SLIM TOP LOADING BAR — the "instant" signal while streaming
+     ============================================================ */
+  .load-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 4px;
+    z-index: 120; background: transparent; overflow: hidden;
+    opacity: 0; transition: opacity .2s ease; pointer-events: none;
+  }
+  .load-bar.active { opacity: 1; }
+  .load-bar .fill {
+    position: absolute; top: 0; left: 0; height: 100%; width: 42%;
+    border-radius: 0 4px 4px 0;
+    background: linear-gradient(90deg, var(--cream), var(--gold), var(--maroon-bright));
+    animation: slideBar 1s linear infinite;
+  }
+  @keyframes slideBar {
+    0% { transform: translateX(-110%); }
+    100% { transform: translateX(360%); }
+  }
+
+  /* ============================================================
+     HERO — search is the star
+     ============================================================ */
+  .hero {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(900px 460px at 84% -20%, rgba(199,154,61,.55), transparent 60%),
+      radial-gradient(820px 480px at 6% 130%, rgba(233,222,166,.40), transparent 60%),
+      linear-gradient(125deg, #7d0003 0%, #B40005 55%, #d51f24 100%);
+    color: #fff;
+    border-bottom-left-radius: 44px;
+    border-bottom-right-radius: 44px;
+    box-shadow: var(--shadow);
+  }
+  .hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.10) 2px, transparent 2px);
+    background-size: 26px 26px; opacity: .5;
+  }
+
+  .hero-top {
+    max-width: 1240px; margin: 0 auto; padding: 20px 20px 0;
+    display: flex; align-items: center; gap: 14px;
+    position: relative; z-index: 2;
+  }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .brand .logo {
+    font-size: 2.2rem; line-height: 1;
+    background: #fff; border-radius: 18px; padding: 7px 11px;
+    box-shadow: 0 6px 0 rgba(0,0,0,.14);
+  }
+  .brand .b-text h1 { margin: 0; font-size: clamp(1.3rem, 3vw, 1.9rem); font-weight: 800; letter-spacing: .4px; }
+  .brand .b-text p { margin: 1px 0 0; font-weight: 600; opacity: .92; font-size: .9rem; }
+
+  .hero-inner {
+    max-width: 880px; margin: 0 auto; padding: 30px 20px 56px;
+    text-align: center; position: relative; z-index: 2;
+  }
+
+  .mascots { position: relative; height: 78px; margin-bottom: 6px; }
+  .mascot {
+    position: absolute; font-size: 2.6rem; line-height: 1;
+    width: 76px; height: 76px; display: grid; place-items: center;
+    background: rgba(255,255,255,.22); border: 3px solid rgba(255,255,255,.5);
+    border-radius: 50%; box-shadow: 0 8px 0 rgba(0,0,0,.12);
+  }
+  .mascot.m1 { left: 50%; transform: translateX(-50%) rotate(-6deg); top: 0; background: rgba(255,209,102,.34); animation: bobA 4s ease-in-out infinite; }
+  .mascot.m2 { left: 50%; transform: translateX(-152px) rotate(-12deg); top: 14px; font-size: 2rem; width: 60px; height: 60px; animation: bobB 4.6s ease-in-out infinite; }
+  .mascot.m3 { left: 50%; transform: translateX(96px) rotate(11deg); top: 12px; font-size: 2rem; width: 60px; height: 60px; animation: bobB 4.2s ease-in-out .4s infinite; }
+  @keyframes bobA { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-6deg); } 50% { transform: translateX(-50%) translateY(-9px) rotate(-6deg); } }
+  @keyframes bobB { 0%,100% { transform: translateX(var(--tx,96px)) translateY(0) rotate(11deg); } 50% { transform: translateX(var(--tx,96px)) translateY(-7px) rotate(11deg); } }
+  .mascot.m2 { --tx: -152px; }
+  .mascot.m3 { --tx: 96px; }
+
+  .hero h2.headline {
+    font-size: clamp(2rem, 5.4vw, 3.3rem); font-weight: 800; line-height: 1.04;
+    margin: 6px 0 10px; letter-spacing: .3px;
+    text-shadow: 0 3px 0 rgba(0,0,0,.12);
+  }
+  .hero h2.headline .pop { color: var(--sun); }
+  .hero p.sub {
+    font-weight: 600; font-size: clamp(1rem, 2.2vw, 1.2rem);
+    opacity: .94; max-width: 560px; margin: 0 auto 26px;
+  }
+
+  .hero-search {
+    display: flex; align-items: center; gap: 12px;
+    background: #fff; border-radius: 999px;
+    padding: 10px 12px 10px 24px;
+    box-shadow: 0 16px 34px rgba(0,0,0,.25);
+    max-width: 700px; margin: 0 auto;
+    border: 4px solid transparent; transition: border-color .15s, box-shadow .15s;
+  }
+  .hero-search:focus-within { border-color: var(--sun); box-shadow: 0 20px 40px rgba(0,0,0,.3); }
+  .hero-search .mag { font-size: 1.9rem; line-height: 1; }
+  .hero-search input {
+    flex: 1; border: 0; outline: 0; background: transparent; min-width: 0;
+    font-family: var(--body-font); font-weight: 600;
+    font-size: clamp(1.05rem, 2.4vw, 1.35rem); color: var(--ink);
+    padding: 12px 0;
+  }
+  .hero-search input::placeholder { color: #a59ec0; }
+  .hero-search .go {
+    border: 0; cursor: pointer; flex: none;
+    background: var(--maroon); color: #fff;
+    font-family: var(--head-font); font-weight: 800; font-size: 1.05rem;
+    padding: 0 26px; min-height: 56px; border-radius: 999px;
+    box-shadow: 0 6px 0 var(--maroon-dark); transition: transform .1s, box-shadow .1s, background .12s;
+  }
+  .hero-search .go:hover { background: #9a0004; transform: translateY(-2px); box-shadow: 0 8px 0 var(--maroon-dark); }
+  .hero-search .go:active { transform: translateY(3px); box-shadow: 0 3px 0 var(--maroon-dark); }
+  .hero-search .go:focus-visible { outline: none; box-shadow: var(--focus); }
+  .hero-clear {
+    border: 0; background: #f0eefb; color: var(--ink-soft);
+    font-size: 1.3rem; width: 48px; height: 48px; border-radius: 50%;
+    cursor: pointer; flex: none; line-height: 1;
+    display: none; align-items: center; justify-content: center;
+  }
+  .hero-clear.show { display: flex; }
+  .hero-clear:hover { background: #e3dffa; }
+  .hero-clear:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  .hero-quick {
+    margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;
+  }
+  .hero-quick .lbl { font-family: var(--head-font); font-weight: 700; opacity: .85; }
+  .qchip {
+    border: 2px solid rgba(255,255,255,.45); background: rgba(255,255,255,.16);
+    color: #fff; cursor: pointer;
+    font-family: var(--head-font); font-weight: 700; font-size: 1rem;
+    padding: 10px 18px; min-height: 48px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .1s, background .12s;
+  }
+  .qchip:hover { background: rgba(255,255,255,.28); transform: translateY(-2px); }
+  .qchip:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  /* ============================================================
+     BROWSE
+     ============================================================ */
+  .section-title {
+    display: flex; align-items: center; gap: 12px;
+    margin: 46px 0 6px; font-size: 1.6rem; font-weight: 800; color: var(--navy);
+  }
+  .section-title .emoji { font-size: 1.9rem; }
+  .section-sub { font-weight: 600; color: var(--ink-soft); font-size: 1rem; margin: 2px 0 18px; }
+
+  /* Staff Picks strip (instant first paint) */
+  .quick-section { margin-top: 34px; }
+  .quick-strip {
+    display: flex; gap: 16px; overflow-x: auto; padding: 6px 4px 16px;
+    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  }
+  .quick-strip .book-card { min-width: 188px; max-width: 188px; scroll-snap-align: start; }
+  /* Staff pick = book card + librarian's "why we love it" note */
+  .staff-pick {
+    display: flex; flex-direction: column; gap: 10px;
+    min-width: 208px; max-width: 208px; flex: none; scroll-snap-align: start;
+  }
+  .staff-pick .book-card { min-width: 0; max-width: none; width: 100%; }
+  .staff-note {
+    background: linear-gradient(160deg, #fbf3d6 0%, var(--cream) 100%);
+    border: 2px solid #d8c98a; border-radius: 16px;
+    padding: 10px 12px; font-style: italic; font-weight: 600;
+    font-size: .82rem; line-height: 1.32; color: #5a4712;
+    box-shadow: var(--shadow);
+  }
+  .staff-note .heart { font-style: normal; margin-right: 4px; }
+  .quick-skeleton {
+    display: flex; gap: 16px; padding: 6px 4px 16px;
+  }
+  .skel-card {
+    min-width: 188px; max-width: 188px; height: 320px; flex: none;
+    border-radius: var(--radius-lg); background: #eef2f9;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .skel-card::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+    transform: translateX(-100%); animation: shimmer 1.15s infinite;
+  }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+  /* Skeleton tile for browse grids (counts pending) */
+  .tile-skel {
+    border-radius: var(--radius-lg); background: #eef2f9;
+    box-shadow: var(--shadow); position: relative; overflow: hidden;
+    min-height: 150px;
+  }
+  .tile-skel::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+    transform: translateX(-100%); animation: shimmer 1.15s infinite;
+  }
+
+  .genre-grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+  .genre-card {
+    border: 0; cursor: pointer; text-align: center;
+    border-radius: var(--radius-lg); padding: 24px 14px 20px;
+    font-family: var(--head-font); font-weight: 700; color: #1c1530;
+    box-shadow: var(--shadow); position: relative;
+    transition: transform .12s ease, box-shadow .12s ease;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    min-height: 168px; justify-content: center;
+  }
+  .genre-card:hover { transform: translateY(-6px) rotate(-1deg); box-shadow: var(--shadow-lg); }
+  .genre-card:focus-visible { outline: none; box-shadow: var(--focus); }
+  .genre-card:active { transform: translateY(-1px); }
+  .genre-card .gc-icon {
+    font-size: 2.8rem; line-height: 1;
+    background: rgba(255,255,255,.55); border-radius: 50%;
+    width: 84px; height: 84px; display: grid; place-items: center;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.06);
+  }
+  .genre-card .gc-name { font-size: 1.22rem; line-height: 1.12; }
+  .genre-card .gc-count { font-family: var(--body-font); font-weight: 700; font-size: .85rem; opacity: .8; }
+
+  .level-grid {
+    display: grid; gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  }
+  .level-card {
+    border: 0; cursor: pointer; text-align: left;
+    border-radius: var(--radius); padding: 18px 18px 20px;
+    color: #1c1530; font-family: var(--head-font); font-weight: 700;
+    box-shadow: var(--shadow); position: relative;
+    transition: transform .12s ease, box-shadow .12s ease;
+    min-height: 116px; display: flex; flex-direction: column; justify-content: space-between; gap: 6px;
+  }
+  .level-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+  .level-card:focus-visible { outline: none; box-shadow: var(--focus); }
+  .level-card:active { transform: translateY(-1px); }
+  .level-card .lc-icon { font-size: 2.1rem; }
+  .level-card .lc-name { font-size: 1.18rem; line-height: 1.08; }
+  .level-card .lc-count { font-family: var(--body-font); font-weight: 700; font-size: .85rem; opacity: .82; }
+
+  /* ============================================================
+     RESULTS VIEW
+     ============================================================ */
+  #browseView { display: block; }
+  #resultsView { display: none; }
+  body.results-mode #browseView { display: none; }
+  body.results-mode #resultsView { display: block; }
+
+  .results-top {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin: 30px 0 8px;
+  }
+  .back-btn {
+    border: 0; cursor: pointer;
+    background: var(--sun); color: #5a4200;
+    font-family: var(--head-font); font-weight: 800; font-size: 1.05rem;
+    border-radius: 999px; padding: 13px 24px; min-height: 54px;
+    display: inline-flex; align-items: center; gap: 9px;
+    box-shadow: 0 6px 0 #9c7a2e; transition: transform .1s, box-shadow .1s;
+  }
+  .back-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #9c7a2e; }
+  .back-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #9c7a2e; }
+  .back-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  .results-search {
+    display: flex; align-items: center; gap: 10px;
+    background: #fff; border-radius: 999px;
+    padding: 6px 8px 6px 18px; flex: 1; min-width: 240px;
+    box-shadow: var(--shadow); border: 3px solid transparent; transition: border-color .15s;
+  }
+  .results-search:focus-within { border-color: var(--sun); }
+  .results-search .mag { font-size: 1.4rem; line-height: 1; }
+  .results-search input {
+    flex: 1; border: 0; outline: 0; background: transparent; min-width: 0;
+    font-family: var(--body-font); font-weight: 600; font-size: 1.1rem; color: var(--ink);
+    padding: 10px 0;
+  }
+  .results-search input::placeholder { color: #a59ec0; }
+  .results-search .r-clear {
+    border: 0; background: #f0eefb; color: var(--ink-soft);
+    font-size: 1.2rem; width: 44px; height: 44px; border-radius: 50%;
+    cursor: pointer; flex: none; line-height: 1;
+    display: none; align-items: center; justify-content: center;
+  }
+  .results-search .r-clear.show { display: flex; }
+  .results-search .r-clear:hover { background: #e3dffa; }
+  .results-search .r-clear:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  .active-bar {
+    display: none; align-items: center; flex-wrap: wrap; gap: 10px;
+    margin-top: 16px;
+  }
+  .active-bar.show { display: flex; }
+  .active-bar .ab-text { font-family: var(--head-font); font-weight: 700; color: var(--navy); font-size: 1.05rem; }
+  .active-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--head-font); font-weight: 700; font-size: .95rem; color: #1c1530;
+    padding: 8px 14px; border-radius: 999px; box-shadow: var(--shadow);
+  }
+  .active-pill .x {
+    background: rgba(0,0,0,.18); color: #1c1530; border: 0; cursor: pointer;
+    width: 24px; height: 24px; border-radius: 50%; font-size: .95rem; line-height: 1;
+    display: grid; place-items: center;
+  }
+  .active-pill .x:hover { background: rgba(0,0,0,.3); }
+  .active-pill .x:focus-visible { outline: none; box-shadow: var(--focus); }
+  .reset-btn {
+    border: 0; cursor: pointer;
+    background: #fff; color: var(--navy);
+    font-family: var(--head-font); font-weight: 800; font-size: .98rem;
+    border-radius: 999px; padding: 10px 18px; min-height: 44px;
+    box-shadow: var(--shadow); display: inline-flex; align-items: center; gap: 7px;
+    transition: transform .1s;
+  }
+  .reset-btn:hover { transform: translateY(-2px); }
+  .reset-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  .avail-toggle { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .chip {
+    border: 3px solid #e6ddc4; background: #fff; cursor: pointer;
+    border-radius: 999px; padding: 11px 20px; min-height: 50px;
+    font-family: var(--head-font); font-weight: 700; font-size: 1rem; color: var(--navy);
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .1s, background .12s, border-color .12s;
+  }
+  .chip:hover { transform: translateY(-2px); }
+  .chip:focus-visible { outline: none; box-shadow: var(--focus); }
+  .chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .chip.avail[aria-pressed="true"] { background: var(--grass); border-color: var(--grass); color: #06402c; }
+
+  .results-head {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    margin: 30px 0 16px;
+  }
+  .results-head h2 { margin: 0; font-size: 1.6rem; color: var(--navy); font-weight: 800; }
+  .results-head .count {
+    font-family: var(--body-font); font-weight: 700; color: var(--ink-soft);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .count .spin {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 3px solid #e6ddc4; border-top-color: var(--gold);
+    animation: spin .7s linear infinite; display: none;
+  }
+  .count.streaming .spin { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-hint {
+    font-family: var(--body-font); font-weight: 600; font-size: .9rem; color: var(--ink-soft);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .loading-hint[hidden] { display: none; }
+
+  .book-grid {
+    display: grid; gap: 22px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+  .book-card {
+    border: 0; cursor: pointer; text-align: left;
+    background: #fff; border-radius: var(--radius-lg); padding: 16px;
+    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 12px;
+    transition: transform .12s ease, box-shadow .12s ease;
+    font-family: var(--body-font);
+  }
+  .book-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+  .book-card:focus-visible { outline: none; box-shadow: var(--focus); }
+  .book-card.stream-in { animation: cardIn .3s ease both; }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .cover {
+    position: relative; border-radius: 14px; overflow: hidden;
+    aspect-ratio: 3 / 4; width: 100%;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 16px 14px; color: #fff;
+    box-shadow: inset -8px 0 14px rgba(0,0,0,.18), inset 4px 0 0 rgba(255,255,255,.28);
+    font-family: var(--head-font);
+  }
+  .cover::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 12px;
+    background: rgba(0,0,0,.22);
+    box-shadow: inset -2px 0 4px rgba(0,0,0,.25);
+  }
+  .cover .c-genre {
+    align-self: flex-end; font-size: 1.7rem; line-height: 1;
+    background: rgba(255,255,255,.3); border-radius: 12px; padding: 6px 8px;
+  }
+  .cover .c-title {
+    font-size: 1.12rem; font-weight: 800; line-height: 1.12;
+    text-shadow: 0 2px 4px rgba(0,0,0,.35);
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .cover .c-author {
+    font-family: var(--body-font); font-weight: 700; font-size: .82rem;
+    opacity: .95; text-shadow: 0 1px 3px rgba(0,0,0,.35); margin-top: 4px;
+  }
+  /* Real cover image (with onerror fallback to the CSS placeholder above) */
+  .cover-img {
+    position: relative; border-radius: 14px; overflow: hidden;
+    aspect-ratio: 3 / 4; width: 100%; background: #e6ecf5;
+    box-shadow: inset -8px 0 14px rgba(0,0,0,.12), inset 4px 0 0 rgba(255,255,255,.28);
+    display: block;
+  }
+  .cover-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .book-card .bc-title {
+    font-family: var(--head-font); font-weight: 700; font-size: 1.12rem; line-height: 1.15; color: var(--ink);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .book-card .bc-author { font-weight: 700; color: var(--ink-soft); font-size: .92rem; margin-top: -6px; }
+
+  .level-chip {
+    display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+    font-family: var(--head-font); font-weight: 700; font-size: .82rem;
+    padding: 5px 12px; border-radius: 999px; color: #1c1530;
+  }
+  .avail-pill {
+    display: inline-flex; align-items: center; gap: 7px; align-self: flex-start;
+    font-family: var(--head-font); font-weight: 700; font-size: .9rem;
+    padding: 7px 13px; border-radius: 999px;
+  }
+  .avail-green { background: #d6f7e9; color: #06623b; }
+  .avail-red   { background: #ffe1e6; color: #9c1c39; }
+  .avail-pill .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .avail-green .dot { background: var(--grass); }
+  .avail-red .dot   { background: var(--berry); }
+
+  .empty {
+    display: none; text-align: center; padding: 56px 20px;
+    background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  }
+  .empty.show { display: block; }
+  .empty .face { font-size: 4.5rem; }
+  .empty h3 { font-size: 1.6rem; color: var(--navy); margin: 10px 0 6px; }
+  .empty p { font-weight: 600; color: var(--ink-soft); font-size: 1.1rem; margin: 0 0 18px; }
+  .empty .reset-btn { margin: 0 auto; background: var(--sun); color: #5a4200; box-shadow: 0 5px 0 #9c7a2e; }
+  .empty .reset-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #9c7a2e; }
+
+  /* ---------- Page-level states (error / empty catalog) ---------- */
+  .pagestate {
+    display: none; text-align: center; padding: 70px 20px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .pagestate.show { display: block; }
+  .pagestate .face { font-size: 4.5rem; }
+  .pagestate h3 { font-size: 1.6rem; color: var(--navy); margin: 14px 0 6px; }
+  .pagestate p { font-weight: 600; color: var(--ink-soft); font-size: 1.1rem; margin: 0; }
+
+  /* ============================================================
+     MODAL
+     ============================================================ */
+  .backdrop {
+    position: fixed; inset: 0; background: rgba(26, 36, 64, .55);
+    backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; z-index: 50;
+  }
+  .backdrop.show { display: flex; animation: fade .18s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: #fff; border-radius: var(--radius-lg); max-width: 720px; width: 100%;
+    max-height: 90vh; overflow: auto; box-shadow: var(--shadow-lg);
+    position: relative; animation: pop .2s ease;
+  }
+  @keyframes pop { from { transform: scale(.92) translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .modal-top {
+    display: grid; grid-template-columns: 180px 1fr; gap: 24px;
+    padding: 28px 28px 8px;
+  }
+  .modal .cover, .modal .cover-img { box-shadow: inset -8px 0 14px rgba(0,0,0,.18), inset 4px 0 0 rgba(255,255,255,.28), var(--shadow); }
+  .modal h2 { margin: 0 0 4px; font-size: 1.7rem; color: var(--ink); line-height: 1.12; }
+  .modal .m-author { font-weight: 700; color: var(--ink-soft); font-size: 1.1rem; margin: 0 0 14px; }
+  .modal .m-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .modal .genre-tag {
+    font-family: var(--head-font); font-weight: 700; font-size: .85rem;
+    padding: 6px 13px; border-radius: 999px; color: #1c1530;
+  }
+  .modal-body { padding: 8px 28px 28px; }
+  .modal .blurb { font-weight: 600; font-size: 1.08rem; line-height: 1.5; color: var(--ink); margin: 6px 0 20px; }
+  .modal .blurb.empty { color: #a59ec0; font-style: italic; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .fact { background: var(--sky); border-radius: 16px; padding: 12px 14px; }
+  .fact .f-label { font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: var(--maroon); }
+  .fact .f-value { font-family: var(--head-font); font-weight: 700; font-size: 1.05rem; color: var(--ink); margin-top: 3px; }
+  .close-btn {
+    position: absolute; top: 14px; right: 14px;
+    border: 0; cursor: pointer; background: #fff; color: var(--navy);
+    width: 52px; height: 52px; border-radius: 50%; font-size: 1.6rem; line-height: 1;
+    box-shadow: var(--shadow); display: grid; place-items: center; z-index: 2;
+    transition: transform .1s, background .12s;
+  }
+  .close-btn:hover { background: var(--berry); color: #fff; transform: rotate(90deg); }
+  .close-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+
+  @media (max-width: 560px) {
+    .modal-top { grid-template-columns: 1fr; }
+    .modal .cover, .modal .cover-img { max-width: 200px; margin: 0 auto; }
+    .hero-search { flex-wrap: wrap; border-radius: 28px; padding: 14px 16px; }
+    .hero-search .go { width: 100%; }
+    .mascot.m2, .mascot.m3 { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .book-card.stream-in { animation: none; }
+    .load-bar .fill { animation: none; width: 100%; transform: none; }
+    .skel-card::after, .tile-skel::after { animation: none; }
+    .count .spin { animation: none; }
+    .mascot.m1, .mascot.m2, .mascot.m3 { animation: none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#browseView">Skip to content</a>
+
+<!-- Slim top loading bar -->
+<div class="load-bar" id="loadBar" aria-hidden="true"><div class="fill"></div></div>
+
+<!-- ---------- Portal nav (links to other portal views) ---------- -->
+<nav class="portal-nav" aria-label="Portal navigation">
+  <a href="#" class="active">Catalog</a>
+  <a href="#?view=studentbooks">My Books</a>
+  <a href="#?view=parentlogin">Parent Login</a>
+</nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="hero-top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">📚</span>
+      <div class="b-text">
+        <h1>HCS Library Catalog</h1>
+        <p>Harford Christian School</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-inner">
+    <div class="mascots" aria-hidden="true">
+      <span class="mascot m2">🦉</span>
+      <span class="mascot m1">📖</span>
+      <span class="mascot m3">🐉</span>
+    </div>
+    <h2 class="headline">Find your next <span class="pop">favorite book!</span></h2>
+    <p class="sub">Start typing — results pop in the instant you type, no waiting.</p>
+
+    <form class="hero-search" id="heroForm" role="search">
+      <span class="mag" aria-hidden="true">🔍</span>
+      <label class="sr-only" for="heroInput">Search books by title or author</label>
+      <input id="heroInput" type="search" autocomplete="off"
+             placeholder="Try a title or an author&hellip;" />
+      <button class="hero-clear" id="heroClear" type="button" aria-label="Clear search">✕</button>
+      <button class="go" type="submit">Search</button>
+    </form>
+
+    <div class="hero-quick" id="heroQuick" role="group" aria-label="Quick filters">
+      <span class="lbl">Popular:</span>
+      <button type="button" class="qchip" data-quick-avail="1">✅ Available now</button>
+      <!-- top genre chips injected from real counts -->
+    </div>
+  </div>
+</header>
+
+<!-- ================= BROWSE ================= -->
+<div id="browseView" class="wrap">
+  <section class="quick-section" id="staffSection" aria-labelledby="qpHeading">
+    <div class="section-title" id="qpHeading">
+      <span class="emoji" aria-hidden="true">❤️</span>
+      <span>Staff Picks</span>
+    </div>
+    <p class="section-sub">Loved by Mrs. Dombeck &amp; the library team</p>
+    <div class="quick-strip" id="quickStrip" role="group" aria-label="Staff Picks">
+      <div class="quick-skeleton" id="quickSkeleton" aria-hidden="true">
+        <div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div>
+        <div class="skel-card"></div><div class="skel-card"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="genreSection" aria-labelledby="catHeading">
+    <div class="section-title" id="catHeading">
+      <span class="emoji" aria-hidden="true">✨</span>
+      <span>What do you like?</span>
+    </div>
+    <p class="section-sub">Tap a category to explore those books.</p>
+    <div class="genre-grid" id="genreGrid" role="group" aria-label="Browse by category"></div>
+  </section>
+
+  <section id="levelSection" aria-labelledby="lvlHeading">
+    <div class="section-title" id="lvlHeading">
+      <span class="emoji" aria-hidden="true">🌈</span>
+      <span>Books for me</span>
+    </div>
+    <p class="section-sub">Pick your reading level — each color helps you find books that are just right.</p>
+    <div class="level-grid" id="levelGrid" role="group" aria-label="Browse by reading level"></div>
+  </section>
+</div>
+
+<!-- ================= RESULTS ================= -->
+<main id="resultsView" class="wrap">
+  <div class="results-top">
+    <button class="back-btn" id="backBtn" type="button"><span aria-hidden="true">↺</span> Start over</button>
+    <div class="results-search">
+      <span class="mag" aria-hidden="true">🔍</span>
+      <label class="sr-only" for="resultsInput">Search books by title or author</label>
+      <input id="resultsInput" type="search" autocomplete="off" placeholder="Search title or author…" />
+      <button class="r-clear" id="resultsClear" type="button" aria-label="Clear search">✕</button>
+    </div>
+  </div>
+
+  <div class="avail-toggle" role="group" aria-label="Show which books">
+    <button class="chip avail" id="availAll" type="button" aria-pressed="true">📖 All books</button>
+    <button class="chip avail" id="availNow" type="button" aria-pressed="false">✅ On the shelf now</button>
+  </div>
+
+  <div class="active-bar" id="activeBar">
+    <span class="ab-text">Showing:</span>
+    <span id="activePills"></span>
+    <button class="reset-btn" id="resetBtn" type="button"><span aria-hidden="true">↺</span> Clear all</button>
+  </div>
+
+  <div class="results-head">
+    <h2 id="resultsTitle">All Books</h2>
+    <span class="count" id="resultsCount" role="status" aria-live="polite" aria-atomic="true">
+      <span class="spin" aria-hidden="true"></span><span id="countText"></span>
+    </span>
+    <span class="loading-hint" id="loadingHint" hidden></span>
+  </div>
+
+  <div class="book-grid" id="bookGrid"></div>
+
+  <div class="empty" id="emptyState">
+    <div class="face" aria-hidden="true">🐛📭</div>
+    <h3>Hmm, no books here yet!</h3>
+    <p>Try a different word, or tap "Start over" to see everything.</p>
+    <button class="reset-btn" id="emptyReset" type="button"><span aria-hidden="true">↺</span> Start over</button>
+  </div>
+</main>
+
+<!-- ================= PAGE-LEVEL STATES ================= -->
+<div class="pagestate" id="errorState" role="alert">
+  <div class="face" aria-hidden="true">😟📚</div>
+  <h3>We couldn't load the catalog</h3>
+  <p id="errorMsg"></p>
+</div>
+<div class="pagestate" id="emptyCatalogState">
+  <div class="face" aria-hidden="true">📭</div>
+  <h3>No books in the catalog yet</h3>
+  <p>Check back soon — books are on their way!</p>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div class="backdrop" id="backdrop">
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <button class="close-btn" id="closeModal" type="button" aria-label="Close book details">✕</button>
+    <div class="modal-top">
+      <div id="modalCover"></div>
+      <div>
+        <h2 id="modalTitle"></h2>
+        <p class="m-author" id="modalAuthor"></p>
+        <div class="m-chips" id="modalChips"></div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <p class="blurb" id="modalBlurb"></p>
+      <div class="facts" id="modalFacts"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =================== Kid-friendly metadata =================== */
+/* Genre + level visuals are keyed by exact string; unknown values fall back gracefully
+   through a cycled palette so real-data genres/levels we don't have art for still look good. */
+var GENRE_COLORS = {
+  'Picture Book': '#f6ad55', 'Early Reader': '#f6e05e', 'Chapter Book': '#68d391',
+  'Middle Grade': '#4fd1c5', 'Graphic Novel': '#fc8181', 'Non-Fiction': '#63b3ed',
+  'Nonfiction': '#63b3ed', 'Poetry': '#b794f4', 'Adventure': '#ed8936',
+  'Mystery': '#a0aec0', 'Fantasy': '#9f7aea', 'Sci-Fi': '#4299e1',
+  'Science Fiction': '#4299e1', 'Historical Fiction': '#d69e2e', 'Biography': '#38b2ac',
+  'Realistic Fiction': '#f687b3', 'Humor': '#f6e05e', 'Fiction': '#7f9cf5'
+};
+var GENRE_ICONS = {
+  'Picture Book': '🖍️', 'Early Reader': '🐣', 'Chapter Book': '📘', 'Middle Grade': '🎒',
+  'Graphic Novel': '💥', 'Non-Fiction': '🔬', 'Nonfiction': '🔬', 'Poetry': '🎵',
+  'Adventure': '🗺️', 'Mystery': '🕵️', 'Fantasy': '🐉', 'Sci-Fi': '🚀',
+  'Science Fiction': '🚀', 'Historical Fiction': '🏰', 'Biography': '⭐',
+  'Realistic Fiction': '🌟', 'Humor': '😂', 'Fiction': '📖'
+};
+var PALETTE = ['#f6ad55','#68d391','#4fd1c5','#fc8181','#63b3ed','#b794f4','#ed8936','#9f7aea','#4299e1','#d69e2e','#38b2ac','#f687b3','#7f9cf5','#f6e05e'];
+var LEVEL_ICONS = ['🧸','🌟','🐢','🚲','🛼','🚀','🏆','📗','🎈','🦊'];
+
+var _genreColorCache = {}, _levelColorCache = {}, _levelIconCache = {}, _paletteIdx = 0;
+function genreColor(g) {
+  if (!g) return '#90cdf4';
+  if (GENRE_COLORS[g]) return GENRE_COLORS[g];
+  if (!_genreColorCache[g]) { _genreColorCache[g] = PALETTE[_paletteIdx % PALETTE.length]; _paletteIdx++; }
+  return _genreColorCache[g];
+}
+function genreIcon(g) { return GENRE_ICONS[g] || '📖'; }
+var _levelIdx = 0;
+function levelColor(l) {
+  if (!l) return '#cbd5e0';
+  if (!_levelColorCache[l]) {
+    _levelColorCache[l] = PALETTE[(_levelIdx + 3) % PALETTE.length];
+    _levelIconCache[l] = LEVEL_ICONS[_levelIdx % LEVEL_ICONS.length];
+    _levelIdx++;
+  }
+  return _levelColorCache[l];
+}
+function levelIcon(l) { levelColor(l); return _levelIconCache[l] || '📗'; }
+
+/* =================== State =================== */
+var ALL = [];                 // full lightweight inventory index (order preserved)
+var STAFF = [];               // staff picks (may not all be present in ALL yet)
+var detailCache = {};         // uid -> { description, callNumber }
+var indexLoaded = false;      // true once the full inventory has streamed in
+var state = { search: '', genre: null, level: null, availableOnly: false, view: 'browse' };
+
+/* =================== Helpers =================== */
+function $(sel) { return document.querySelector(sel); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+  });
+}
+function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function debounce(fn, ms) {
+  var t = null;
+  return function () {
+    var args = arguments, self = this;
+    clearTimeout(t);
+    t = setTimeout(function () { fn.apply(self, args); }, ms);
+  };
+}
+
+function isOut(b) { return String(b.status).toLowerCase() === 'out'; }
+function isAvailable(b) { return !isOut(b); }
+function dueText(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+/* Availability is derived from status only — green (available) / red (checked out). */
+function availInfo(b) {
+  if (isOut(b)) {
+    var dt = dueText(b.dueDate);
+    return { cls: 'avail-red', short: 'Checked out', label: 'Checked out' + (dt ? ' · Due ' + dt : '') };
+  }
+  return { cls: 'avail-green', short: 'Available', label: 'Available now' };
+}
+
+/* darken a hex color by pct (negative = darker) */
+function shade(hex, pct) {
+  var n = parseInt(hex.slice(1), 16);
+  var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  var f = function (v) { return Math.max(0, Math.min(255, Math.round(v + (v * pct) / 100))); };
+  return '#' + [f(r), f(g), f(b)].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+}
+/* lighten a hex toward white by pct */
+function tint(hex, pct) {
+  var n = parseInt(hex.slice(1), 16);
+  var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  var f = function (v) { return Math.round(v + (255 - v) * (pct / 100)); };
+  return '#' + [f(r), f(g), f(b)].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+}
+
+/* =================== Cover (real image OR CSS placeholder) =================== */
+function placeholderCoverHTML(b) {
+  var c = genreColor(b.genre);
+  return (
+    '<div class="cover" style="background:linear-gradient(150deg,' + c + ' 0%,' + shade(c, -22) + ' 100%);">' +
+      '<span class="c-genre" aria-hidden="true">' + genreIcon(b.genre) + '</span>' +
+      '<div>' +
+        '<div class="c-title">' + esc(b.title) + '</div>' +
+        '<div class="c-author">' + esc(b.author) + '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+function coverHTML(b) {
+  if (b.coverUrl) {
+    // Real image; if it fails to load, coverFallback swaps in the genre-colored placeholder.
+    // Genre/title/author are stashed on the img so the fallback works without a lookup.
+    return (
+      '<div class="cover-img">' +
+        '<img src="' + esc(b.coverUrl) + '" alt="Cover of ' + esc(b.title) + '" loading="lazy" ' +
+          'data-genre="' + esc(b.genre) + '" data-title="' + esc(b.title) + '" data-author="' + esc(b.author) + '" ' +
+          'onerror="coverFallback(this)">' +
+      '</div>'
+    );
+  }
+  return placeholderCoverHTML(b);
+}
+function coverFallback(img) {
+  var wrap = img.closest('.cover-img');
+  if (!wrap) { img.style.display = 'none'; return; }
+  var b = {
+    genre: img.getAttribute('data-genre'),
+    title: img.getAttribute('data-title'),
+    author: img.getAttribute('data-author')
+  };
+  wrap.outerHTML = placeholderCoverHTML(b);
+}
+
+/* =================== Book card =================== */
+function bookCardHTML(b, streamIn) {
+  var a = availInfo(b);
+  var levelHTML = b.readingLevel
+    ? '<span class="level-chip" style="background:' + levelColor(b.readingLevel) + ';">' + levelIcon(b.readingLevel) + ' ' + esc(b.readingLevel) + '</span>'
+    : '';
+  var ariaLevel = b.readingLevel ? ', ' + b.readingLevel : '';
+  return (
+    '<button class="book-card' + (streamIn ? ' stream-in' : '') + '" type="button" data-uid="' + esc(b.uid) + '" ' +
+      'aria-label="' + esc(b.title) + ' by ' + esc(b.author) + esc(ariaLevel) + ', ' + esc(a.label) + '. View details.">' +
+      coverHTML(b) +
+      levelHTML +
+      '<div class="bc-title">' + esc(b.title) + '</div>' +
+      '<div class="bc-author">by ' + esc(b.author) + '</div>' +
+      '<span class="avail-pill ' + a.cls + '"><span class="dot" aria-hidden="true"></span>' + a.short + '</span>' +
+    '</button>'
+  );
+}
+
+function bookByUid(uid) {
+  var key = String(uid);
+  var i;
+  for (i = 0; i < ALL.length; i++) { if (String(ALL[i].uid) === key) return ALL[i]; }
+  for (i = 0; i < STAFF.length; i++) { if (String(STAFF[i].uid) === key) return STAFF[i]; }
+  return null;
+}
+
+/* =================== Loading bar =================== */
+var barCount = 0;
+function showBar() { barCount++; $('#loadBar').classList.add('active'); }
+function hideBar() { barCount = Math.max(0, barCount - 1); if (barCount === 0) $('#loadBar').classList.remove('active'); }
+
+/* =================== Staff Picks strip (fed by getStaffPicks) =================== */
+function staffPickHTML(b) {
+  var note = b.note
+    ? '<p class="staff-note"><span class="heart" aria-hidden="true">❤️</span>' + esc(b.note) + '</p>'
+    : '';
+  return '<div class="staff-pick">' + bookCardHTML(b, false) + note + '</div>';
+}
+function renderStaffPicks(picks) {
+  STAFF = (picks || []).filter(function (b) { return b && b.uid; });
+  var section = $('#staffSection');
+  if (!STAFF.length) { section.style.display = 'none'; return; }   // hide the whole strip if empty
+  $('#quickStrip').innerHTML = STAFF.map(staffPickHTML).join('');
+}
+function loadStaffPicks() {
+  google.script.run
+    .withSuccessHandler(renderStaffPicks)
+    .withFailureHandler(function () { $('#staffSection').style.display = 'none'; })
+    .getStaffPicks();
+}
+
+/* =================== Browse tiles (fed by getBrowseCounts) =================== */
+function tileSkeletons(n) {
+  var s = '';
+  for (var i = 0; i < n; i++) s += '<div class="tile-skel" aria-hidden="true"></div>';
+  return s;
+}
+function renderBrowseTiles(counts) {
+  var genres = (counts && counts.genres) || [];
+  var levels = (counts && counts.levels) || [];
+
+  // Genre tiles — only genres that actually exist in the data.
+  if (!genres.length) { $('#genreSection').style.display = 'none'; }
+  else {
+    $('#genreGrid').innerHTML = genres.map(function (g) {
+      var c = genreColor(g.name), n = g.count;
+      return (
+        '<button class="genre-card" type="button" data-genre="' + esc(g.name) + '" ' +
+          'aria-label="Browse ' + esc(g.name) + ', ' + n + ' books" ' +
+          'style="background:linear-gradient(165deg,' + tint(c, 40) + ' 0%,' + c + ' 100%);">' +
+          '<span class="gc-icon" aria-hidden="true">' + genreIcon(g.name) + '</span>' +
+          '<span class="gc-name">' + esc(g.name) + '</span>' +
+          '<span class="gc-count">' + n + ' book' + (n === 1 ? '' : 's') + '</span>' +
+        '</button>'
+      );
+    }).join('');
+  }
+
+  // Reading-level tiles — only levels that exist.
+  if (!levels.length) { $('#levelSection').style.display = 'none'; }
+  else {
+    $('#levelGrid').innerHTML = levels.map(function (lv) {
+      var c = levelColor(lv.name), n = lv.count;
+      return (
+        '<button class="level-card" type="button" data-level="' + esc(lv.name) + '" ' +
+          'aria-label="Browse books for ' + esc(lv.name) + ', ' + n + ' books" ' +
+          'style="background:linear-gradient(160deg,' + c + ' 0%,' + shade(c, -16) + ' 100%);">' +
+          '<span class="lc-icon" aria-hidden="true">' + levelIcon(lv.name) + '</span>' +
+          '<span class="lc-name">' + esc(lv.name) + '</span>' +
+          '<span class="lc-count">' + n + ' book' + (n === 1 ? '' : 's') + '</span>' +
+        '</button>'
+      );
+    }).join('');
+  }
+
+  // Hero quick chips from the top genres (already sorted desc by count server-side).
+  var top = genres.slice(0, 3);
+  if (top.length) {
+    var html = top.map(function (g) {
+      return '<button type="button" class="qchip" data-quick-genre="' + esc(g.name) + '">' + genreIcon(g.name) + ' ' + esc(g.name) + '</button>';
+    }).join('');
+    $('#heroQuick').insertAdjacentHTML('beforeend', html);
+  }
+}
+function loadBrowseCounts() {
+  $('#genreGrid').innerHTML = tileSkeletons(6);
+  $('#levelGrid').innerHTML = tileSkeletons(5);
+  google.script.run
+    .withSuccessHandler(renderBrowseTiles)
+    .withFailureHandler(function () {
+      // Non-fatal: tiles just don't appear. Search still works off the full index.
+      $('#genreSection').style.display = 'none';
+      $('#levelSection').style.display = 'none';
+    })
+    .getBrowseCounts();
+}
+
+/* =================== Client-side filtering =================== */
+function matchAll() {
+  var q = state.search.trim().toLowerCase();
+  return ALL.filter(function (b) {
+    if (q && !(String(b.title).toLowerCase().indexOf(q) >= 0 || String(b.author).toLowerCase().indexOf(q) >= 0)) return false;
+    if (state.genre && b.genre !== state.genre) return false;
+    if (state.level && b.readingLevel !== state.level) return false;
+    if (state.availableOnly && !isAvailable(b)) return false;
+    return true;
+  });
+}
+
+/* =================== Results: incremental streaming render =================== */
+var STREAM_BATCH = 24;   // cards rendered per visible batch
+var searchToken = 0;     // any newer keystroke/filter cancels an in-flight render
+
+function setResultsTitle() {
+  var title = 'All Books';
+  if (state.genre && state.level) title = state.genre + ' · ' + state.level;
+  else if (state.genre) title = state.genre;
+  else if (state.level) title = 'Books for ' + state.level;
+  else if (state.availableOnly) title = 'On the shelf now';
+  else if (state.search.trim()) title = 'Search results';
+  $('#resultsTitle').textContent = title;
+}
+function updateCountText(loaded, total, streaming) {
+  var el = $('#resultsCount');
+  var txt = $('#countText');
+  el.classList.toggle('streaming', !!streaming);
+  if (streaming && loaded < total) {
+    txt.textContent = 'Showing ' + loaded + ' of ' + total + '…';
+  } else {
+    txt.textContent = total === 0 ? 'No books' : (total === 1 ? '1 book' : total + ' books');
+  }
+}
+function updateLoadingHint() {
+  var el = $('#loadingHint');
+  if (!el) return;
+  el.hidden = indexLoaded || state.view !== 'results';
+  if (!el.hidden && !el.textContent) el.textContent = '… still loading the rest of the catalog';
+}
+
+async function runSearch() {
+  var token = ++searchToken;
+  setResultsTitle();
+  buildActivePills();
+
+  var grid = $('#bookGrid');
+  grid.innerHTML = '';
+  grid.style.display = '';
+  $('#emptyState').classList.remove('show');
+  updateLoadingHint();
+
+  var list = matchAll();
+  var total = list.length;
+  updateCountText(0, total, true);
+  showBar();
+
+  var loaded = 0;
+  try {
+    while (loaded < total) {
+      var batch = list.slice(loaded, loaded + STREAM_BATCH);
+      var frag = document.createElement('div');
+      frag.innerHTML = batch.map(function (b) { return bookCardHTML(b, true); }).join('');
+      while (frag.firstChild) grid.appendChild(frag.firstChild);
+      loaded += batch.length;
+      updateCountText(loaded, total, true);
+      if (loaded >= total) break;
+      await wait(55);                        // small gap so batches visibly stream in
+      if (token !== searchToken) return;     // superseded by a newer search
+    }
+  } finally {
+    if (token === searchToken) hideBar();
+  }
+  if (token !== searchToken) return;
+
+  updateCountText(loaded, total, false);
+  var isEmpty = total === 0;
+  $('#emptyState').classList.toggle('show', isEmpty);
+  grid.style.display = isEmpty ? 'none' : '';
+}
+
+/* =================== View switching =================== */
+function goToResults() {
+  state.view = 'results';
+  document.body.classList.add('results-mode');
+  $('#resultsInput').value = state.search;
+  syncClears();
+  runSearch();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  $('#resultsInput').focus({ preventScroll: true });
+}
+function goToBrowse() {
+  state.view = 'browse';
+  document.body.classList.remove('results-mode');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function resetFilters() {
+  state.search = ''; state.genre = null; state.level = null; state.availableOnly = false;
+  $('#heroInput').value = ''; $('#resultsInput').value = '';
+  syncClears();
+}
+function syncClears() {
+  $('#heroClear').classList.toggle('show', state.search.length > 0);
+  $('#resultsClear').classList.toggle('show', state.search.length > 0);
+}
+
+/* =================== Active filter pills =================== */
+function buildActivePills() {
+  $('#availAll').setAttribute('aria-pressed', String(!state.availableOnly));
+  $('#availNow').setAttribute('aria-pressed', String(state.availableOnly));
+
+  var pills = [];
+  if (state.search.trim()) pills.push({ key: 'search', label: '“' + state.search.trim() + '”', color: '#f0e6c6' });
+  if (state.genre) pills.push({ key: 'genre', label: genreIcon(state.genre) + ' ' + state.genre, color: genreColor(state.genre) });
+  if (state.level) pills.push({ key: 'level', label: levelIcon(state.level) + ' ' + state.level, color: levelColor(state.level) });
+  if (state.availableOnly) pills.push({ key: 'avail', label: '✅ On the shelf now', color: '#c8f6e4' });
+
+  $('#activeBar').classList.toggle('show', pills.length > 0);
+  $('#activePills').innerHTML = pills.map(function (p) {
+    return '<span class="active-pill" style="background:' + p.color + ';">' + esc(p.label) +
+      ' <button class="x" type="button" data-clear="' + p.key + '" aria-label="Remove filter ' + esc(p.label) + '">✕</button></span>';
+  }).join('');
+}
+function clearOne(key) {
+  if (key === 'search') { state.search = ''; $('#heroInput').value = ''; $('#resultsInput').value = ''; }
+  else if (key === 'genre') state.genre = null;
+  else if (key === 'level') state.level = null;
+  else if (key === 'avail') state.availableOnly = false;
+  syncClears();
+  runSearch();
+}
+
+/* =================== Modal (detail fetched on demand) =================== */
+var lastFocus = null;
+function openModal(uid) {
+  var b = bookByUid(uid);
+  if (!b) return;
+  lastFocus = document.activeElement;
+  var a = availInfo(b);
+
+  $('#modalCover').innerHTML = coverHTML(b);
+  $('#modalTitle').textContent = b.title;
+  $('#modalAuthor').textContent = b.author ? 'by ' + b.author : '';
+
+  var chips = '';
+  if (b.genre) chips += '<span class="genre-tag" style="background:' + genreColor(b.genre) + ';">' + genreIcon(b.genre) + ' ' + esc(b.genre) + '</span>';
+  if (b.readingLevel) chips += '<span class="genre-tag" style="background:' + levelColor(b.readingLevel) + ';">' + levelIcon(b.readingLevel) + ' ' + esc(b.readingLevel) + '</span>';
+  chips += '<span class="avail-pill ' + a.cls + '"><span class="dot" aria-hidden="true"></span>' + a.label + '</span>';
+  $('#modalChips').innerHTML = chips;
+
+  var blurb = $('#modalBlurb');
+  blurb.classList.remove('empty');
+  blurb.textContent = 'Loading…';
+
+  renderFacts(b, null);   // call number filled in once detail returns
+
+  $('#backdrop').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  $('#closeModal').focus();
+
+  loadDetail(b);
+}
+function renderFacts(b, detail) {
+  var facts = [];
+  if (b.readingLevel) facts.push({ label: 'Reading Level', value: b.readingLevel });
+  if (b.genre) facts.push({ label: 'Genre', value: b.genre });
+  if (isOut(b)) {
+    var dt = dueText(b.dueDate);
+    facts.push({ label: 'Status', value: dt ? 'Due back ' + dt : 'Checked out' });
+  } else {
+    facts.push({ label: 'Status', value: 'Available now' });
+  }
+  if (detail && detail.callNumber) facts.push({ label: 'Call Number', value: detail.callNumber });
+  $('#modalFacts').innerHTML = facts.map(function (f) {
+    return '<div class="fact"><div class="f-label">' + esc(f.label) + '</div>' +
+      '<div class="f-value">' + esc(f.value) + '</div></div>';
+  }).join('');
+}
+function applyDetail(b, detail) {
+  var blurb = $('#modalBlurb');
+  if (detail && detail.description) {
+    blurb.classList.remove('empty');
+    blurb.textContent = detail.description;
+  } else {
+    blurb.classList.add('empty');
+    blurb.textContent = 'No description available yet.';
+  }
+  renderFacts(b, detail);
+}
+function loadDetail(b) {
+  var uid = String(b.uid);
+  if (detailCache[uid]) { applyDetail(b, detailCache[uid]); return; }
+  google.script.run
+    .withSuccessHandler(function (d) {
+      var detail = d || { description: '', callNumber: '' };
+      detailCache[uid] = detail;
+      if ($('#backdrop').classList.contains('show') && $('#modalTitle').textContent === b.title) {
+        applyDetail(b, detail);
+      }
+    })
+    .withFailureHandler(function () {
+      if ($('#backdrop').classList.contains('show') && $('#modalTitle').textContent === b.title) {
+        applyDetail(b, { description: '', callNumber: '' });
+      }
+    })
+    .getBookDetail(uid);
+}
+function closeModal() {
+  $('#backdrop').classList.remove('show');
+  document.body.style.overflow = '';
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+
+/* ========= Adaptive paged inventory load (shrinks the chunk until it transfers) ========= */
+var PAGE_SIZE = 500;   // auto-halves if a chunk is still too big to come back
+var PAGE_MIN = 40;
+
+function loadInventoryPaged() { ALL = []; showBar(); loadNextPage(0); }
+
+function loadNextPage(offset) {
+  google.script.run
+    .withSuccessHandler(function (res) { onPage(res, offset); })
+    .withFailureHandler(function (err) { onPageError(err, offset); })
+    .getInventoryPage(offset, PAGE_SIZE);
+}
+
+function onPage(res, offset) {
+  // A too-large response can come back null/empty even though the server has data — shrink & retry.
+  if (!res || !res.books || (res.total > offset && res.books.length === 0)) {
+    return shrinkAndRetry(offset, 'empty response (chunk too big?)');
+  }
+  for (var i = 0; i < res.books.length; i++) ALL.push(res.books[i]);
+  var total = res.total || ALL.length;
+  setLoadMsg('… still loading (' + ALL.length + ' of ' + total + ')');
+  if (ALL.length < total) { loadNextPage(ALL.length); return; }
+  finishLoad();
+}
+
+function onPageError(err, offset) {
+  if (PAGE_SIZE > PAGE_MIN) return shrinkAndRetry(offset, (err && err.message) || 'error');
+  onError(err);
+}
+
+function shrinkAndRetry(offset, why) {
+  if (PAGE_SIZE <= PAGE_MIN) {
+    if (ALL.length) { finishLoad(); }
+    else { onError({ message: 'Could not load the catalog — ' + why + '.' }); }
+    return;
+  }
+  PAGE_SIZE = Math.floor(PAGE_SIZE / 2);
+  setLoadMsg('Adjusting load size… (' + ALL.length + ' books so far)');
+  loadNextPage(offset);
+}
+
+function setLoadMsg(txt) {
+  var el = $('#loadingHint');
+  if (el) el.textContent = txt;
+}
+
+function finishLoad() {
+  indexLoaded = true;
+  hideBar();
+  if (!ALL.length) { showEmptyCatalog(); return; }
+  // If the user is already searching a partially-loaded index, re-render with the full set now.
+  if (state.view === 'results') runSearch();
+  else updateLoadingHint();
+}
+
+function showEmptyCatalog() {
+  $('#browseView').style.display = 'none';
+  document.body.classList.remove('results-mode');
+  $('#resultsView').style.display = 'none';
+  $('#emptyCatalogState').classList.add('show');
+}
+
+function onError(err) {
+  indexLoaded = true;
+  hideBar();
+  $('#browseView').style.display = 'none';
+  document.body.classList.remove('results-mode');
+  $('#resultsView').style.display = 'none';
+  $('#errorState').classList.add('show');
+  $('#errorMsg').textContent = (err && err.message) ? err.message : 'Something went wrong. Please try again.';
+}
+
+/* =================== Wiring =================== */
+function init() {
+  // Delegated clicks — cards stream in incrementally, so a single body listener is simplest.
+  document.body.addEventListener('click', function (e) {
+    var card = e.target.closest('.book-card');
+    if (card) { openModal(card.dataset.uid); return; }
+
+    var gc = e.target.closest('.genre-card');
+    if (gc) { resetFilters(); state.genre = gc.dataset.genre; goToResults(); return; }
+
+    var lc = e.target.closest('.level-card');
+    if (lc) { resetFilters(); state.level = lc.dataset.level; goToResults(); return; }
+
+    var qg = e.target.closest('[data-quick-genre]');
+    if (qg) { resetFilters(); state.genre = qg.dataset.quickGenre; goToResults(); return; }
+
+    var qa = e.target.closest('[data-quick-avail]');
+    if (qa) { resetFilters(); state.availableOnly = true; goToResults(); return; }
+
+    var x = e.target.closest('.active-pill .x');
+    if (x) { clearOne(x.dataset.clear); return; }
+  });
+
+  // Hero search — debounced instant search as you type
+  var debouncedHero = debounce(function () {
+    if (state.search.trim()) {
+      if (state.view === 'browse') goToResults();
+      else runSearch();
+    }
+  }, 180);
+  $('#heroInput').addEventListener('input', function (e) {
+    state.search = e.target.value;
+    syncClears();
+    debouncedHero();
+  });
+  $('#heroForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    state.search = $('#heroInput').value;
+    goToResults();
+  });
+  $('#heroClear').addEventListener('click', function () {
+    state.search = ''; $('#heroInput').value = ''; syncClears(); $('#heroInput').focus();
+  });
+
+  // Results search — debounced incremental too
+  var debouncedResults = debounce(function () { runSearch(); }, 180);
+  $('#resultsInput').addEventListener('input', function (e) {
+    state.search = e.target.value; $('#heroInput').value = e.target.value; syncClears();
+    debouncedResults();
+  });
+  $('#resultsClear').addEventListener('click', function () {
+    state.search = ''; $('#resultsInput').value = ''; $('#heroInput').value = ''; syncClears();
+    $('#resultsInput').focus(); runSearch();
+  });
+
+  // Availability toggle
+  $('#availAll').addEventListener('click', function () { state.availableOnly = false; runSearch(); });
+  $('#availNow').addEventListener('click', function () { state.availableOnly = true; runSearch(); });
+
+  // Start over / clear all
+  function startOver() { resetFilters(); goToBrowse(); }
+  $('#backBtn').addEventListener('click', startOver);
+  $('#emptyReset').addEventListener('click', startOver);
+  $('#resetBtn').addEventListener('click', function () { resetFilters(); runSearch(); $('#resultsInput').focus(); });
+
+  // Modal
+  $('#closeModal').addEventListener('click', closeModal);
+  $('#backdrop').addEventListener('click', function (e) { if (e.target === $('#backdrop')) closeModal(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('#backdrop').classList.contains('show')) closeModal();
+  });
+  // focus trap
+  $('#modal').addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab') return;
+    var f = $('#modal').querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])');
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  // Fire the three independent server calls in parallel on load.
+  loadStaffPicks();        // Staff Picks strip (hidden if empty)
+  loadBrowseCounts();      // genre + level tiles with real counts
+  loadInventoryPaged();    // full lightweight index for instant client-side search
+}
+
+init();
+</script>
+</body>
+</html>

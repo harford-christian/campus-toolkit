@@ -1,0 +1,2808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Door Automation</title>
+  <!-- Bootstrap 5.3 + Inter (CDN) so this admin shell wears the shared HCS look. -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   HCS shared design system (inlined from design/system/hcs-ui.css).
+   Layers on top of Bootstrap 5.3 + Inter. `hcs-`-namespaced so it never
+   collides with Bootstrap utilities or this app's classes. The Door
+   admin APP layer follows AFTER this block and keeps its EXISTING class
+   names (nav-btn, bottom-tab, tab-panel, card, badge-*, btn-*, toast,
+   action-grid, modal-*, group-dropdown, qc-*, …) because the inline
+   <script> builds/queries them by name — only their STYLING is re-skinned
+   to the shared token system. Legacy :root tokens are re-aliased to the
+   hcs tokens so every JS-built `var(--x)` inline style is untouched.
+   ===================================================================== */
+:root{
+  --hcs-red:#B22222; --hcs-red-dark:#8f1b1b; --hcs-red-soft:#fff5f5;
+  --hcs-gold:#D4AF37; --hcs-gold-soft:#fffdf4;
+  --hcs-ink:#23272e; --hcs-muted:#6b7280; --hcs-line:#e7e9ee;
+  --hcs-bg:#f6f7f9; --hcs-surface:#ffffff; --hcs-surface-2:#f7f8fa;
+  --hcs-ok:#1f8a4c; --hcs-ok-bg:#e9f7ef; --hcs-ok-line:#bfe6cd;
+  --hcs-warn:#b5751a; --hcs-warn-bg:#fdf3e2; --hcs-warn-line:#f1d9a8;
+  --hcs-closed:#8a8f98; --hcs-closed-bg:#f1f0ee;
+  --hcs-radius-sm:8px; --hcs-radius:12px; --hcs-radius-lg:16px; --hcs-radius-xl:18px;
+  --hcs-gap:14px; --hcs-pad:18px 20px;
+
+  /* ---- legacy-token aliases ----
+     The Door markup + inline <script> still emit built inline styles that
+     read these `var(--x)` names. Alias each to an hcs token so all that
+     markup/JS is byte-untouched while the palette becomes the shared one. */
+  --bg:        var(--hcs-bg);
+  --surface:   var(--hcs-surface);
+  --surface2:  var(--hcs-surface-2);
+  --border:    var(--hcs-line);
+  --accent:    var(--hcs-gold);          /* old brown accent → hcs gold */
+  --accent-red:var(--hcs-red);
+  --accent2:   var(--hcs-red);           /* table mono time color (was undefined → inherit; now brand red) */
+  --text:      var(--hcs-ink);
+  --muted:     var(--hcs-muted);
+  --green:     var(--hcs-ok);
+  --red:       var(--hcs-red);
+  --orange:    var(--hcs-warn);
+  --warn:      var(--hcs-warn);
+  --yellow:    var(--hcs-warn);
+  --radius:    var(--hcs-radius-xl);
+  --radius-sm: var(--hcs-radius);
+  --shadow:    0 1px 2px rgba(20,20,40,.04), 0 4px 16px rgba(20,20,40,.05);
+}
+
+body.hcs-app{
+  font-family:'Inter',system-ui,sans-serif;
+  background:var(--hcs-bg);
+  color:var(--hcs-ink);
+  margin:0;
+  min-height:100vh;
+  font-size:16px;
+  -webkit-font-smoothing:antialiased;
+}
+body.hcs-app *{box-sizing:border-box;}
+
+/* shell — shared header / wrap / footer */
+.hcs-header{background:var(--hcs-surface);border-bottom:1px solid var(--hcs-line);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.hcs-brand{width:40px;height:40px;border-radius:11px;background:var(--hcs-red);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.05rem;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);flex:none;}
+.hcs-title{font-weight:800;font-size:1.12rem;line-height:1.1;margin:0;}
+.hcs-subtitle{color:var(--hcs-muted);font-size:.8rem;margin:0;}
+.hcs-footer{text-align:center;color:var(--hcs-muted);font-size:.8rem;padding:26px 0 36px;}
+.hcs-footer a{color:var(--hcs-red);font-weight:600;}
+
+/* =====================================================================
+   APP LAYER (Door Automation admin) — existing class names, hcs look.
+   ===================================================================== */
+  .hidden { display: none !important; }
+
+  /* ── Desktop Nav (tabs live in the hcs header) ── */
+  .nav {
+    background: var(--hcs-surface);
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--hcs-line);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    min-height: 56px;
+    flex-wrap: wrap;
+  }
+  .nav h1 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--hcs-ink);
+    letter-spacing: -0.01em;
+    margin-right: 14px;
+    white-space: nowrap;
+  }
+  /* nav tabs as hcs pill buttons */
+  .nav-btn {
+    background: none;
+    border: 0;
+    color: var(--hcs-muted);
+    padding: 7px 15px;
+    cursor: pointer;
+    font-size: .88rem;
+    font-weight: 700;
+    border-radius: 999px;
+    transition: all .15s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+  }
+  .nav-btn:hover { color: var(--hcs-ink); background: #f0f1f4; }
+  .nav-btn.active { color: var(--hcs-red); background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12), inset 0 0 0 1px var(--hcs-line); }
+
+  /* ── Mobile Bottom Tab Bar ── */
+  .bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--hcs-surface);
+    border-top: 1px solid var(--hcs-line);
+    z-index: 200;
+    height: 70px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 12px rgba(20,20,40,.05);
+  }
+  .bottom-nav-tabs { display: flex; height: 70px; }
+  .bottom-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--hcs-muted);
+    font-size: 0.65rem;
+    font-weight: 700;
+    transition: color 0.15s;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0 8px;
+  }
+  .bottom-tab.active { color: var(--hcs-red); }
+  .bottom-tab-icon { font-size: 1.5rem; line-height: 1; }
+
+  @media (max-width: 640px) {
+    .nav { display: none; }
+    .bottom-nav { display: flex; }
+    .content { padding: 12px 12px 84px; }
+    /* Prevent tables from overflowing on narrow screens */
+    #overrides-list, #events-list { overflow-x: auto; }
+    #overrides-list table, #events-list table { min-width: 560px; }
+  }
+
+  /* ── Content ── */
+  .content { padding: 24px 16px 60px; max-width: 900px; margin: 0 auto; }
+
+  /* ── Cards (hcs surface; signature gold-accent variant) ── */
+  .card {
+    background: var(--hcs-surface);
+    border-radius: var(--hcs-radius-lg);
+    padding: 18px 18px;
+    border: 1px solid var(--hcs-line);
+    box-shadow: 0 1px 2px rgba(20,20,40,.04);
+    margin-bottom: 16px;
+  }
+  @media (min-width: 641px) { .card { padding: 22px 24px; } }
+  .card h2 {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: var(--hcs-ink);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-left: 4px solid var(--hcs-gold);
+    padding-left: 12px;
+  }
+  .card.emergency {
+    border: 1.5px solid var(--hcs-red);
+    box-shadow: 0 0 0 3px rgba(178,34,34,0.07), 0 1px 2px rgba(20,20,40,.04);
+  }
+  .card.emergency h2 { color: var(--hcs-red); border-left-color: var(--hcs-red); }
+  /* the signature surface = gold-left-border accent card */
+  .card-red-accent { border-left: 5px solid var(--hcs-gold); }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: var(--hcs-radius-sm);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .badge-green  { background: var(--hcs-ok-bg);   color: var(--hcs-ok); }
+  .badge-red    { background: var(--hcs-red-soft); color: var(--hcs-red); }
+  .badge-blue   { background: #e8eefb;            color: #1d4ed8; }
+  .badge-orange { background: var(--hcs-warn-bg); color: var(--hcs-warn); }
+  .badge-yellow { background: var(--hcs-warn-bg); color: var(--hcs-warn); }
+  .badge-gray   { background: #eef2f7;            color: #516074; }
+  .badge-brown  { background: var(--hcs-gold-soft); color: #8a6d1a; border: 1px solid var(--hcs-warn-line); }
+
+  /* ── Buttons (Bootstrap is loaded but app uses bare .btn) ── */
+  .btn {
+    min-height: 44px;
+    padding: 10px 18px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-size: 0.92rem;
+    font-weight: 700;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    line-height: 1.2;
+  }
+  .btn:hover { filter: brightness(0.97); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .btn:active { box-shadow: none; }
+  .btn-primary { background: var(--hcs-red); border-color: var(--hcs-red); color: #fff; }
+  .btn-primary:hover { background: var(--hcs-red-dark); border-color: var(--hcs-red-dark); filter: none; color: #fff; }
+  .btn-danger  { background: var(--hcs-red); border-color: var(--hcs-red); color: #fff; }
+  .btn-danger:hover { background: var(--hcs-red-dark); border-color: var(--hcs-red-dark); filter: none; }
+  .btn-warning { background: var(--hcs-warn); border-color: var(--hcs-warn); color: #fff; }
+  .btn-warning:hover { background: #97600f; border-color: #97600f; filter: none; }
+  .btn-gray { background: var(--hcs-surface); color: var(--hcs-ink); border: 1.5px solid var(--hcs-line); }
+  .btn-gray:hover { background: var(--hcs-bg); border-color: var(--hcs-muted); }
+  .btn-sm { min-height: 34px; padding: 6px 12px; font-size: 0.82rem; border-radius: 8px; }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; filter: none !important; box-shadow: none !important; }
+  @media (max-width: 640px) { .btn-block-mobile { width: 100%; } }
+  .btn-spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4); border-top-color: currentColor;
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--hcs-line); font-size: 0.86rem; }
+  th { font-weight: 700; color: var(--hcs-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; background: var(--hcs-surface-2); }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #fafbfc; }
+  tbody tr:hover { background: var(--hcs-gold-soft); }
+
+  /* ── Forms (>=16px to avoid iOS zoom) ── */
+  .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+  .form-group label { font-size: 0.82rem; font-weight: 700; color: var(--hcs-ink); }
+  .form-group input, .form-group select, .form-group textarea {
+    height: 48px;
+    padding: 0 14px;
+    border: 1.5px solid var(--hcs-line);
+    border-radius: 11px;
+    font-size: 1rem;
+    outline: none;
+    background: var(--hcs-surface);
+    color: var(--hcs-ink);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  .form-group textarea { height: auto; padding: 12px 14px; min-height: 80px; resize: vertical; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--hcs-red);
+    box-shadow: 0 0 0 3px rgba(178,34,34,0.12);
+    background: var(--hcs-surface);
+  }
+  .form-group select option { background: #fff; color: var(--hcs-ink); }
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator { opacity: 0.5; }
+  @media (max-width: 640px) { .form-row { flex-direction: column; } .form-group { min-width: 100%; } }
+
+  /* ── Status colors ── */
+  .status-pending   { color: var(--hcs-warn); font-weight: 600; }
+  .status-scheduled { color: var(--hcs-warn); font-weight: 600; }
+  .status-completed { color: var(--hcs-ok);   font-weight: 600; }
+  .status-failed    { color: var(--hcs-red);  font-weight: 600; }
+  .status-partial   { color: var(--hcs-warn); font-weight: 600; }
+  .status-skipped   { color: var(--hcs-muted); font-weight: 600; }
+  .status-overridden{ color: var(--hcs-muted); font-weight: 600; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 80px; right: 16px;
+    background: var(--hcs-ink); color: #fff;
+    padding: 12px 20px; border-radius: 12px; font-size: 0.9rem;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none; z-index: 9999;
+    transform: translateY(8px);
+    max-width: calc(100vw - 32px);
+    box-shadow: 0 8px 28px rgba(0,0,0,.22);
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.toast-error { background: var(--hcs-red); }
+  @media (min-width: 641px) { #toast { bottom: 24px; right: 24px; } }
+
+  /* ── Tab panels ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Calendar ── */
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-header { text-align: center; font-size: 0.7rem; font-weight: 700; color: var(--hcs-muted); padding: 6px 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .cal-cell { min-height: 60px; padding: 6px; border-radius: 10px; background: var(--hcs-surface); border: 1px solid var(--hcs-line); cursor: pointer; transition: all 0.15s; }
+  .cal-cell:hover { border-color: var(--hcs-gold); box-shadow: 0 3px 10px rgba(180,150,40,.15); }
+  .cal-cell.today { border-color: var(--hcs-red); box-shadow: 0 0 0 2px rgba(178,34,34,0.12); }
+  .cal-cell.other-month { opacity: 0.35; }
+  .cal-day-num { font-size: 0.8rem; font-weight: 700; margin-bottom: 4px; color: var(--hcs-ink); }
+  .cal-event { font-size: 0.67rem; padding: 2px 5px; border-radius: 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Skeleton ── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--hcs-surface-2) 25%, var(--hcs-line) 50%, var(--hcs-surface-2) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s infinite;
+    border-radius: 6px; height: 16px; margin: 5px 0;
+    display: block;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skeleton-row { display: flex; gap: 12px; padding: 4px 0; }
+  .skeleton-row .skeleton { flex: 1; }
+
+  /* ── Today status card ── */
+  .today-hdr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .today-date-lbl { color: var(--hcs-muted); font-size: 0.88rem; }
+  .door-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 50px;
+    font-size: 0.86rem; font-weight: 700; white-space: nowrap;
+  }
+  .door-pill-unlocked { background: var(--hcs-ok-bg);  color: var(--hcs-ok); }
+  .door-pill-locked   { background: var(--hcs-red-soft); color: var(--hcs-red); }
+  .door-pill-error    { background: var(--hcs-surface-2); color: var(--hcs-muted); }
+  .door-pill-pending  { background: var(--hcs-warn-bg); color: var(--hcs-warn); }
+  .door-pills-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* ── Action cards (mobile) ── */
+  .action-cards { display: flex; flex-direction: column; gap: 10px; }
+  .action-card {
+    background: var(--hcs-surface); border: 1px solid var(--hcs-line);
+    border-radius: 14px; padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .action-card.action-completed { opacity: 0.5; }
+  .action-card.action-failed  { border-color: var(--hcs-red);       background: var(--hcs-red-soft);  }
+  .action-card.action-partial { border-color: var(--hcs-warn-line); background: var(--hcs-warn-bg);  }
+  .action-card.action-next { border-left: 4px solid var(--hcs-gold); background: var(--hcs-gold-soft); }
+  .action-card.action-skipped { opacity: 0.4; }
+  .action-card-body { flex: 1; min-width: 0; }
+  .action-card-name { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+  .action-card-time { font-size: 0.82rem; color: var(--hcs-muted); font-variant-numeric: tabular-nums; margin-bottom: 6px; }
+  .action-card-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .action-edit-btn {
+    background: none; border: 1.5px solid var(--hcs-line); border-radius: 8px;
+    padding: 6px 10px; cursor: pointer; color: var(--hcs-muted); font-size: 0.85rem;
+    transition: all 0.15s; flex-shrink: 0; min-height: 36px;
+  }
+  .action-edit-btn:hover { border-color: var(--hcs-red); color: var(--hcs-red); }
+  .action-edit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── Desktop action grid ── */
+  .action-grid-wrap { display: none; }
+  @media (min-width: 641px) {
+    .action-cards { display: none; }
+    .action-grid-wrap { display: block; }
+  }
+  .action-grid {
+    width: 100%; border-collapse: collapse; font-size: 0.85rem;
+    border-top: 1px solid var(--hcs-line); border-left: 1px solid var(--hcs-line);
+  }
+  .action-grid thead th {
+    background: var(--hcs-surface-2); color: var(--hcs-muted);
+    font-weight: 700; font-size: 0.72rem; letter-spacing: 0.06em;
+    text-transform: uppercase; padding: 9px 10px;
+    border-right: 1px solid var(--hcs-line); border-bottom: 2px solid var(--hcs-line);
+    text-align: center;
+  }
+  .action-grid thead th:first-child { width: 90px; }
+  .action-grid tbody tr { border-bottom: 1px solid var(--hcs-line); }
+  .ag-time {
+    color: var(--hcs-muted); font-variant-numeric: tabular-nums;
+    font-size: 0.75rem; white-space: nowrap; padding: 8px 12px;
+    border-right: 2px solid var(--hcs-line); vertical-align: top;
+    background: var(--hcs-surface-2); text-align: right; height: 60px;
+  }
+  .ag-cell {
+    background: var(--hcs-surface);
+    background-image: repeating-linear-gradient(
+      to bottom, transparent 0px, transparent 59px,
+      var(--hcs-line) 59px, var(--hcs-line) 60px
+    );
+    border-right: 1px solid var(--hcs-line);
+    padding: 4px 6px; vertical-align: top; min-width: 80px;
+  }
+  .ag-chip {
+    border: 1.5px solid transparent; border-radius: 8px; padding: 5px 7px;
+    font-size: 0.8rem; cursor: pointer; transition: filter 0.1s, box-shadow 0.1s;
+  }
+  .ag-chip-unlock { background: var(--hcs-ok-bg);  border-color: var(--hcs-ok-line); }
+  .ag-chip-lock   { background: var(--hcs-red-soft); border-color: #f1bcbc; }
+  .ag-chip-done   { opacity: 0.45; }
+  .ag-chip-fail   { background: var(--hcs-warn-bg); border-color: var(--hcs-warn-line); }
+  .ag-chip:hover  { filter: brightness(1.04); box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
+  .ag-chip.selected { box-shadow: 0 0 0 2px var(--hcs-gold); }
+  .ag-chip--minimal .ag-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 0; }
+  .ag-chip-name { font-weight: 700; margin-bottom: 3px; color: var(--hcs-ink); font-size: 0.78rem; }
+  .ag-chip-time { color: var(--hcs-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; margin-bottom: 4px; font-weight: 600; }
+  .ds-checked-lbl { font-size: 0.75rem; color: var(--hcs-muted); font-weight: 400; margin-left: 8px; }
+
+  /* ── Grid with floating detail panel ── */
+  .action-grid-wrap { overflow-x: auto; }
+  .action-detail-panel {
+    position: fixed; z-index: 200;
+    width: 210px; border: 1px solid var(--hcs-line); padding: 14px 16px;
+    background: var(--hcs-surface); font-size: 0.88rem; border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.14); max-height: 65vh; overflow-y: auto;
+    border-left: 4px solid var(--hcs-gold);
+  }
+  .action-detail-panel .detail-label {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--hcs-muted); margin-bottom: 12px;
+  }
+  .action-detail-panel .detail-name { font-size: 0.95rem; font-weight: 800; margin-bottom: 8px; line-height: 1.3; }
+  .action-detail-panel .detail-time { font-variant-numeric: tabular-nums; font-size: 0.82rem; color: var(--hcs-muted); margin-bottom: 8px; }
+
+  /* ── Modal progress bar ── */
+  .modal-card { position: relative; }
+  .modal-progress-bar {
+    height: 3px; border-radius: 3px; margin-bottom: 10px;
+    background: var(--hcs-red); display: none; width: 0%;
+  }
+
+  /* ── Modals / bottom sheets ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(20,22,30,.5);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 1000;
+  }
+  @media (min-width: 641px) { .modal-overlay { align-items: center; } }
+  .modal-overlay.hidden { display: none; }
+  .modal-card {
+    background: var(--hcs-surface); border-radius: 20px 20px 0 0;
+    padding: 20px 18px 36px; width: 100%;
+    max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 -4px 30px rgba(0,0,0,0.1);
+    animation: slideUp 0.22s ease;
+  }
+  @media (min-width: 641px) { .modal-card { border-radius: var(--hcs-radius-xl); max-width: 480px; padding: 26px 28px; box-shadow: 0 20px 60px rgba(0,0,0,.3); } }
+  @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-card.danger  { border-top: 4px solid var(--hcs-red); }
+  .modal-card.warning { border-top: 4px solid var(--hcs-warn); }
+  .modal-card h3 { margin: 0 0 16px; font-size: 1.15rem; font-weight: 800; }
+  .modal-card p  { margin: 0 0 16px; color: var(--hcs-muted); line-height: 1.55; font-size: 0.9rem; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  @media (max-width: 640px) { .modal-actions { flex-direction: column; } .modal-actions .btn { width: 100%; } }
+  .modal-hint { font-size: .8rem; color: var(--hcs-muted); margin-top: 14px; line-height: 1.6; border-top: 1px solid var(--hcs-line); padding-top: 10px; }
+  .modal-drag-handle { width: 40px; height: 4px; background: var(--hcs-line); border-radius: 2px; margin: 0 auto 16px; display: block; }
+  @media (min-width: 641px) { .modal-drag-handle { display: none; } }
+
+  /* ── Checkbox dropdown ── */
+  .group-dropdown { position: relative; flex: 1; min-width: 160px; }
+  .group-dropdown-toggle {
+    width: 100%; height: 48px; padding: 0 14px;
+    border: 1.5px solid var(--hcs-line); border-radius: 11px; font-size: 1rem; outline: none;
+    background: var(--hcs-surface); color: var(--hcs-ink); cursor: pointer; text-align: left;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .group-dropdown-toggle:focus, .group-dropdown-toggle.open {
+    border-color: var(--hcs-red); box-shadow: 0 0 0 3px rgba(178,34,34,0.12);
+  }
+  .group-dropdown-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+    background: var(--hcs-surface); border: 1.5px solid var(--hcs-red);
+    border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    max-height: 200px; overflow-y: auto; padding: 4px 0;
+  }
+  .group-option { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; font-size: 0.92rem; color: var(--hcs-ink); transition: background 0.1s; }
+  .group-option:hover { background: var(--hcs-gold-soft); }
+  .group-option input[type="checkbox"] { accent-color: var(--hcs-red); width: 16px; height: 16px; }
+
+  /* ── Doors expander ── */
+  .doors-expander-toggle {
+    background: none; border: 1.5px solid var(--hcs-line); border-radius: 8px;
+    color: var(--hcs-muted); font-size: 0.85rem; padding: 6px 12px;
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  }
+  .doors-expander-toggle:hover, .doors-expander-toggle.open { border-color: var(--hcs-red); color: var(--hcs-red); }
+  .doors-group-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--hcs-muted); margin: 10px 0 5px; }
+  .doors-group-label:first-child { margin-top: 0; }
+  .doors-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .door-option { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1.5px solid var(--hcs-line); border-radius: 10px; cursor: pointer; font-size: 0.88rem; color: var(--hcs-ink); transition: border-color 0.1s, background 0.1s; user-select: none; }
+  .door-option:hover { border-color: var(--hcs-gold); background: var(--hcs-gold-soft); }
+  .door-option input[type="checkbox"] { accent-color: var(--hcs-red); width: 14px; height: 14px; }
+
+  /* ── Timeline (legacy, kept for possible future use) ── */
+  .tl-item { display: flex; gap: 16px; align-items: flex-start; padding: 14px 16px; border-radius: var(--hcs-radius-lg); border: 1px solid var(--hcs-line); background: var(--hcs-surface-2); transition: all 0.2s; margin-bottom: 8px; }
+  .tl-times { min-width: 120px; display: flex; flex-direction: column; gap: 3px; font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+  .tl-unlock { color: var(--hcs-ok); }
+  .tl-lock-time { color: var(--hcs-red); }
+  .tl-body { flex: 1; min-width: 0; }
+  .tl-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+</style>
+
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Door Automation" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body class="hcs-app">
+
+<!-- Desktop nav (shared HCS header: brand badge + tabs) -->
+<nav class="nav">
+  <div class="hcs-brand">&#x1F511;</div>
+  <h1>Door Automation</h1>
+  <button class="nav-btn active" data-tab="today" onclick="showTab('today', this)">Today</button>
+  <button class="nav-btn" data-tab="edit" onclick="showTab('edit', this)">Edit</button>
+  <button class="nav-btn" data-tab="schedules" onclick="showTab('schedules', this)">Schedules</button>
+  
+  <button class="nav-btn" data-tab="quick" onclick="showTab('quick', this)">Quick Control</button>
+  
+  <a id="dash-link" class="nav-btn" style="margin-left:auto; text-decoration:none;" href="dashboard.html" target="_blank">Dashboard →</a> <a class="nav-btn" style="text-decoration:none;" href="leadership.html" target="_blank">Leadership →</a>
+</nav>
+
+<!-- Mobile bottom tab bar -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-tabs">
+    <button class="bottom-tab active" data-tab="today" onclick="showTab('today', this)">
+      <span class="bottom-tab-icon">&#128197;</span>
+      <span>Today</span>
+    </button>
+    <button class="bottom-tab" data-tab="edit" onclick="showTab('edit', this)">
+      <span class="bottom-tab-icon">&#9999;&#65039;</span>
+      <span>Edit</span>
+    </button>
+    <button class="bottom-tab" data-tab="schedules" onclick="showTab('schedules', this)">
+      <span class="bottom-tab-icon">&#128336;</span>
+      <span>Schedules</span>
+    </button>
+    
+    <button class="bottom-tab" data-tab="quick" onclick="showTab('quick', this)">
+      <span class="bottom-tab-icon">&#128275;</span>
+      <span>Quick</span>
+    </button>
+    
+  </div>
+</nav>
+
+<div class="content">
+  <div id="tab-today"  class="tab-panel active"><!-- Status Card -->
+<div class="card card-red-accent">
+  <h2>Today's Status</h2>
+  <div class="today-hdr" id="schedule-header">
+    <span class="skeleton" style="width:160px;height:32px;border-radius:50px;"></span>
+    <span class="skeleton" style="width:200px;height:16px;"></span>
+  </div>
+  <div class="door-pills-wrap" id="door-pills" style="margin-top:12px;">
+    <span class="skeleton" style="width:100px;height:36px;border-radius:50px;"></span>
+    <span class="skeleton" style="width:100px;height:36px;border-radius:50px;"></span>
+    <span class="skeleton" style="width:100px;height:36px;border-radius:50px;"></span>
+  </div>
+  <div style="margin-top:14px;display:flex;align-items:center;gap:8px;">
+    <button class="btn btn-gray btn-sm" onclick="checkLiveDoorStates(this)">&#128065; Check Live Status</button>
+    <span id="door-states-ts" class="ds-checked-lbl"></span>
+  </div>
+</div>
+
+<!-- Today's Actions -->
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <h2 style="margin-bottom:0">Door Actions Today</h2>
+    <button class="btn btn-primary btn-sm" onclick="openAddModal()">+ Add Action</button>
+  </div>
+  <!-- Schedule change summary (shown after add/edit) -->
+  <div id="changes-summary" style="display:none;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.83rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <strong>Schedule updated</strong>
+      <button onclick="dismissChanges()" style="background:none;border:none;cursor:pointer;font-size:1rem;line-height:1;color:var(--muted);padding:0 2px">&#10005;</button>
+    </div>
+    <ul id="changes-list" style="margin:0;padding-left:18px;line-height:1.8"></ul>
+  </div>
+  <!-- Mobile: card list -->
+  <div class="action-cards" id="actions-list">
+    <span class="skeleton" style="height:82px;border-radius:14px;display:block;margin-bottom:10px;"></span>
+    <span class="skeleton" style="height:82px;border-radius:14px;display:block;"></span>
+  </div>
+  <!-- Desktop: action grid with side panel -->
+  <div class="grid-with-panel">
+    <div class="action-grid-wrap" id="timeline">
+      <p style="color:var(--muted);font-style:italic">Loading&hellip;</p>
+    </div>
+    <div id="action-detail-panel" class="action-detail-panel hidden">
+      <div class="detail-label">
+        <span>Action Detail</span>
+        <button class="btn btn-gray btn-sm" onclick="closeDetailPanel()" style="padding:1px 7px;font-size:0.72rem;line-height:1.5">&#10005;</button>
+      </div>
+      <div id="detail-content"></div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">
+        <button id="detail-edit-btn" class="btn btn-primary btn-sm" onclick="openEditFromDetail()">Edit Action</button>
+        <button id="detail-skip-btn" class="btn btn-gray btn-sm" onclick="cancelFromDetail()" style="display:none">Cancel Action</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit/Add Action Modal -->
+<div id="action-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div id="modal-progress-bar" class="modal-progress-bar"></div>
+    <span class="modal-drag-handle"></span>
+    <h3 id="action-modal-title">Edit Action</h3>
+    <div id="modal-inprogress-warn" style="display:none;background:rgba(185,28,28,0.07);border:1px solid rgba(185,28,28,0.3);border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:0.83rem;color:#b91c1c;">
+      &#9888; This action is in progress — the door has already unlocked. Editing the lock time will reschedule when it locks.
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Name</label>
+      <input type="text" id="modal-name" placeholder="Event name">
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Start</label>
+      <input type="time" id="modal-unlock">
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>End</label>
+      <input type="time" id="modal-lock">
+    </div>
+    <div class="form-group" id="modal-type-group" style="margin-bottom:14px;display:none;">
+      <label>Event Type</label>
+      <select id="modal-type">
+        <option value="Unlock" selected>Unlock</option>
+        <option value="Lock">Lock (blocks unlocks)</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:14px;">
+      <label>Doors / Groups</label>
+      <div class="group-dropdown" id="modal-target-dropdown">
+        <button type="button" class="group-dropdown-toggle" id="modal-target-toggle"
+                onclick="toggleModalTargetDropdown(event)">ALL GROUPS &#9660;</button>
+        <div class="group-dropdown-menu" id="modal-target-menu" style="display:none"></div>
+      </div>
+    </div>
+<div id="modal-preview-result" style="display:none;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:0.83rem;"></div>
+<div class="modal-actions">
+      <button id="modal-preview-btn" class="btn btn-gray" onclick="previewActionModal()">Preview</button>
+      <button id="modal-save-btn" class="btn btn-primary" onclick="applyActionModal()">Apply</button>
+      <button id="modal-skip-btn" class="btn btn-gray" onclick="cancelActionModal()" style="display:none">Cancel This Action</button>
+      <button class="btn btn-gray" onclick="closeActionModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div id="confirm-modal" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:340px">
+    <h3 id="confirm-modal-title">Confirm</h3>
+    <div id="confirm-modal-body" style="color:var(--muted);margin:10px 0 20px;font-size:0.9rem;line-height:1.5"></div>
+    <div class="modal-actions">
+      <button id="confirm-modal-ok" class="btn btn-danger">Confirm</button>
+      <button class="btn btn-gray" onclick="closeConfirmModal()">Nevermind</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var _serverTz = null;
+  var _doorGroups = [];
+  var _doors = [];
+  var _doorToGroup = {};
+  var _modalRowIndex = null;
+  var _modalIsNew = false;
+  var _actionMap = {};
+  var _detailRowIndex = null;
+  var _progressTimers = [];
+  var _lastPreviewChanges = null;
+
+  /* ── Helpers ── */
+  function esc(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function _tzOffsetMins(tz) {
+    var now = new Date();
+    var utcH  = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'UTC',  hour: '2-digit', hour12: false }).format(now), 10);
+    var utcM  = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: 'UTC',  minute: '2-digit' }).format(now), 10);
+    var tzH   = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz,     hour: '2-digit', hour12: false }).format(now), 10);
+    var tzM   = parseInt(new Intl.DateTimeFormat('en-US', { timeZone: tz,     minute: '2-digit' }).format(now), 10);
+    var off = (tzH * 60 + tzM) - (utcH * 60 + utcM);
+    if (off < -720) off += 1440;
+    if (off >  720) off -= 1440;
+    return off;
+  }
+
+  function toLocalTime(hhmm) {
+    if (!hhmm) return '';
+    try {
+      var parts = hhmm.split(':');
+      var h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+      var serverOff = _serverTz ? _tzOffsetMins(_serverTz) : 0;
+      var localOff  = -new Date().getTimezoneOffset();
+      var serverMins = h * 60 + m;
+      var utcMins    = serverMins - serverOff;
+      var localMins  = ((utcMins + localOff) % 1440 + 1440) % 1440;
+      var lh = Math.floor(localMins / 60), lm = localMins % 60;
+      var suffix = lh >= 12 ? 'PM' : 'AM';
+      return (lh % 12 || 12) + ':' + String(lm).padStart(2, '0') + ' ' + suffix;
+    } catch(e) {
+      var p = hhmm.split(':');
+      var rh = parseInt(p[0], 10), rm = parseInt(p[1], 10);
+      var s = rh >= 12 ? 'PM' : 'AM';
+      return (rh % 12 || 12) + ':' + String(rm).padStart(2,'0') + ' ' + s;
+    }
+  }
+
+  function timeToMins(t) {
+    if (!t) return null;
+    var m = t.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), mn = parseInt(m[2], 10);
+    var ap = (m[3] || '').toUpperCase();
+    if (ap === 'PM' && h !== 12) h += 12;
+    if (ap === 'AM' && h === 12) h = 0;
+    return h * 60 + mn;
+  }
+
+  function _nowMins() {
+    var now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  }
+
+  function statusBadge(label, s) {
+    var map = { 'Pending':'status-pending','Scheduled':'status-pending','Completed':'status-completed','Failed':'status-failed','Partial':'status-partial','Skipped':'status-skipped','Overridden':'status-overridden','N/A':'' };
+    var cls = map[s] !== undefined ? map[s] : '';
+    if (!cls && !s) return '';
+    var display = (s === 'Scheduled') ? 'Pending' : (s === 'Skipped') ? 'Canceled' : s;
+    return '<span class="' + cls + '" style="font-size:0.75rem">' + esc(label) + ': ' + esc(display) + '</span>';
+  }
+
+  function chipClass(us, ls, eventType) {
+    if (us === 'Failed' || ls === 'Failed' || us === 'Partial' || ls === 'Partial') return 'ag-chip ag-chip-fail';
+    var done = ['Completed', 'Skipped', 'Overridden', 'N/A'];
+    var isDone = done.includes(us) && done.includes(ls);
+    var base = 'ag-chip ' + (eventType === 'Lock' ? 'ag-chip-lock' : 'ag-chip-unlock');
+    return isDone ? base + ' ag-chip-done' : base;
+  }
+
+  /* ── Data loading ── */
+  function refreshToday(onDone) {
+    post('getTodayData', {}, function(data) {
+      renderTodayData(data);
+      if (onDone) onDone();
+    });
+  }
+
+  /* ── Changes summary ── */
+  function showChangesSummary(changes) {
+    if (!changes || !changes.length) return;
+    var el   = document.getElementById('changes-summary');
+    var list = document.getElementById('changes-list');
+    if (!el || !list) return;
+    var html = '';
+    changes.forEach(function(c) {
+      var t    = (c.unlock || '') + (c.unlock && c.lock ? '–' : '') + (c.lock || '');
+      var prev = c.prev ? ((c.prev.unlock || '') + (c.prev.unlock && c.prev.lock ? '–' : '') + (c.prev.lock || '')) : '';
+      if (c.type === 'added') {
+        html += '<li><strong>' + esc(c.name) + '</strong> added' + (t ? ' (' + esc(t) + ')' : '') + '</li>';
+      } else if (c.type === 'removed') {
+        html += '<li><strong>' + esc(c.name) + '</strong> removed from schedule</li>';
+      } else if (c.type === 'changed') {
+        var parts = [];
+        if (c.prev.unlock !== c.unlock || c.prev.lock !== c.lock) parts.push(esc(prev) + ' &rarr; ' + esc(t));
+        if (c.prev.groups !== c.groups) parts.push('doors changed');
+        html += '<li><strong>' + esc(c.name) + '</strong>: ' + parts.join(', ') + '</li>';
+      }
+    });
+    list.innerHTML = html;
+    el.style.display = '';
+    clearTimeout(el._dt);
+    el._dt = setTimeout(function() { el.style.display = 'none'; }, 15000);
+  }
+
+  function dismissChanges() {
+    var el = document.getElementById('changes-summary');
+    if (el) { clearTimeout(el._dt); el.style.display = 'none'; }
+  }
+
+  function renderTodayData(data) {
+    _serverTz = data.serverTimezone || null;
+
+    if (data.doorGroups && data.doorGroups.length) {
+      _doorGroups = data.doorGroups.filter(function(g) { return g !== 'ALL'; });
+    }
+    if (data.doors) {
+      _doors = data.doors;
+      _doorToGroup = {};
+      _doors.forEach(function(d) { _doorToGroup[d.name.toUpperCase()] = d.group; });
+    }
+    if (_doorGroups.length) populateModalTargetDropdown(_doorGroups, _doors);
+
+    /* Schedule header */
+    var hdr = document.getElementById('schedule-header');
+    var dateLabel = '';
+    if (data.today) {
+      try {
+        dateLabel = new Date(data.today + 'T12:00:00').toLocaleDateString(undefined,
+          { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      } catch(e) { dateLabel = data.today; }
+    }
+    var churchStatus = data.todayChurchStatus || '';
+    // Church meets Sun/Wed only — on every other day show N/A (no service today), not the raw
+    // col-G open/closed flag (which defaults to "open" and would falsely read as church being on).
+    var churchBadge = !data.todayChurchMeets
+      ? '<span class="badge" style="font-size:0.85rem;padding:4px 12px;margin-left:6px;background:#9ca3af;color:#fff">&#9963; Church: N/A</span>'
+      : churchStatus === 'closed'
+        ? '<span class="badge badge-red" style="font-size:0.85rem;padding:4px 12px;margin-left:6px">&#9963; Church: Closed</span>'
+        : '<span class="badge badge-green" style="font-size:0.85rem;padding:4px 12px;margin-left:6px">&#9963; Church: Open</span>';
+    hdr.innerHTML =
+      (data.scheduleType
+        ? '<span class="badge badge-brown" style="font-size:0.95rem;padding:6px 16px">' + esc(data.scheduleType) + '</span>'
+        : '<span class="badge badge-red">No Schedule</span>') +
+      churchBadge +
+      (dateLabel ? '<span class="today-date-lbl">' + esc(dateLabel) + '</span>' : '');
+
+    /* Actions */
+    var listEl = document.getElementById('actions-list');
+    var gridEl = document.getElementById('timeline');
+    _actionMap = {};
+    if (!data.doorActions || data.doorActions.length === 0) {
+      listEl.innerHTML = '<p style="color:var(--muted);font-style:italic">No door actions scheduled for today.</p>';
+      gridEl.innerHTML = '<p style="color:var(--muted);font-style:italic">No door actions scheduled for today.</p>';
+      renderScheduledDoorStatus([]);
+      closeDetailPanel();
+      return;
+    }
+    data.doorActions.forEach(function(a) { _actionMap[a.rowIndex] = a; });
+    listEl.innerHTML = renderActionCards(data.doorActions);
+    gridEl.innerHTML = renderActionGrid(data.doorActions);
+    renderScheduledDoorStatus(data.doorActions);
+    closeDetailPanel();
+  }
+
+  /* ── Mobile action cards ── */
+  function renderActionCards(actions) {
+    var nowMins = _nowMins();
+    return actions.map(function(a) {
+      var unlockLocal = toLocalTime(a.unlockTime);
+      var lockLocal   = toLocalTime(a.lockTime);
+      var timeStr = [unlockLocal, lockLocal].filter(Boolean).join(' → ');
+
+      var us = a.unlockStatus || '';
+      var ls = a.lockStatus   || '';
+      var done = ['Completed','Skipped','Overridden','N/A'];
+      var isCompleted = done.includes(us) && done.includes(ls);
+      var isFailed    = us === 'Failed' || ls === 'Failed';
+      var isPartial   = !isFailed && (us === 'Partial' || ls === 'Partial');
+      var isSkipped   = (us === 'Skipped' || us === 'N/A') && (ls === 'Skipped' || ls === 'N/A');
+      var uMins = timeToMins(unlockLocal || a.unlockTime);
+      var isNext = !isCompleted && !isFailed && !isPartial && !isSkipped && uMins !== null && uMins > nowMins;
+
+      var cardCls = 'action-card';
+      if (isCompleted && !isFailed) cardCls += ' action-completed';
+      else if (isFailed)            cardCls += ' action-failed';
+      else if (isPartial)           cardCls += ' action-partial';
+      else if (isSkipped)           cardCls += ' action-skipped';
+      else if (isNext)              cardCls += ' action-next';
+
+      var statusHtml = '';
+      if (us && us !== 'N/A') statusHtml += statusBadge('Unlock', us) + ' ';
+      if (ls && ls !== 'N/A') statusHtml += statusBadge('Lock', ls);
+
+      var editDisabled = (isCompleted || isPartial) ? ' disabled' : '';
+
+      var isLockRow  = a.eventType === 'Lock';
+      var lockBadge  = isLockRow ? '<span class="badge badge-red" style="font-size:0.72rem">&#128274; Lock</span> ' : '';
+
+      return '<div class="' + cardCls + '">' +
+        '<div class="action-card-body">' +
+          '<div class="action-card-name">' + esc(a.name || '') + '</div>' +
+          (timeStr ? '<div class="action-card-time">' + esc(timeStr) + '</div>' : '') +
+          '<div class="action-card-meta">' +
+            lockBadge +
+            (a.groups ? '<span class="badge badge-gray" style="font-size:0.72rem">' + esc(a.groups) + '</span> ' : '') +
+            statusHtml +
+          '</div>' +
+        '</div>' +
+        '<button class="action-edit-btn"' + editDisabled +
+          ' onclick="openEditModal(' + a.rowIndex + ')">&#9998;</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* ── Door states rendered as pills ── */
+  function refreshDoorStates() { /* no-op — Index.html calls this on load; scheduled status renders via renderScheduledDoorStatus */ }
+
+  function checkLiveDoorStates(btn) {
+    if (btn) btnLoad(btn, 'Checking…');
+    document.getElementById('door-pills').innerHTML =
+      '<span class="skeleton" style="width:100px;height:36px;border-radius:50px;display:inline-block;"></span> ' +
+      '<span class="skeleton" style="width:100px;height:36px;border-radius:50px;display:inline-block;"></span>';
+    post('getDoorStates', {}, function(data) {
+      var pillsEl = document.getElementById('door-pills');
+      var ts = document.getElementById('door-states-ts');
+      var checkedLbl = 'Live as of ' + new Date().toLocaleTimeString(undefined, {hour:'numeric', minute:'2-digit'});
+      if (!data || !data.doors || data.doors.length === 0) {
+        pillsEl.innerHTML = '<span style="color:var(--muted);font-size:0.88rem">No active doors found.</span>';
+        if (ts) ts.textContent = checkedLbl;
+        if (btn) btnReset(btn);
+        return;
+      }
+      pillsEl.innerHTML = data.doors.map(function(d) {
+        if (d.noSensor) return '<span class="door-pill door-pill-error" title="No DPS sensor configured">' + esc(d.name) + ' (N/A)</span>';
+        if (d.error) return '<span class="door-pill door-pill-error" title="' + esc(d.error) + '">&#9888; ' + esc(d.name) + '</span>';
+        return d.ison
+          ? '<span class="door-pill door-pill-unlocked">&#128275; ' + esc(d.name) + '</span>'
+          : '<span class="door-pill door-pill-locked">&#128274; ' + esc(d.name) + '</span>';
+      }).join('');
+      if (ts) ts.textContent = checkedLbl;
+      if (btn) btnReset(btn);
+    }, btn ? function() { btnReset(btn); } : null);
+  }
+
+  function renderScheduledDoorStatus(actions) {
+    var pillsEl = document.getElementById('door-pills');
+    var ts = document.getElementById('door-states-ts');
+    if (!pillsEl) return;
+    if (ts) ts.textContent = 'Scheduled estimate';
+    if (!_doors.length) {
+      pillsEl.innerHTML = '<span style="color:var(--muted);font-size:0.88rem">No doors configured.</span>';
+      return;
+    }
+    var nowMins = _nowMins();
+    var doorStatus = {}; // door name uppercase → 'unlocked' | 'pending'
+    (actions || []).forEach(function(a) {
+      var us = a.unlockStatus || '';
+      var ls = a.lockStatus || '';
+      var fired = ['Completed', 'Failed', 'Partial'];
+      var pending = ['Pending', 'Scheduled'];
+      var inProgress = fired.includes(us) && pending.includes(ls);
+      var upcoming = pending.includes(us);
+      var affectedDoors = [];
+      if (String(a.groups || '').trim().toUpperCase() === 'ALL') {
+        affectedDoors = _doors.map(function(d) { return d.name; });
+      } else {
+        var tokens = String(a.groups || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        tokens.forEach(function(token) {
+          var uToken = token.toUpperCase();
+          var isDoor = _doors.some(function(d) { return d.name.toUpperCase() === uToken; });
+          if (isDoor) {
+            affectedDoors.push(token);
+          } else {
+            _doors.forEach(function(d) { if (d.group.toUpperCase() === uToken) affectedDoors.push(d.name); });
+          }
+        });
+      }
+      affectedDoors.forEach(function(name) {
+        var key = name.toUpperCase();
+        if (inProgress) {
+          doorStatus[key] = 'unlocked';
+        } else if (upcoming && doorStatus[key] !== 'unlocked') {
+          var uMins = timeToMins(toLocalTime(a.unlockTime) || a.unlockTime);
+          if (uMins !== null && uMins > nowMins) doorStatus[key] = 'pending';
+        }
+      });
+    });
+    pillsEl.innerHTML = _doors.map(function(d) {
+      var s = doorStatus[d.name.toUpperCase()] || 'locked';
+      if (s === 'unlocked') return '<span class="door-pill door-pill-unlocked">&#128275; ' + esc(d.name) + '</span>';
+      if (s === 'pending') return '<span class="door-pill door-pill-pending">&#128274; ' + esc(d.name) + '</span>';
+      return '<span class="door-pill door-pill-locked">&#128274; ' + esc(d.name) + '</span>';
+    }).join('');
+  }
+
+  /* ── Edit/Add Modal ── */
+  function _clearModalPreview() {
+    _lastPreviewChanges = null;
+    var el = document.getElementById('modal-preview-result');
+    if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+  }
+
+  function openEditModal(rowIndex) {
+    var action = _actionMap[rowIndex];
+    if (!action) return;
+    _clearModalPreview();
+    _modalRowIndex = rowIndex;
+    _modalIsNew = false;
+    document.getElementById('action-modal-title').textContent = 'Edit Action';
+    document.getElementById('modal-name').value = action.name || '';
+    document.getElementById('modal-unlock').value = action.unlockTime || '';
+    document.getElementById('modal-lock').value   = action.lockTime   || '';
+
+    var fired = ['Completed', 'Failed', 'Partial'];
+    document.getElementById('modal-unlock').disabled = fired.includes(action.unlockStatus);
+
+    var skippable = ['Pending', 'Scheduled'];
+    var canSkip = skippable.includes(action.unlockStatus) || skippable.includes(action.lockStatus);
+    document.getElementById('modal-skip-btn').style.display = canSkip ? '' : 'none';
+
+    var inProgress = fired.includes(action.unlockStatus) && skippable.includes(action.lockStatus);
+    document.getElementById('modal-inprogress-warn').style.display = inProgress ? 'block' : 'none';
+
+    document.getElementById('modal-type-group').style.display = 'none';
+    setModalTarget(action.groups || 'ALL');
+    document.getElementById('action-modal').classList.remove('hidden');
+  }
+
+  function openAddModal() {
+    _clearModalPreview();
+    _modalRowIndex = null;
+    _modalIsNew = true;
+    document.getElementById('action-modal-title').textContent = 'Add Action';
+    document.getElementById('modal-name').value = '';
+    document.getElementById('modal-unlock').value = '';
+    document.getElementById('modal-lock').value   = '';
+    document.getElementById('modal-unlock').disabled = false;
+    document.getElementById('modal-skip-btn').style.display = 'none';
+    document.getElementById('modal-inprogress-warn').style.display = 'none';
+    document.getElementById('modal-type').value = 'Unlock';
+    document.getElementById('modal-type-group').style.display = '';
+    setModalTarget('ALL');
+    document.getElementById('action-modal').classList.remove('hidden');
+  }
+
+  function closeActionModal() {
+    document.getElementById('action-modal').classList.add('hidden');
+  }
+
+  function _buildChangesHtml(changes) {
+    if (!changes || !changes.length) return '<p style="margin:0">No schedule changes detected.</p>';
+    var html = '<ul style="margin:6px 0 0;padding-left:18px;line-height:1.8">';
+    changes.forEach(function(c) {
+      var t    = (c.unlock || '') + (c.unlock && c.lock ? '–' : '') + (c.lock || '');
+      var prev = c.prev ? ((c.prev.unlock || '') + (c.prev.unlock && c.prev.lock ? '–' : '') + (c.prev.lock || '')) : '';
+      if (c.type === 'added') {
+        html += '<li><strong>' + esc(c.name) + '</strong> added' + (t ? ' (' + esc(t) + ')' : '') + '</li>';
+      } else if (c.type === 'removed') {
+        html += '<li><strong>' + esc(c.name) + '</strong> removed from schedule</li>';
+      } else if (c.type === 'changed') {
+        var parts = [];
+        if (c.prev.unlock !== c.unlock || c.prev.lock !== c.lock) parts.push(esc(prev) + ' &rarr; ' + esc(t));
+        if (c.prev.groups !== c.groups) parts.push('doors changed');
+        html += '<li><strong>' + esc(c.name) + '</strong>: ' + parts.join(', ') + '</li>';
+      }
+    });
+    html += '</ul>';
+    return html;
+  }
+
+  function _getPreviewParams(name, unlock, lock, groups) {
+    if (_modalIsNew) {
+      return { isNew: true, name: name, unlockTime: unlock, lockTime: lock, groups: groups,
+               type: document.getElementById('modal-type').value || 'Unlock' };
+    }
+    var ud = document.getElementById('modal-unlock').disabled;
+    var p = { isNew: false, rowIndex: _modalRowIndex, name: name, lockTime: lock, groups: groups };
+    if (!ud) p.unlockTime = unlock;
+    return p;
+  }
+
+  function previewActionModal() {
+    var name   = document.getElementById('modal-name').value.trim();
+    var unlock = document.getElementById('modal-unlock').value;
+    var lock   = document.getElementById('modal-lock').value;
+    var groups = getModalTarget();
+    if (_modalIsNew && !name) { toast('Name is required', true); return; }
+
+    var previewBtn = document.getElementById('modal-preview-btn');
+    var resultEl   = document.getElementById('modal-preview-result');
+    btnLoad(previewBtn, 'Previewing…');
+
+    post('previewTodayRow', _getPreviewParams(name, unlock, lock, groups), function(res) {
+      btnReset(previewBtn);
+      _lastPreviewChanges = (res && res.changes) || [];
+      resultEl.innerHTML = '<strong style="font-size:0.78rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted)">Preview</strong>' + _buildChangesHtml(_lastPreviewChanges);
+      resultEl.style.display = '';
+    }, function() {
+      btnReset(previewBtn);
+      _lastPreviewChanges = null;
+      resultEl.innerHTML = '<span style="color:var(--warn,#f59e0b)">&#9888; Could not compute preview.</span>';
+      resultEl.style.display = '';
+    });
+  }
+
+  function applyActionModal() {
+    var name   = document.getElementById('modal-name').value.trim();
+    var unlock = document.getElementById('modal-unlock').value;
+    var lock   = document.getElementById('modal-lock').value;
+    var groups = getModalTarget();
+    if (_modalIsNew && !name) { toast('Name is required', true); return; }
+
+    var changesHtml = _lastPreviewChanges !== null
+      ? _buildChangesHtml(_lastPreviewChanges)
+      : '<p style="margin:0;color:var(--muted);font-size:0.85rem">No preview run — apply anyway?</p>';
+    showConfirmModal(
+      _modalIsNew ? 'Add to Schedule?' : 'Apply Changes?',
+      changesHtml, 'Apply', 'btn-primary',
+      function() { _applyActionModal(name, unlock, lock, groups); }
+    );
+  }
+
+  function updateModalPreview() { _clearModalPreview(); }
+
+  function _applyActionModal(name, unlock, lock, groups) {
+    var saveBtn = document.getElementById('modal-save-btn');
+    if (_modalIsNew) {
+      var rowType = document.getElementById('modal-type').value || 'Unlock';
+      btnLoad(saveBtn, 'Adding…');
+      _showModalProgress();
+      post('addTodayRow', { name: name, unlockTime: unlock, lockTime: lock, groups: groups, type: rowType }, function(res) {
+        _hideModalProgress();
+        btnReset(saveBtn);
+        toast('Action added');
+        closeActionModal();
+        refreshToday(function() { showChangesSummary(res && res.changes); });
+      }, function() { _hideModalProgress(); btnReset(saveBtn); });
+    } else {
+      var unlockDisabled = document.getElementById('modal-unlock').disabled;
+      var params = { rowIndex: _modalRowIndex, name: name, lockTime: lock, groups: groups };
+      if (!unlockDisabled) params.unlockTime = unlock;
+      btnLoad(saveBtn, 'Saving…');
+      _showModalProgress();
+      post('updateTodayRow', params, function(res) {
+        _hideModalProgress();
+        btnReset(saveBtn);
+        toast('Changes saved');
+        closeActionModal();
+        refreshToday(function() { showChangesSummary(res && res.changes); });
+      }, function() { _hideModalProgress(); btnReset(saveBtn); });
+    }
+  }
+
+  function _buildCancelConfirmBody(rowName, changesHtml) {
+    var components = rowName.includes(' / ')
+      ? rowName.split(' / ').map(function(s) { return s.trim(); }).filter(Boolean)
+      : null;
+    var body = 'Cancel &ldquo;' + esc(rowName) + '&rdquo;? This removes it from today\'s schedule.';
+    if (components) {
+      body += '<div style="margin-top:10px"><strong style="font-size:0.82rem">Events in this group:</strong>';
+      body += '<div id="cancel-component-list" style="margin-top:6px;font-size:0.85rem">';
+      components.forEach(function(c) {
+        body += '<label style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer">' +
+          '<input type="checkbox" class="cancel-component-cb" value="' + esc(c) + '" checked> ' + esc(c) + '</label>';
+      });
+      body += '</div></div>';
+    }
+    if (changesHtml) body += '<div style="margin-top:10px">' + changesHtml + '</div>';
+    return { body: body, components: components };
+  }
+
+  function _doCancelRow(idx, onSuccess) {
+    var components = null;
+    var cbList = document.querySelectorAll('.cancel-component-cb');
+    if (cbList.length) {
+      components = Array.from(cbList).filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; });
+      if (!components.length) { toast('Select at least one event to cancel.', true); return; }
+    }
+    var callParams = { rowIndex: idx };
+    if (components) callParams.componentNames = components;
+    post('cancelTodayRow', callParams, function() {
+      closeConfirmModal();
+      toast('Action canceled');
+      if (onSuccess) onSuccess();
+      refreshToday();
+    }, function() { closeConfirmModal(); });
+  }
+
+  function cancelActionModal() {
+    if (!_modalRowIndex) return;
+    var skipBtn = document.getElementById('modal-skip-btn');
+    var idx = _modalRowIndex;
+    var a = _actionMap[idx];
+    var rowName = a ? (a.name || 'this action') : 'this action';
+    if (skipBtn) btnLoad(skipBtn, 'Checking…');
+    post('previewCancelTodayRow', { rowIndex: idx }, function(res) {
+      if (skipBtn) btnReset(skipBtn);
+      var changesHtml = _buildChangesHtml((res && res.changes) || null);
+      var built = _buildCancelConfirmBody(rowName, changesHtml);
+      showConfirmModal('Cancel Action', built.body,
+        built.components ? 'Cancel Selected' : 'Cancel Action', 'btn-danger',
+        function() { _doCancelRow(idx, closeActionModal); }, true);
+    }, function(err) {
+      if (skipBtn) btnReset(skipBtn);
+      if (err) return; // server returned an error (e.g. stale rowIndex) — toast already shown, don't open modal
+      var built = _buildCancelConfirmBody(rowName, null);
+      showConfirmModal('Cancel Action', built.body,
+        built.components ? 'Cancel Selected' : 'Cancel Action', 'btn-danger',
+        function() { _doCancelRow(idx, closeActionModal); }, true);
+    });
+  }
+
+  /* ── Modal target (doors/groups) dropdown ── */
+  function populateModalTargetDropdown(groups, doors) {
+    var menu = document.getElementById('modal-target-menu');
+    if (!menu) return;
+    var groupMap = {};
+    (doors || []).forEach(function(d) {
+      if (!groupMap[d.group]) groupMap[d.group] = [];
+      groupMap[d.group].push(d.name);
+    });
+    var html = '<label class="group-option" onclick="event.stopPropagation()">' +
+      '<input type="checkbox" value="ALL" checked onchange="onModalTargetCheck(this)"> ALL GROUPS</label>';
+    groups.forEach(function(g) {
+      var gDoors = groupMap[g] || [];
+      html += '<div style="padding:7px 14px 2px;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">' + esc(g) + '</div>';
+      html += '<label class="group-option" onclick="event.stopPropagation()">' +
+        '<input type="checkbox" data-group="' + esc(g) + '" class="modal-target-group-cb" onchange="onModalTargetCheck(this)"> ' +
+        esc(g) + ' (all)</label>';
+      gDoors.forEach(function(dName) {
+        html += '<label class="group-option" onclick="event.stopPropagation()" style="padding-left:28px">' +
+          '<input type="checkbox" value="' + esc(dName) + '" data-door-group="' + esc(g) + '" class="modal-target-door-cb" onchange="onModalTargetCheck(this)"> ' +
+          esc(dName) + '</label>';
+      });
+    });
+    menu.innerHTML = html;
+    updateModalTargetLabel();
+  }
+
+  function setModalTarget(targetStr) {
+    var menu = document.getElementById('modal-target-menu');
+    if (!menu) return;
+    var tokens = (targetStr || 'ALL').split(',').map(function(s) { return s.trim().toUpperCase(); });
+    var isAll = tokens.indexOf('ALL') !== -1;
+    var allCb = menu.querySelector('input[value="ALL"]');
+    var doorCbs = Array.from(menu.querySelectorAll('.modal-target-door-cb'));
+    var groupCbs = Array.from(menu.querySelectorAll('.modal-target-group-cb'));
+    if (isAll) {
+      if (allCb) allCb.checked = true;
+      doorCbs.forEach(function(cb) { cb.checked = false; });
+      groupCbs.forEach(function(cb) { cb.checked = false; });
+    } else {
+      if (allCb) allCb.checked = false;
+      doorCbs.forEach(function(cb) { cb.checked = tokens.indexOf(cb.value.toUpperCase()) !== -1; });
+      groupCbs.forEach(function(cb) {
+        var grp = cb.getAttribute('data-group');
+        var grpDoors = menu.querySelectorAll('.modal-target-door-cb[data-door-group="' + grp + '"]');
+        cb.checked = grpDoors.length > 0 && Array.from(grpDoors).every(function(d) { return d.checked; });
+      });
+    }
+    updateModalTargetLabel();
+  }
+
+  function getModalTarget() {
+    var menu = document.getElementById('modal-target-menu');
+    if (!menu) return 'ALL';
+    var allCb = menu.querySelector('input[value="ALL"]');
+    if (allCb && allCb.checked) return 'ALL';
+    var checked = Array.from(menu.querySelectorAll('.modal-target-door-cb'))
+      .filter(function(cb) { return cb.checked; })
+      .map(function(cb) { return cb.value; });
+    return checked.length ? checked.join(', ') : 'ALL';
+  }
+
+  function toggleModalTargetDropdown(e) {
+    e.stopPropagation();
+    var menu = document.getElementById('modal-target-menu');
+    var toggle = document.getElementById('modal-target-toggle');
+    var open = menu.style.display !== 'none';
+    menu.style.display = open ? 'none' : 'block';
+    toggle.classList.toggle('open', !open);
+  }
+
+  document.addEventListener('click', function() {
+    var menu = document.getElementById('modal-target-menu');
+    if (menu) menu.style.display = 'none';
+    var toggle = document.getElementById('modal-target-toggle');
+    if (toggle) toggle.classList.remove('open');
+  });
+
+  function onModalTargetCheck(cb) {
+    var menu = document.getElementById('modal-target-menu');
+    var allCb = menu.querySelector('input[value="ALL"]');
+    if (cb.value === 'ALL') {
+      if (!cb.checked) cb.checked = true; // can't uncheck ALL when nothing else checked
+      Array.from(menu.querySelectorAll('.modal-target-door-cb, .modal-target-group-cb'))
+        .forEach(function(c) { c.checked = false; });
+    } else if (cb.classList.contains('modal-target-group-cb')) {
+      var grp = cb.getAttribute('data-group');
+      Array.from(menu.querySelectorAll('.modal-target-door-cb[data-door-group="' + grp + '"]'))
+        .forEach(function(d) { d.checked = cb.checked; });
+      if (allCb) allCb.checked = false;
+      var anyDoor = Array.from(menu.querySelectorAll('.modal-target-door-cb')).some(function(c) { return c.checked; });
+      if (!anyDoor && allCb) allCb.checked = true;
+    } else {
+      if (allCb) allCb.checked = false;
+      var doorGrp = cb.getAttribute('data-door-group');
+      if (doorGrp) {
+        var grpDoors = menu.querySelectorAll('.modal-target-door-cb[data-door-group="' + doorGrp + '"]');
+        var grpCb = menu.querySelector('.modal-target-group-cb[data-group="' + doorGrp + '"]');
+        if (grpCb) grpCb.checked = Array.from(grpDoors).every(function(d) { return d.checked; });
+      }
+      var anyChecked = Array.from(menu.querySelectorAll('.modal-target-door-cb')).some(function(c) { return c.checked; });
+      if (!anyChecked && allCb) allCb.checked = true;
+    }
+    updateModalTargetLabel();
+    updateModalPreview();
+  }
+
+  function updateModalTargetLabel() {
+    var menu = document.getElementById('modal-target-menu');
+    var toggle = document.getElementById('modal-target-toggle');
+    if (!menu || !toggle) return;
+    var allCb = menu.querySelector('input[value="ALL"]');
+    if (allCb && allCb.checked) { toggle.textContent = 'ALL GROUPS ▾'; return; }
+    var parts = [];
+    var groupSet = new Set();
+    Array.from(menu.querySelectorAll('.modal-target-group-cb')).forEach(function(cb) {
+      if (cb.checked) { parts.push(cb.getAttribute('data-group')); groupSet.add(cb.getAttribute('data-group')); }
+    });
+    Array.from(menu.querySelectorAll('.modal-target-door-cb')).forEach(function(cb) {
+      if (cb.checked && !groupSet.has(cb.getAttribute('data-door-group'))) parts.push(cb.value);
+    });
+    toggle.textContent = parts.length ? parts.join(', ') + ' ▾' : 'ALL GROUPS ▾';
+  }
+
+  /* ── Confirm modal ── */
+  // asyncOk: true → OK button shows "Working…" and stays open; callback must call closeConfirmModal() when done
+  function showConfirmModal(title, body, okLabel, okClass, callback, asyncOk) {
+    document.getElementById('confirm-modal-title').textContent = title;
+    document.getElementById('confirm-modal-body').innerHTML = body;
+    var okBtn = document.getElementById('confirm-modal-ok');
+    okBtn.textContent = okLabel || 'Confirm';
+    okBtn.className = 'btn ' + (okClass || 'btn-danger');
+    okBtn.disabled = false;
+    if (asyncOk) {
+      okBtn.onclick = function() {
+        okBtn.disabled = true;
+        okBtn.textContent = 'Working…';
+        if (callback) callback();
+      };
+    } else {
+      okBtn.onclick = function() { closeConfirmModal(); if (callback) callback(); };
+    }
+    document.getElementById('confirm-modal').classList.remove('hidden');
+  }
+
+  function closeConfirmModal() {
+    document.getElementById('confirm-modal').classList.add('hidden');
+  }
+
+  /* ── Desktop action grid ── */
+  function renderActionGrid(doorActions) {
+    var ROW_H = 60;
+    // Columns are door groups (not individual door names)
+    var groups = _doorGroups.length ? _doorGroups.slice() : [];
+    if (!groups.length) {
+      doorActions.forEach(function(a) {
+        String(a.groups || '').split(',').forEach(function(g) {
+          g = g.trim();
+          if (g && g.toUpperCase() !== 'ALL' && groups.indexOf(g) === -1) groups.push(g);
+        });
+      });
+      groups.sort();
+    }
+    if (!groups.length) groups = ['All Doors'];
+    var minHour = 23, maxHour = 0, hasAny = false;
+    doorActions.forEach(function(a) {
+      var u = timeToMins(toLocalTime(a.unlockTime));
+      var l = timeToMins(toLocalTime(a.lockTime));
+      if (u !== null) {
+        hasAny = true;
+        var uh = Math.floor(u / 60);
+        if (uh < minHour) minHour = uh;
+        var uEnd = uh + 1;
+        if (uEnd > maxHour) maxHour = uEnd;
+      }
+      if (l !== null) {
+        var lh = (l % 60 === 0) ? l / 60 : Math.floor(l / 60) + 1;
+        if (lh > maxHour) maxHour = lh;
+      }
+    });
+    if (!hasAny) { minHour = 6; maxHour = 18; }
+
+    var chipDefs = [];
+    for (var gi = 0; gi < groups.length; gi++) chipDefs.push({});
+
+    doorActions.forEach(function(a) {
+      if (!String(a.groups || '').trim()) return; // no target — skip
+      var unlockLocal = toLocalTime(a.unlockTime);
+      var lockLocal   = toLocalTime(a.lockTime);
+      var uMins = timeToMins(unlockLocal || a.unlockTime);
+      var lMins = timeToMins(lockLocal   || a.lockTime);
+      if (uMins === null) return;
+      var startHour = Math.floor(uMins / 60);
+      var topPx = Math.round((uMins - startHour * 60) / 60 * ROW_H);
+      var durationMins = lMins !== null ? Math.max(lMins - uMins, 5) : 60;
+      var chipHeight = Math.max(Math.round(durationMins / 60 * ROW_H), 14);
+      var numRows = Math.ceil((topPx + chipHeight) / ROW_H);
+      var actionGroups;
+      var groupsStr = String(a.groups || '').trim();
+      if (groupsStr.toUpperCase() === 'ALL') {
+        actionGroups = groups.slice();
+      } else {
+        var doorNames = groupsStr.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        var grpSet = {};
+        doorNames.forEach(function(name) {
+          var grp = _doorToGroup[name.toUpperCase()];
+          if (grp && groups.indexOf(grp) !== -1) grpSet[grp] = true;
+          else if (groups.indexOf(name) !== -1) grpSet[name] = true;
+        });
+        actionGroups = Object.keys(grpSet);
+        if (!actionGroups.length) return; // unresolvable target — skip
+      }
+      actionGroups.forEach(function(g) {
+        var idx = groups.indexOf(g);
+        if (idx === -1) return;
+        if (!chipDefs[idx][startHour]) chipDefs[idx][startHour] = [];
+        chipDefs[idx][startHour].push({ action: a, rowspan: numRows, topPx: topPx, chipHeight: chipHeight, unlockLocal: unlockLocal, lockLocal: lockLocal });
+      });
+    });
+
+    var occupied = {}, ownerOf = {};
+    for (var h = minHour; h < maxHour; h++) { occupied[h] = {}; ownerOf[h] = {}; }
+    for (var ci2 = 0; ci2 < groups.length; ci2++) {
+      for (var sh in chipDefs[ci2]) {
+        var shInt = parseInt(sh, 10);
+        chipDefs[ci2][sh].forEach(function(chip) {
+          for (var rr = shInt + 1; rr < shInt + chip.rowspan; rr++) {
+            if (!occupied[rr]) occupied[rr] = {};
+            occupied[rr][ci2] = true;
+            if (!ownerOf[rr]) ownerOf[rr] = {};
+            ownerOf[rr][ci2] = shInt;
+          }
+        });
+      }
+    }
+    // Hoist chips starting inside an occupied row into their owning cell with adjusted topPx
+    for (var rr2 = minHour + 1; rr2 < maxHour; rr2++) {
+      for (var ci3 = 0; ci3 < groups.length; ci3++) {
+        if (occupied[rr2] && occupied[rr2][ci3] && chipDefs[ci3][rr2] && chipDefs[ci3][rr2].length) {
+          var ownerHr = ownerOf[rr2][ci3];
+          var rowOffset = (rr2 - ownerHr) * ROW_H;
+          if (!chipDefs[ci3][ownerHr]) chipDefs[ci3][ownerHr] = [];
+          chipDefs[ci3][rr2].forEach(function(chip) {
+            chipDefs[ci3][ownerHr].push({
+              action: chip.action, rowspan: chip.rowspan,
+              topPx: chip.topPx + rowOffset, chipHeight: chip.chipHeight,
+              unlockLocal: chip.unlockLocal, lockLocal: chip.lockLocal
+            });
+          });
+          chipDefs[ci3][rr2] = [];
+        }
+      }
+    }
+
+    function fmtHour(hr) { return (hr % 12 || 12) + (hr >= 12 ? 'pm' : 'am'); }
+
+    var html = '<table class="action-grid"><thead><tr><th></th>';
+    groups.forEach(function(g) { html += '<th>' + esc(g) + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    for (var hr = minHour; hr < maxHour; hr++) {
+      html += '<tr><td class="ag-time">' + fmtHour(hr) + '–' + fmtHour(hr + 1) + '</td>';
+      for (var ci = 0; ci < groups.length; ci++) {
+        if (occupied[hr] && occupied[hr][ci]) continue;
+        var chips = chipDefs[ci][hr] || [];
+        if (!chips.length) { html += '<td class="ag-cell"></td>'; continue; }
+        var maxRS = 1;
+        chips.forEach(function(c) {
+          var rowsNeeded = Math.ceil((c.topPx + c.chipHeight) / ROW_H);
+          if (rowsNeeded > maxRS) maxRS = rowsNeeded;
+        });
+        var rsAttr = maxRS > 1 ? ' rowspan="' + maxRS + '"' : '';
+        html += '<td class="ag-cell"' + rsAttr + ' style="position:relative">';
+        var total = chips.length;
+        chips.forEach(function(c, idx) {
+          var a = c.action;
+          var us = a.unlockStatus || '';
+          var ls = a.lockStatus   || '';
+          var cls = chipClass(us, ls, a.eventType) + ' ag-chip--minimal';
+          var leftPct  = (idx / total * 100).toFixed(1);
+          var rightPct = ((total - idx - 1) / total * 100).toFixed(1);
+          var chipStyle = 'position:absolute;top:' + c.topPx + 'px;height:' + c.chipHeight + 'px;' +
+            'left:calc(' + leftPct + '% + 2px);right:calc(' + rightPct + '% + 2px);cursor:pointer';
+          html += '<div class="' + cls + '" data-row="' + a.rowIndex + '" style="' + chipStyle + '" onclick="showActionDetail(' + a.rowIndex + ',this)"></div>';
+        });
+        html += '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    return html;
+  }
+
+  /* ── Action detail panel ── */
+  function showActionDetail(rowIndex, chipEl) {
+    var a = _actionMap[rowIndex];
+    if (!a) return;
+    _detailRowIndex = rowIndex;
+    var panel = document.getElementById('action-detail-panel');
+    var content = document.getElementById('detail-content');
+    var unlockLocal = toLocalTime(a.unlockTime);
+    var lockLocal = toLocalTime(a.lockTime);
+    var us = a.unlockStatus || '';
+    var ls = a.lockStatus || '';
+    var done = ['Completed', 'Skipped', 'Overridden', 'N/A'];
+    var pending = ['Pending', 'Scheduled'];
+    var canEdit = !(done.includes(us) && done.includes(ls));
+    var canSkip = pending.includes(us) || pending.includes(ls);
+    var html = '<div class="detail-name">' + esc(a.name || '') + '</div>';
+    if (a.eventType === 'Lock') html += '<div style="margin-top:4px"><span class="badge badge-red" style="font-size:0.72rem">&#128274; Lock Event</span></div>';
+    if (unlockLocal || lockLocal) html += '<div class="detail-time">' + esc([unlockLocal, lockLocal].filter(Boolean).join(' → ')) + '</div>';
+    if (a.groups) html += '<div style="font-size:0.78rem;color:var(--muted);margin-top:4px">' + esc(a.groups) + '</div>';
+    html += '<div style="margin-top:8px">';
+    if (us && us !== 'N/A') html += statusBadge('Unlock', us) + ' ';
+    if (ls && ls !== 'N/A') html += statusBadge('Lock', ls);
+    html += '</div>';
+    content.innerHTML = html;
+    document.getElementById('detail-edit-btn').style.display = canEdit ? '' : 'none';
+    document.getElementById('detail-skip-btn').style.display = canSkip ? '' : 'none';
+    Array.from(document.querySelectorAll('.ag-chip.selected')).forEach(function(el) { el.classList.remove('selected'); });
+    Array.from(document.querySelectorAll('[data-row="' + rowIndex + '"]')).forEach(function(el) { el.classList.add('selected'); });
+    // Position panel near the clicked chip
+    panel.classList.remove('hidden');
+    if (chipEl) {
+      var rect = chipEl.getBoundingClientRect();
+      var pw = 218, ph = 240;
+      var left = rect.right + 10;
+      if (left + pw > window.innerWidth - 8) left = rect.left - pw - 10;
+      if (left < 8) left = 8;
+      var top = rect.top;
+      if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
+      if (top < 8) top = 8;
+      panel.style.left = left + 'px';
+      panel.style.top  = top + 'px';
+    }
+  }
+
+  function closeDetailPanel() {
+    _detailRowIndex = null;
+    var panel = document.getElementById('action-detail-panel');
+    if (panel) panel.classList.add('hidden');
+    Array.from(document.querySelectorAll('.ag-chip.selected')).forEach(function(el) { el.classList.remove('selected'); });
+  }
+
+  function openEditFromDetail() {
+    if (_detailRowIndex === null) return;
+    var idx = _detailRowIndex;
+    closeDetailPanel();
+    openEditModal(idx);
+  }
+
+  function cancelFromDetail() {
+    if (_detailRowIndex === null) return;
+    var a = _actionMap[_detailRowIndex];
+    var rowName = a ? (a.name || 'this action') : 'this action';
+    var idx = _detailRowIndex;
+    var cancelBtn = document.getElementById('detail-skip-btn');
+    if (cancelBtn) btnLoad(cancelBtn, 'Checking…');
+    post('previewCancelTodayRow', { rowIndex: idx }, function(res) {
+      if (cancelBtn) btnReset(cancelBtn);
+      var changesHtml = _buildChangesHtml((res && res.changes) || null);
+      var built = _buildCancelConfirmBody(rowName, changesHtml);
+      showConfirmModal('Cancel Action', built.body,
+        built.components ? 'Cancel Selected' : 'Cancel Action', 'btn-danger',
+        function() { _doCancelRow(idx, closeDetailPanel); }, true);
+    }, function(err) {
+      if (cancelBtn) btnReset(cancelBtn);
+      if (err) return; // server returned an error — toast already shown, don't open modal
+      var built = _buildCancelConfirmBody(rowName, null);
+      showConfirmModal('Cancel Action', built.body,
+        built.components ? 'Cancel Selected' : 'Cancel Action', 'btn-danger',
+        function() { _doCancelRow(idx, closeDetailPanel); }, true);
+    });
+  }
+
+  /* ── Modal progress bar (stepped estimate) ── */
+  function _showModalProgress() {
+    _progressTimers.forEach(clearTimeout); _progressTimers = [];
+    var bar = document.getElementById('modal-progress-bar');
+    if (!bar) return;
+    bar.style.transition = 'none';
+    bar.style.width = '5%';
+    bar.style.display = 'block';
+    _progressTimers.push(setTimeout(function() {
+      bar.style.transition = 'width 0.9s ease';
+      bar.style.width = '35%';
+    }, 120));
+    _progressTimers.push(setTimeout(function() {
+      bar.style.transition = 'width 1.8s ease';
+      bar.style.width = '65%';
+    }, 1100));
+    _progressTimers.push(setTimeout(function() {
+      bar.style.transition = 'width 3s ease';
+      bar.style.width = '85%';
+    }, 3200));
+  }
+
+  function _hideModalProgress() {
+    _progressTimers.forEach(clearTimeout); _progressTimers = [];
+    var bar = document.getElementById('modal-progress-bar');
+    if (!bar) return;
+    bar.style.transition = 'width 0.2s ease';
+    bar.style.width = '100%';
+    setTimeout(function() {
+      bar.style.display = 'none';
+      bar.style.transition = 'none';
+      bar.style.width = '0%';
+    }, 250);
+  }
+</script></div>
+  <div id="tab-edit"   class="tab-panel"><!-- Emergency Modal -->
+<div id="emergency-modal" class="modal-overlay hidden">
+  <div id="emergency-modal-card" class="modal-card danger">
+    <h3 id="emergency-modal-title"></h3>
+    <p id="emergency-modal-body"></p>
+    <div class="modal-actions">
+      <button id="emergency-confirm-btn" onclick="emergencyConfirm()">Confirm</button>
+      <button class="btn btn-gray" onclick="hideEmergencyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Conflict Modal -->
+<div id="conflict-modal" class="modal-overlay hidden">
+  <div class="modal-card warning">
+    <h3>&#x26A0; Conflict Detected</h3>
+    <p>This event overlaps with the following existing actions:</p>
+    <ul id="conflict-list" style="margin:0 0 12px;padding-left:18px;color:#444;line-height:1.7;font-size:0.9rem"></ul>
+    <div class="modal-actions">
+      <button class="btn btn-warning" onclick="resolveConflict('merge')">Merge</button>
+      <button class="btn btn-gray" onclick="resolveConflict('cancel')">Cancel</button>
+    </div>
+    <div class="modal-hint">
+      <b>Merge</b>: Overlapping groups get a combined time window; non-overlapping groups stay separate.<br>
+      <span id="conflict-preview" style="display:block;margin-top:6px;font-style:italic"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Controls -->
+<div class="card">
+  <h2>Schedule Controls</h2>
+  <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px">The CMS controls the active schedule. Lockdown now lives in the dedicated <b>Lockdown</b> app; use Restore to resync today's doors to the CMS schedule.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn btn-warning" id="btn-restore"
+      onclick="confirmAction('restoreNormal','Restore to CMS Schedule','This will rebuild today\'s schedule from the CMS.','Restore','warning',this)">
+      Restore to CMS Schedule
+    </button>
+  </div>
+</div>
+
+<!-- Custom Events Section -->
+<div class="card">
+  <h2>Custom Events</h2>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Name</label>
+      <input type="text" id="evt-name" placeholder="e.g., Church Service">
+    </div>
+    <div class="form-group">
+      <label id="evt-date-label">Date</label>
+      <input type="date" id="evt-date">
+    </div>
+    <div class="form-group">
+      <label>Recurrence</label>
+      <select id="evt-recurrence" onchange="updateDateInput()">
+        <option value="ONE_TIME">One-time</option>
+        <option value="ANNUAL">Annual (same date each year)</option>
+        <option value="CONSECUTIVE">Consecutive Days</option>
+      </select>
+    </div>
+    <div class="form-group" id="evt-days-group" style="display:none">
+      <label>Repeat for N Days</label>
+      <input type="number" id="evt-days" min="2" max="365" value="2" placeholder="e.g., 5">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Unlock Time (local)</label>
+      <input type="time" id="evt-unlock">
+    </div>
+    <div class="form-group">
+      <label>Lock Time (local)</label>
+      <input type="time" id="evt-lock">
+    </div>
+    <div class="form-group">
+      <label>Doors / Groups</label>
+      <div class="group-dropdown" id="groups-dropdown">
+        <button type="button" class="group-dropdown-toggle" id="groups-toggle"
+                onclick="toggleGroupsDropdown(event)">ALL GROUPS ▾</button>
+        <div class="group-dropdown-menu" id="groups-menu" style="display:none"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Event Type</label>
+      <select id="evt-type">
+        <option value="Unlock" selected>Unlock (normal)</option>
+        <option value="Lock">Lock (blocks unlocks)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="evt-category">
+        <option value="School" selected>School</option>
+        <option value="Church">Church</option>
+        <option value="Both">Both</option>
+      </select>
+    </div>
+    <div class="form-group" style="justify-content:flex-end;align-items:center;gap:8px;">
+      <label>&nbsp;</label>
+      <button id="btn-add-event" class="btn btn-primary btn-block-mobile" onclick="submitEvent()">Add Event</button>
+      <a id="cancel-edit-link" href="#" style="display:none;font-size:0.85rem;color:var(--muted)"
+         onclick="cancelEditMode();return false;">Cancel Edit</a>
+    </div>
+  </div>
+  <div id="events-list" style="margin-top:16px;overflow-x:auto;">
+    <div class="skeleton-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    <div class="skeleton-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  </div>
+</div>
+
+
+<script>
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  var _editRowIndex = null;
+  var _eventsMap    = {};
+
+  function setGroupsDropdown(groupsStr) {
+    var menu = document.getElementById('groups-menu');
+    if (!menu) return;
+    var tokens = (groupsStr || 'ALL').split(',').map(function(s) { return s.trim().toUpperCase(); });
+    var isAll = tokens.indexOf('ALL') !== -1;
+    var allCb = menu.querySelector('input[value="ALL"]');
+    var doorCbs = Array.from(menu.querySelectorAll('.edit-target-door-cb'));
+    var groupCbs = Array.from(menu.querySelectorAll('.edit-target-group-cb'));
+    if (isAll) {
+      if (allCb) allCb.checked = true;
+      doorCbs.forEach(function(cb) { cb.checked = false; });
+      groupCbs.forEach(function(cb) { cb.checked = false; });
+    } else {
+      if (allCb) allCb.checked = false;
+      doorCbs.forEach(function(cb) { cb.checked = tokens.indexOf(cb.value.toUpperCase()) !== -1; });
+      groupCbs.forEach(function(cb) {
+        var grp = cb.getAttribute('data-group');
+        var grpDoors = menu.querySelectorAll('.edit-target-door-cb[data-door-group="' + grp + '"]');
+        cb.checked = grpDoors.length > 0 && Array.from(grpDoors).every(function(d) { return d.checked; });
+      });
+    }
+    updateGroupsLabel();
+  }
+
+  function editEvent(rowIndex, eJson) {
+    _editRowIndex = rowIndex;
+    var e = eJson;
+    document.getElementById('evt-name').value = e.name || '';
+    var recurStr  = String(e.recurrence || 'ONE_TIME').toUpperCase();
+    var recurType = recurStr.indexOf('CONSECUTIVE') === 0 ? 'CONSECUTIVE' : recurStr;
+    document.getElementById('evt-recurrence').value = recurType;
+    updateDateInput(); // resets date value — re-set it below
+    if (recurType === 'CONSECUTIVE') {
+      var n = parseInt(recurStr.split(':')[1] || '2', 10);
+      document.getElementById('evt-days').value = n;
+      document.getElementById('evt-date').value = e.date || '';
+    } else {
+      document.getElementById('evt-date').value = e.resolvedDate || e.date || '';
+    }
+    document.getElementById('evt-unlock').value = e.unlockTime || '';
+    document.getElementById('evt-lock').value   = e.lockTime   || '';
+    document.getElementById('evt-type').value     = e.type     || 'Unlock';
+    document.getElementById('evt-category').value = e.category || 'School';
+    setGroupsDropdown(e.groups || 'ALL');
+    document.getElementById('btn-add-event').textContent = 'Update Event';
+    document.getElementById('cancel-edit-link').style.display = 'inline';
+    // Scroll to form
+    var form = document.getElementById('btn-add-event');
+    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function cancelEditMode() {
+    _editRowIndex = null;
+    ['evt-name', 'evt-date', 'evt-unlock', 'evt-lock'].forEach(function(id) {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('evt-recurrence').value = 'ONE_TIME';
+    updateDateInput();
+    document.getElementById('evt-type').value     = 'Unlock';
+    document.getElementById('evt-category').value = 'School';
+    setGroupsDropdown('ALL');
+    document.getElementById('btn-add-event').textContent = 'Add Event';
+    document.getElementById('cancel-edit-link').style.display = 'none';
+  }
+
+  function updateDateInput() {
+    var recur = document.getElementById('evt-recurrence').value;
+    var input = document.getElementById('evt-date');
+    var label = document.getElementById('evt-date-label');
+    var daysGroup = document.getElementById('evt-days-group');
+    if (recur === 'ANNUAL') {
+      input.type = 'text';
+      input.placeholder = 'MM-DD (e.g., 09-15)';
+      label.textContent = 'Date (MM-DD, annual)';
+      daysGroup.style.display = 'none';
+    } else if (recur === 'CONSECUTIVE') {
+      input.type = 'date';
+      input.placeholder = '';
+      label.textContent = 'Start Date';
+      daysGroup.style.display = '';
+    } else {
+      input.type = 'date';
+      input.placeholder = '';
+      label.textContent = 'Date';
+      daysGroup.style.display = 'none';
+    }
+    input.value = '';
+  }
+
+  function toggleGroupsDropdown(e) {
+    e.stopPropagation();
+    var menu = document.getElementById('groups-menu');
+    var toggle = document.getElementById('groups-toggle');
+    var open = menu.style.display !== 'none';
+    menu.style.display = open ? 'none' : 'block';
+    toggle.classList.toggle('open', !open);
+  }
+
+  document.addEventListener('click', function() {
+    var menu = document.getElementById('groups-menu');
+    var toggle = document.getElementById('groups-toggle');
+    if (menu) { menu.style.display = 'none'; }
+    if (toggle) { toggle.classList.remove('open'); }
+  });
+
+  var _editDoors = [];
+
+  function onGroupCheck(cb) {
+    var menu = document.getElementById('groups-menu');
+    var allCb = menu.querySelector('input[value="ALL"]');
+    if (cb.value === 'ALL') {
+      if (!cb.checked) cb.checked = true;
+      Array.from(menu.querySelectorAll('.edit-target-door-cb, .edit-target-group-cb'))
+        .forEach(function(c) { c.checked = false; });
+    } else if (cb.classList.contains('edit-target-group-cb')) {
+      var grp = cb.getAttribute('data-group');
+      Array.from(menu.querySelectorAll('.edit-target-door-cb[data-door-group="' + grp + '"]'))
+        .forEach(function(d) { d.checked = cb.checked; });
+      if (allCb) allCb.checked = false;
+      var anyDoor = Array.from(menu.querySelectorAll('.edit-target-door-cb')).some(function(c) { return c.checked; });
+      if (!anyDoor && allCb) allCb.checked = true;
+    } else {
+      if (allCb) allCb.checked = false;
+      var doorGrp = cb.getAttribute('data-door-group');
+      if (doorGrp) {
+        var grpDoors = menu.querySelectorAll('.edit-target-door-cb[data-door-group="' + doorGrp + '"]');
+        var grpCb = menu.querySelector('.edit-target-group-cb[data-group="' + doorGrp + '"]');
+        if (grpCb) grpCb.checked = Array.from(grpDoors).every(function(d) { return d.checked; });
+      }
+      var anyChecked = Array.from(menu.querySelectorAll('.edit-target-door-cb')).some(function(c) { return c.checked; });
+      if (!anyChecked && allCb) allCb.checked = true;
+    }
+    updateGroupsLabel();
+  }
+
+  function updateGroupsLabel() {
+    var menu = document.getElementById('groups-menu');
+    var toggle = document.getElementById('groups-toggle');
+    if (!menu || !toggle) return;
+    var allCb = menu.querySelector('input[value="ALL"]');
+    if (allCb && allCb.checked) { toggle.textContent = 'ALL GROUPS ▾'; return; }
+    var parts = [];
+    var groupSet = new Set();
+    Array.from(menu.querySelectorAll('.edit-target-group-cb')).forEach(function(cb) {
+      if (cb.checked) { parts.push(cb.getAttribute('data-group')); groupSet.add(cb.getAttribute('data-group')); }
+    });
+    Array.from(menu.querySelectorAll('.edit-target-door-cb')).forEach(function(cb) {
+      if (cb.checked && !groupSet.has(cb.getAttribute('data-door-group'))) parts.push(cb.value);
+    });
+    toggle.textContent = parts.length ? parts.join(', ') + ' ▾' : 'ALL GROUPS ▾';
+  }
+
+  function getSelectedGroups() {
+    var menu = document.getElementById('groups-menu');
+    if (!menu) return ['ALL'];
+    var allCb = menu.querySelector('input[value="ALL"]');
+    if (allCb && allCb.checked) return ['ALL'];
+    var checked = Array.from(menu.querySelectorAll('.edit-target-door-cb'))
+      .filter(function(c) { return c.checked; })
+      .map(function(c) { return c.value; });
+    return checked.length ? checked : ['ALL'];
+  }
+
+  function populateGroupsDropdown(groups, doors) {
+    _editDoors = doors || [];
+    var menu = document.getElementById('groups-menu');
+    var pureGroups = groups.filter(function(g) { return g !== 'ALL'; });
+    var groupMap = {};
+    _editDoors.forEach(function(d) {
+      if (!groupMap[d.group]) groupMap[d.group] = [];
+      groupMap[d.group].push(d.name);
+    });
+    var html = '<label class="group-option" onclick="event.stopPropagation()">' +
+      '<input type="checkbox" value="ALL" checked onchange="onGroupCheck(this)"> ALL GROUPS</label>';
+    pureGroups.forEach(function(g) {
+      var gDoors = groupMap[g] || [];
+      html += '<div style="padding:7px 14px 2px;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">' + escHtml(g) + '</div>';
+      html += '<label class="group-option" onclick="event.stopPropagation()">' +
+        '<input type="checkbox" data-group="' + escHtml(g) + '" class="edit-target-group-cb" onchange="onGroupCheck(this)"> ' +
+        escHtml(g) + ' (all)</label>';
+      gDoors.forEach(function(dName) {
+        html += '<label class="group-option" onclick="event.stopPropagation()" style="padding-left:28px">' +
+          '<input type="checkbox" value="' + escHtml(dName) + '" data-door-group="' + escHtml(g) + '" class="edit-target-door-cb" onchange="onGroupCheck(this)"> ' +
+          escHtml(dName) + '</label>';
+      });
+    });
+    menu.innerHTML = html;
+    updateGroupsLabel();
+  }
+
+  var _pendingEmergency = null;
+
+  function confirmAction(action, title, body, confirmLabel, severity, btn) {
+    _pendingEmergency = { action: action, btn: btn, category: null };
+    document.getElementById('emergency-modal-title').textContent = title;
+    document.getElementById('emergency-modal-body').textContent  = body;
+    var confirmBtn = document.getElementById('emergency-confirm-btn');
+    confirmBtn.textContent  = confirmLabel || 'Confirm';
+    confirmBtn.className    = 'btn btn-' + (severity || 'danger');
+    document.getElementById('emergency-modal-card').className = 'modal-card ' + (severity || 'danger');
+    document.getElementById('emergency-modal').classList.remove('hidden');
+  }
+
+  function emergencyConfirm() {
+    hideEmergencyModal();
+    if (!_pendingEmergency) return;
+    _executeEmergencyAction();
+  }
+
+  function _executeEmergencyAction() {
+    if (!_pendingEmergency) return;
+    var action = _pendingEmergency.action;
+    var btn    = _pendingEmergency.btn;
+    _pendingEmergency = null;
+    var loadText = 'Restoring…';
+    if (btn) btnLoad(btn, loadText);
+    post(action, {}, function() {
+      toast('Done');
+      invalidateTab('today');
+      loadEditData();
+    }, btn ? function() { btnReset(btn); } : null);
+  }
+
+  function hideEmergencyModal() {
+    document.getElementById('emergency-modal').classList.add('hidden');
+    _pendingEmergency = null;
+  }
+
+
+  var _pendingSubmit = null;
+
+  function _todayLocalStr() {
+    var now = new Date();
+    return now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+  }
+
+  function submitEvent() {
+    var recurSel = document.getElementById('evt-recurrence').value;
+    var recurrence = recurSel;
+    if (recurSel === 'CONSECUTIVE') {
+      var n = parseInt(document.getElementById('evt-days').value, 10);
+      if (!n || n < 1) { toast('Enter a valid number of days (min 1)', true); return; }
+      recurrence = 'CONSECUTIVE:' + n;
+    }
+
+    var selected   = getSelectedGroups();
+    var groups     = (selected.length === 0 || selected.indexOf('ALL') !== -1) ? 'ALL' : selected.join(', ');
+    var targetType = 'GROUPS';
+
+    var params = {
+      name:       document.getElementById('evt-name').value.trim(),
+      date:       document.getElementById('evt-date').value.trim(),
+      recurrence: recurrence,
+      unlockTime: document.getElementById('evt-unlock').value.trim(),
+      lockTime:   document.getElementById('evt-lock').value.trim(),
+      groups:     groups,
+      category:   document.getElementById('evt-category').value,
+      type:       document.getElementById('evt-type').value,
+      targetType: targetType
+    };
+    if (!params.name || !params.date) { toast('Name and date are required', true); return; }
+
+    var submitBtn = document.getElementById('btn-add-event');
+
+    // Conflict check only for today's date
+    if (params.date === _todayLocalStr()) {
+      btnLoad(submitBtn, 'Checking…');
+      post('getEventConflicts', {
+        date: params.date, groups: params.groups,
+        unlockTime: params.unlockTime, lockTime: params.lockTime
+      }, function(r) {
+        if (r.hasConflict && r.conflicts && r.conflicts.length > 0) {
+          btnReset(submitBtn);
+          _pendingSubmit = params;
+          var list = document.getElementById('conflict-list');
+          list.innerHTML = r.conflicts.map(function(c) {
+            return '<li><b>' + escHtml(c.name) + '</b> &mdash; ' + escHtml(c.groups) +
+              ' (' + (c.unlock || '&mdash;') + ' &rarr; ' + (c.lock || '&mdash;') + ')</li>';
+          }).join('');
+          /* Dynamic preview: show what Split will produce for this specific event */
+          var preview = document.getElementById('conflict-preview');
+          if (preview) {
+            var pName = params.name || 'This event';
+            var pUnlock = params.unlockTime || '';
+            var pLock   = params.lockTime   || '';
+            var pGroups = params.groups     || '';
+            var pConflict = r.conflicts[0] ? r.conflicts[0].name : '';
+            var timeRange = pUnlock && pLock ? pUnlock + ' – ' + pLock
+                          : pUnlock ? 'from ' + pUnlock
+                          : pLock   ? 'until ' + pLock : '';
+            preview.textContent = '”' + pName + '”' +
+              (timeRange ? ' (' + timeRange + ')' : '') +
+              ' will be merged with “' + (pConflict || 'existing action') + '”' +
+              ' — shared groups get a combined window, non-overlapping groups stay separate.';
+          }
+          document.getElementById('conflict-modal').classList.remove('hidden');
+        } else {
+          _doSubmitEvent(params);
+        }
+      }, function() { btnReset(submitBtn); });
+    } else {
+      _doSubmitEvent(params);
+    }
+  }
+
+  function resolveConflict(choice) {
+    document.getElementById('conflict-modal').classList.add('hidden');
+    if (choice === 'cancel' || !_pendingSubmit) { _pendingSubmit = null; return; }
+    var params = _pendingSubmit;
+    _pendingSubmit = null;
+    params.resolution = '';  // empty → goes through _smartGroupMerge
+    _doSubmitEvent(params);
+  }
+
+  function _doSubmitEvent(params) {
+    var isEdit = _editRowIndex !== null;
+    if (isEdit) params.rowIndex = _editRowIndex;
+    var action   = isEdit ? 'updateEvent'  : 'createEvent';
+    var loadText = isEdit ? 'Updating…'    : 'Adding…';
+    var doneMsg  = isEdit ? 'Event updated' : 'Event created';
+    postBtn(document.getElementById('btn-add-event'), loadText, action, params, function() {
+      toast(doneMsg);
+      cancelEditMode();
+      invalidateTab('today');
+      loadEditData();
+    });
+  }
+
+  /* ---- Cancel event (inline confirmation) ---- */
+  function cancelEvent(rowIndex, btn) {
+    var cell = btn.parentNode;
+    cell._origHtml = cell.innerHTML;
+    cell.innerHTML =
+      '<button class="btn btn-danger btn-sm" onclick="confirmCancel(' + rowIndex + ',this)">Confirm cancel</button>' +
+      ' <button class="btn btn-gray btn-sm" onclick="revertCancel(this)">Nevermind</button>';
+  }
+
+  function revertCancel(btn) {
+    var cell = btn.parentNode;
+    cell.innerHTML = cell._origHtml || '';
+  }
+
+  function confirmCancel(rowIndex, btn) {
+    postBtn(btn, 'Canceling…', 'cancelEvent', { rowIndex: rowIndex }, function() {
+      toast('Event canceled');
+      loadEditData();
+      post('syncTodaySchedule', {}, function() {});
+    });
+  }
+
+  function _parseConsecutiveDateRange(startDate, recurStr) {
+    var n = parseInt((recurStr.split(':')[1] || '1'), 10);
+    var endMs = new Date(startDate + 'T12:00:00').getTime() + (n - 1) * 86400000;
+    var endDate = new Date(endMs).toLocaleDateString('en-CA'); /* YYYY-MM-DD */
+    return startDate + ' &ndash; ' + endDate + ' <span style="color:var(--muted)">(' + n + ' days)</span>';
+  }
+
+  function loadEditData() {
+    post('getEditData', {}, function(data) {
+      if (typeof _loaded !== 'undefined') _loaded.edit = true;
+
+      /* Door groups + individual doors dropdown */
+      populateGroupsDropdown(data.doorGroups || ['ALL'], data.doors || []);
+
+      /* Upcoming events table */
+      var evEl = document.getElementById('events-list');
+      if (!data.events || data.events.length === 0) {
+        evEl.innerHTML = '<p style="color:var(--muted);font-size:0.88rem">No upcoming active events.</p>';
+      } else {
+        var now      = new Date();
+        var todayStr = now.getFullYear() + '-' +
+          String(now.getMonth() + 1).padStart(2, '0') + '-' +
+          String(now.getDate()).padStart(2, '0');
+        var nowHHMM  = String(now.getHours()).padStart(2, '0') + ':' +
+          String(now.getMinutes()).padStart(2, '0');
+
+        // Store event objects by rowIndex for the Edit button onclick
+        _eventsMap = {};
+        data.events.forEach(function(e) { _eventsMap[e.rowIndex] = e; });
+
+        evEl.innerHTML = '<table><thead><tr><th>Name</th><th>Date / Range</th><th>Recurrence</th><th>Type</th><th>Unlock</th><th>Lock</th><th>Target</th><th>Category</th><th></th></tr></thead><tbody>' +
+          data.events.map(function(e) {
+            var recurStr  = String(e.recurrence || 'ONE_TIME').toUpperCase();
+            var recurLabel, dateDisplay;
+            if (recurStr.indexOf('CONSECUTIVE') === 0) {
+              recurLabel  = '<span class="badge badge-yellow">Consecutive</span>';
+              dateDisplay = _parseConsecutiveDateRange(e.date || e.resolvedDate, recurStr);
+            } else if (recurStr === 'ANNUAL') {
+              recurLabel  = '<span class="badge badge-blue">Annual</span>';
+              dateDisplay = e.date;
+            } else {
+              recurLabel  = '<span class="badge badge-gray">One-time</span>';
+              dateDisplay = e.resolvedDate || e.date;
+            }
+
+            // Past / in-progress detection
+            var evDate     = e.resolvedDate || e.date || '';
+            var isPast     = evDate !== '' && evDate < todayStr;
+            var isToday    = evDate === todayStr;
+            var lockPast   = isToday && e.lockTime   && e.lockTime   <= nowHHMM;
+            var unlockPast = isToday && e.unlockTime && e.unlockTime <= nowHHMM;
+            var inProgress = isToday && unlockPast && !lockPast;
+            var isDimmed   = isPast || lockPast;
+            var rowStyle   = isDimmed ? ' style="opacity:0.4"' : '';
+            var statusBadge = inProgress
+              ? '<span class="badge badge-yellow" style="margin-left:4px;font-size:0.75rem">In Progress</span>'
+              : '';
+
+            var isLockEvt  = (e.type || 'Unlock') === 'Lock';
+            var typeBadge  = isLockEvt
+              ? '<span class="badge badge-red">&#128274; Lock</span>'
+              : '<span class="badge badge-gray">Unlock</span>';
+
+            return '<tr' + rowStyle + '>' +
+              '<td>' + escHtml(e.name) + statusBadge + '</td>' +
+              '<td style="font-size:0.84rem">' + escHtml(dateDisplay) + '</td>' +
+              '<td>' + recurLabel + '</td>' +
+              '<td>' + typeBadge + '</td>' +
+              '<td style="font-family:monospace;color:var(--accent2)">' + (e.unlockTime || '&mdash;') + '</td>' +
+              '<td style="font-family:monospace;color:var(--accent2)">' + (e.lockTime   || '&mdash;') + '</td>' +
+              '<td>' + escHtml(e.groups) + '</td>' +
+              '<td><span class="badge ' + (e.category === 'Church' ? 'badge-blue' : 'badge-gray') + '">' + escHtml(e.category || 'School') + '</span></td>' +
+              '<td>' +
+                '<button class="btn btn-gray btn-sm" style="margin-right:4px" ' +
+                  'onclick="editEvent(' + e.rowIndex + ',_eventsMap[' + e.rowIndex + '])">Edit</button>' +
+                '<button class="btn btn-gray btn-sm" ' + (isDimmed ? 'disabled ' : '') +
+                  'onclick="cancelEvent(' + e.rowIndex + ',this)">Cancel</button>' +
+              '</td>' +
+              '</tr>';
+          }).join('') + '</tbody></table>';
+      }
+    });
+  }
+</script></div>
+  <div id="tab-schedules" class="tab-panel"><!-- Schedules tab — view the standing/standard door schedules; DoorAdmins can add/edit/delete with a
+     two-step confirm. Shares the app shell's post()/toast()/CAN_ADMIN. Server: ScheduleAdminData.gs. -->
+<style>
+  .sch-wrap { max-width: 960px; margin: 0 auto; padding: 4px 2px 40px; }
+  .sch-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 6px; }
+  .sch-head h2 { font-size: 1.15rem; font-weight: 800; margin: 0; }
+  .sch-note { flex-basis: 100%; color: var(--muted, #6b7280); font-size: 0.85rem; margin: 2px 0 10px; line-height: 1.4; }
+  .sch-muted { color: var(--muted, #6b7280); font-size: 0.88rem; padding: 8px 2px; }
+
+  .sch-type { background: #fff; border: 1px solid var(--line, #e7e9ee); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
+  .sch-type-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: #f7f8fa; cursor: pointer; user-select: none; }
+  .sch-type-head:hover { background: #f1f2f5; }
+  .sch-type.open .sch-type-head { border-bottom: 1px solid var(--line, #e7e9ee); }
+  .sch-type-name { font-weight: 800; font-size: 0.98rem; }
+  .sch-type-count { color: var(--muted, #6b7280); font-size: 0.78rem; }
+  .sch-caret { margin-left: auto; color: #6b7280; font-size: 0.8rem; transition: transform 0.15s; }
+  .sch-type.open .sch-caret { transform: rotate(90deg); }
+  .sch-type-body { display: none; }
+  .sch-type.open .sch-type-body { display: block; }
+  .sch-ro { background: #f7f8fa; color: #6b7280; cursor: not-allowed; }
+  .sch-tbl { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  .sch-tbl th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted, #6b7280); padding: 7px 10px; border-bottom: 1px solid var(--line, #e7e9ee); }
+  .sch-tbl td { padding: 8px 10px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; }
+  .sch-tbl tr:last-child td { border-bottom: none; }
+  .sch-time { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
+  .sch-off { opacity: 0.5; }
+  .sch-pill { display: inline-block; font-size: 0.66rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .sch-pill-on  { background: #e9f7ef; color: #1f8a4c; }
+  .sch-pill-off { background: #f1f0ee; color: #8a8f98; }
+  .sch-tempbadge { display: inline-block; margin-top: 4px; font-size: 0.72rem; font-weight: 700;
+    background: #fdf3e2; color: #b5751a; border: 1px solid #f1d9a8; border-radius: 6px; padding: 2px 7px; }
+
+  .sch-btn { font-family: inherit; font-size: 0.82rem; font-weight: 700; padding: 7px 13px; border-radius: 8px;
+    border: 1px solid var(--line, #e7e9ee); background: #fff; color: #23272e; cursor: pointer; }
+  .sch-btn:hover { background: #f7f8fa; }
+  .sch-btn-primary { background: #B22222; border-color: #B22222; color: #fff; }
+  .sch-btn-primary:hover { background: #8f1b1b; }
+  .sch-btn-danger { background: #B22222; border-color: #B22222; color: #fff; }
+  .sch-btn-danger:hover { background: #8f1b1b; }
+  .sch-btn-sm { padding: 4px 9px; font-size: 0.76rem; }
+  .sch-btn-ghost { border-color: transparent; color: #B22222; background: none; }
+  .sch-row-actions { text-align: right; white-space: nowrap; }
+
+  .sch-overlay { position: fixed; inset: 0; background: rgba(20,20,30,0.5); display: flex; align-items: center;
+    justify-content: center; z-index: 300; padding: 18px; }
+  .sch-card { background: #fff; border-radius: 14px; width: 100%; max-width: 480px; max-height: 88vh; overflow: auto;
+    box-shadow: 0 14px 44px rgba(0,0,0,0.28); }
+  .sch-card-sm { max-width: 420px; }
+  .sch-card-head { display: flex; align-items: center; gap: 8px; padding: 15px 18px; border-bottom: 1px solid var(--line,#e7e9ee);
+    font-size: 1.02rem; font-weight: 800; position: sticky; top: 0; background: #fff; }
+  .sch-card-head.sch-danger { color: #B22222; }
+  .sch-x { margin-left: auto; background: none; border: none; font-size: 1.5rem; line-height: 1; color: #6b7280; cursor: pointer; font-family: inherit; }
+  .sch-form { padding: 14px 18px; display: flex; flex-direction: column; gap: 11px; }
+  .sch-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.76rem; font-weight: 700; color: #444; }
+  .sch-form input, .sch-form select { font-family: inherit; font-size: 0.9rem; padding: 8px 10px; border: 1px solid var(--line,#e7e9ee);
+    border-radius: 8px; font-weight: 500; }
+  .sch-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .sch-chk { flex-direction: row !important; align-items: center; gap: 7px; }
+  .sch-chk input { width: auto; }
+  .sch-groups { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sch-gchk { display: inline-flex; align-items: center; gap: 5px; font-size: 0.82rem; font-weight: 600; border: 1px solid var(--line,#e7e9ee);
+    border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+  .sch-gchk input { margin: 0; }
+  .sch-body { padding: 15px 18px; font-size: 0.9rem; line-height: 1.5; }
+  .sch-body p { margin: 0 0 10px; }
+  .sch-summary { background: #f7f8fa; border: 1px solid var(--line,#e7e9ee); border-radius: 8px; padding: 12px; font-size: 0.82rem;
+    white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, Menlo, Consolas, monospace; margin: 0 0 10px; }
+  .sch-card-foot { display: flex; justify-content: flex-end; gap: 9px; padding: 13px 18px; border-top: 1px solid var(--line,#e7e9ee);
+    position: sticky; bottom: 0; background: #fff; }
+</style>
+
+<div class="sch-wrap">
+  <div class="sch-head">
+    <h2>Standard Schedules</h2>
+    <p class="sch-note">The recurring door schedules that run automatically based on the day type (Normal, delays, Summer, Church&hellip;).
+      <span id="sch-admin-hint"></span></p>
+  </div>
+  <div id="sch-loading" class="sch-muted">Loading schedules&hellip;</div>
+  <div id="sch-list"></div>
+</div>
+
+<!-- Add / Edit form -->
+<div id="sch-modal" class="sch-overlay" style="display:none">
+  <div class="sch-card">
+    <div class="sch-card-head"><span id="sch-modal-title">Edit schedule</span><button class="sch-x" onclick="schCloseModal()" aria-label="Close">&times;</button></div>
+    <div class="sch-form">
+      <label>Schedule type
+        <input id="sch-f-type" class="sch-ro" readonly tabindex="-1">
+      </label>
+      <label>Name / label
+        <input id="sch-f-name" placeholder="e.g. Morning unlock" autocomplete="off">
+      </label>
+      <label>Days
+        <input id="sch-f-days" placeholder="DAILY, WEEKDAYS, WEEKENDS, or 1-5 (0=Sun&hellip;6=Sat)" autocomplete="off">
+      </label>
+      <div class="sch-row2">
+        <label>Unlock<input type="time" id="sch-f-start"></label>
+        <label>Lock<input type="time" id="sch-f-end"></label>
+      </div>
+      <label>Target doors</label>
+      <div id="sch-f-groups" class="sch-groups"></div>
+      <div class="sch-row2">
+        <label>Category
+          <select id="sch-f-category">
+            <option>School</option><option>Church</option><option>Event</option><option>Both</option>
+          </select>
+        </label>
+        <label class="sch-chk"><input type="checkbox" id="sch-f-enabled" checked> Enabled</label>
+      </div>
+      <div id="sch-until-row" style="display:none;">
+        <label>Temporary — revert on this date
+          <input type="date" id="sch-f-until">
+        </label>
+        <div class="form-text sch-muted" style="padding:2px 0 0">The change applies through this date, then the schedule automatically reverts to its permanent settings.</div>
+      </div>
+    </div>
+    <div class="sch-card-foot">
+      <button class="sch-btn" onclick="schCloseModal()">Cancel</button>
+      <button class="sch-btn sch-btn-primary" onclick="schReview()">Review change&hellip;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 1: risk warning -->
+<div id="sch-warn" class="sch-overlay" style="display:none">
+  <div class="sch-card sch-card-sm">
+    <div class="sch-card-head sch-danger" id="sch-warn-head">&#9888;&#65039;&nbsp; Standing schedule change</div>
+    <div class="sch-body">
+      <p id="sch-warn-text">You're about to change a <b>standing</b> door schedule. This affects <b>every future day</b> of this type across campus &mdash; it moves real doors on a recurring basis.</p>
+      <p>Do you want to continue?</p>
+    </div>
+    <div class="sch-card-foot">
+      <button class="sch-btn" onclick="schCloseAll()">Cancel</button>
+      <button class="sch-btn sch-btn-danger" onclick="schShowSummary()">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Step 2: summary + apply -->
+<div id="sch-confirm" class="sch-overlay" style="display:none">
+  <div class="sch-card sch-card-sm">
+    <div class="sch-card-head">Confirm this change</div>
+    <div class="sch-body">
+      <pre id="sch-summary" class="sch-summary"></pre>
+      <p class="sch-muted">A change notice will be emailed to <b>facilities@</b>, <b>it@</b>, and <b>admin@harfordchristian.org</b>.</p>
+    </div>
+    <div class="sch-card-foot">
+      <button class="sch-btn" onclick="schCloseAll()">Cancel</button>
+      <button id="sch-apply-btn" class="sch-btn sch-btn-danger" onclick="schApply(this)">Apply change</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  var _sch = { list: [], groups: [], editRow: null, pending: null, mode: 'edit' };
+
+  function schEsc(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function schTo12h(hhmm) {
+    var m = /^(\d{1,2}):(\d{2})/.exec(String(hhmm || ''));
+    if (!m) return schEsc(hhmm || '');
+    var h = parseInt(m[1], 10), ap = h < 12 ? 'AM' : 'PM', h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + m[2] + ' ' + ap;
+  }
+
+  function loadSchedules() {
+    document.getElementById('sch-loading').style.display = 'block';
+    post('getSchedulesData', {}, function(d) {
+      _sch.list   = d.schedules || [];
+      _sch.groups = d.doorGroups || [];
+      document.getElementById('sch-loading').style.display = 'none';
+      document.getElementById('sch-admin-hint').innerHTML = CAN_ADMIN
+        ? 'Tap a type to expand. <b>Edit</b> = permanent change; <b>Temp</b> = change until a date, then it auto-reverts. Both take a two-step confirm.'
+        : 'Tap a type to expand. View only — editing requires DoorAdmin access.';
+      schRender();
+    });
+  }
+
+  function schRender() {
+    var el = document.getElementById('sch-list');
+    if (!_sch.list.length) { el.innerHTML = '<div class="sch-muted">No standing schedules found.</div>'; return; }
+    // group by type, preserving first-seen order
+    var order = [], byType = {};
+    _sch.list.forEach(function(s) {
+      var t = s.type || '(untyped)';
+      if (!byType[t]) { byType[t] = []; order.push(t); }
+      byType[t].push(s);
+    });
+    el.innerHTML = order.map(function(t) {
+      var rows = byType[t].map(function(s) {
+        var ov = s.override;
+        var badge = ov
+          ? '<div class="sch-tempbadge">&#9203; Temp until ' + schEsc(ov.until) + ': ' +
+              (ov.enabled ? schTo12h(ov.unlockTime) + '&ndash;' + schTo12h(ov.lockTime) +
+                            (ov.groups ? ' [' + schEsc(ov.groups) + ']' : '') : 'disabled') + '</div>'
+          : '';
+        var actions = CAN_ADMIN
+          ? '<td class="sch-row-actions">' +
+              '<button class="sch-btn sch-btn-sm" onclick="schOpenEdit(' + s.rowIndex + ')">Edit</button> ' +
+              '<button class="sch-btn sch-btn-sm" onclick="schOpenTemp(' + s.rowIndex + ')">Temp</button>' +
+              (ov ? ' <button class="sch-btn sch-btn-sm sch-btn-ghost" onclick="schCancelTemp(' + ov.soRow + ')">Cancel temp</button>' : '') +
+            '</td>'
+          : '';
+        return '<tr class="' + (s.enabled ? '' : 'sch-off') + '">' +
+          '<td>' + schEsc(s.name || '') + badge + '</td>' +
+          '<td>' + schEsc(s.days || '') + '</td>' +
+          '<td class="sch-time">' + schTo12h(s.unlockTime) + ' &ndash; ' + schTo12h(s.lockTime) + '</td>' +
+          '<td>' + schEsc(s.groups || 'ALL') + '</td>' +
+          '<td>' + schEsc(s.category || 'School') + '</td>' +
+          '<td><span class="sch-pill ' + (s.enabled ? 'sch-pill-on' : 'sch-pill-off') + '">' + (s.enabled ? 'On' : 'Off') + '</span></td>' +
+          actions +
+        '</tr>';
+      }).join('');
+      var adminTh = CAN_ADMIN ? '<th></th>' : '';
+      // Collapsed by default — click the type header to expand.
+      return '<div class="sch-type">' +
+        '<div class="sch-type-head" onclick="schToggleType(this)"><span class="sch-type-name">' + schEsc(t) + '</span>' +
+          '<span class="sch-type-count">' + byType[t].length + (byType[t].length === 1 ? ' window' : ' windows') + '</span>' +
+          '<span class="sch-caret">&#9654;</span></div>' +
+        '<div class="sch-type-body"><table class="sch-tbl"><thead><tr><th>Name</th><th>Days</th><th>Window</th><th>Target</th><th>Category</th><th>Status</th>' + adminTh + '</tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div></div>';
+    }).join('');
+  }
+  function schToggleType(headEl) { headEl.parentNode.classList.toggle('open'); }
+
+  // ── group picker ──
+  function schRenderGroups(selected) {
+    var sel = String(selected || 'ALL').toUpperCase().split(',').map(function(x){ return x.trim(); });
+    var isAll = sel.indexOf('ALL') >= 0;
+    var host = document.getElementById('sch-f-groups');
+    var opts = ['ALL'].concat(_sch.groups.filter(function(g){ return g && g.toUpperCase() !== 'ALL'; }));
+    host.innerHTML = opts.map(function(g) {
+      var checked = (g === 'ALL') ? isAll : (!isAll && sel.indexOf(g.toUpperCase()) >= 0);
+      return '<label class="sch-gchk"><input type="checkbox" value="' + schEsc(g) + '" ' + (checked ? 'checked' : '') +
+        ' onchange="schGroupToggle(this)"> ' + schEsc(g) + '</label>';
+    }).join('');
+  }
+  function schGroupToggle(cb) {
+    var boxes = document.querySelectorAll('#sch-f-groups input');
+    if (cb.value.toUpperCase() === 'ALL' && cb.checked) {
+      boxes.forEach(function(b){ if (b.value.toUpperCase() !== 'ALL') b.checked = false; });
+    } else if (cb.value.toUpperCase() !== 'ALL' && cb.checked) {
+      boxes.forEach(function(b){ if (b.value.toUpperCase() === 'ALL') b.checked = false; });
+    }
+  }
+  function schGatherGroups() {
+    var checked = [];
+    document.querySelectorAll('#sch-f-groups input:checked').forEach(function(b){ checked.push(b.value); });
+    if (!checked.length) return 'ALL';
+    if (checked.some(function(g){ return g.toUpperCase() === 'ALL'; })) return 'ALL';
+    return checked.join(',');
+  }
+
+  // ── open edit (existing rows only — no add) ──
+  function schOpenEdit(rowIndex) {
+    if (!CAN_ADMIN) return;
+    var s = _sch.list.filter(function(x){ return x.rowIndex === rowIndex; })[0];
+    if (!s) return;
+    _sch.editRow = s; _sch.mode = 'edit';
+    document.getElementById('sch-modal-title').textContent = 'Edit schedule (permanent)';
+    document.getElementById('sch-f-type').value = s.type || '';   // read-only — you edit within a type
+    document.getElementById('sch-f-name').value = s.name || '';
+    document.getElementById('sch-f-days').value = s.days || '';
+    document.getElementById('sch-f-start').value = (s.unlockTime || '').substring(0, 5);
+    document.getElementById('sch-f-end').value = (s.lockTime || '').substring(0, 5);
+    document.getElementById('sch-f-category').value = s.category || 'School';
+    document.getElementById('sch-f-enabled').checked = !!s.enabled;
+    document.getElementById('sch-until-row').style.display = 'none';
+    schRenderGroups(s.groups || 'ALL');
+    document.getElementById('sch-modal').style.display = 'flex';
+  }
+  // Temporary change — pre-fills from an active override if one exists, else the base window; requires an Until date.
+  function schOpenTemp(rowIndex) {
+    if (!CAN_ADMIN) return;
+    var s = _sch.list.filter(function(x){ return x.rowIndex === rowIndex; })[0];
+    if (!s) return;
+    var ov = s.override;
+    _sch.editRow = s; _sch.mode = 'temp';
+    document.getElementById('sch-modal-title').textContent = 'Temporary change';
+    document.getElementById('sch-f-type').value = s.type || '';
+    document.getElementById('sch-f-name').value = s.name || '';
+    document.getElementById('sch-f-days').value = (ov ? ov.days : s.days) || '';
+    document.getElementById('sch-f-start').value = ((ov ? ov.unlockTime : s.unlockTime) || '').substring(0, 5);
+    document.getElementById('sch-f-end').value = ((ov ? ov.lockTime : s.lockTime) || '').substring(0, 5);
+    document.getElementById('sch-f-category').value = s.category || 'School';
+    document.getElementById('sch-f-enabled').checked = ov ? !!ov.enabled : !!s.enabled;
+    document.getElementById('sch-f-until').value = ov ? ov.until : '';
+    document.getElementById('sch-until-row').style.display = 'block';
+    schRenderGroups((ov ? ov.groups : s.groups) || 'ALL');
+    document.getElementById('sch-modal').style.display = 'flex';
+  }
+  function schCancelTemp(soRow) {
+    if (!CAN_ADMIN) return;
+    var s = _sch.list.filter(function(x){ return x.override && x.override.soRow === soRow; })[0];
+    var label = s ? (s.type + ' / ' + s.name) : 'this window';
+    _sch.editRow = null; _sch.mode = 'cancel';
+    _sch.pending = { op: 'cancelScheduleOverride', params: { soRow: soRow },
+      summary: 'CANCEL temporary change\n\n' + label + '\n\nReverts to the standing schedule now.',
+      toast: 'Temporary change cancelled — reverted to the standing schedule.' };
+    _schSetWarn('cancel');
+    document.getElementById('sch-warn').style.display = 'flex';
+  }
+  function _schSetWarn(mode) {
+    var head = document.getElementById('sch-warn-head'), text = document.getElementById('sch-warn-text');
+    if (mode === 'temp') {
+      head.innerHTML = '&#9888;&#65039;&nbsp; Temporary schedule change';
+      text.innerHTML = "You're about to <b>temporarily</b> change a standing schedule until the date you set. The permanent schedule is untouched and <b>auto-reverts</b> afterward.";
+    } else if (mode === 'cancel') {
+      head.innerHTML = '&#9888;&#65039;&nbsp; Cancel temporary change';
+      text.innerHTML = "This ends the temporary change now and <b>reverts</b> to the standing schedule.";
+    } else {
+      head.innerHTML = '&#9888;&#65039;&nbsp; Standing schedule change';
+      text.innerHTML = "You're about to change a <b>standing</b> door schedule. This affects <b>every future day</b> of this type across campus &mdash; it moves real doors on a recurring basis.";
+    }
+  }
+  function schCloseModal()  { document.getElementById('sch-modal').style.display = 'none'; }
+  function schCloseAll() {
+    ['sch-modal','sch-warn','sch-confirm'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+    document.getElementById('sch-until-row').style.display = 'none';
+    _sch.pending = null;
+  }
+
+  // ── two-step confirm ──
+  function schFmtRow(o) {
+    return o.type + ' / ' + o.name + '\n  ' + o.days + '   ' + o.unlockTime + '–' + o.lockTime +
+      '\n  Target: ' + o.groups + '   Category: ' + o.category + (o.enabled ? '' : '   (DISABLED)');
+  }
+  function schReview() {
+    if (!_sch.editRow) { toast('No schedule selected', true); return; }
+    var isTemp  = (_sch.mode === 'temp');
+    var enabled = document.getElementById('sch-f-enabled').checked;
+    var days    = document.getElementById('sch-f-days').value.trim();
+    var unlock  = document.getElementById('sch-f-start').value.trim();
+    var lock    = document.getElementById('sch-f-end').value.trim();
+    var groups  = schGatherGroups();
+    var type    = _sch.editRow.type;                                            // locked
+    var name    = document.getElementById('sch-f-name').value.trim() || type;
+
+    // A disabled TEMP window needs no window/times; every other case needs a valid window.
+    var needTimes = enabled || !isTemp;
+    if (needTimes) {
+      if (!days) { toast('Days is required', true); return; }
+      if (!unlock || !lock) { toast('Unlock and Lock times are required', true); return; }
+      if (lock <= unlock) { toast('Lock must be after Unlock', true); return; }
+    }
+
+    if (isTemp) {
+      var until = document.getElementById('sch-f-until').value;
+      if (!until) { toast('Set the "revert on" date', true); return; }
+      if (until < new Date().toISOString().slice(0, 10)) { toast('The revert date must be today or later', true); return; }
+      var whileActive = enabled ? (days + '   ' + unlock + '–' + lock + '   [' + groups + ']') : 'window DISABLED';
+      var summary = 'TEMPORARY change — reverts on ' + until + '\n\n' + type + ' / ' + name +
+        '\n\nWhile active:\n  ' + whileActive + '\n\nAfter ' + until + ': back to the standing schedule.';
+      _sch.pending = { op: 'tempScheduleChange',
+        params: { rowIndex: _sch.editRow.rowIndex, enabled: enabled, days: days,
+                  unlockTime: unlock, lockTime: lock, groups: groups, until: until },
+        summary: summary, toast: 'Temporary change set — reverts on ' + until + '. Notice emailed.' };
+      _schSetWarn('temp');
+    } else {
+      var newObj = { type: type, name: name, days: days, unlockTime: unlock, lockTime: lock,
+                     groups: groups, category: document.getElementById('sch-f-category').value, enabled: enabled };
+      var summ = 'UPDATE (permanent)\n\nBefore:\n' + schFmtRow(_sch.editRow) + '\n\nAfter:\n' + schFmtRow(newObj);
+      _sch.pending = { op: 'updateSchedule',
+        params: { rowIndex: _sch.editRow.rowIndex, type: type, name: name, days: days, unlockTime: unlock,
+                  lockTime: lock, groups: groups, category: newObj.category, enabled: enabled },
+        summary: summ, toast: 'Schedule updated — change notice emailed.' };
+      _schSetWarn('edit');
+    }
+    document.getElementById('sch-warn').style.display = 'flex';
+  }
+  function schShowSummary() {
+    if (!_sch.pending) return;
+    document.getElementById('sch-warn').style.display = 'none';
+    document.getElementById('sch-summary').textContent = _sch.pending.summary;
+    document.getElementById('sch-confirm').style.display = 'flex';
+  }
+  function schApply(btn) {
+    if (!_sch.pending) return;
+    var p = _sch.pending;
+    postBtn(btn, 'Applying…', p.op, p.params, function() {
+      toast(p.toast || 'Done.');
+      schCloseAll();
+      loadSchedules();
+    });
+  }
+  function schCloseConfirm() { schCloseAll(); }
+  function schCloseWarn()    { schCloseAll(); }
+</script>
+</div>
+  
+  <div id="tab-quick"  class="tab-panel"><!-- Quick Control tab — included into Index.html. Uses the shared post()/postBtn()/toast() helpers. -->
+<style>
+  /* Quick Control — re-skinned to the shared HCS tokens (class names kept;
+     the inline script queries .qc-* / #qc-* by name). */
+  .qc-wrap{max-width:760px;margin:0 auto;padding:14px;}
+  .qc-wrap h2{margin:0 0 4px;font-weight:800;}
+  .qc-muted{color:var(--hcs-muted);font-size:.85rem;margin:0 0 16px;}
+  .qc-sec{border:1px solid var(--hcs-line);border-radius:var(--hcs-radius);padding:12px 14px;margin-bottom:14px;background:var(--hcs-surface);}
+  .qc-sec > .qc-lbl{display:block;font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--hcs-muted);margin-bottom:8px;}
+  .qc-act{border:1.5px solid var(--hcs-line);background:var(--hcs-surface);color:var(--hcs-ink);border-radius:9px;padding:8px 18px;cursor:pointer;font-weight:700;margin-right:8px;}
+  .qc-act.active{background:var(--hcs-red);color:#fff;border-color:var(--hcs-red);}
+  .qc-row{margin:6px 0;display:flex;flex-wrap:wrap;gap:14px;align-items:center;}
+  .qc-row label{font-weight:400;}
+  .qc-grp{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--hcs-line);border-radius:8px;padding:5px 10px;margin:3px 6px 3px 0;}
+  .qc-doors-grp{margin:6px 0;}
+  .qc-doors-grp > b{font-size:.8rem;color:var(--hcs-muted);}
+  .qc-summary{margin-top:8px;font-size:.85rem;color:var(--hcs-ink);}
+  .qc-result{margin-top:14px;padding:10px 12px;border-radius:8px;font-size:.88rem;display:none;}
+  .qc-result.ok{background:var(--hcs-ok-bg);border:1px solid var(--hcs-ok-line);display:block;}
+  .qc-result.bad{background:var(--hcs-red-soft);border:1px solid #fecaca;display:block;}
+  .qc-num{width:64px;} .qc-time,.qc-date{padding:3px;}
+  #qc-submit{background:var(--hcs-red);color:#fff;border:0;border-radius:9px;padding:11px 26px;font-weight:700;cursor:pointer;font-size:1rem;}
+  #qc-submit:hover{background:var(--hcs-red-dark);}
+</style>
+
+<div class="qc-wrap">
+  <h2>&#128275; Quick Control</h2>
+  <p class="qc-muted">Immediate or scheduled manual door actions. Doors <b>auto-revert to the regular schedule</b> at the window end. Doors only &mdash; bells &amp; announcements are unaffected.</p>
+
+  <div class="qc-sec">
+    <span class="qc-lbl">Action</span>
+    <button type="button" id="qc-actUnlock" class="qc-act active" onclick="qcSetAction('Unlock')">&#128275; Unlock</button>
+    <button type="button" id="qc-actLock"   class="qc-act"        onclick="qcSetAction('Lock')">&#128274; Lock</button>
+  </div>
+
+  <div class="qc-sec">
+    <span class="qc-lbl">When</span>
+    <div class="qc-row">
+      <label><input type="radio" name="qcWhen" value="now" checked onchange="qcSetWhen()"> Now (immediate)</label>
+      <label><input type="radio" name="qcWhen" value="sched" onchange="qcSetWhen()"> Scheduled</label>
+    </div>
+    <div id="qc-nowOpts" class="qc-row">
+      <span>Revert</span>
+      <label><input type="radio" name="qcRevert" value="dur" checked onchange="qcSetRevert()"> after <input type="number" id="qc-dur" class="qc-num" value="30" min="1" max="1440"> min</label>
+      <label><input type="radio" name="qcRevert" value="time" onchange="qcSetRevert()"> at <input type="time" id="qc-until" class="qc-time" disabled></label>
+    </div>
+    <div id="qc-schedOpts" class="qc-row" style="display:none;">
+      <label>Date <input type="date" id="qc-date" class="qc-date"></label>
+      <label>Start <input type="time" id="qc-start" class="qc-time"></label>
+      <label>End <input type="time" id="qc-end" class="qc-time"></label>
+    </div>
+  </div>
+
+  <div class="qc-sec">
+    <span class="qc-lbl">Doors</span>
+    <div class="qc-row"><label><input type="checkbox" id="qc-all" onchange="qcAllToggle()"> <b>All campus</b></label></div>
+    <div id="qc-groups"></div>
+    <details id="qc-doorsWrap"><summary>Individual doors</summary><div id="qc-doors"></div></details>
+    <div id="qc-summary" class="qc-summary"></div>
+  </div>
+
+  <button type="button" id="qc-submit" onclick="qcSubmit(this)">Apply</button>
+  <div id="qc-result" class="qc-result"></div>
+</div>
+
+<script>
+  var QC = { action: 'Unlock', doors: [] };   // doors: [{name, group}]
+
+  function qcInit() {
+    var d = new Date(), pad = function(n){ return ('0'+n).slice(-2); };
+    document.getElementById('qc-date').value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+    post('getDoorGroups', {}, function(r) {
+      QC.doors = (r && r.doors) || [];
+      var groups = ((r && r.groups) || []).filter(function(g){ return String(g).toUpperCase() !== 'ALL'; });
+      // group checkboxes
+      document.getElementById('qc-groups').innerHTML = groups.map(function(g){
+        return '<span class="qc-grp"><input type="checkbox" class="qc-grpchk" value="'+g+'" onchange="qcOnPick()"> '+g+'</span>';
+      }).join('') || '<span class="qc-muted">No door groups configured.</span>';
+      // individual doors, grouped
+      var byGrp = {};
+      QC.doors.forEach(function(dr){ (byGrp[dr.group] = byGrp[dr.group] || []).push(dr.name); });
+      document.getElementById('qc-doors').innerHTML = Object.keys(byGrp).sort().map(function(g){
+        return '<div class="qc-doors-grp"><b>'+g+'</b><br>' + byGrp[g].map(function(n){
+          return '<span class="qc-grp"><input type="checkbox" class="qc-doorchk" value="'+n+'" data-grp="'+g+'" onchange="qcOnPick()"> '+n+'</span>';
+        }).join('') + '</div>';
+      }).join('');
+      qcOnPick();
+    });
+  }
+
+  function qcSetAction(a){
+    QC.action = a;
+    document.getElementById('qc-actUnlock').classList.toggle('active', a==='Unlock');
+    document.getElementById('qc-actLock').classList.toggle('active', a==='Lock');
+  }
+  function qcWhen(){ return document.querySelector('input[name="qcWhen"]:checked').value; }
+  function qcSetWhen(){
+    var now = qcWhen()==='now';
+    document.getElementById('qc-nowOpts').style.display   = now ? 'flex' : 'none';
+    document.getElementById('qc-schedOpts').style.display = now ? 'none' : 'flex';
+  }
+  function qcSetRevert(){
+    var byDur = document.querySelector('input[name="qcRevert"]:checked').value==='dur';
+    document.getElementById('qc-dur').disabled   = !byDur;
+    document.getElementById('qc-until').disabled = byDur;
+  }
+  function qcAllToggle(){
+    var all = document.getElementById('qc-all').checked;
+    document.querySelectorAll('.qc-grpchk,.qc-doorchk').forEach(function(c){ c.disabled = all; if(all) c.checked=false; });
+    qcOnPick();
+  }
+
+  // Selected targets as an array of group/door tokens (or ['ALL']).
+  function qcTargets(){
+    if (document.getElementById('qc-all').checked) return ['ALL'];
+    var t = [];
+    document.querySelectorAll('.qc-grpchk:checked').forEach(function(c){ t.push(c.value); });
+    document.querySelectorAll('.qc-doorchk:checked').forEach(function(c){ t.push(c.value); });
+    return t;
+  }
+  // Distinct groups/buildings the selection touches (each group counts separately; MOD & 6th are own).
+  function qcTouchedGroups(){
+    if (document.getElementById('qc-all').checked) return ['ALL CAMPUS'];
+    var s = {};
+    document.querySelectorAll('.qc-grpchk:checked').forEach(function(c){ s[c.value] = 1; });
+    document.querySelectorAll('.qc-doorchk:checked').forEach(function(c){ s[c.getAttribute('data-grp')] = 1; });
+    return Object.keys(s);
+  }
+  function qcOnPick(){
+    var t = qcTargets(), g = qcTouchedGroups();
+    document.getElementById('qc-summary').textContent = t.length
+      ? ('Selected: ' + t.join(', ') + (g.length>1 ? '  ·  spans '+g.length+' buildings (confirmation required)' : ''))
+      : 'Nothing selected.';
+  }
+
+  function qcSubmit(btn){
+    var targets = qcTargets();
+    if (!targets.length) { toast('Pick at least one door or group.', true); return; }
+
+    var when = qcWhen(), params = { qcAction: QC.action, qcTargets: targets.join(',') };
+    var windowDesc;
+    if (when === 'now') {
+      params.qcImmediate = true;
+      if (document.querySelector('input[name="qcRevert"]:checked').value === 'dur') {
+        var mins = parseInt(document.getElementById('qc-dur').value, 10);
+        if (!(mins > 0)) { toast('Enter a revert duration in minutes.', true); return; }
+        params.qcDuration = mins; windowDesc = 'now, revert in ' + mins + ' min';
+      } else {
+        var u = document.getElementById('qc-until').value;
+        if (!u) { toast('Pick a revert time.', true); return; }
+        params.qcEnd = u; windowDesc = 'now until ' + u;
+      }
+    } else {
+      var date = document.getElementById('qc-date').value, s = document.getElementById('qc-start').value, e = document.getElementById('qc-end').value;
+      if (!date || !s || !e) { toast('Fill date, start, and end.', true); return; }
+      params.qcImmediate = false; params.qcDate = date; params.qcStart = s; params.qcEnd = e;
+      windowDesc = date + ' ' + s + '–' + e;
+    }
+
+    // Confirmation popup for All campus or a multi-building selection.
+    var touched = qcTouchedGroups();
+    if (targets.indexOf('ALL') !== -1 || touched.length > 1) {
+      var scope = targets.indexOf('ALL') !== -1 ? 'ALL CAMPUS' : touched.join(', ');
+      if (!confirm(QC.action.toUpperCase() + ' doors across ' + scope + '\nWindow: ' + windowDesc + '\n\nProceed?')) return;
+    }
+
+    var res = document.getElementById('qc-result'); res.className = 'qc-result';
+    postBtn(btn, 'Applying…', 'quickControl', params, function(r){
+      if (!r || !r.success) { res.className = 'qc-result bad'; res.textContent = (r && r.error) || 'Failed.'; return; }
+      res.className = 'qc-result ok';
+      res.innerHTML = '<b>' + r.action + '</b> &mdash; ' + (r.doors||[]).length + ' door(s): ' + (r.doors||[]).join(', ') +
+        '<br>Window: ' + r.date + ' ' + r.startTime + '–' + r.endTime + (r.immediate ? ' (actuated now)' : ' (scheduled)') +
+        ((r.failed && r.failed.length) ? '<br><span style="color:#b91c1c">Failed to actuate: ' + r.failed.join(', ') + '</span>' : '');
+      toast(r.action + ' applied to ' + (r.doors||[]).length + ' door(s).');
+    });
+  }
+</script>
+</div>
+  
+</div>
+
+<footer class="hcs-footer">Door Automation &middot; HCS campus-control system</footer>
+
+<div id="toast"></div>
+
+<script>
+  let CSRF = 'demo-csrf-0';
+  var CAN_ADMIN = true;   // DoorAdmin → may edit standing schedules (view is open to all)
+
+  var _loaded = { today: false, edit: false, quick: false, schedules: false };
+  function invalidateTab(name) { _loaded[name] = false; }
+
+  function showTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    document.querySelectorAll('[data-tab]').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-tab') === name);
+    });
+    if (name === 'today' && !_loaded.today) { _loaded.today = true; refreshToday(); }
+    if (name === 'edit'  && !_loaded.edit)  { _loaded.edit  = true; loadEditData(); }
+    if (name === 'schedules' && !_loaded.schedules && typeof loadSchedules === 'function') { _loaded.schedules = true; loadSchedules(); }
+    if (name === 'quick' && !_loaded.quick && typeof qcInit === 'function') { _loaded.quick = true; qcInit(); }
+  }
+
+  function toast(msg, isError) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.toggle('toast-error', !!isError);
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 3500);
+  }
+
+  function post(action, params, callback, onFinal) {
+    var payload = Object.assign({ action: action, csrf: CSRF }, params || {});
+    google.script.run
+      .withSuccessHandler(function(r) {
+        if (r && r.csrfToken) CSRF = r.csrfToken;
+        if (r && r.error) { if (onFinal) onFinal(r.error); toast(r.error, true); } else { if (onFinal) onFinal(null); callback(r); }
+      })
+      .withFailureHandler(function(e) {
+        if (onFinal) onFinal(null);
+        toast(e.message || 'Error', true);
+      })
+      .processPost(payload);
+  }
+
+  function btnLoad(btn, text) {
+    btn.disabled = true;
+    btn._origHtml = btn.innerHTML;
+    btn.innerHTML = '<span class="btn-spinner"></span>' + text;
+  }
+  function btnReset(btn) {
+    btn.disabled = false;
+    btn.innerHTML = btn._origHtml || btn.textContent;
+  }
+  function postBtn(btn, loadText, action, params, callback) {
+    btnLoad(btn, loadText);
+    post(action, params, callback, function() { btnReset(btn); });
+  }
+
+  window.addEventListener('DOMContentLoaded', function() {
+    _loaded.today = true;
+    refreshToday();
+  });
+</script>
+</body>
+</html>

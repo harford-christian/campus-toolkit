@@ -1,0 +1,1915 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+      :root { --hcs-red: #B22222; --hcs-gold: #D4AF37; }
+      body { background-color: #f4f7f6; font-family: 'Inter', sans-serif; }
+
+      .public-nav {
+        background: #fff;
+        border-bottom: 2px solid #eee;
+        padding: 10px 20px;
+        position: sticky; top: 0; z-index: 1000;
+      }
+      .nav-pill-custom {
+        color: #555; font-weight: 600; padding: 8px 16px;
+        border-radius: 8px; text-decoration: none;
+        transition: all 0.2s; font-size: 0.85rem; cursor: pointer;
+      }
+      .nav-pill-custom.active  { background: var(--hcs-red); color: white !important; }
+      .nav-pill-custom:hover:not(.active) { background: #f0f0f0; }
+
+      .handbook-btn {
+        color: #27ae60; font-weight: 700; padding: 6px 12px;
+        border-radius: 8px; text-decoration: none;
+        font-size: 0.8rem; border: 1.5px solid #27ae60;
+        transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+      }
+      .handbook-btn:hover { background: #27ae60; color: #fff !important; }
+
+      .filter-box {
+        background: white; border-radius: 12px; padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px;
+        flex-wrap: wrap; gap: 12px;
+      }
+
+      .user-chip {
+        display: none; align-items: center; gap: 8px;
+        margin-left: auto; flex-shrink: 0;
+        border-left: 1px solid #eee; padding-left: 12px;
+      }
+      .user-chip .user-email {
+        font-size: .72rem; color: #888; font-weight: 600;
+        max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .user-chip .switch-btn {
+        font-size: .72rem; color: var(--hcs-red); font-weight: 700;
+        text-decoration: none; white-space: nowrap; cursor: pointer;
+      }
+      .user-chip .switch-btn:hover { text-decoration: underline; }
+
+      @media (max-width: 576px) {
+        .public-nav { flex-direction: column; align-items: flex-start !important; gap: 10px; }
+        .nav-pills-wrap { flex-wrap: wrap; }
+        .nav-pill-custom { font-size: 0.75rem; padding: 6px 10px; }
+        .user-chip { margin-left: 0; border-left: none; padding-left: 0; border-top: 1px solid #eee; padding-top: 8px; width: 100%; }
+        .handbook-btn { font-size: 0.72rem; padding: 5px 10px; }
+      }
+    </style>
+  <!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Leave & Substitute Analytics" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+  <body>
+
+    <nav class="public-nav d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2 flex-wrap w-100">
+        <div class="pe-3 me-1 border-end flex-shrink-0">
+          <h5 class="mb-0 fw-800" style="color:var(--hcs-red);">🦅 HCS</h5>
+        </div>
+
+        <!-- Tab pills -->
+        <div class="d-flex gap-1 nav-pills-wrap">
+          <div id="tab1" class="nav-pill-custom active" onclick="switchTab(1)">👤 MY LEAVE</div>
+          <div id="tab2" class="nav-pill-custom"        onclick="switchTab(2)">🔮 FORECAST</div>
+          <div id="tab3" class="nav-pill-custom"        onclick="switchTab(3)">🔥 HEATMAP</div>
+          <div id="tab4" class="nav-pill-custom"        onclick="switchTab(4)">🔄 SUBS</div>
+          <div id="tab5" class="nav-pill-custom"        onclick="switchTab(5)">📋 SUMMARY</div>
+        </div>
+
+        <!-- Staff Handbook button — appears once URL is fetched -->
+        <a id="handbookBtn" href="#" target="_blank" rel="noopener"
+           class="handbook-btn" style="display:none;">
+          📖 Handbook
+        </a>
+
+        <!-- Logged-in user chip -->
+        <div id="userChip" class="user-chip">
+          <span id="userEmailLabel" class="user-email"></span>
+          <a id="switchAccountBtn" href="#" class="switch-btn"
+             title="Sign in with a different Google account">⇄ Switch Account</a>
+        </div>
+
+      </div>
+    </nav>
+
+    <div class="container py-4">
+
+      <!-- Filter bar — visible only on FORECAST, HEATMAP, SUMMARY -->
+      <div id="filterBar" class="filter-box d-flex align-items-center" style="display:none;">
+        <label class="small fw-bold text-muted">TYPE:</label>
+        <select id="typeFilter" class="form-select form-select-sm w-auto" onchange="applyAllFilters()">
+          <option value="All">All Leave Types</option>
+          <option value="Sick Leave">Sick Leave</option>
+          <option value="Personal Leave">Personal Leave</option>
+          <option value="HCS-Related">HCS-Related</option>
+          <option value="Late Arrival/Early Departure">Late Arrival / Early Departure</option>
+          <option value="Other Paid Leave">Other Paid Leave</option>
+        </select>
+        <label class="small fw-bold text-muted ms-3">RANGE:</label>
+        <select id="rangeFilter" class="form-select form-select-sm w-auto" onchange="applyAllFilters()">
+          <option value="">Loading…</option>
+        </select>
+        <span id="syLabel" class="small text-muted ms-2 fw-bold"></span>
+      </div>
+
+      <!-- Tab content panels -->
+      <div id="content1">                        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  /* ── Cards ── */
+  .p-card        { background:#fff; border-radius:14px; padding:20px; box-shadow:0 4px 14px rgba(0,0,0,.06); height:100%; }
+  .p-card-accent { border-top:4px solid #B22222; }
+  .p-card-gold   { border-top:4px solid #D4AF37; }
+  .p-card-dark   { border-top:4px solid #2c3e50; }
+  .p-card-green  { border-top:4px solid #27ae60; }
+
+  /* ── Filter bar ── */
+  .ml-filter-bar {
+    background:#fff; border-radius:14px; padding:16px 20px;
+    box-shadow:0 4px 14px rgba(0,0,0,.06); margin-bottom:20px;
+    border-left:4px solid #2c3e50;
+  }
+  .ml-filter-bar .form-select,
+  .ml-filter-bar .form-control { font-size:.8rem; border-radius:7px; }
+  .ml-filter-bar label { font-size:.68rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#999; margin-bottom:3px; display:block; }
+  .metric-toggle .btn { font-size:.78rem; font-weight:700; padding:5px 14px; }
+  .ml-result-count { font-size:.72rem; font-weight:700; color:#999; }
+
+  /* ── Policy note (appears under filter bar when a type is selected) ── */
+  .ml-policy-note {
+    padding: 10px 14px; margin-top: 10px;
+    border-top: 1px solid #f0f0f0;
+    font-size: .75rem; color: #555; line-height: 1.6;
+  }
+
+  /* ── Policy info icon ── */
+  .policy-info-icon {
+    cursor: pointer; font-size: .8rem; opacity: .65;
+    margin-left: 5px; vertical-align: middle;
+    display: inline-block; transition: opacity .15s;
+  }
+  .policy-info-icon:hover { opacity: 1; }
+
+  /* ── Stat cards ── */
+  .stat-num        { font-size:2.2rem; font-weight:800; line-height:1.1; }
+  .stat-num.red    { color:#B22222; }
+  .stat-num.gold   { color:#D4AF37; }
+  .stat-num.dark   { color:#2c3e50; }
+  .stat-num.warn   { color:#e67e22; }
+  .stat-num.green  { color:#27ae60; }
+  .stat-label      { font-size:.7rem; font-weight:800; letter-spacing:.05em; color:#999; text-transform:uppercase; }
+  .stat-sublabel   { font-size:.75rem; color:#bbb; margin-top:2px; }
+
+  .p-card.primary-metric   { border-top-color:#B22222 !important; }
+  .p-card.secondary-metric { border-top-color:#dee2e6 !important; }
+
+  /* ── History rows ── */
+  .leave-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:11px 12px; border-radius:8px; margin-bottom:6px;
+    cursor:pointer; transition:background .15s; border:2px solid transparent;
+    background:#f8f9fa;
+  }
+  .leave-row:hover              { background:#eef0f2; }
+  .leave-row.late-warning       { border-color:#B22222; background:#fff5f5; }
+  .leave-row.late-warning:hover { background:#ffe8e8; }
+  .leave-type-label { font-size:.72rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:#2c3e50; }
+  .leave-date       { font-size:.8rem; color:#888; margin-top:2px; }
+  .leave-metric-val { font-size:1.1rem; font-weight:800; color:#2980b9; white-space:nowrap; }
+
+  /* ── Rankings ── */
+  .rank-type-block { margin-bottom:22px; }
+  .rank-type-block:last-child { margin-bottom:0; }
+  .rank-entry { display:flex; align-items:center; padding:7px 10px; border-radius:7px; margin-bottom:4px; font-size:.82rem; background:#f8f9fa; }
+  .rank-entry.is-me { background:#B22222; color:#fff; font-weight:700; }
+  .rank-num  { width:28px; font-weight:800; flex-shrink:0; }
+  .rank-name { flex:1; }
+  .rank-hrs  { font-weight:700; white-space:nowrap; }
+  .rank-ellipsis { text-align:center; font-size:.75rem; color:#bbb; padding:2px 0 6px; letter-spacing:.1em; }
+
+  /* ── Upcoming ── */
+  .upcoming-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px; border-radius:9px; background:#fffbf0;
+    border-left:4px solid #D4AF37; margin-bottom:8px;
+  }
+  .upcoming-row:last-child { margin-bottom:0; }
+
+  /* ── Section header ── */
+  .section-header { font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#999; margin-bottom:14px; }
+
+  /* ── Modal ── */
+  .modal-detail-row  { display:flex; justify-content:space-between; align-items:flex-start; padding:8px 0; border-bottom:1px solid #f0f0f0; font-size:.88rem; }
+  .modal-detail-row:last-child { border-bottom:none; }
+  .modal-detail-label { font-weight:700; color:#555; flex-shrink:0; margin-right:12px; }
+  .modal-late-alert { background:#fff0f0; border:1px solid #f5c6cb; border-radius:8px; padding:10px 14px; margin-top:10px; font-size:.82rem; color:#721c24; }
+  .modal-policy-box { background:#f0f7ff; border:1px solid #cde; border-radius:8px; padding:10px 14px; margin-top:10px; font-size:.8rem; color:#2c3e50; line-height:1.55; }
+  .modal-policy-box .policy-title { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#2980b9; margin-bottom:6px; }
+</style>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     FILTER BAR
+════════════════════════════════════════════════════════════ -->
+<div class="ml-filter-bar">
+  <div class="row g-2 align-items-end mb-2">
+
+    <div class="col-6 col-sm-4 col-md-2">
+      <label>School Year</label>
+      <select id="mlSchoolYear" class="form-select form-select-sm" onchange="_onFilterChange()">
+        <option value="all">All Time</option>
+      </select>
+    </div>
+
+    <div class="col-6 col-sm-4 col-md-2">
+      <label>Leave Type</label>
+      <select id="mlType" class="form-select form-select-sm" onchange="_onFilterChange()">
+        <option value="all">All Types</option>
+        <option value="Sick Leave">Sick Leave</option>
+        <option value="Personal Leave">Personal Leave</option>
+        <option value="HCS-Related">HCS-Related</option>
+        <option value="Late Arrival/Early Departure">Late / Early Departure</option>
+        <option value="Other Paid Leave">Other Paid Leave</option>
+      </select>
+    </div>
+
+    <div class="col-6 col-sm-4 col-md-2">
+      <label>Status</label>
+      <select id="mlStatus" class="form-select form-select-sm" onchange="_onFilterChange()">
+        <option value="all">All Statuses</option>
+        <option value="Approved">Approved Only</option>
+        <option value="Pending">Pending Only</option>
+      </select>
+    </div>
+
+    <div class="col-6 col-sm-4 col-md-2">
+      <label>Sort By</label>
+      <select id="mlSort" class="form-select form-select-sm" onchange="_onFilterChange()">
+        <option value="date-desc">Newest First</option>
+        <option value="date-asc">Oldest First</option>
+        <option value="hours-desc">Most Hours First</option>
+        <option value="hours-asc">Fewest Hours First</option>
+        <option value="type">Leave Type (A–Z)</option>
+      </select>
+    </div>
+
+    <div class="col-12 col-md-4 d-flex align-items-end justify-content-md-end gap-2 flex-wrap">
+      <div>
+        <label>View As</label>
+        <div class="btn-group metric-toggle" role="group">
+          <button id="btnHours"    class="btn btn-sm btn-danger active"     onclick="_setMetric('hours')">Hours</button>
+          <button id="btnRequests" class="btn btn-sm btn-outline-secondary" onclick="_setMetric('requests')">Requests</button>
+        </div>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary mb-0" onclick="_clearFilters()" style="height:31px; align-self:flex-end;">
+        ↺ Clear
+      </button>
+    </div>
+
+  </div>
+
+  <div class="row g-2 align-items-end">
+    <div class="col-auto">
+      <label>Custom From</label>
+      <input type="date" id="mlDateFrom" class="form-control form-control-sm" onchange="_onCustomDateChange()" style="width:145px;">
+    </div>
+    <div class="col-auto">
+      <label>Custom To</label>
+      <input type="date" id="mlDateTo" class="form-control form-control-sm" onchange="_onCustomDateChange()" style="width:145px;">
+    </div>
+    <div class="col-auto" style="padding-bottom:2px;">
+      <span id="mlResultCount" class="ml-result-count">— records</span>
+    </div>
+    <div class="col-auto" style="padding-bottom:2px;">
+      <span id="mlRangeNote" class="small text-muted" style="font-size:.72rem;"></span>
+    </div>
+  </div>
+
+  <!-- Policy note — appears when a specific Leave Type is selected -->
+  <div id="mlPolicyNote" class="ml-policy-note" style="display:none;"></div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     STAT CARDS
+════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <div class="col-6 col-md-3">
+    <div class="p-card p-card-accent primary-metric text-center" id="cardPrimary">
+      <div class="stat-label" id="cardPrimaryLabel">Approved Hours</div>
+      <div class="stat-num red" id="cardPrimaryValue">—</div>
+      <div class="stat-sublabel" id="cardPrimarySub">—</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="p-card secondary-metric text-center" id="cardSecondary" style="border-top:4px solid #dee2e6;">
+      <div class="stat-label" id="cardSecondaryLabel">Requests</div>
+      <div class="stat-num dark" id="cardSecondaryValue">—</div>
+      <div class="stat-sublabel">approved</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="p-card p-card-gold text-center">
+      <div class="stat-label">Pending</div>
+      <div class="stat-num warn" id="myPendingReqs">—</div>
+      <div class="stat-sublabel">awaiting approval</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="p-card p-card-green text-center">
+      <div class="stat-label">Top Leave Type</div>
+      <div class="stat-num dark" id="myTopType" style="font-size:1rem; padding-top:6px;">—</div>
+      <div class="stat-sublabel" id="myTopTypeSub">by hours</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     CHART + RANKINGS
+════════════════════════════════════════════════════════════ -->
+<div class="row g-4 mb-4">
+  <div class="col-md-5">
+    <div class="p-card p-card-accent" style="min-height:300px;">
+      <div class="section-header" id="chartSectionHeader">My Hours by Leave Type</div>
+      <div id="myTypeChartWrap"><canvas id="myTypeChart"></canvas></div>
+    </div>
+  </div>
+  <div class="col-md-7">
+    <div class="p-card p-card-gold">
+      <div class="section-header">🏆 School-Wide Rankings</div>
+      <p class="text-muted mb-3" style="font-size:.75rem;">
+        Your totals vs. all staff for the full school year. Others are fully anonymous.
+        Rankings are always based on hours. Tap ℹ️ to view the leave policy for each type.
+      </p>
+      <div id="rankingArea">
+        <div class="text-center py-4">
+          <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+          <p class="small text-muted mt-2">Loading rankings…</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     UPCOMING LEAVE
+════════════════════════════════════════════════════════════ -->
+<div id="upcomingSection" class="mb-4" style="display:none;">
+  <div class="p-card p-card-gold">
+    <div class="section-header">⏭️ Upcoming Leave</div>
+    <div id="upcomingList"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     LEAVE HISTORY
+════════════════════════════════════════════════════════════ -->
+<div class="p-card p-card-dark">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="section-header mb-0">📋 Leave History</div>
+    <span class="badge bg-success" style="font-size:.7rem;">✓ Verified</span>
+  </div>
+  <div id="personalLogArea">
+    <div class="text-center py-5" id="personalLoader">
+      <div class="spinner-border text-secondary" role="status"></div>
+      <p class="mt-2 text-muted small">Retrieving your private records…</p>
+    </div>
+    <div id="personalList" style="display:none;"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     DETAIL MODAL
+════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="leaveDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:14px; border:none;">
+      <div class="modal-header" id="modalHeader" style="background:#2c3e50; border-radius:14px 14px 0 0;">
+        <h6 id="modalLeaveType" class="modal-title fw-800 text-white mb-0"></h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body px-4 py-3">
+        <div id="modalBody"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════ -->
+<script>
+// ── Module state ─────────────────────────────────────────────────────────────
+var _personalData = null;
+var _rankingData  = null;
+var _myTypeChart  = null;
+var _bsModal      = null;
+
+// Filter state
+var _F = {
+  metric:  'hours',
+  sy:      'current',
+  syStart: 0,
+  syEnd:   0,
+  type:    'all',
+  status:  'all',
+  dateFrom: null,
+  dateTo:   null,
+  sort:    'date-desc'
+};
+
+// ── Leave Policy Data (sourced from Staff Handbook 2025-2026, pp. 8-9) ────────
+var _POLICIES = {
+  'Personal Leave': {
+    excerpt: '3 days/yr (24 hrs) · Must be requested <strong>2 weeks in advance</strong> · Unused days are not carried over to the next year · Paid out at $25/unused day at year end · Leave without pay requires 1 month advance notice',
+    page: 8
+  },
+  'Other Paid Leave': {
+    excerpt: '5 days/yr (40 hrs) · Non-crisis requests require <strong>2 weeks advance notice</strong> · Valid uses: paternity (3 days), family crisis, aging family care, funeral, jury duty, college travel for children · Unused OPL converts to sick leave; paid out at $10/unused day',
+    page: 8
+  },
+  'Sick Leave': {
+    excerpt: '5 days/yr (40 hrs) · Accumulates up to <strong>90 days</strong> · Valid: personal illness, preventative care, family member care, maternity/paternity (≤15 days), bereavement (≤3 days) · Must arrange substitute through Coverage Supervisor · Exceeding accumulated leave = leave without pay',
+    page: 8
+  },
+  'Late Arrival/Early Departure': {
+    excerpt: '<strong>4 instances/yr</strong> permitted · Early departure = after 2:00 PM · Late arrival = before 9:30 AM · Must be pre-approved by administration · After 4 instances, standard leave policies apply',
+    page: 9
+  },
+  'HCS-Related': {
+    excerpt: 'School-related leave for HCS-sponsored events and activities. Contact administration for specific details and approval.',
+    page: null
+  }
+};
+
+// ── School year helpers ───────────────────────────────────────────────────────
+var _SY_MONTH_START = 8; // September (0-indexed) — school year starts Sep 1
+
+function _syBounds(startYear) {
+  return {
+    start: new Date(startYear,     _SY_MONTH_START,  1,  0,  0,  0).getTime(),
+    end:   new Date(startYear + 1, _SY_MONTH_START - 1, 31, 23, 59, 59).getTime()
+  };
+}
+function _currentSYYear() {
+  var now = new Date();
+  return now.getMonth() >= _SY_MONTH_START ? now.getFullYear() : now.getFullYear() - 1;
+}
+function _syLabelFor(y) { return y + '–' + (y + 1); }
+
+// ── Entry point ───────────────────────────────────────────────────────────────
+function fetchPersonalData() {
+  document.getElementById('personalLoader').style.display = 'block';
+  document.getElementById('personalList').style.display   = 'none';
+  document.getElementById('rankingArea').innerHTML =
+    '<div class="text-center py-4">' +
+      '<div class="spinner-border spinner-border-sm text-secondary" role="status"></div>' +
+      '<p class="small text-muted mt-2">Loading…</p>' +
+    '</div>';
+
+  google.script.run
+    .withSuccessHandler(function(d) {
+      _personalData = d;
+      _initFilters();
+      _applyAndRender();
+      _renderUpcoming();
+    })
+    .withFailureHandler(function() {
+      document.getElementById('personalLoader').style.display = 'none';
+      document.getElementById('personalList').style.display   = 'block';
+      document.getElementById('personalList').innerHTML =
+        '<p class="text-danger small text-center py-3">Could not load records. Try refreshing.</p>';
+    })
+    .getPersonalLeaveData();
+
+  google.script.run
+    .withSuccessHandler(function(d) { _rankingData = d; _renderRankings(); })
+    .withFailureHandler(function()  {
+      document.getElementById('rankingArea').innerHTML =
+        '<p class="text-muted small text-center">Rankings temporarily unavailable.</p>';
+    })
+    .getRankingData();
+}
+
+// ── Initialise filters ────────────────────────────────────────────────────────
+function _initFilters() {
+  var records = (_personalData && _personalData.records) || [];
+  var years   = {};
+  records.forEach(function(r) {
+    if (!r.startRaw) return;
+    var d  = new Date(r.startRaw);
+    var sy = d.getMonth() >= _SY_MONTH_START ? d.getFullYear() : d.getFullYear() - 1;
+    years[sy] = true;
+  });
+
+  var sortedYears = Object.keys(years).map(Number).sort(function(a,b){ return b - a; });
+  var sel = document.getElementById('mlSchoolYear');
+  while (sel.options.length > 1) sel.remove(1);
+
+  sortedYears.forEach(function(y) {
+    var opt = document.createElement('option');
+    opt.value = String(y);
+    opt.textContent = _syLabelFor(y);
+    sel.add(opt);
+  });
+
+  var curSY = _currentSYYear();
+  if (years[curSY]) {
+    sel.value = String(curSY);
+    var b = _syBounds(curSY);
+    _F.sy = curSY; _F.syStart = b.start; _F.syEnd = b.end;
+  } else {
+    sel.value = 'all'; _F.sy = 'all'; _F.syStart = 0; _F.syEnd = 0;
+  }
+  _updateRangeNote();
+}
+
+// ── Filter change handlers ────────────────────────────────────────────────────
+function _onFilterChange() {
+  _F.type   = document.getElementById('mlType').value;
+  _F.status = document.getElementById('mlStatus').value;
+  _F.sort   = document.getElementById('mlSort').value;
+
+  var syVal = document.getElementById('mlSchoolYear').value;
+  if (syVal === 'all') {
+    _F.sy = 'all'; _F.syStart = 0; _F.syEnd = 0;
+  } else {
+    var y = parseInt(syVal), b = _syBounds(y);
+    _F.sy = y; _F.syStart = b.start; _F.syEnd = b.end;
+  }
+
+  _F.dateFrom = null; _F.dateTo = null;
+  document.getElementById('mlDateFrom').value = '';
+  document.getElementById('mlDateTo').value   = '';
+
+  _updateRangeNote();
+  _applyAndRender();
+}
+
+function _onCustomDateChange() {
+  var fromVal = document.getElementById('mlDateFrom').value;
+  var toVal   = document.getElementById('mlDateTo').value;
+  _F.dateFrom = fromVal ? new Date(fromVal + 'T00:00:00').getTime() : null;
+  _F.dateTo   = toVal   ? new Date(toVal   + 'T23:59:59').getTime() : null;
+
+  if (_F.dateFrom || _F.dateTo) {
+    document.getElementById('mlSchoolYear').value = 'all';
+    _F.sy = 'all'; _F.syStart = 0; _F.syEnd = 0;
+    document.getElementById('mlRangeNote').innerText = 'Custom date range active';
+  } else {
+    _updateRangeNote();
+  }
+  _applyAndRender();
+}
+
+function _setMetric(m) {
+  _F.metric = m;
+  document.getElementById('btnHours').className =
+    'btn btn-sm ' + (m === 'hours' ? 'btn-danger active' : 'btn-outline-secondary');
+  document.getElementById('btnRequests').className =
+    'btn btn-sm ' + (m === 'requests' ? 'btn-dark active' : 'btn-outline-secondary');
+  _applyAndRender();
+}
+
+function _clearFilters() {
+  document.getElementById('mlSchoolYear').value = '';
+  document.getElementById('mlType').value       = 'all';
+  document.getElementById('mlStatus').value     = 'all';
+  document.getElementById('mlSort').value       = 'date-desc';
+  document.getElementById('mlDateFrom').value   = '';
+  document.getElementById('mlDateTo').value     = '';
+
+  _F.type = 'all'; _F.status = 'all'; _F.sort = 'date-desc';
+  _F.dateFrom = null; _F.dateTo = null; _F.metric = 'hours';
+  document.getElementById('btnHours').className    = 'btn btn-sm btn-danger active';
+  document.getElementById('btnRequests').className = 'btn btn-sm btn-outline-secondary';
+
+  _initFilters();
+  _applyAndRender();
+}
+
+function _updateRangeNote() {
+  var note = '';
+  if (_F.sy !== 'all' && typeof _F.sy === 'number') {
+    note = 'Showing: ' + _syLabelFor(_F.sy);
+    if (_F.sy === _currentSYYear()) note += ' (current)';
+  }
+  document.getElementById('mlRangeNote').innerText = note;
+}
+
+// ── Policy note (shown below filter bar when a specific type is selected) ─────
+function _updatePolicyNote() {
+  var noteEl = document.getElementById('mlPolicyNote');
+  if (!noteEl) return;
+  var type = _F.type;
+  if (type === 'all' || !_POLICIES[type]) {
+    noteEl.style.display = 'none';
+    return;
+  }
+  var p = _POLICIES[type];
+  var handbookLink = '';
+  if (_handbookUrl) {
+    var pageRef = p.page ? ' (p.' + p.page + ')' : '';
+    handbookLink = '&nbsp;&nbsp;<a href="' + _handbookUrl + '" target="_blank" rel="noopener" ' +
+      'style="color:#B22222;font-weight:700;font-size:.72rem;white-space:nowrap;">' +
+      '📖 Staff Handbook' + pageRef + ' ↗</a>';
+  }
+  noteEl.innerHTML = '📋 ' + p.excerpt + handbookLink;
+  noteEl.style.display = 'block';
+}
+
+// ── Bootstrap popover initialiser (rankings ℹ️ icons) ─────────────────────────
+function _initPopovers() {
+  if (typeof bootstrap === 'undefined') return;
+  document.querySelectorAll('.policy-info-icon').forEach(function(el) {
+    var existing = bootstrap.Popover.getInstance(el);
+    if (existing) existing.dispose();
+    new bootstrap.Popover(el, {
+      html:      true,
+      trigger:   'hover focus',
+      placement: 'top',
+      sanitize:  false,
+      title: function() {
+        return '<span style="font-size:.78rem;font-weight:800;">' +
+               (el.getAttribute('data-policy-type') || 'Leave Policy') + '</span>';
+      },
+      content: function() {
+        var type = el.getAttribute('data-policy-type');
+        var p    = _POLICIES[type];
+        if (!p) return 'No policy information available.';
+        var html = '<div style="font-size:.76rem;line-height:1.55;">' + p.excerpt + '</div>';
+        if (_handbookUrl) {
+          var pageRef = p.page ? ' · p.' + p.page : '';
+          html += '<div style="margin-top:8px;">' +
+            '<a href="' + _handbookUrl + '" target="_blank" rel="noopener" ' +
+            'style="font-size:.72rem;color:#B22222;font-weight:700;text-decoration:none;">' +
+            '📖 View Staff Handbook' + pageRef + ' ↗</a></div>';
+        }
+        return html;
+      }
+    });
+  });
+}
+
+// ── Core pipeline ─────────────────────────────────────────────────────────────
+function _getFiltered() {
+  var records = (_personalData && _personalData.records) || [];
+  var from = _F.dateFrom || (_F.syStart > 0 ? _F.syStart : null);
+  var to   = _F.dateTo   || (_F.syEnd   > 0 ? _F.syEnd   : null);
+
+  var out = records.filter(function(r) {
+    if (from && r.startRaw && r.startRaw < from) return false;
+    if (to   && r.startRaw && r.startRaw > to)   return false;
+    if (_F.type   !== 'all' && r.type   !== _F.type)   return false;
+    if (_F.status !== 'all' && r.status !== _F.status) return false;
+    return true;
+  });
+
+  out.sort(function(a, b) {
+    switch (_F.sort) {
+      case 'date-asc':   return (a.startRaw || 0) - (b.startRaw || 0);
+      case 'hours-desc': return b.hours - a.hours;
+      case 'hours-asc':  return a.hours - b.hours;
+      case 'type':       return (a.type || '').localeCompare(b.type || '');
+      default:           return (b.startRaw || 0) - (a.startRaw || 0);
+    }
+  });
+  return out;
+}
+
+function _applyAndRender() {
+  var filtered = _getFiltered();
+  _renderStats(filtered);
+  _renderChart(filtered);
+  _renderHistory(filtered);
+  _updatePolicyNote();
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function _renderStats(filtered) {
+  var approved = filtered.filter(function(r){ return r.status === 'Approved'; });
+  var pending  = filtered.filter(function(r){ return r.status === 'Pending';  });
+
+  var totalHours    = parseFloat(approved.reduce(function(s,r){ return s + r.hours; }, 0).toFixed(1));
+  var totalRequests = approved.length;
+  var isHours       = _F.metric === 'hours';
+
+  document.getElementById('cardPrimaryLabel').innerText  = isHours ? 'Approved Hours'    : 'Approved Requests';
+  document.getElementById('cardPrimaryValue').innerText  = isHours ? totalHours          : totalRequests;
+  document.getElementById('cardPrimarySub').innerText    = isHours ? totalRequests + ' requests' : totalHours + ' hrs total';
+  document.getElementById('cardPrimary').style.borderTopColor = '#B22222';
+
+  document.getElementById('cardSecondaryLabel').innerText = isHours ? 'Requests'   : 'Total Hours';
+  document.getElementById('cardSecondaryValue').innerText = isHours ? totalRequests : totalHours;
+  document.getElementById('cardSecondary').style.borderTopColor = '#dee2e6';
+
+  document.getElementById('myPendingReqs').innerText = pending.length;
+
+  var byType = {};
+  approved.forEach(function(r) {
+    if (!byType[r.type]) byType[r.type] = { hours: 0, count: 0 };
+    byType[r.type].hours += r.hours;
+    byType[r.type].count++;
+  });
+  var topEntry = Object.entries(byType)
+    .sort(function(a,b){ return isHours ? b[1].hours - a[1].hours : b[1].count - a[1].count; })[0];
+  document.getElementById('myTopType').innerText    = topEntry ? _shortType(topEntry[0]) : '—';
+  document.getElementById('myTopTypeSub').innerText = isHours ? 'by hours' : 'by requests';
+
+  document.getElementById('mlResultCount').innerText =
+    filtered.length + ' record' + (filtered.length !== 1 ? 's' : '');
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+function _renderChart(filtered) {
+  var approved = filtered.filter(function(r){ return r.status === 'Approved'; });
+  var isHours  = _F.metric === 'hours';
+  var palette  = ['#B22222','#D4AF37','#2c3e50','#27ae60','#2980b9'];
+
+  document.getElementById('chartSectionHeader').innerText =
+    isHours ? 'My Hours by Leave Type' : 'My Requests by Leave Type';
+
+  var byType = {};
+  approved.forEach(function(r) {
+    if (!byType[r.type]) byType[r.type] = { hours: 0, count: 0 };
+    byType[r.type].hours += r.hours;
+    byType[r.type].count++;
+  });
+
+  var entries = Object.entries(byType)
+    .filter(function(e){ return isHours ? e[1].hours > 0 : e[1].count > 0; })
+    .sort(function(a,b){ return isHours ? b[1].hours - a[1].hours : b[1].count - a[1].count; });
+
+  var wrap = document.getElementById('myTypeChartWrap');
+  if (!document.getElementById('myTypeChart')) {
+    wrap.innerHTML = '<canvas id="myTypeChart"></canvas>';
+  }
+
+  if (entries.length === 0) {
+    wrap.innerHTML = '<p class="text-muted text-center small py-4">No approved leave for the selected filters.</p>';
+    if (_myTypeChart) { _myTypeChart.destroy(); _myTypeChart = null; }
+    return;
+  }
+
+  var labels = entries.map(function(e){ return _shortType(e[0]); });
+  var values = entries.map(function(e){ return isHours ? e[1].hours : e[1].count; });
+  var colors = entries.map(function(_,i){ return palette[i % palette.length]; });
+
+  var ctx = document.getElementById('myTypeChart').getContext('2d');
+  if (_myTypeChart) _myTypeChart.destroy();
+
+  _myTypeChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 5 }] },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: function(c){ return isHours ? (' ' + c.parsed.x + ' hrs') : (' ' + c.parsed.x + ' req'); }
+        }}
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { display: false },
+             ticks: { callback: function(v){ return isHours ? v + 'h' : v; } } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── History list ──────────────────────────────────────────────────────────────
+function _renderHistory(filtered) {
+  document.getElementById('personalLoader').style.display = 'none';
+  var listEl = document.getElementById('personalList');
+  listEl.style.display = 'block';
+
+  var now  = new Date();
+  var past = filtered.filter(function(r){ return !r.startRaw || new Date(r.startRaw) <= now; });
+  window._currentRecords = past;
+
+  if (past.length === 0) {
+    listEl.innerHTML = '<p class="text-muted text-center py-4 small">No records match the current filters.</p>';
+    return;
+  }
+
+  var isHours = _F.metric === 'hours';
+
+  listEl.innerHTML = past.map(function(r, idx) {
+    var late      = _isLatePersonal(r);
+    var metricVal = isHours ? (r.hours + ' hrs') : '1 req';
+
+    return '<div class="leave-row' + (late ? ' late-warning' : '') + '" onclick="_openModal(' + idx + ')">' +
+      '<div style="min-width:0;">' +
+        '<div class="leave-type-label">' +
+          (late ? '<span title="Submitted inside 2-week window" style="margin-right:4px;">⚠️</span>' : '') +
+          _esc(r.type) +
+        '</div>' +
+        '<div class="leave-date">' + _dateRange(r) + '</div>' +
+      '</div>' +
+      '<div class="d-flex flex-column align-items-end gap-1" style="flex-shrink:0;">' +
+        '<span class="badge ' + _statusCls(r.status) + '">' + r.status + '</span>' +
+        '<span class="leave-metric-val">' + _esc(metricVal) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Upcoming ──────────────────────────────────────────────────────────────────
+function _renderUpcoming() {
+  if (!_personalData) return;
+  var now      = new Date();
+  var upcoming = (_personalData.records || []).filter(function(r){ return r.startRaw && new Date(r.startRaw) > now; });
+  if (upcoming.length === 0) return;
+
+  document.getElementById('upcomingSection').style.display = 'block';
+  document.getElementById('upcomingList').innerHTML = upcoming.map(function(r) {
+    return '<div class="upcoming-row">' +
+      '<div>' +
+        '<div class="leave-type-label">' + _esc(r.type) + '</div>' +
+        '<div class="leave-date">' + _dateRange(r) + '</div>' +
+      '</div>' +
+      '<div class="text-end">' +
+        '<span class="badge ' + _statusCls(r.status) + ' mb-1">' + r.status + '</span><br>' +
+        '<span class="leave-metric-val">' + r.hours + ' hrs</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Detail modal ──────────────────────────────────────────────────────────────
+function _openModal(idx) {
+  var r    = (window._currentRecords || [])[idx];
+  if (!r) return;
+  var late = _isLatePersonal(r);
+
+  document.getElementById('modalLeaveType').innerText = r.type;
+
+  var subLabel   = 'Sub';
+  var subDisplay = 'N/A';
+  if (r.subRequired && r.subRequired.toLowerCase() === 'yes') {
+    var names  = (r.subNames || '').split(/[&,]/).map(function(n){ return n.trim(); }).filter(Boolean);
+    subDisplay = names.length > 1 ? names.join(' & ') : (names[0] || 'Assigned — name pending');
+    if (names.length > 1) subLabel = 'Subs';
+  } else if (r.subRequired && r.subRequired.toLowerCase() === 'no') {
+    subDisplay = 'No sub needed';
+  }
+
+  var rows = [
+    ['Date',        _dateRange(r)],
+    ['Hours',       r.hours + ' hrs'],
+    ['Status',      '<span class="badge ' + _statusCls(r.status) + '">' + r.status + '</span>'],
+    [subLabel,      _esc(subDisplay)],
+    ['Approval ID', r.approvalId ? _esc(r.approvalId) : '—']
+  ];
+
+  if (r.uidLink) {
+    rows.push(['UID Portal',
+      '<a href="' + _esc(r.uidLink) + '" target="_blank" rel="noopener"' +
+      ' class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.75rem;">Open in UID ↗</a>'
+    ]);
+  }
+  if (r.discussion) {
+    rows.push(['Notes', '<span style="font-size:.8rem;color:#555;">' + _esc(r.discussion) + '</span>']);
+  }
+
+  var html = rows.map(function(p) {
+    return '<div class="modal-detail-row">' +
+      '<span class="modal-detail-label">' + p[0] + '</span>' +
+      '<span style="text-align:right;">'  + p[1] + '</span>' +
+    '</div>';
+  }).join('');
+
+  // Policy box
+  var policy = _POLICIES[r.type];
+  if (policy) {
+    var pageRef     = policy.page ? ' · p.' + policy.page : '';
+    var hbButton    = _handbookUrl
+      ? '<div style="margin-top:8px;"><a href="' + _handbookUrl + '" target="_blank" rel="noopener" ' +
+        'class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:.72rem;">' +
+        '📖 Staff Handbook' + pageRef + ' ↗</a></div>'
+      : '';
+    html += '<div class="modal-policy-box">' +
+      '<div class="policy-title">📋 Leave Policy</div>' +
+      '<div>' + policy.excerpt + '</div>' +
+      hbButton +
+    '</div>';
+  }
+
+  // Late warning (upgraded with handbook link)
+  if (late) {
+    var hbLink = _handbookUrl
+      ? ' <a href="' + _handbookUrl + '" target="_blank" rel="noopener" ' +
+        'style="color:#721c24;font-weight:700;">See Staff Handbook p.8 ↗</a>'
+      : '';
+    html += '<div class="modal-late-alert">' +
+      '<strong>⚠️ Policy Notice:</strong> This request was submitted inside the required ' +
+      '2-week advance window for Personal Leave. It may have been approved at management\'s discretion.' +
+      hbLink +
+    '</div>';
+  }
+
+  document.getElementById('modalBody').innerHTML = html;
+
+  if (!_bsModal) _bsModal = new bootstrap.Modal(document.getElementById('leaveDetailModal'));
+  _bsModal.show();
+}
+
+// ── Rankings ──────────────────────────────────────────────────────────────────
+function _renderRankings() {
+  if (!_rankingData) return;
+  var area    = document.getElementById('rankingArea');
+  var hasData = Object.values(_rankingData).some(function(v){ return v !== null; });
+  if (!hasData) {
+    area.innerHTML = '<p class="text-muted small text-center py-3">No ranking data available yet.</p>';
+    return;
+  }
+
+  var order = ['Sick Leave','Personal Leave','HCS-Related','Late Arrival/Early Departure','Other Paid Leave'];
+  var html  = '';
+  order.forEach(function(type) {
+    var d = _rankingData[type];
+    if (!d) return;
+
+    // ℹ️ policy icon
+    var infoIcon = '<span class="policy-info-icon" ' +
+      'data-policy-type="' + _esc(type) + '" ' +
+      'tabindex="0" ' +
+      'aria-label="View ' + _esc(type) + ' policy" ' +
+      'onclick="event.stopPropagation()">ℹ️</span>';
+
+    html += '<div class="rank-type-block">' +
+      '<div class="d-flex justify-content-between align-items-center mb-2">' +
+        '<span style="font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;">' +
+          _esc(type) + infoIcon +
+        '</span>' +
+        '<span class="badge" style="background:#B22222;font-size:.7rem;">#' + d.rank + ' of ' + d.total + ' staff</span>' +
+      '</div>';
+
+    var shownEllipsis = false;
+    d.topFive.forEach(function(entry) {
+      if (entry.ellipsis && !shownEllipsis) {
+        html += '<div class="rank-ellipsis">• • •</div>';
+        shownEllipsis = true;
+      }
+      html += '<div class="rank-entry' + (entry.isMe ? ' is-me' : '') + '">' +
+        '<span class="rank-num">#' + entry.rank + '</span>' +
+        '<span class="rank-name">' + (entry.isMe ? 'You' : '—') + '</span>' +
+        '<span class="rank-hrs">'  + entry.hours + ' hrs</span>' +
+      '</div>';
+    });
+    html += '</div>';
+  });
+
+  area.innerHTML = html;
+  _initPopovers(); // attach Bootstrap popovers to the ℹ️ icons
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+var _TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+
+function _isLatePersonal(r) {
+  return r.type === 'Personal Leave' &&
+         r.submittedRaw != null && r.startRaw != null &&
+         (r.startRaw - r.submittedRaw) < _TWO_WEEKS_MS;
+}
+function _shortType(t) {
+  return {'Late Arrival/Early Departure':'Late / Early','Other Paid Leave':'Other Paid'}[t] || t;
+}
+function _dateRange(r) {
+  if (!r.end || r.end === r.start || r.end === '') return r.start;
+  return r.start + ' – ' + r.end;
+}
+function _statusCls(s) { return s === 'Approved' ? 'bg-success' : 'bg-warning text-dark'; }
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script></div>
+      <div id="content2" style="display:none;">  <style>
+  .calendar-container { background: #0b0f19; border-radius: 15px; padding: 20px; color: white; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  .cal-day { background: #161b22; border: 1px solid #30363d; min-height: 120px; padding: 10px; border-radius: 8px; position: relative; transition: background 0.2s; }
+  .cal-day.weekend { background: rgba(255,255,255,0.02); border-style: dashed; opacity: 0.5; }
+  .cal-day.today { border-color: #D4AF37; box-shadow: 0 0 10px rgba(212, 175, 55, 0.2); }
+  .big-count { font-size: 2.2rem; font-weight: 800; color: #D4AF37; display: block; text-align: center; margin-top: 15px; }
+  .day-label { font-size: 0.75rem; color: #888; font-weight: bold; position: absolute; top: 10px; left: 10px; }
+  .cal-header-cell { text-align: center; font-weight: 800; color: #aaa; font-size: 0.8rem; padding-bottom: 10px; }
+  .weekend-label { text-align: center; color: #444; font-size: 0.65rem; margin-top: 20px; font-weight: bold; }
+  .cal-day-label { text-align: center; font-size: 0.6rem; opacity: 0.5; margin-top: 2px; }
+
+  @media (max-width: 600px) {
+    .calendar-container { padding: 10px; border-radius: 10px; }
+    .calendar-grid { gap: 3px; }
+    .cal-day { min-height: 54px; padding: 4px; border-radius: 5px; }
+    .big-count { font-size: 1.4rem; margin-top: 6px; }
+    .day-label { font-size: 0.55rem; top: 3px; left: 4px; }
+    .cal-header-cell { font-size: 0.58rem; padding-bottom: 5px; }
+    .weekend-label { font-size: 0.5rem; margin-top: 6px; }
+    .cal-day-label { display: none; }
+  }
+</style>
+
+<div class="calendar-container">
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mb-3 gap-2">
+    <div class="d-flex gap-3 align-items-center">
+      <button class="btn btn-sm btn-outline-warning" onclick="changeForecastDate(-1)">◀</button>
+      <h5 id="forecastDateDisplay" class="fw-bold text-warning mb-0" style="min-width: 160px; text-align: center;"></h5>
+      <button class="btn btn-sm btn-outline-warning" onclick="changeForecastDate(1)">▶</button>
+    </div>
+    <div class="small text-muted fw-bold text-uppercase">Staffing Capacity</div>
+  </div>
+
+  <div class="calendar-grid mb-2">
+    <div class="cal-header-cell">SUN</div><div class="cal-header-cell">MON</div><div class="cal-header-cell">TUE</div><div class="cal-header-cell">WED</div><div class="cal-header-cell">THU</div><div class="cal-header-cell">FRI</div><div class="cal-header-cell">SAT</div>
+  </div>
+  
+  <div id="forecastCalendar" class="calendar-grid"></div>
+</div>
+
+<script>
+  let forecastViewDate = new Date();
+
+  function changeForecastDate(dir) {
+    forecastViewDate.setMonth(forecastViewDate.getMonth() + dir);
+    renderForecast();
+  }
+
+  function renderForecast() {
+    const area = document.getElementById('forecastCalendar'); 
+    area.innerHTML = "";
+    
+    const year = forecastViewDate.getFullYear();
+    const month = forecastViewDate.getMonth();
+    document.getElementById('forecastDateDisplay').innerText = forecastViewDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+    
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Padding for Sunday start
+    for (let i = 0; i < firstDay; i++) {
+      area.innerHTML += `<div class="cal-day" style="opacity:0.05; border:none;"></div>`;
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(year, month, d);
+      const isWeekend = (date.getDay() === 0 || date.getDay() === 6);
+      const isToday = date.toDateString() === new Date().toDateString();
+      
+      // Calculate absences for this specific day from the filtered pool
+      const count = isWeekend ? 0 : filteredData.filter(i => {
+        const start = new Date(i.startRaw); start.setHours(0,0,0,0);
+        const end = new Date(i.endRaw || i.startRaw); end.setHours(0,0,0,0);
+        return date >= start && date <= end;
+      }).length;
+
+      const card = document.createElement('div');
+      card.className = `cal-day ${isWeekend ? 'weekend' : ''} ${isToday ? 'today' : ''}`;
+      
+      let html = `<span class="day-label">${d}</span>`;
+      if (isWeekend) {
+        html += `<div class="weekend-label">WEEKEND</div>`;
+      } else {
+        html += `<span class="big-count">${count}</span>`;
+        if (count > 0) {
+          html += `<div class="cal-day-label opacity-50">Staff Out</div>`;
+        } else {
+          html += `<div class="cal-day-label opacity-25">Clear</div>`;
+        }
+      }
+      
+      card.innerHTML = html;
+      area.appendChild(card);
+    }
+  }
+</script></div>
+      <div id="content3" style="display:none;">  <style>
+  .heatmap-container { background: #fff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  .month-row { display: flex; align-items: center; margin-bottom: 5px; }
+  .month-label { width: 40px; font-size: 0.7rem; font-weight: 800; color: #666; }
+  .day-cell { width: 18px; height: 18px; margin: 2px; border-radius: 2px; position: relative; cursor: pointer; border: 1px solid rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; line-height: 1; }
+  .day-cell:hover::after {
+    content: attr(data-info);
+    position: absolute; bottom: 100%; left: 50%;
+    transform: translateX(-50%);
+    background: #333; color: white;
+    padding: 4px 8px; border-radius: 4px;
+    font-size: 0.6rem; white-space: nowrap; z-index: 10;
+  }
+
+  /* Heatmap Color Scale */
+  .level-0 { background-color: #ebedf0; color: transparent; } /* 0 absences   */
+  .level-1 { background-color: #ff9999; color: #7a0000; }     /* 1–2 absences */
+  .level-2 { background-color: #ff4d4d; color: #fff; }        /* 3–4 absences */
+  .level-3 { background-color: #cc0000; color: #fff; }        /* 5+ absences  */
+
+  .legend { display: flex; align-items: center; gap: 10px; margin-top: 20px; font-size: 0.7rem; font-weight: bold; color: #666; }
+</style>
+
+<div class="heatmap-container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h6 class="fw-bold m-0 text-uppercase">Absence Intensity Heatmap</h6>
+    <div id="heatmapYearLabel" class="small text-muted fw-bold"></div>
+  </div>
+
+  <div id="heatmapArea"></div>
+
+  <div class="legend">
+    <span>Less</span>
+    <div class="day-cell level-0"></div>
+    <div class="day-cell level-1"></div>
+    <div class="day-cell level-2"></div>
+    <div class="day-cell level-3"></div>
+    <span>More absences</span>
+  </div>
+</div>
+
+<script>
+  function generateHeatmap() {
+    var area = document.getElementById('heatmapArea');
+    area.innerHTML = '';
+
+    // ── Determine which school year to render ────────────────────────────────
+    // Read from the range filter if set; fall back to current school year.
+    // School year: Sep 1 (month 8) through Aug 31 of the following year.
+    var rangeEl  = document.getElementById('rangeFilter');
+    var rangeVal = rangeEl ? rangeEl.value : '';
+    var syStartYear;
+    if (rangeVal.indexOf('sy:') === 0) {
+      syStartYear = parseInt(rangeVal.slice(3), 10);
+    } else {
+      var now = new Date();
+      syStartYear = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+    }
+
+    // Update the year badge in the card header
+    var yearLabel = document.getElementById('heatmapYearLabel');
+    if (yearLabel) yearLabel.innerText = 'School Year ' + syStartYear + '–' + (syStartYear + 1);
+
+    // School year months: Sep (8) through Jun (5), in order
+    var SY_MONTHS    = [8, 9, 10, 11, 0, 1, 2, 3, 4, 5];
+    var MONTH_NAMES  = ['SEP','OCT','NOV','DEC','JAN','FEB','MAR','APR','MAY','JUN'];
+
+    SY_MONTHS.forEach(function(mIdx, i) {
+      // Sep–Dec (mIdx 8–11) → syStartYear;  Jan–Jun (mIdx 0–5) → syStartYear + 1
+      var year = (mIdx >= 8) ? syStartYear : syStartYear + 1;
+
+      var monthRow = document.createElement('div');
+      monthRow.className = 'month-row';
+
+      var label = document.createElement('div');
+      label.className = 'month-label';
+      label.innerText = MONTH_NAMES[i];
+      monthRow.appendChild(label);
+
+      var daysInMonth = new Date(year, mIdx + 1, 0).getDate();
+
+      for (var d = 1; d <= 31; d++) {
+        var cell = document.createElement('div');
+        cell.className = 'day-cell';
+
+        if (d <= daysInMonth) {
+          var date      = new Date(year, mIdx, d);
+          var isWeekend = (date.getDay() === 0 || date.getDay() === 6);
+
+          if (isWeekend) {
+            cell.style.opacity = '0.1';
+            cell.classList.add('level-0');
+          } else {
+            var count = filteredData.filter(function(req) {
+              var start = new Date(req.startRaw); start.setHours(0,0,0,0);
+              var end   = new Date(req.endRaw || req.startRaw); end.setHours(0,0,0,0);
+              return date >= start && date <= end;
+            }).length;
+
+            if      (count === 0) cell.classList.add('level-0');
+            else if (count <= 2)  cell.classList.add('level-1');
+            else if (count <= 4)  cell.classList.add('level-2');
+            else                  cell.classList.add('level-3');
+
+            if (count > 0) cell.textContent = count;   // show the count right in the cell
+            cell.setAttribute('data-info', MONTH_NAMES[i] + ' ' + d + ': ' + count + ' absence(s)');
+          }
+        } else {
+          cell.style.visibility = 'hidden';
+        }
+
+        monthRow.appendChild(cell);
+      }
+
+      area.appendChild(monthRow);
+    });
+  }
+</script>
+</div>
+      <div id="content4" style="display:none;">  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  .s-card { background:#fff; border-radius:14px; padding:20px; box-shadow:0 4px 14px rgba(0,0,0,.06); height:100%; }
+  .s-card-red    { border-top:4px solid #B22222; }
+  .s-card-gold   { border-top:4px solid #D4AF37; }
+  .s-card-dark   { border-top:4px solid #2c3e50; }
+  .s-card-green  { border-top:4px solid #27ae60; }
+  .s-card-blue   { border-top:4px solid #2980b9; }
+
+  .s-stat        { font-size:2rem; font-weight:800; line-height:1.1; }
+  .s-stat.red    { color:#B22222; }
+  .s-stat.gold   { color:#D4AF37; }
+  .s-stat.dark   { color:#2c3e50; }
+  .s-stat.green  { color:#27ae60; }
+  .s-stat.blue   { color:#2980b9; }
+  .s-label       { font-size:.7rem; font-weight:800; letter-spacing:.05em; color:#999; text-transform:uppercase; }
+
+  .section-divider {
+    display:flex; align-items:center; gap:12px; margin:28px 0 18px;
+  }
+  .section-divider h6 { margin:0; font-weight:800; font-size:.9rem; text-transform:uppercase; letter-spacing:.05em; color:#2c3e50; white-space:nowrap; }
+  .section-divider hr { flex:1; margin:0; border-color:#dee2e6; }
+
+  .sub-row { display:flex; align-items:center; padding:8px 0; border-bottom:1px solid #f0f0f0; }
+  .sub-row:last-child { border-bottom:none; }
+  .sub-bar-wrap { flex:1; background:#f0f0f0; border-radius:4px; height:10px; margin:0 12px; overflow:hidden; }
+  .sub-bar-fill { height:100%; border-radius:4px; background:#B22222; }
+
+  .sub-assign-row { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px; background:#f8f9fa; margin-bottom:6px; font-size:.85rem; }
+
+  .impact-pill { display:inline-block; padding:4px 12px; border-radius:20px; font-size:.78rem; font-weight:700; }
+  .impact-pill.high   { background:#fff0f0; color:#B22222; }
+  .impact-pill.med    { background:#fff8e1; color:#b8860b; }
+  .impact-pill.low    { background:#f0fff4; color:#27ae60; }
+</style>
+
+
+<!-- ════════════════════════════════════════════════════════════════
+     LOADING STATE
+════════════════════════════════════════════════════════════════ -->
+<div id="subsLoader" class="text-center py-5">
+  <div class="spinner-border text-secondary" role="status"></div>
+  <p class="mt-3 text-muted small">Loading your sub utilization data…</p>
+</div>
+
+<div id="subsContent" style="display:none;">
+
+  <!-- ════════ SECTION A — YOUR LEAVE AND SUB COVERAGE ════════════════ -->
+  <div class="section-divider">
+    <h6>📤 Your Leave → Sub Coverage</h6><hr>
+  </div>
+
+  <!-- Stat row -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="s-card s-card-dark text-center">
+        <div class="s-label">Total Leaves</div>
+        <div id="sTotalLeaves" class="s-stat dark">—</div>
+        <div class="small text-muted mt-1">approved</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="s-card s-card-red text-center">
+        <div class="s-label">Needed a Sub</div>
+        <div id="sNeedSub" class="s-stat red">—</div>
+        <div class="small text-muted mt-1" id="sNeedSubPct"></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="s-card s-card-gold text-center">
+        <div class="s-label">Sub Hours Used</div>
+        <div id="sSubHours" class="s-stat gold">—</div>
+        <div class="small text-muted mt-1">of your leave hours</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="s-card s-card-blue text-center">
+        <div class="s-label">School Impact</div>
+        <div id="sMyImpactPct" class="s-stat blue">—%</div>
+        <div class="small text-muted mt-1">of all sub hours needed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subs who covered your leave -->
+  <div class="row g-4 mb-2">
+    <div class="col-md-6">
+      <div class="s-card s-card-red">
+        <div class="s-label mb-3">Subs Who Covered Your Leave</div>
+        <div id="subNameList">
+          <p class="text-muted small text-center py-3">No sub assignments on record yet.</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="s-card s-card-gold">
+        <div class="s-label mb-3">Sub vs. No-Sub Breakdown</div>
+        <div style="max-height:220px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="subDonutChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════ SECTION B — YOUR SUB WORK ══════════════════════════════ -->
+  <div id="mySubWorkSection">
+    <div class="section-divider">
+      <h6>🔄 Your Sub Work</h6><hr>
+    </div>
+
+    <!-- No sub work fallback -->
+    <div id="noSubWorkMsg" class="s-card text-center py-4" style="display:none;">
+      <span style="font-size:2rem;">📋</span>
+      <p class="text-muted mt-2 mb-0">You have no sub assignments on record. If you sub for others, those assignments will appear here once they're entered in the system.</p>
+    </div>
+
+    <!-- Sub work stats (shown only when assignments > 0) -->
+    <div id="subWorkStats" style="display:none;">
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="s-card s-card-green text-center">
+            <div class="s-label">Assignments</div>
+            <div id="swAssignments" class="s-stat green">—</div>
+            <div class="small text-muted mt-1">sub sessions</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="s-card s-card-blue text-center">
+            <div class="s-label">Hours Subbed</div>
+            <div id="swHours" class="s-stat blue">—</div>
+            <div class="small text-muted mt-1">total</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="s-card s-card-gold text-center">
+            <div class="s-label">Contribution</div>
+            <div id="swContribPct" class="s-stat gold">—%</div>
+            <div class="small text-muted mt-1">of school's sub hours</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="s-card s-card-dark text-center">
+            <div class="s-label">Impact Level</div>
+            <div id="swImpactLabel" class="mt-2">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Monthly chart -->
+      <div class="s-card s-card-green mb-4">
+        <div class="s-label mb-3">Monthly Sub Hours Contributed</div>
+        <canvas id="subMonthlyChart" style="max-height:220px;"></canvas>
+      </div>
+
+      <!-- Sub assignment history -->
+      <div class="s-card s-card-dark">
+        <div class="s-label mb-3">Sub Assignment History</div>
+        <p class="text-muted mb-3" style="font-size:.75rem;">The staff member you covered is not shown to protect their privacy.</p>
+        <div id="subAssignList"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /subsContent -->
+
+
+<script>
+  var _subDonut   = null;
+  var _subMonthly = null;
+
+  // Called by Public.html when SUBS tab is opened (once per session)
+  function fetchSubData() {
+    google.script.run
+      .withSuccessHandler(function(d) { _renderSubData(d); })
+      .withFailureHandler(function()  {
+        document.getElementById('subsLoader').innerHTML =
+          '<p class="text-danger text-center py-4">Could not load sub data. Please refresh and try again.</p>';
+      })
+      .getSubData();
+  }
+
+  function _renderSubData(d) {
+    document.getElementById('subsLoader').style.display  = 'none';
+    document.getElementById('subsContent').style.display = 'block';
+
+    if (!d) {
+      document.getElementById('subsContent').innerHTML =
+        '<p class="text-danger text-center py-4">Error loading data.</p>';
+      return;
+    }
+
+    var ml  = d.myLeave    || {};
+    var sw  = d.mySubWork  || {};
+    var sc  = d.schoolWide || {};
+
+    // ── Section A stats ────────────────────────────────────────────────────
+    document.getElementById('sTotalLeaves').innerText  = ml.totalApproved || 0;
+    document.getElementById('sNeedSub').innerText      = ml.neededSubs    || 0;
+    document.getElementById('sSubHours').innerText     = (ml.impactHours  || 0) + 'h';
+    document.getElementById('sMyImpactPct').innerText  = (sc.myImpactPct  || 0) + '%';
+
+    var needPct = ml.totalApproved > 0
+      ? Math.round((ml.neededSubs / ml.totalApproved) * 100) : 0;
+    document.getElementById('sNeedSubPct').innerText = needPct + '% of your leaves';
+
+    // Sub name list with bar chart
+    var subs = ml.subsUsed || [];
+    var maxH = subs.length > 0 ? subs[0].hours : 1;
+    if (subs.length > 0) {
+      document.getElementById('subNameList').innerHTML = subs.map(function(s) {
+        var pct = Math.round((s.hours / maxH) * 100);
+        return '<div class="sub-row">' +
+          '<span style="font-size:.82rem;font-weight:700;min-width:120px;">' + _esc(s.name) + '</span>' +
+          '<div class="sub-bar-wrap"><div class="sub-bar-fill" style="width:' + pct + '%;"></div></div>' +
+          '<span style="font-size:.82rem;font-weight:700;min-width:55px;text-align:right;">' + s.hours + ' hrs</span>' +
+          '<span style="font-size:.75rem;color:#999;margin-left:8px;">×' + s.count + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    // Doughnut: sub vs no-sub leaves
+    var noSub = (ml.totalApproved || 0) - (ml.neededSubs || 0);
+    _renderDonut(ml.neededSubs || 0, noSub);
+
+    // ── Section B: Sub work ────────────────────────────────────────────────
+    if (!sw.totalAssignments || sw.totalAssignments === 0) {
+      document.getElementById('noSubWorkMsg').style.display   = 'block';
+      document.getElementById('subWorkStats').style.display   = 'none';
+    } else {
+      document.getElementById('noSubWorkMsg').style.display   = 'none';
+      document.getElementById('subWorkStats').style.display   = 'block';
+
+      document.getElementById('swAssignments').innerText = sw.totalAssignments;
+      document.getElementById('swHours').innerText       = sw.totalHours + 'h';
+      document.getElementById('swContribPct').innerText  = (sc.myContributionPct || 0) + '%';
+
+      // Impact level label
+      var pct = sc.myContributionPct || 0;
+      var impactHtml;
+      if      (pct >= 15) impactHtml = '<span class="impact-pill high">High Impact</span><div class="small text-muted mt-2" style="font-size:.72rem;">You\'re one of the school\'s primary substitutes.</div>';
+      else if (pct >= 5)  impactHtml = '<span class="impact-pill med">Moderate Impact</span><div class="small text-muted mt-2" style="font-size:.72rem;">Your sub work makes a meaningful contribution.</div>';
+      else                impactHtml = '<span class="impact-pill low">Occasional</span><div class="small text-muted mt-2" style="font-size:.72rem;">You sub occasionally when needed.</div>';
+      document.getElementById('swImpactLabel').innerHTML = impactHtml;
+
+      // Monthly bar chart
+      _renderMonthlyChart(sc.monthlyHours || sw.monthlyHours || {});
+
+      // Assignment history
+      var recs = sw.records || [];
+      document.getElementById('subAssignList').innerHTML = recs.length === 0
+        ? '<p class="text-muted small text-center py-2">No records yet.</p>'
+        : recs.map(function(r) {
+            return '<div class="sub-assign-row">' +
+              '<div>' +
+                '<span style="font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:.03em;">' + _esc(r.type) + '</span>' +
+                '<div style="font-size:.75rem;color:#888;margin-top:2px;">' + _esc(r.start) + '</div>' +
+              '</div>' +
+              '<span style="font-weight:800;color:#27ae60;">' + r.hours + ' hrs</span>' +
+            '</div>';
+          }).join('');
+    }
+  }
+
+  // ── Doughnut: sub vs no-sub ───────────────────────────────────────────────
+  function _renderDonut(withSub, withoutSub) {
+    var ctx = document.getElementById('subDonutChart').getContext('2d');
+    if (_subDonut) _subDonut.destroy();
+    _subDonut = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Needed Sub', 'No Sub Required'],
+        datasets: [{ data: [withSub, withoutSub], backgroundColor: ['#B22222','#ebedf0'], borderWidth: 0 }]
+      },
+      options: {
+        responsive:true, cutout:'68%',
+        plugins: {
+          legend: { position:'bottom', labels:{ font:{size:11}, boxWidth:12 } },
+          tooltip: { callbacks: { label: function(c){ return ' ' + c.parsed + ' leave(s)'; } } }
+        }
+      }
+    });
+  }
+
+  // ── Monthly sub hours bar chart ───────────────────────────────────────────
+  function _renderMonthlyChart(monthly) {
+    var keys   = Object.keys(monthly).sort();
+    if (keys.length === 0) return;
+    var labels = keys.map(function(k) {
+      var parts = k.split('-');
+      var d     = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+      return d.toLocaleString('default', { month:'short', year:'2-digit' });
+    });
+    var values = keys.map(function(k){ return parseFloat((monthly[k]||0).toFixed(1)); });
+
+    var ctx = document.getElementById('subMonthlyChart').getContext('2d');
+    if (_subMonthly) _subMonthly.destroy();
+    _subMonthly = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Hours Subbed',
+          data: values,
+          backgroundColor: '#27ae60',
+          borderRadius: 5
+        }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: { legend:{ display:false }, tooltip:{ callbacks:{ label:function(c){ return ' '+c.parsed.y+' hrs'; } } } },
+        scales: {
+          x: { grid:{ display:false } },
+          y: { beginAtZero:true, grid:{ display:false }, ticks:{ callback:function(v){ return v+'h'; } } }
+        }
+      }
+    });
+  }
+
+  function _esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</div>
+      <div id="content5" style="display:none;">  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<style>
+  .metric-card { background:white; border-radius:15px; border:none; box-shadow:0 4px 12px rgba(0,0,0,.05); padding:20px; height:100%; }
+  .big-num { font-size:2.5rem; font-weight:800; color:#B22222; }
+  .school-totals-banner {
+    background: linear-gradient(135deg, #2c3e50 0%, #3d5166 100%);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 22px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .school-totals-banner h5 { color:#fff; margin:0; font-weight:800; font-size:1.05rem; }
+  .school-totals-banner p  { color:rgba(255,255,255,.7); margin:0; font-size:.78rem; }
+</style>
+
+<!-- ── "This is school-wide data" banner ── -->
+<div class="school-totals-banner">
+  <span style="font-size:1.8rem;">🏫</span>
+  <div>
+    <h5>Overall School Totals</h5>
+    <p>The data below reflects all approved staff leave across the entire school — not your personal records.</p>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-md-4"><div class="metric-card text-center"><div class="text-muted small fw-bold">TOTAL HOURS</div><div id="totalHours" class="big-num">0</div></div></div>
+  <div class="col-md-4"><div class="metric-card text-center"><div class="text-muted small fw-bold">TOTAL REQUESTS</div><div id="totalReq" class="big-num">0</div></div></div>
+  <div class="col-md-4"><div class="metric-card text-center"><div class="text-muted small fw-bold">AVG DURATION</div><div id="avgHours" class="big-num">0</div></div></div>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-12">
+    <div class="metric-card">
+      <h6 class="fw-bold mb-3">Leave Category Distribution</h6>
+      <canvas id="typeChart" style="max-height:400px;"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  var summaryChart;
+  if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+
+  function renderSummary() {
+    var totalHours = filteredData.reduce(function(s,i){ return s + parseFloat(i.hours||0); }, 0);
+    var totalReqs  = filteredData.length;
+    var avg        = totalReqs > 0 ? (totalHours / totalReqs).toFixed(1) : 0;
+
+    document.getElementById('totalHours').innerText = totalHours.toFixed(1);
+    document.getElementById('totalReq').innerText   = totalReqs;
+    document.getElementById('avgHours').innerText   = avg;
+
+    _renderSummaryChart(filteredData);
+  }
+
+  function _renderSummaryChart(data) {
+    var cats   = ['HCS-Related','Late Arrival/Early Departure','Other Paid Leave','Personal Leave','Sick Leave'];
+    var counts = cats.map(function(c){ return data.filter(function(i){ return i.type===c; }).length; });
+    var ctx    = document.getElementById('typeChart').getContext('2d');
+    if (summaryChart) summaryChart.destroy();
+    summaryChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: cats,
+        datasets: [{ label:'Requests', data:counts, backgroundColor:['#B22222','#D4AF37','#2c3e50','#27ae60','#2980b9'] }]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins: {
+          legend: { display:false },
+          datalabels: {
+            color:'#fff', font:{weight:'bold'},
+            display:function(ctx){ return ctx.dataset.data[ctx.dataIndex]>0; }
+          }
+        },
+        scales: { y:{ beginAtZero:true, grid:{display:false} } }
+      }
+    });
+  }
+</script></div>
+
+    </div>
+
+    <script>
+      // ── Global: handbook URL (set once getStaffHandbook() resolves) ───────────
+      var _handbookUrl = null;
+
+      // ── School Year Helpers ────────────────────────────────────────────────────
+      // School year: Sep 1 (month 8) through Aug 31 (month 7) of the following year
+      function _currentSYYear() {
+        var now = new Date();
+        return now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+      }
+      function getSchoolYearBounds(startYear) {
+        return {
+          start: new Date(startYear,     8,  1,  0,  0,  0).getTime(),
+          end:   new Date(startYear + 1, 7, 31, 23, 59, 59).getTime()
+        };
+      }
+      // Builds (or rebuilds) the RANGE dropdown from the school years present in data
+      function _buildRangeDropdown(data) {
+        var years = {};
+        data.forEach(function(i) {
+          if (!i.startRaw) return;
+          var d  = new Date(i.startRaw);
+          var sy = d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+          years[sy] = true;
+        });
+        var curSY = _currentSYYear();
+        years[curSY] = true; // always include current year even if no data yet
+        var sorted = Object.keys(years).map(Number).sort(function(a,b){ return b - a; });
+        var sel  = document.getElementById('rangeFilter');
+        var prev = sel.value;
+        sel.innerHTML = '';
+        sorted.forEach(function(y) {
+          var opt = document.createElement('option');
+          opt.value       = 'sy:' + y;
+          opt.textContent = y + '–' + (y + 1) + (y === curSY ? ' (Current)' : '');
+          sel.appendChild(opt);
+        });
+        var mo = document.createElement('option'); mo.value = 'Month'; mo.textContent = 'This Month';
+        var al = document.createElement('option'); al.value = 'All';   al.textContent = 'All Time';
+        sel.appendChild(mo);
+        sel.appendChild(al);
+        // Restore prior selection if still valid; otherwise default to current school year
+        sel.value = sel.querySelector('[value="' + prev + '"]') ? prev : 'sy:' + curSY;
+      }
+      function _syncSyLabel() {
+        var range = document.getElementById('rangeFilter').value;
+        var el    = document.getElementById('syLabel');
+        if (range.indexOf('sy:') === 0) {
+          var sy = parseInt(range.slice(3), 10);
+          el.innerText = sy + '–' + (sy + 1);
+        } else { el.innerText = ''; }
+      }
+
+      // ── Global Data State ──────────────────────────────────────────────────────
+      let fullData     = [];
+      let filteredData = [];
+
+      // ── Tabs that show/hide the filter bar ────────────────────────────────────
+      const FILTER_TABS = [2, 3, 5];
+
+      // ── Initialise ────────────────────────────────────────────────────────────
+      window.onload = function() {
+        // School-wide analytics (tabs 2, 3, 5)
+        google.script.run
+          .withSuccessHandler(function(data) { fullData = data; _buildRangeDropdown(data); applyAllFilters(); })
+          .withFailureHandler(function()     { console.error('getPublicAnalytics failed'); })
+          .getPublicAnalytics();
+
+        // My Leave tab (default)
+        fetchPersonalData();
+
+        // Staff Handbook PDF link
+        google.script.run
+          .withSuccessHandler(function(hb) {
+            if (!hb || !hb.url) return;
+            _handbookUrl = hb.url;
+            var btn = document.getElementById('handbookBtn');
+            btn.href  = hb.url;
+            btn.title = hb.name;
+            btn.style.display = '';
+          })
+          .withFailureHandler(function() { /* silently skip */ })
+          .getStaffHandbook();
+
+        // Logged-in user chip + Switch Account
+        google.script.run
+          .withSuccessHandler(function(info) {
+            var chip  = document.getElementById('userChip');
+            var label = document.getElementById('userEmailLabel');
+            var btn   = document.getElementById('switchAccountBtn');
+            if (info && info.email) label.innerText = info.email;
+            var dest = (info && info.appUrl) ? info.appUrl : window.top.location.href;
+            btn.href = 'https://accounts.google.com/AccountChooser?continue=' +
+                       encodeURIComponent(dest);
+            chip.style.display = 'flex';
+          })
+          .withFailureHandler(function() { /* silently skip */ })
+          .getLoggedInUser();
+      };
+
+      // ── Filter Logic ──────────────────────────────────────────────────────────
+      function applyAllFilters() {
+        var type  = document.getElementById('typeFilter').value;
+        var range = document.getElementById('rangeFilter').value;
+        var now   = new Date();
+
+        _syncSyLabel();
+
+        filteredData = fullData.filter(function(i) {
+          if (type !== 'All' && i.type !== type) return false;
+          if (range === 'Month') {
+            var d = new Date(i.startRaw);
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          }
+          if (range.indexOf('sy:') === 0) {
+            var sy     = parseInt(range.slice(3), 10);
+            var bounds = getSchoolYearBounds(sy);
+            return i.startRaw >= bounds.start && i.startRaw <= bounds.end;
+          }
+          return true; // 'All'
+        });
+
+        var active = _activeTab();
+        if (active === 2) renderForecast();
+        if (active === 3) generateHeatmap();
+        if (active === 5) renderSummary();
+      }
+
+      // ── Tab Switching ─────────────────────────────────────────────────────────
+      let _subsFetched = false;
+
+      function switchTab(idx) {
+        [1,2,3,4,5].forEach(function(i) {
+          document.getElementById('tab'     + i).classList.toggle('active', i === idx);
+          document.getElementById('content' + i).style.display = i === idx ? 'block' : 'none';
+        });
+
+        document.getElementById('filterBar').style.display =
+          FILTER_TABS.includes(idx) ? 'flex' : 'none';
+
+        if (idx === 2) { _syncSyLabel(); renderForecast(); }
+        if (idx === 3) { _syncSyLabel(); generateHeatmap(); }
+        if (idx === 5) { _syncSyLabel(); renderSummary(); }
+
+        if (idx === 4 && !_subsFetched) { _subsFetched = true; fetchSubData(); }
+      }
+
+      function _activeTab() {
+        for (var i = 1; i <= 5; i++) {
+          if (document.getElementById('tab' + i).classList.contains('active')) return i;
+        }
+        return 1;
+      }
+    </script>
+
+    <!-- ============================================================
+         MOBILE LAYER (Option A) — desktop untouched.
+         Opens on "My Leave"; the 4 analytics tabs group under "Insights"
+         (a horizontal pill strip). Bottom bar + sheets + a "one chart at a
+         time" picker on the Subs tab (its only 2-chart view). The breakpoint
+         is template-driven so ?ui=mobile / ?ui=desktop force the layout.
+         Reuses the existing switchTab(), handbookBtn, switchAccountBtn.
+         ============================================================ -->
+    <style>
+      #mTabbar, #mScrim, .m-sheet, .m-chartpick { display: none; }
+      /* Breakpoint is template-driven: ?ui=mobile forces mobile, ?ui=desktop forces desktop, default 768px. */
+      @media (max-width: 768px) {
+        body { padding-bottom: 72px; }
+        /* My Leave lives on the bottom bar; analytics pills show only in Insights */
+        #tab1 { display: none; }
+        .nav-pills-wrap { display: none; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+        .nav-pills-wrap::-webkit-scrollbar { height: 0; }
+        body.m-insights .nav-pills-wrap { display: flex; }
+        .nav-pill-custom { white-space: nowrap; }
+        .handbook-btn { display: none !important; }
+        .user-chip { display: none !important; }
+
+        #mTabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1030;
+          background: #fff; border-top: 1px solid #e6e8eb; box-shadow: 0 -2px 8px rgba(0,0,0,.06); }
+        #mTabbar button { flex: 1; background: none; border: none; padding: 7px 2px 9px; cursor: pointer;
+          display: flex; flex-direction: column; align-items: center; gap: 3px; color: #6b7280; font-size: .64rem; font-weight: 600; }
+        #mTabbar button .ic { font-size: 1.2rem; line-height: 1; }
+        #mTabbar button.on { color: #B22222; }
+
+        #mScrim.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 1040; }
+        .m-sheet { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1041; background: #fff;
+          border-radius: 18px 18px 0 0; padding: 8px 0 16px; transform: translateY(110%); transition: transform .25s;
+          max-height: 85vh; overflow-y: auto; box-shadow: 0 -4px 20px rgba(0,0,0,.22); }
+        .m-sheet.open { transform: translateY(0); }
+        .m-grab { width: 40px; height: 4px; background: #ccc; border-radius: 2px; margin: 8px auto; }
+        .m-sheet h6 { margin: 6px 18px 8px; font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; color: #999; font-weight: 800; }
+        .m-row { display: flex; align-items: center; gap: 12px; width: 100%; background: none; border: none;
+          padding: 14px 18px; font-size: .97rem; color: #333; text-align: left; cursor: pointer; }
+        .m-row:active { background: #faf5f5; }
+
+        .m-chartpick { display: block; background: #fff; border: 1px solid #e6e8eb; border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+        .m-chartpick label { display: block; }
+      }
+    </style>
+
+    <nav id="mTabbar" aria-label="Primary">
+      <button id="mtbLeave" class="on" onclick="switchTab(1)"><span class="ic">&#128100;</span>My Leave</button>
+      <button id="mtbIns" onclick="switchTab(5)"><span class="ic">&#128202;</span>Insights</button>
+      <button onclick="mHandbook()"><span class="ic">&#128214;</span>Handbook</button>
+      <button onclick="mOpen('mMore')"><span class="ic">&#9776;</span>More</button>
+    </nav>
+
+    <div id="mScrim" onclick="mClose()"></div>
+
+    <div id="mMore" class="m-sheet" role="dialog" aria-label="Account">
+      <div class="m-grab"></div><h6>Account</h6>
+      <div id="mUserEmail" style="padding: 0 18px 8px; font-size: .8rem; color: #888;"></div>
+      <button class="m-row" onclick="mClose(); mSwitchAccount();">&#8644; &nbsp;Switch Google Account</button>
+      <button class="m-row" onclick="mClose(); mHandbook();">&#128214; &nbsp;Staff Handbook</button>
+      <button class="m-row" onclick="mClose();">&#10005; &nbsp;Close</button>
+    </div>
+
+    <script>
+      function mOpen(id){ mClose(); document.getElementById(id).classList.add('open'); document.getElementById('mScrim').classList.add('open'); }
+      function mClose(){ document.querySelectorAll('.m-sheet.open').forEach(function(s){ s.classList.remove('open'); }); document.getElementById('mScrim').classList.remove('open'); }
+      function mHandbook(){ var b = document.getElementById('handbookBtn'); if(b && b.href && b.getAttribute('href') !== '#' && b.href.indexOf('http') === 0){ window.open(b.href, '_blank'); } else { alert('Staff Handbook link is not available yet.'); } }
+      function mSwitchAccount(){ var b = document.getElementById('switchAccountBtn'); if(b && b.href){ (window.top || window).location.href = b.href; } }
+      function mIsMobile(){ var t = document.getElementById('mTabbar'); return t && getComputedStyle(t).display !== 'none'; }
+
+      // ── One-chart-at-a-time picker, scoped to the active tab panel ──────────
+      // Only the Subs tab has 2 charts; all other tabs are left as-is.
+      var mUnits = null, mChartIdx = null, mCurrentTab = 1;
+      function mClearCharts(){ if(mUnits){ mUnits.forEach(function(u){ u.style.display = ''; }); mUnits = null; } var p = document.getElementById('mChartPick'); if(p) p.remove(); mChartIdx = null; }
+      function mShowUnit(val){ if(!mUnits) return; mUnits.forEach(function(u, i){ var show = String(i) === String(val); u.style.display = show ? '' : 'none'; if(show){ var cv = u.querySelector('canvas'); var inst = (window.Chart && Chart.getChart) ? Chart.getChart(cv) : null; if(inst){ try { inst.resize(); } catch(e){} } } }); }
+      function mManageCharts(idx){
+        if(mChartIdx === idx && document.getElementById('mChartPick')){ var s = document.querySelector('#mChartPick select'); mShowUnit(s ? s.value : '0'); return; }
+        mClearCharts();
+        if(!mIsMobile()) return;
+        var panel = document.getElementById('content' + idx); if(!panel) return;
+        var units = [];
+        Array.prototype.slice.call(panel.querySelectorAll('canvas')).forEach(function(cv){
+          var u = cv.closest('[class*="col-"]') || cv.parentElement;
+          if(u && units.indexOf(u) === -1) units.push(u);
+        });
+        if(units.length < 2) return;
+        mUnits = units; mChartIdx = idx;
+        var wrap = document.createElement('div'); wrap.className = 'm-chartpick'; wrap.id = 'mChartPick';
+        var sel = document.createElement('select'); sel.className = 'form-select form-select-sm';
+        units.forEach(function(u, i){
+          var h = u.querySelector('h6, h5, .s-label, .section-divider h6');
+          var label = h ? h.textContent.trim() : ('Chart ' + (i + 1));
+          var o = document.createElement('option'); o.value = i; o.textContent = label; sel.appendChild(o);
+        });
+        sel.addEventListener('change', function(){ mShowUnit(this.value); });
+        wrap.innerHTML = '<label class="form-label small fw-bold text-muted mb-1">Show this chart</label>';
+        wrap.appendChild(sel);
+        panel.insertBefore(wrap, panel.firstChild);
+        mShowUnit('0');
+      }
+
+      window.mSyncTabs = function(idx){
+        mCurrentTab = idx;
+        document.body.classList.toggle('m-insights', idx !== 1);
+        var l = document.getElementById('mtbLeave'), i = document.getElementById('mtbIns');
+        if(l) l.classList.toggle('on', idx === 1);
+        if(i) i.classList.toggle('on', idx !== 1);
+        mManageCharts(idx);
+        setTimeout(function(){ if(mCurrentTab === idx) mManageCharts(idx); }, 500); // catch lazy-rendered charts
+      };
+
+      (function(){
+        if(typeof switchTab === 'function'){ var _orig = switchTab; switchTab = function(idx){ _orig(idx); mSyncTabs(idx); }; }
+        function mInit(){
+          mSyncTabs(1);
+          var lbl = document.getElementById('userEmailLabel'), tgt = document.getElementById('mUserEmail');
+          if(lbl && tgt){ try { var obs = new MutationObserver(function(){ tgt.textContent = lbl.textContent; }); obs.observe(lbl, { childList: true, characterData: true, subtree: true }); } catch(e){} }
+        }
+        if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mInit); else mInit();
+        window.addEventListener('resize', function(){ mManageCharts(mCurrentTab); });
+      })();
+    </script>
+
+  </body>
+</html>

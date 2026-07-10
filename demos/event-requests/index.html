@@ -1,0 +1,1752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Requests — HCS Door Automation</title>
+<!-- Bootstrap 5.3 + Inter (CDN) so this page wears the shared HCS "Eagle Eye" look. -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* =====================================================================
+     HCS shared design system (inlined from design/system/hcs-ui.css).
+     This staff requester page is a self-contained HtmlService template
+     (token-served, NOT included into Index), so the token layer is inlined
+     here rather than shared. The Request APP layer follows AFTER this block
+     and keeps its EXISTING class names (nav, card, chip, door-panel, btn-*,
+     form-field, door-dropdown, dd-*, adv-*, badge-*, modal-*, toast, …)
+     because the inline script builds/queries them by name — only their
+     STYLING is re-skinned. Legacy :root tokens are re-aliased to the hcs
+     tokens so every literal var(--x) reference is byte-untouched. */
+  :root {
+    --hcs-red:#B22222; --hcs-red-dark:#8f1b1b; --hcs-red-soft:#fff5f5;
+    --hcs-gold:#D4AF37; --hcs-gold-soft:#fffdf4;
+    --hcs-ink:#23272e; --hcs-muted:#6b7280; --hcs-line:#e7e9ee;
+    --hcs-bg:#f6f7f9; --hcs-surface:#ffffff; --hcs-surface-2:#f7f8fa;
+    --hcs-ok:#1f8a4c; --hcs-ok-bg:#e9f7ef; --hcs-ok-line:#bfe6cd;
+    --hcs-warn:#b5751a; --hcs-warn-bg:#fdf3e2; --hcs-warn-line:#f1d9a8;
+    --hcs-closed:#8a8f98; --hcs-closed-bg:#f1f0ee;
+    --hcs-radius-sm:8px; --hcs-radius:12px; --hcs-radius-lg:16px; --hcs-radius-xl:18px;
+
+    /* ---- legacy-token aliases ----
+       The markup + inline script still emit built inline styles that read
+       these var(--x) names. Alias each onto an hcs token so all that
+       markup/JS stays byte-untouched while the palette becomes the shared one. */
+    --bg:          var(--hcs-bg);
+    --surface:     var(--hcs-surface);
+    --surface2:    var(--hcs-surface-2);
+    --border:      var(--hcs-line);
+    --accent:      var(--hcs-gold);    /* old brown accent → hcs gold */
+    --accent2:     var(--hcs-gold);
+    --accent-red:  var(--hcs-red);
+    --text:        var(--hcs-ink);
+    --muted:       var(--hcs-muted);
+    --green:       var(--hcs-ok);
+    --red:         var(--hcs-red);
+    --radius:      var(--hcs-radius-lg);
+    --glow-yellow: 0 2px 10px rgba(212,175,55,0.25);
+    --glow-green:  0 2px 10px rgba(31,138,76,0.2);
+    --glow-red:    0 2px 10px rgba(178,34,34,0.2);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--hcs-bg); color: var(--hcs-ink); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+
+  /* ── Nav (shared HCS brand bar) ───────────────────── */
+  .nav {
+    background: var(--hcs-surface); padding: 14px 24px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--hcs-line);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-brand   { font-size: 1.12rem; font-weight: 800; padding: 0; color: var(--hcs-ink); letter-spacing: -0.01em; white-space: nowrap; }
+  .nav-sep     { color: var(--hcs-line); font-size: 1.2rem; padding: 0 4px; user-select: none; }
+  .nav-section { font-size: 0.9rem; font-weight: 600; color: var(--hcs-muted); padding: 0 8px; letter-spacing: 0.01em; }
+  .nav-user    { margin-left: auto; font-size: 0.78rem; color: var(--hcs-muted); padding: 0; white-space: nowrap; }
+
+  /* ── Layout ──────────────────────────────────────── */
+  .container { max-width: 1400px; margin: 0 auto; padding: 28px 32px 56px; }
+
+  /* ── Section labels ───────────────────────────────── */
+  .section-label {
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); margin: 32px 0 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── "Eagle Eye" form treatment (matches CMS New Campus Event) ──── */
+  .section-header {
+    border-left: 5px solid var(--hcs-gold); padding-left: 13px; margin: 24px 0 12px;
+    font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #3a3f47; font-size: 0.95rem;
+  }
+  .card-form {
+    background: var(--hcs-surface); border: none; border-left: 5px solid var(--hcs-gold);
+    border-radius: var(--hcs-radius-lg); box-shadow: 0 6px 22px rgba(20,20,40,0.06);
+  }
+  .auto-block {
+    background: #faf8f3; border: 1px solid var(--hcs-line); border-radius: var(--hcs-radius);
+    padding: 14px; margin-top: 10px;
+  }
+
+  /* ── Per-group approval progress (Approvals tab card) ─────── */
+  .grp-progress { margin-top: 12px; }
+  .grp-seg-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--hcs-line); gap: 2px; }
+  .grp-seg { flex: 1; border-radius: 2px; }
+  .grp-seg.approved { background: var(--hcs-ok); }
+  .grp-seg.pending  { background: var(--hcs-warn-line); }
+  .grp-rows { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .grp-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
+  .grp-name { font-weight: 700; color: var(--hcs-ink); }
+  .grp-status { font-weight: 700; }
+  .grp-status.approved { color: var(--hcs-ok); }
+  .grp-status.pending  { color: var(--hcs-warn); }
+  .grp-waiting-note { font-size: 0.82rem; color: var(--hcs-muted); font-style: italic; }
+
+  /* ── Approvals dashboard: exact match to the approved mockup (full-dashboard.html) ── */
+  #appr-dashboard { display: none; }
+  #appr-dashboard.show { display: flex; gap: 24px; align-items: flex-start; font-family: 'Inter', system-ui, sans-serif; }
+  .fd-sidebar { flex: 0 0 240px; background: var(--hcs-surface); border: 1px solid var(--hcs-line); border-radius: 14px; padding: 20px; }
+  .fd-sidebar .lbl { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hcs-muted); margin: 14px 0 6px; }
+  .fd-sidebar .lbl:first-child { margin-top: 0; }
+  .fd-input, .fd-select { width: 100%; padding: 9px 11px; border: 1px solid var(--hcs-line); border-radius: 9px; font-size: 0.85rem; font-family: inherit; }
+  .fd-btn-reset { width: 100%; margin-top: 16px; padding: 10px; border-radius: 9px; border: none; background: var(--hcs-ink); color: #fff; font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+  .fd-btn-add { width: 100%; margin-top: 8px; padding: 10px; border-radius: 9px; border: none; background: var(--hcs-ok); color: #fff; font-weight: 700; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+
+  .fd-main { flex: 1; min-width: 0; }
+  .fd-section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .fd-section-head:not(:first-child) { margin-top: 36px; }
+  .fd-bar { width: 4px; height: 22px; border-radius: 2px; background: var(--hcs-gold); }
+  .fd-bar.approved { background: var(--hcs-ok); }
+  .fd-bar.rejected { background: var(--hcs-red); }
+  .fd-section-title { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.01em; }
+  .fd-section-title.rejected { color: var(--hcs-red); }
+  .fd-count { background: var(--hcs-gold); color: #fff; font-size: 0.8rem; font-weight: 800; padding: 2px 10px; border-radius: 999px; }
+  .fd-sort { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #444; }
+  .fd-sort select { padding: 6px 10px; border: 1px solid var(--hcs-line); border-radius: 8px; font-family: inherit; font-size: 0.82rem; }
+
+  .fd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .fd-card { background: var(--hcs-surface); border: 1px solid var(--hcs-line); border-left: 4px solid var(--hcs-gold); border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(20,20,40,0.05); }
+  .fd-card.approved { border-left-color: var(--hcs-ok); }
+  .fd-card.denied { border-left-color: var(--hcs-red); }
+  .fd-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 2px; }
+  .fd-card-top .fd-card-name { flex: 1; min-width: 0; }
+  .fd-info-btn {
+    width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--hcs-line); background: #fff;
+    color: var(--hcs-muted); font-size: 0.72rem; font-weight: 800; font-style: italic; font-family: Georgia, serif;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: none;
+  }
+  .fd-info-btn:hover { border-color: var(--hcs-red); color: var(--hcs-red); }
+  .detail-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--hcs-line); font-size: 0.86rem; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-label { flex: 0 0 150px; font-weight: 700; color: var(--hcs-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .detail-value { flex: 1; color: var(--hcs-ink); word-break: break-word; }
+  .fd-card-name { font-size: 1.02rem; font-weight: 800; }
+  .fd-badge { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .fd-badge.pending { background: var(--hcs-warn-bg); color: var(--hcs-warn); }
+  .fd-badge.approved { background: var(--hcs-ok-bg); color: var(--hcs-ok); }
+  .fd-badge.denied { background: var(--hcs-closed-bg); color: var(--hcs-red); }
+  .fd-meta-row { display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: #444; margin-top: 8px; }
+  .fd-meta-row .ic { opacity: 0.7; width: 16px; text-align: center; }
+
+  .fd-progress-wrap { margin-top: 14px; }
+  .fd-seg-bar { display: flex; height: 9px; border-radius: 999px; overflow: hidden; background: var(--hcs-closed-bg); gap: 2px; }
+  .fd-seg { flex: 1; border-radius: 2px; }
+  .fd-seg.approved { background: var(--hcs-ok); }
+  .fd-seg.pending { background: var(--hcs-warn-line); }
+  .fd-group-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .fd-group-row { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
+  .fd-group-name { font-weight: 700; color: #333; }
+  .fd-group-status { font-weight: 700; }
+  .fd-group-status.approved { color: var(--hcs-ok); }
+  .fd-group-status.pending { color: var(--hcs-warn); }
+  .fd-seg.na { background: var(--hcs-line); }
+  .fd-group-status.na { color: var(--hcs-closed); font-weight: 600; }
+  .fd-rel-date { color: var(--hcs-muted); font-weight: 600; }
+
+  .fd-ticket { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--hcs-line); display: flex; justify-content: space-between; align-items: center; }
+  .fd-id { font-size: 0.78rem; color: #9aa0a8; font-weight: 600; }
+  .fd-actions { display: flex; gap: 6px; }
+  .fd-act-btn { font-size: 0.76rem; font-weight: 700; padding: 6px 12px; border-radius: 7px; border: 1px solid var(--hcs-line); background: #fff; cursor: pointer; font-family: inherit; }
+  .fd-act-btn.approve { background: var(--hcs-red); border-color: var(--hcs-red); color: #fff; }
+  .fd-waiting-note { font-size: 0.78rem; color: var(--hcs-muted); font-style: italic; }
+
+  .fd-empty { color: #9aa0a8; font-style: italic; font-size: 0.9rem; }
+
+  /* ── Cards ───────────────────────────────────────── */
+  .card {
+    background: var(--hcs-surface); border-radius: var(--hcs-radius-lg); border: 1px solid var(--hcs-line);
+    box-shadow: 0 1px 2px rgba(20,20,40,0.04); margin-bottom: 10px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .card:hover { border-color: var(--hcs-gold); }
+  .card-accent { height: 3px; background: var(--hcs-line); }
+  .card.upcoming .card-accent { background: linear-gradient(90deg, var(--hcs-gold), var(--hcs-gold-soft)); }
+  .card.past { opacity: 0.8; }
+  .card.past .card-accent { background: var(--hcs-line); }
+
+  .card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; cursor: pointer; gap: 12px; user-select: none; transition: background 0.15s;
+  }
+  .card-header:hover { background: var(--hcs-gold-soft); }
+  .card-main { flex: 1; min-width: 0; }
+  .card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; }
+  .card-title { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+  .card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .meta-item { display: flex; align-items: center; gap: 4px; font-size: 0.78rem; color: var(--muted); }
+  .meta-item svg { flex-shrink: 0; opacity: 0.6; }
+  .meta-sep { color: var(--border); }
+  .card-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .chevron {
+    width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+    transform: rotate(45deg); transition: transform 0.25s ease, border-color 0.2s;
+    flex-shrink: 0; margin-top: -3px;
+  }
+  .card-header.open .chevron { transform: rotate(-135deg); border-color: var(--accent); margin-top: 3px; }
+
+  /* ── Card body ───────────────────────────────────── */
+  .card-body { display: none; border-top: 1px solid var(--border); }
+  .card-body.open { display: block; animation: slideDown 0.22s ease; }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Chips (view mode) ───────────────────────────── */
+  .info-section  { padding: 16px 18px 14px; }
+  .info-chips    { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px;
+    background: var(--hcs-surface-2); border: 1.5px solid var(--hcs-line); font-size: 0.82rem;
+  }
+  .chip-label { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--hcs-muted); margin-right: 2px; }
+  .chip-value { font-weight: 700; color: var(--hcs-ink); }
+  .chip-value.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; }
+  .chip-yes  { border-color: var(--hcs-ok-line); background: var(--hcs-ok-bg); }
+  .chip-yes .chip-value  { color: var(--hcs-ok); }
+  .chip-no .chip-value   { color: var(--hcs-muted); }
+  .chip-date { border-color: var(--hcs-warn-line); }
+  .chip-date .chip-value { color: var(--hcs-warn); }
+
+  /* ── Door panel (signature gold-accent surface) ──── */
+  .door-panel {
+    margin: 0 18px 14px; padding: 14px 16px;
+    background: var(--hcs-gold-soft); border: 1px solid var(--hcs-line); border-left: 4px solid var(--hcs-gold); border-radius: 12px;
+  }
+  .door-panel-title { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--hcs-red); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .door-panel .info-chips { gap: 6px; }
+
+  /* ── Action bar ──────────────────────────────────── */
+  .card-actions { padding: 10px 18px 16px; display: flex; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border); }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn {
+    padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    transition: all 0.15s; font-family: inherit; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+  .btn-primary { background: var(--hcs-red); color: #fff; }
+  .btn-primary:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); background: var(--hcs-red-dark); }
+  .btn-danger  { background: var(--hcs-red-soft); color: var(--hcs-red); border: 1.5px solid var(--hcs-red); }
+  .btn-danger:hover  { background: var(--hcs-red); color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: var(--hcs-red); }
+  .btn-gray { background: var(--hcs-surface); color: var(--hcs-ink); border: 1.5px solid var(--hcs-line); }
+  .btn-gray:hover { background: var(--hcs-bg); border-color: var(--hcs-muted); }
+
+  /* ── Edit mode (in-place) ────────────────────────── */
+  .card-edit { display: none; }
+  .card-edit.active { display: block; animation: slideDown 0.2s ease; }
+
+  .edit-inner { padding: 16px 18px 0; }
+
+  /* field labels match chip-label style */
+  .form-field label {
+    display: block; font-size: 0.64rem; font-weight: 700; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px;
+  }
+  .form-field input, .form-field select {
+    width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 0.88rem; color: var(--text); background: var(--surface2);
+    font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .form-field input:focus, .form-field select:focus {
+    border-color: var(--hcs-red); box-shadow: 0 0 0 3px rgba(178,34,34,0.12);
+    background: var(--surface);
+  }
+  .form-field select option { background: #fff; color: var(--text); }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 0.45; cursor: pointer;
+  }
+  /* clock icons inside chips */
+  .chip svg { opacity: 0.55; flex-shrink: 0; }
+  /* chip row wraps and scrolls on small screens */
+  .ds-chip-row { overflow: visible; }
+
+  /* grid layouts for edit rows */
+  .edit-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .edit-row .form-field { flex: 1; min-width: 140px; }
+  .edit-row .form-field.grow2 { flex: 2; min-width: 200px; }
+  .edit-row .form-field.full  { flex: 1 0 100%; }
+
+  /* dt-pair: date + time side by side inside one field slot */
+  .dt-pair { display: flex; gap: 6px; }
+  .dt-pair input[type="date"] { flex: 1.3; min-width: 0; }
+  .dt-pair input[type="time"] { flex: 1; min-width: 0; }
+
+  .edit-actions { padding: 14px 18px 18px; display: flex; gap: 8px; border-top: 1px solid var(--border); margin-top: 14px; }
+
+  /* ── Door group multi-select ─────────────────────── */
+  .door-dropdown { position: relative; }
+  .door-dropdown-toggle {
+    width: 100%; padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: 0.88rem; color: var(--text); background: var(--surface2);
+    font-family: inherit; cursor: pointer; text-align: left;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  }
+  .door-dropdown-toggle:focus, .door-dropdown-toggle.open {
+    border-color: var(--hcs-red); box-shadow: 0 0 0 3px rgba(178,34,34,0.12); outline: none;
+    background: var(--surface);
+  }
+  .door-dropdown-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 300;
+    background: var(--surface); border: 1.5px solid var(--hcs-red); border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-height: 220px; overflow-y: auto;
+    padding: 4px 0; display: none;
+  }
+  .door-dropdown-menu.open { display: block; animation: slideDown 0.15s ease; }
+  .door-option {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    cursor: pointer; font-size: 0.86rem; color: var(--text); transition: background 0.1s;
+  }
+  .door-option:hover { background: var(--hcs-gold-soft); }
+  .door-option input[type="checkbox"] { accent-color: var(--hcs-red); width: 14px; height: 14px; }
+  .door-option-group { font-size: 0.7rem; color: var(--muted); margin-left: auto; }
+
+  /* ── Badges ──────────────────────────────────────── */
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap; }
+  .badge-upcoming { background: var(--hcs-ok-bg); color: var(--hcs-ok); }
+  .badge-past     { background: #eef2f7; color: #516074; }
+
+  /* ── Loading ─────────────────────────────────────── */
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%);
+    background-size: 200% 100%; animation: shimmer 1.6s infinite; border-radius: 4px;
+  }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  .skeleton-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 10px; }
+  .skeleton-line { height: 12px; margin-bottom: 8px; }
+  .sk-sm { height: 10px; width: 45%; }
+
+  /* ── States ──────────────────────────────────────── */
+  .state-center { text-align: center; padding: 64px 24px; }
+  .state-icon   { width: 44px; height: 44px; margin: 0 auto 16px; opacity: 0.25; }
+  .state-center h2 { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .state-center p  { font-size: 0.88rem; color: var(--muted); line-height: 1.6; max-width: 420px; margin: 0 auto; }
+  .state-center.error h2 { color: var(--red); }
+
+  /* ── Confirm modal ───────────────────────────────── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+  .modal-overlay.hidden { display: none; }
+  .modal-card {
+    background: var(--surface); border-radius: var(--hcs-radius-xl); padding: 28px 28px 24px;
+    max-width: 420px; width: 90%; border: 1px solid var(--border);
+    border-top: 4px solid var(--hcs-red); box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    animation: slideDown 0.2s ease;
+  }
+  .modal-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+  .modal-card p  { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+  .modal-card-wide { max-width: 640px; max-height: 88vh; overflow-y: auto; padding: 24px 28px; }
+  .modal-card-wide .edit-inner { padding: 0; }
+  .modal-card-wide .edit-actions { padding: 0; border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px; }
+
+  /* ── Toast ───────────────────────────────────────── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--surface2); color: var(--text);
+    padding: 12px 18px; border-radius: 12px; font-size: 0.88rem;
+    opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none; z-index: 9999;
+    border: 1px solid var(--hcs-ink); box-shadow: 0 8px 28px rgba(0,0,0,0.22); transform: translateY(8px); max-width: 300px; background: var(--hcs-ink); color: #fff;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.toast-error { background: var(--hcs-red) !important; border-color: var(--hcs-red) !important; }
+
+  footer { text-align: center; padding: 28px; font-size: 0.72rem; color: var(--hcs-muted); border-top: 1px solid var(--border); margin-top: 8px; }
+
+  @media (max-width: 640px) {
+    .container { padding: 16px 12px 40px; }
+    .nav-user { display: none; }
+    #appr-dashboard.show { flex-direction: column; }
+    .fd-sidebar { flex: none; width: 100%; }
+    .fd-grid { grid-template-columns: 1fr; }
+    .modal-card-wide { max-width: calc(100% - 24px); max-height: 92vh; overflow-y: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+  /* ── Door schedule edit (Tasks 6 & 7) ───────────── */
+  .chip-time-input {
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-family: monospace;
+    font-size: 0.82em;
+    width: 100px;
+    outline: none;
+    cursor: text;
+  }
+  .req-star { color: var(--red); margin-left: 2px; }
+  .ds-chip-row { margin-top: 8px; flex-wrap: wrap; gap: 6px; }
+  .ds-basic-greyed { opacity: 0.4; pointer-events: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .ds-adv-chips { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .ds-mode-toggle {
+    display: flex; gap: 4px; margin-bottom: 10px; margin-top: 8px;
+  }
+  .ds-mode-btn {
+    background: var(--surface2); border: 1.5px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 4px 12px; font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; transition: all 0.15s; letter-spacing: 0.03em;
+  }
+  .ds-mode-btn.active {
+    background: var(--hcs-red); border-color: var(--hcs-red); color: #fff;
+  }
+  .ds-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .btn-save {
+    padding: 8px 16px; border-radius: 9px; border: none; cursor: pointer;
+    font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--hcs-red); color: #fff; font-family: inherit;
+    transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-save:hover { background: var(--hcs-red-dark); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+  .btn-discard {
+    padding: 8px 16px; border-radius: 9px; cursor: pointer;
+    font-size: 0.82rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--hcs-surface); color: var(--hcs-ink); border: 1.5px solid var(--hcs-line);
+    font-family: inherit; transition: all 0.15s;
+  }
+  .btn-discard:hover { background: var(--hcs-bg); border-color: var(--hcs-muted); }
+  .btn-add-entry {
+    background: none; border: 1.5px dashed var(--hcs-line); color: var(--hcs-muted);
+    border-radius: 8px; padding: 5px 12px; margin-top: 6px;
+    cursor: pointer; font-size: 0.8em;
+  }
+  .btn-add-entry:hover { border-color: var(--hcs-red); color: var(--hcs-red); }
+  .btn-edit {
+    padding: 8px 16px; border-radius: 9px; border: 1.5px solid var(--hcs-red); cursor: pointer;
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+    background: var(--hcs-red-soft); color: var(--hcs-red); font-family: inherit;
+    transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-edit:hover { background: var(--hcs-red); color: #fff; transform: translateY(-1px); }
+
+  /* ── Inline door dropdown (ds-dd-*) ─────────────── */
+  .dd-wrap { position: relative; display: inline-block; }
+  .dd-btn {
+    background: var(--surface2); border: 1.5px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 4px 10px; font-size: 0.8em; cursor: pointer; font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  .dd-btn:hover { border-color: var(--hcs-red); }
+  .dd-list {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 400;
+    background: var(--surface); border: 1.5px solid var(--hcs-red); border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 140px;
+    padding: 4px 0; max-height: 200px; overflow-y: auto;
+  }
+  .dd-list label {
+    display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+    cursor: pointer; font-size: 0.84em; color: var(--text); transition: background 0.1s;
+  }
+  .dd-list label:hover { background: var(--hcs-gold-soft); }
+  .dd-list input[type="checkbox"] { accent-color: var(--hcs-red); }
+
+  /* ── Advanced per-door entry rows ───────────────── */
+  .adv-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 6px; flex-wrap: wrap;
+  }
+  .adv-door, .adv-action {
+    background: var(--surface2); border: 1.5px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 4px 8px; font-size: 0.8em;
+  }
+  /* Advanced dropdown: group headers + indented individual door rows */
+  .dd-group-header {
+    font-size: 0.63rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--accent); padding: 7px 10px 2px; pointer-events: none;
+    border-top: 1px solid var(--border); margin-top: 2px;
+  }
+  .dd-group-header:first-child { border-top: none; margin-top: 0; }
+  .dd-opt-group { font-weight: 600; }
+  .dd-opt-door  { padding-left: 24px !important; font-size: 0.8em !important; color: var(--muted); }
+  .adv-time {
+    background: var(--surface2); border: 1.5px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 4px 8px; font-size: 0.8em; width: 100px;
+  }
+  .adv-dash { color: var(--muted); }
+  .adv-remove {
+    background: none; border: none; color: var(--red);
+    cursor: pointer; font-size: 1em; padding: 0 4px;
+  }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Event Requests & Approvals" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+
+<nav class="nav" role="navigation" aria-label="Site navigation">
+  <span class="nav-brand">&#x1F511; Event Request</span>
+  <div class="nav-user" id="headerEmail" aria-label="Signed-in user"></div>
+</nav>
+
+<main class="container" id="app">
+  <style>
+    /* Approver-only tab bar (added for the requests/approvals split) */
+    #tab-bar { display:none; gap:8px; margin-bottom:16px; }
+    #tab-bar.show { display:flex; }
+    .req-tab { font-family:inherit; font-size:0.85rem; font-weight:700; padding:8px 16px; border-radius:999px;
+      border:1.5px solid var(--border); background:#fff; color:var(--muted); cursor:pointer; }
+    .req-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+    #content.tab-mine .card[data-mine="0"]    { display:none; }  /* My Requests: only my own */
+    #content.tab-appr .card[data-pending="0"] { display:none; }  /* Approvals: only pending */
+    #content.tab-mine .appr-only              { display:none; }  /* approve/deny only on Approvals */
+  </style>
+  <div id="tab-bar">
+    <button class="req-tab active" data-tab="mine" onclick="switchReqTab('mine')">My Requests</button>
+    <button class="req-tab"        data-tab="appr" onclick="switchReqTab('appr')">Approvals</button>
+  </div>
+  <div id="appr-dashboard">
+    <div class="fd-sidebar">
+      <div class="lbl">Dashboard Filters</div>
+      <input class="fd-input" id="appr-search" placeholder="Event, requester..." oninput="renderApprovalsDashboard()">
+      <div class="lbl">Group</div>
+      <select class="fd-select" id="appr-group-filter" onchange="renderApprovalsDashboard()"><option value="">All Groups</option></select>
+      <div class="lbl">View</div>
+      <select class="fd-select" id="appr-view-filter" onchange="renderApprovalsDashboard()">
+        <option value="all">Show All</option>
+        <option value="mine">Needs my approval</option>
+      </select>
+      <button class="fd-btn-reset" onclick="resetApprovalsFilters()">Reset Filters</button>
+      <button class="fd-btn-add" onclick="showNewRequest()">+ New Request</button>
+    </div>
+    <div class="fd-main">
+      <div class="fd-section-head">
+        <div class="fd-bar"></div>
+        <div class="fd-section-title">PENDING REQUESTS</div>
+        <span class="fd-count" id="appr-count-pending">0</span>
+        <span class="fd-sort">Sort By: <select id="appr-sort-pending" onchange="renderApprovalsDashboard()"><option value="date">Event Date</option><option value="submitted">Recently Submitted</option></select></span>
+      </div>
+      <div class="fd-grid" id="appr-grid-pending"></div>
+      <p class="fd-empty" id="appr-empty-pending" style="display:none;">No pending requests.</p>
+
+      <div class="fd-section-head">
+        <div class="fd-bar approved"></div>
+        <div class="fd-section-title">APPROVED / COMPLETED</div>
+        <span class="fd-sort">Sort By: <select id="appr-sort-approved" onchange="renderApprovalsDashboard()"><option value="updated">Recently Updated</option></select></span>
+      </div>
+      <div class="fd-grid" id="appr-grid-approved"></div>
+      <p class="fd-empty" id="appr-empty-approved" style="display:none;">No approved requests.</p>
+
+      <div class="fd-section-head">
+        <div class="fd-bar rejected"></div>
+        <div class="fd-section-title rejected">REJECTED / DENIED</div>
+      </div>
+      <div class="fd-grid" id="appr-grid-denied"></div>
+      <p class="fd-empty" id="appr-empty-denied" style="display:none;">No rejected requests.</p>
+    </div>
+  </div>
+  <div id="new-req-bar" style="display:none; margin-bottom:20px; display:flex; justify-content:flex-end">
+    <button class="btn btn-primary" onclick="showNewRequest()">+ New Request</button>
+  </div>
+
+  <div id="nr-panel" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="nr-modal-title">
+    <div class="modal-card modal-card-wide">
+    <h3 id="nr-modal-title">New Request</h3>
+    <div class="edit-inner">
+
+      <div class="edit-row">
+        <div class="form-field full"><label>Your Name<span class="req-star">*</span></label>
+          <input id="nr-name-field" placeholder="Your full name"></div>
+      </div>
+
+      <div class="edit-row">
+        <div class="form-field full"><label>Event Name<span class="req-star">*</span></label>
+          <input id="nr-event-name" placeholder="e.g. Spring Band Concert"></div>
+      </div>
+
+      <div class="edit-row">
+        <div class="form-field grow2"><label>Event Date<span class="req-star">*</span></label>
+          <div class="dt-pair">
+            <input type="date" id="nr-edate">
+            <input type="time" id="nr-etime">
+          </div></div>
+        <div class="form-field"><label>Setup Date</label>
+          <input type="date" id="nr-setup"></div>
+      </div>
+
+      <div class="edit-row">
+        <div class="form-field full"><label>Location</label>
+          <input id="nr-loc" placeholder="e.g. Main Gymnasium"></div>
+      </div>
+
+      <div class="edit-row">
+        <div class="form-field"><label>Event Type</label>
+          <select id="nr-etype">
+            <option value="School">School</option>
+            <option value="Church">Church</option>
+          </select></div>
+        <div class="form-field"><label>AV / IT Required</label>
+          <select id="nr-av"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+        <div class="form-field"><label>Heavy Items</label>
+          <select id="nr-heavy"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+      </div>
+
+      <div class="edit-row">
+        <div class="form-field"><label>Door Schedule Required?</label>
+          <select id="nr-ds" onchange="toggleNRDoorSection()">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+          </select></div>
+      </div>
+
+      <div id="nr-door-section" class="auto-block" style="display:none; margin-bottom:12px;">
+        <h6 class="section-header" style="font-size:0.78rem; margin:0 0 12px;">Door Schedule</h6>
+        <div id="ds-mode-container-nr" data-door-mode="simple">
+          <div class="ds-mode-toggle">
+            <button class="ds-mode-btn active" id="ds-mode-simple-nr" type="button" onclick="toggleDoorMode('nr', 'simple')">Simple</button>
+            <button class="ds-mode-btn"        id="ds-mode-adv-nr"    type="button" onclick="toggleDoorMode('nr', 'advanced')">Advanced</button>
+          </div>
+          <div id="ds-simple-section-nr" class="info-chips ds-chip-row">
+            <div class="chip" style="overflow:visible; position:relative">
+              <span class="chip-label">TARGET</span>
+              <span id="nr-dd-placeholder"></span>
+            </div>
+            <div class="chip chip-date">
+              <span class="chip-label">START</span>
+              <input type="time" id="nr-start" class="chip-time-input">
+            </div>
+            <div class="chip chip-date">
+              <span class="chip-label">END</span>
+              <input type="time" id="nr-end" class="chip-time-input">
+            </div>
+          </div>
+          <div id="ds-adv-section-nr" style="display:none">
+            <div id="ds-adv-list-nr"></div>
+            <button class="btn-add-entry" type="button" onclick="addActionEntry('nr')">+ Add Action</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="edit-actions">
+      <button class="btn btn-primary" id="nr-submit-btn" onclick="submitRequestModal()">Submit Request</button>
+      <button class="btn btn-gray" onclick="hideNewRequest()">Cancel</button>
+    </div>
+    </div>
+  </div>
+
+  <div id="spinner" style="display:none">
+    <div class="skeleton-card"><div class="skeleton skeleton-line" style="width:55%"></div><div class="skeleton skeleton-line sk-sm"></div></div>
+    <div class="skeleton-card"><div class="skeleton skeleton-line" style="width:72%"></div><div class="skeleton skeleton-line sk-sm"></div></div>
+    <div class="skeleton-card"><div class="skeleton skeleton-line" style="width:44%"></div><div class="skeleton skeleton-line sk-sm"></div></div>
+  </div>
+
+  <div class="state-center error" id="errorState" style="display:none">
+    <svg class="state-icon" viewBox="0 0 24 24" fill="none" stroke="#e05252" stroke-width="1.5">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.6" fill="#e05252"/>
+    </svg>
+    <h2>Unable to Load Requests</h2>
+    <p id="errorMsg">Make sure you are signed into your Harford Christian School Google account and try again.</p>
+  </div>
+
+  <div id="content" style="display:none">
+    <div class="fd-main" style="width:100%;">
+      <div class="fd-section-head">
+        <div class="fd-bar"></div>
+        <div class="fd-section-title">PENDING REQUESTS</div>
+        <span class="fd-count" id="mine-count-pending">0</span>
+      </div>
+      <div class="fd-grid" id="mine-grid-pending"></div>
+      <p class="fd-empty" id="mine-empty-pending" style="display:none;">No pending requests.</p>
+
+      <div class="fd-section-head">
+        <div class="fd-bar approved"></div>
+        <div class="fd-section-title">APPROVED / COMPLETED</div>
+      </div>
+      <div class="fd-grid" id="mine-grid-approved"></div>
+      <p class="fd-empty" id="mine-empty-approved" style="display:none;">No approved requests.</p>
+
+      <div class="fd-section-head">
+        <div class="fd-bar rejected"></div>
+        <div class="fd-section-title rejected">REJECTED / DENIED</div>
+      </div>
+      <div class="fd-grid" id="mine-grid-denied"></div>
+      <p class="fd-empty" id="mine-empty-denied" style="display:none;">No rejected requests.</p>
+    </div>
+  </div>
+</main>
+
+<footer>Harford Christian School &nbsp;·&nbsp; Door Automation System</footer>
+
+<div class="modal-overlay hidden" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+  <div class="modal-card">
+    <h3 id="modalTitle">Cancel This Request?</h3>
+    <p>This will mark the request as canceled. The school office will be notified. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-gray" onclick="closeModal()">Keep It</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn">Yes, Cancel Request</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="genericConfirmModal" role="dialog" aria-modal="true" aria-labelledby="genericConfirmTitle">
+  <div class="modal-card">
+    <h3 id="genericConfirmTitle">Please Confirm</h3>
+    <p id="genericConfirmText"></p>
+    <div class="modal-actions">
+      <button class="btn btn-gray" onclick="_genericConfirmCancel()">Cancel</button>
+      <button class="btn btn-danger" id="genericConfirmYesBtn">Yes, Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay hidden" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+  <div class="modal-card modal-card-wide">
+    <h3 id="detailModalTitle">Event Details</h3>
+    <div id="detail-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-gray" onclick="closeDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="alert" aria-live="polite"></div>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="ico-cal"   viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="2.5" width="14" height="12" rx="2"/><line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/><line x1="1" y1="6.5" x2="15" y2="6.5"/></symbol>
+  <symbol id="ico-clock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><polyline points="8,4 8,8 11,10"/></symbol>
+  <symbol id="ico-door"  viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="12" height="14" rx="1"/><circle cx="11" cy="8" r="1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="ico-trash" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><path d="M6 7v5m4-5v5"/><rect x="3" y="4" width="10" height="10" rx="1"/></symbol>
+  <symbol id="ico-edit"  viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></symbol>
+  <symbol id="ico-loc"   viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1a5 5 0 0 1 5 5c0 4-5 9-5 9S3 10 3 6a5 5 0 0 1 5-5z"/><circle cx="8" cy="6" r="1.5"/></symbol>
+  <symbol id="ico-chev"  viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4,6 8,10 12,6"/></symbol>
+</svg>
+
+<script>
+var BASE_URL          = '#';
+var CSRF              = 'demo-csrf-0';
+var CURRENT_EMAIL     = '';
+var IS_ADMIN          = false;
+var DOOR_GROUPS       = ['ALL'];
+var DOORS             = [];
+var REQUESTS          = [];
+var MY_GROUPS         = [];
+var ALL_GROUPS        = [];
+var IS_SUPER_APPROVER = false;
+var pendingDelToken   = null;
+var toastTimer        = null;
+var _nrDoorBuilt      = false;
+var EDIT_TOKEN        = null;   // null = New Request modal in create mode; else the token being edited
+var _editOriginalReq  = null;   // snapshot of the request being edited, for the "would restart approval" check on Save
+var _actionCounter    = {};     // per-widget-idx counter for advanced door-action rows (addActionEntry)
+
+/* ── API ─────────────────────────────────────────── */
+function run(action, params, cb) {
+  params.action = action;
+  params.csrf   = CSRF;
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r && r.csrfToken) CSRF = r.csrfToken;
+      cb(r);
+    })
+    .withFailureHandler(function(e) { cb({ error: e.message }); })
+    .processPost(params);
+}
+
+/* ── Toast ───────────────────────────────────────── */
+function showToast(msg, isErr) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isErr ? ' toast-error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.className = ''; }, 4500);
+}
+
+/* ── Date/time helpers ───────────────────────────── */
+
+// Parses any reasonable date string → { y, mo, d, str:"YYYY-MM-DD" } or null
+function parseAnyDate(raw) {
+  if (!raw) return null;
+  // YYYY-MM-DD (with optional time after)
+  var m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return { y: +m[1], mo: +m[2], d: +m[3], str: m[1]+'-'+m[2]+'-'+m[3] };
+  // JS Date.toString() e.g. "Sun May 31 2026 00:00:00 GMT-0400"
+  var dt = new Date(raw);
+  if (!isNaN(dt.getTime())) {
+    var y = dt.getFullYear(), mo = dt.getMonth()+1, d = dt.getDate();
+    return { y: y, mo: mo, d: d, str: y+'-'+pad(mo)+'-'+pad(d) };
+  }
+  return null;
+}
+
+// Extracts time portion from "YYYY-MM-DD HH:MM" or any string → "HH:MM" or ""
+function parseTime(raw) {
+  if (!raw) return '';
+  var m = raw.match(/(\d{2}):(\d{2})/);
+  return m ? m[1]+':'+m[2] : '';
+}
+
+// Splits a datetime string into { datePart:"YYYY-MM-DD", timePart:"HH:MM" }
+function splitDT(raw) {
+  var pd = parseAnyDate(raw);
+  var pt = parseTime(raw);
+  return { datePart: pd ? pd.str : '', timePart: pt };
+}
+
+function pad(n) { return n < 10 ? '0'+n : String(n); }
+
+function isUpcoming(raw) {
+  if (!raw) return false;
+  var pd = parseAnyDate(raw);
+  if (!pd) return false;
+  var today = new Date().toISOString().substring(0, 10);
+  return pd.str >= today;
+}
+
+function fmtDate(raw) {
+  var mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var pd = parseAnyDate(raw);
+  if (!pd) return raw || '—';
+  return mo[pd.mo - 1] + ' ' + pd.d + ', ' + pd.y;
+}
+
+function fmtTime(raw) {
+  var t = parseTime(raw);
+  if (!t) return '—';
+  var h = +t.substring(0,2), mi = t.substring(3,5);
+  var suf = h >= 12 ? 'PM' : 'AM';
+  if (h > 12) h -= 12; else if (h === 0) h = 12;
+  return h + ':' + mi + ' ' + suf;
+}
+
+/* ── HTML helpers ─────────────────────────────────── */
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function svg(id, sz) {
+  sz = sz||14;
+  return '<svg width="'+sz+'" height="'+sz+'" aria-hidden="true"><use href="#'+id+'"/></svg>';
+}
+
+// "MM/DD/YYYY · in N days" (or "today"/"tomorrow"/"N days ago"), matching the mockup's card date line.
+function _fdDateText(raw) {
+  var pd = parseAnyDate(raw);
+  if (!pd) return raw || '—';
+  var dateStr = pad(pd.mo) + '/' + pad(pd.d) + '/' + pd.y;
+  var todayMs = new Date(new Date().toISOString().substring(0, 10)).getTime();
+  var evMs    = new Date(pd.str).getTime();
+  var days    = Math.round((evMs - todayMs) / 86400000);
+  var rel = days === 0 ? 'today' : days === 1 ? 'tomorrow' : days > 1 ? 'in ' + days + ' days' :
+            days === -1 ? 'yesterday' : (days * -1) + ' days ago';
+  return dateStr + ' <span class="fd-rel-date">&middot; ' + rel + '</span>';
+}
+
+// Dedicated Approvals-tab card — exact markup/classes from the approved mockup (full-dashboard.html).
+// Separate from buildMyRequestCard() (My Requests tab has its own tile with Edit/Cancel instead of
+// Approve/Deny). '#XXXX' ticket id is synthetic (this app has no real sequential ticket number;
+// approvalId exists in the schema but is never populated).
+function buildApprovalCard(req) {
+  var statusKey  = req.status === 'Active' ? 'approved' : (req.status === 'Denied' ? 'denied' : 'pending');
+  var badgeText  = statusKey === 'approved' ? 'Approved' : (statusKey === 'denied' ? 'Denied' : 'Pending');
+  var ticket     = '#' + req.token.slice(-4).toUpperCase();
+  var progressHtml = '';
+  var actionsHtml  = '';
+
+  if (statusKey === 'pending' && req.requiredGroups.length) {
+    // The progress bar has one segment per REQUIRED group only (matches the mockup: 2 required groups
+    // = 2 segments). The rows list below shows every known group, with non-required ones marked
+    // "Not required" as text only — that's informational, not part of the progress visualization.
+    var segs = req.requiredGroups.map(function(g) {
+      var approved = req.groupApprovals[g] && req.groupApprovals[g].status === 'Approved';
+      return '<div class="fd-seg ' + (approved ? 'approved' : 'pending') + '"></div>';
+    }).join('');
+    var rows = ALL_GROUPS.map(function(g) {
+      if (req.requiredGroups.indexOf(g) === -1) {
+        return '<div class="fd-group-row"><span class="fd-group-name">' + esc(g) + '</span>' +
+               '<span class="fd-group-status na">Not required</span></div>';
+      }
+      var gs = req.groupApprovals[g] || { status: 'Pending' };
+      var approved = gs.status === 'Approved';
+      var label = approved ? '&#10003; Approved' : 'Waiting';
+      return '<div class="fd-group-row"><span class="fd-group-name">' + esc(g) + '</span>' +
+             '<span class="fd-group-status ' + (approved ? 'approved' : 'pending') + '">' + label + '</span></div>';
+    }).join('');
+    progressHtml = '<div class="fd-progress-wrap"><div class="fd-seg-bar">' + segs + '</div>' +
+                   '<div class="fd-group-rows">' + rows + '</div></div>';
+
+    var myPendingGroups = req.requiredGroups.filter(function(g) {
+      return MY_GROUPS.indexOf(g) !== -1 && !(req.groupApprovals[g] && req.groupApprovals[g].status === 'Approved');
+    });
+    var canAct = IS_SUPER_APPROVER || myPendingGroups.length > 0;
+    actionsHtml = canAct
+      ? '<div class="fd-actions">' +
+          '<button class="fd-act-btn approve" onclick="approveRequest(\'' + esc(req.token) + '\',this)">Approve</button>' +
+          '<button class="fd-act-btn" onclick="denyRequest(\'' + esc(req.token) + '\',this)">Deny</button>' +
+        '</div>'
+      : '<span class="fd-waiting-note">Waiting on another group</span>';
+  } else if (statusKey === 'pending') {
+    // Legacy request with no tracked groups — any admin can act, same one-click behavior as before this feature.
+    actionsHtml = '<div class="fd-actions">' +
+        '<button class="fd-act-btn approve" onclick="approveRequest(\'' + esc(req.token) + '\',this)">Approve</button>' +
+        '<button class="fd-act-btn" onclick="denyRequest(\'' + esc(req.token) + '\',this)">Deny</button>' +
+      '</div>';
+  }
+
+  return '<div class="fd-card ' + statusKey + '">' +
+    '<div class="fd-card-top"><div class="fd-card-name">' + esc(req.eventName) + '</div>' +
+      '<button class="fd-info-btn" onclick="showRequestDetail(\'' + esc(req.token) + '\')" title="View details" aria-label="View details">i</button>' +
+      '<span class="fd-badge ' + statusKey + '">' + badgeText + '</span></div>' +
+    '<div class="fd-meta-row"><span class="ic">&#128100;</span>' + esc(req.requesterName) + '</div>' +
+    '<div class="fd-meta-row"><span class="ic">&#127963;&#65039;</span>' + esc(req.location || '—') + '</div>' +
+    '<div class="fd-meta-row"><span class="ic">&#128197;</span>Starts: ' + _fdDateText(req.eventDate) + '</div>' +
+    progressHtml +
+    '<div class="fd-ticket"><span class="fd-id">' + ticket + '</span>' + actionsHtml + '</div>' +
+  '</div>';
+}
+
+/* ── Inline door dropdown (ds-dd-*) ─────────────── */
+function buildDoorDDInline(idx, currentVal, groups) {
+  var selected = currentVal
+    ? currentVal.split(',').map(function(s) { return s.trim(); }).filter(Boolean)
+    : [];
+  var id    = 'ds-dd-' + idx;
+  var btnId = 'ds-dd-btn-' + idx;
+  var lstId = 'ds-dd-list-' + idx;
+  var groupList = groups || DOOR_GROUPS;
+  var idxJs = (typeof idx === 'number') ? idx : "'" + idx + "'";
+
+  var options = groupList.map(function(g) {
+    var chk = selected.indexOf(g) !== -1 ? ' checked' : '';
+    return '<label onclick="event.stopPropagation()"><input type="checkbox" name="' + id + '" value="' + g + '"' + chk +
+           ' onchange="updateDSLabel(this,' + idxJs + ')"> ' + g + '</label>';
+  });
+
+  return '<div class="dd-wrap" id="' + id + '">' +
+    '<button class="dd-btn" id="' + btnId + '" type="button" onclick="toggleDSDD(event,' + idxJs + ')">' +
+      (selected.length ? selected.join(', ') : 'Select...') +
+    '</button>' +
+    '<div class="dd-list" id="' + lstId + '" style="display:none">' +
+      options.join('') +
+    '</div>' +
+  '</div>';
+}
+
+function toggleDSDD(e, idx) {
+  e.stopPropagation();
+  var list = document.getElementById('ds-dd-list-' + idx);
+  var isOpen = list.style.display === 'block';
+  document.querySelectorAll('.dd-list').forEach(function(l) { l.style.display = 'none'; });
+  if (!isOpen) { list.style.display = 'block'; }
+}
+
+function updateDSLabel(el, idx) {
+  var boxes = document.querySelectorAll('input[name="ds-dd-' + idx + '"]');
+  if (el) {
+    if (el.value === 'ALL' && el.checked) {
+      boxes.forEach(function(b) { if (b.value !== 'ALL') b.checked = false; });
+    } else if (el.value !== 'ALL' && el.checked) {
+      boxes.forEach(function(b) { if (b.value === 'ALL') b.checked = false; });
+    }
+  }
+  var checked = Array.prototype.filter.call(boxes, function(b) { return b.checked; });
+  var vals = checked.map(function(b) { return b.value; });
+  document.getElementById('ds-dd-btn-' + idx).textContent = vals.length ? vals.join(', ') : 'Select...';
+}
+
+function getDSDDValue(idx) {
+  var boxes = document.querySelectorAll('input[name="ds-dd-' + idx + '"]:checked');
+  return Array.prototype.map.call(boxes, function(c) { return c.value; }).join(',');
+}
+
+/* ── Parse/format door actions client-side ───────── */
+function parseDoorActionsClient(str) {
+  if (!str) return [];
+  return str.split(';').reduce(function(acc, entry) {
+    var parts = entry.split('|');
+    if (parts.length < 3) return acc;
+    var type    = parts[0].trim();
+    var targets = parts[1].trim();
+    var start   = parts[2].trim();
+    var end     = (parts[3] || '').trim();
+    if (!type || !targets) return acc;
+    acc.push({ type: type, targets: targets, start: start, end: end });
+    return acc;
+  }, []);
+}
+
+function formatDoorActionsClient(entries) {
+  return entries.map(function(e) {
+    return [e.type || 'Unlock', e.targets || '', e.start || '', e.end || ''].join('|');
+  }).join(';');
+}
+
+/* ── Door mode toggle ────────────────────────────── */
+function toggleDoorMode(idx, mode) {
+  var container = document.getElementById('ds-mode-container-' + idx);
+  if (container) container.setAttribute('data-door-mode', mode);
+
+  var simpleBtn  = document.getElementById('ds-mode-simple-' + idx);
+  var advBtn     = document.getElementById('ds-mode-adv-' + idx);
+  var simpleSection = document.getElementById('ds-simple-section-' + idx);
+  var advSection    = document.getElementById('ds-adv-section-' + idx);
+
+  if (simpleBtn)  simpleBtn.classList.toggle('active', mode === 'simple');
+  if (advBtn)     advBtn.classList.toggle('active', mode === 'advanced');
+  if (simpleSection) simpleSection.style.display = mode === 'simple' ? '' : 'none';
+  if (advSection)    advSection.style.display    = mode === 'advanced' ? '' : 'none';
+
+  // Clear the hidden mode's data to avoid stale values on submit
+  if (mode === 'simple') {
+    // Clear advanced action list
+    var advList = document.getElementById('ds-adv-list-' + idx);
+    if (advList) advList.innerHTML = '';
+    if (_actionCounter) _actionCounter[idx] = 0;
+  } else {
+    // Clear simple fields
+    var startEl = document.getElementById('ds-start-' + idx);
+    var endEl   = document.getElementById('ds-end-' + idx);
+    if (startEl) startEl.value = '';
+    if (endEl)   endEl.value   = '';
+    // Clear target dropdown selection via the dd-btn label reset
+    var ddBtn = document.querySelector('#ds-dd-' + idx + '-btn');
+    if (ddBtn) {
+      ddBtn.textContent = 'Select…';
+      document.querySelectorAll('input[name="ds-dd-' + idx + '"]:checked').forEach(function(c) { c.checked = false; });
+    }
+  }
+}
+
+/* ── Advanced dropdown: groups + individual doors grouped by group ── */
+// Group checkboxes use data-group (no name) — they are UI-only toggles, not serialized.
+// Individual door checkboxes use name=ddId + data-door-group — these are the serialized values.
+// Exception: groups with no individual doors use data-group checkboxes as fallback values.
+function _buildAdvancedDoorOptions(ddId, selectedTargets) {
+  var opts = '';
+  var groups = DOOR_GROUPS.filter(function(g) { return g !== 'ALL'; });
+  groups.forEach(function(g) {
+    var groupDoors = DOORS.filter(function(d) { return d.group === g; });
+    // Group toggle is checked if group name is in selected targets, or all individual doors are
+    var grpDirectlySelected = selectedTargets.indexOf(g) !== -1;
+    var allDoorNamesSelected = groupDoors.length > 0 && groupDoors.every(function(d) {
+      return selectedTargets.indexOf(d.name) !== -1 || grpDirectlySelected;
+    });
+    var grpChk = (grpDirectlySelected || allDoorNamesSelected) ? ' checked' : '';
+
+    opts += '<div class="dd-group-header">' + esc(g) + '</div>';
+    // Whole-group toggle: data-group only, no name (excluded from serialization)
+    opts += '<label class="dd-opt-group" onclick="event.stopPropagation()">' +
+            '<input type="checkbox" data-group="' + esc(g) + '" value="' + esc(g) + '"' + grpChk +
+            ' onchange="updateActionDDLabel(\'' + ddId + '\', this)"> ' + esc(g) + ' (whole group)</label>';
+    // Individual doors: name=ddId + data-door-group (these are the real serialized values)
+    groupDoors.forEach(function(d) {
+      var doorChk = (selectedTargets.indexOf(d.name) !== -1 || grpDirectlySelected) ? ' checked' : '';
+      opts += '<label class="dd-opt-door" onclick="event.stopPropagation()">' +
+              '<input type="checkbox" name="' + ddId + '" data-door-group="' + esc(g) + '" value="' + esc(d.name) + '"' + doorChk +
+              ' onchange="updateActionDDLabel(\'' + ddId + '\', this)"> ' + esc(d.name) + '</label>';
+    });
+  });
+  // Fallback: no DOORS loaded → show groups only (with name so they serialize)
+  if (!groups.length) {
+    DOOR_GROUPS.forEach(function(g) {
+      var chk = selectedTargets.indexOf(g) !== -1 ? ' checked' : '';
+      opts += '<label onclick="event.stopPropagation()"><input type="checkbox" name="' + ddId + '" value="' + esc(g) + '"' + chk +
+              ' onchange="updateActionDDLabel(\'' + ddId + '\', this)"> ' + esc(g) + '</label>';
+    });
+  }
+  return opts;
+}
+
+/* ── Door action entry rows ──────────────────────── */
+function addActionEntry(idx, entry) {
+  if (!_actionCounter[idx]) _actionCounter[idx] = 0;
+  var n = _actionCounter[idx]++;
+  var rowId   = 'adv-row-' + idx + '-' + n;
+  var ddId    = 'adv-dd-'  + idx + '-' + n;
+  entry = entry || {};
+
+  var selectedTargets = (entry.targets || '').split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var ddLabel = selectedTargets.length ? selectedTargets.join(', ') : 'Select…';
+
+  var row =
+    '<div class="adv-row" id="' + rowId + '">' +
+      '<select class="adv-action" id="adv-type-' + idx + '-' + n + '">' +
+        '<option value="Unlock"' + (entry.type !== 'Lock' ? ' selected' : '') + '>Unlock</option>' +
+        '<option value="Lock"'   + (entry.type === 'Lock' ? ' selected' : '') + '>Lock</option>' +
+      '</select>' +
+      '<div class="dd-wrap" id="' + ddId + '" style="position:relative">' +
+        '<button class="dd-btn adv-door" type="button" id="' + ddId + '-btn" onclick="toggleActionDD(event,\'' + ddId + '\')">' + esc(ddLabel) + '</button>' +
+        '<div class="dd-list" id="' + ddId + '-list" style="display:none;min-width:220px">' +
+          _buildAdvancedDoorOptions(ddId, selectedTargets) +
+        '</div>' +
+      '</div>' +
+      '<input type="hidden" id="adv-targets-' + idx + '-' + n + '">' +
+      '<input type="time" class="adv-time" id="adv-start-' + idx + '-' + n + '" value="' + esc(entry.start || '') + '">' +
+      '<span class="adv-dash">–</span>' +
+      '<input type="time" class="adv-time" id="adv-end-'   + idx + '-' + n + '" value="' + esc(entry.end   || '') + '">' +
+      '<button class="adv-remove" type="button" onclick="removeAdvRow(\'' + rowId + '\')">&times;</button>' +
+    '</div>';
+
+  document.getElementById('ds-adv-list-' + idx).insertAdjacentHTML('beforeend', row);
+  _updateOverrideNote(idx);
+}
+
+function toggleActionDD(e, ddId) {
+  e.stopPropagation();
+  var list = document.getElementById(ddId + '-list');
+  var isOpen = list.style.display === 'block';
+  document.querySelectorAll('.dd-list').forEach(function(l) { l.style.display = 'none'; });
+  if (!isOpen) { list.style.display = 'block'; }
+}
+
+function updateActionDDLabel(ddId, changedCb) {
+  var list = document.getElementById(ddId + '-list');
+  if (!list) return;
+
+  if (changedCb) {
+    var grpAttr  = changedCb.getAttribute('data-group');
+    var doorAttr = changedCb.getAttribute('data-door-group');
+
+    if (grpAttr) {
+      // "Whole group" toggled → sync all individual doors in that group
+      list.querySelectorAll('input[data-door-group="' + grpAttr + '"]').forEach(function(c) {
+        c.checked = changedCb.checked;
+      });
+    } else if (doorAttr) {
+      // Individual door toggled → sync parent group toggle
+      var groupToggle = list.querySelector('input[data-group="' + doorAttr + '"]');
+      if (groupToggle) {
+        var allInGroup = list.querySelectorAll('input[data-door-group="' + doorAttr + '"]');
+        groupToggle.checked = Array.prototype.every.call(allInGroup, function(c) { return c.checked; });
+      }
+    }
+  }
+
+  // Build label from serialized values (individual doors + fallback group names)
+  var parts = _getAdvancedDDParts(ddId, list);
+  document.getElementById(ddId + '-btn').textContent = parts.length ? parts.join(', ') : 'Select…';
+}
+
+// Returns the serialized value parts for an advanced door dropdown.
+// Individual door names (name=ddId) are the real values.
+// Group names are included only for groups that have no individual door entries (fallback).
+function _getAdvancedDDParts(ddId, list) {
+  var parts = [];
+  list.querySelectorAll('input[name="' + ddId + '"]:checked').forEach(function(c) {
+    parts.push(c.value);
+  });
+  // Fallback: groups with no individual doors
+  list.querySelectorAll('input[data-group]').forEach(function(grpCb) {
+    var g = grpCb.getAttribute('data-group');
+    if (list.querySelectorAll('input[data-door-group="' + g + '"]').length === 0 && grpCb.checked) {
+      parts.push(grpCb.value);
+    }
+  });
+  return parts;
+}
+
+function getDSDDValueById(ddId) {
+  var list = document.getElementById(ddId + '-list');
+  if (!list) {
+    var boxes = document.querySelectorAll('input[name="' + ddId + '"]:checked');
+    return Array.prototype.map.call(boxes, function(c) { return c.value; }).join(', ');
+  }
+  return _getAdvancedDDParts(ddId, list).join(', ');
+}
+
+// Reads back every advanced door-action row for a given widget idx (the shared 'nr' modal today).
+function getActionEntries(idx) {
+  var list = document.getElementById('ds-adv-list-' + idx);
+  if (!list) return [];
+  var rows = list.querySelectorAll('.adv-row');
+  var entries = [];
+  Array.prototype.forEach.call(rows, function(row) {
+    var parts = row.id.split('-'); // "adv-row-{idx}-{n}"
+    var n       = parts[parts.length - 1];
+    var typeEl  = document.getElementById('adv-type-'  + idx + '-' + n);
+    var startEl = document.getElementById('adv-start-' + idx + '-' + n);
+    var endEl   = document.getElementById('adv-end-'   + idx + '-' + n);
+    var targets = getDSDDValueById('adv-dd-' + idx + '-' + n);
+    if (targets && startEl) {
+      entries.push({
+        type:    typeEl ? typeEl.value : 'Unlock',
+        targets: targets,
+        start:   startEl.value || '',
+        end:     endEl ? endEl.value : ''
+      });
+    }
+  });
+  return entries;
+}
+
+function removeAdvRow(rowId) {
+  var el = document.getElementById(rowId);
+  if (el) {
+    var parts = rowId.split('-'); // adv-row-{idx}-{n}
+    var idx = parts[2];
+    el.parentNode.removeChild(el);
+    _updateOverrideNote(idx);
+  }
+}
+
+function _updateOverrideNote(idx) {
+  var list = document.getElementById('ds-adv-list-' + idx);
+  var note = document.getElementById('ds-override-note-' + idx);
+  if (note) note.style.display = (list && list.children.length > 0) ? '' : 'none';
+}
+
+/* ── New Request / Edit Request modal (shared) ────── */
+function showNewRequest() {
+  EDIT_TOKEN = null;
+  _editOriginalReq = null;
+  document.getElementById('nr-modal-title').textContent = 'New Request';
+  document.getElementById('nr-submit-btn').textContent = 'Submit Request';
+  document.getElementById('nr-panel').classList.remove('hidden');
+  _nrDoorBuilt = false;
+  _actionCounter['nr'] = 0;
+  document.getElementById('nr-dd-placeholder').innerHTML = '';
+
+  // Delegate mode state, button visibility, section visibility to toggleDoorMode
+  toggleDoorMode('nr', 'simple');
+
+  document.getElementById('nr-name-field').value = '';
+  document.getElementById('nr-event-name').value = '';
+  document.getElementById('nr-edate').value = '';
+  document.getElementById('nr-etime').value = '';
+  document.getElementById('nr-setup').value = '';
+  document.getElementById('nr-loc').value = '';
+  document.getElementById('nr-etype').value = 'School';
+  document.getElementById('nr-av').value = 'No';
+  document.getElementById('nr-heavy').value = 'No';
+
+  // Reset start/end time inputs
+  var startEl = document.getElementById('nr-start');
+  var endEl   = document.getElementById('nr-end');
+  if (startEl) startEl.value = '';
+  if (endEl)   endEl.value   = '';
+
+  // Reset target dropdown button label and uncheck all checkboxes
+  var ddBtn = document.querySelector('#ds-dd-nr-btn');
+  if (ddBtn) {
+    ddBtn.textContent = 'Select…';
+    document.querySelectorAll('input[name="ds-dd-nr"]:checked').forEach(function(c){ c.checked = false; });
+  }
+
+  // Reset door section to hidden and ds dropdown value
+  document.getElementById('nr-ds').value = 'No';
+  document.getElementById('nr-door-section').style.display = 'none';
+
+  document.getElementById('nr-event-name').focus();
+}
+
+// Opens the same modal pre-filled with an existing request's fields, in edit mode.
+function openEditRequestModal(token) {
+  var req = REQUESTS.filter(function(r) { return r.token === token; })[0];
+  if (!req) { showToast('Request not found.', true); return; }
+
+  showNewRequest();   // reset to a clean blank state first, then overwrite with req's values
+  EDIT_TOKEN = token;
+  _editOriginalReq = req;
+  document.getElementById('nr-modal-title').textContent = 'Edit Request';
+  document.getElementById('nr-submit-btn').textContent = 'Save Changes';
+
+  document.getElementById('nr-name-field').value = req.requesterName || '';
+  document.getElementById('nr-event-name').value = req.eventName || '';
+  var evDT = splitDT(req.eventDate);
+  document.getElementById('nr-edate').value = evDT.datePart;
+  document.getElementById('nr-etime').value = evDT.timePart;
+  document.getElementById('nr-setup').value = splitDT(req.setupDate).datePart;
+  document.getElementById('nr-loc').value = req.location || '';
+  document.getElementById('nr-etype').value = req.eventType === 'Church' ? 'Church' : 'School';
+  document.getElementById('nr-av').value = req.avRequired === 'Yes' ? 'Yes' : 'No';
+  document.getElementById('nr-heavy').value = req.heavyItems === 'Yes' ? 'Yes' : 'No';
+
+  var doorsYes = (req.doorSchedule || '').trim().toLowerCase().startsWith('yes');
+  document.getElementById('nr-ds').value = doorsYes ? 'Yes' : 'No';
+  document.getElementById('nr-door-section').style.display = doorsYes ? '' : 'none';
+  if (doorsYes) _populateNRDoorSection(req);
+}
+
+// Fills the shared door-schedule widget (simple target/start/end, or advanced action list) from an
+// existing request's saved values — same widget showNewRequest() resets blank, reused here for edit.
+function _populateNRDoorSection(req) {
+  var parsedActions = parseDoorActionsClient(req.doorActions || '');
+  var mode = parsedActions.length > 0 ? 'advanced' : 'simple';
+  toggleDoorMode('nr', mode);
+  if (mode === 'simple') {
+    document.getElementById('nr-dd-placeholder').innerHTML =
+      buildDoorDDInline('nr', req.target || '', DOOR_GROUPS.filter(function(g) { return g !== 'ALL'; }));
+    _nrDoorBuilt = true;
+    var startTime = req.start ? (req.start.split(' ')[1] || req.start) : '';
+    var endTime   = req.end   ? (req.end.split(' ')[1]   || req.end)   : '';
+    document.getElementById('nr-start').value = startTime;
+    document.getElementById('nr-end').value   = endTime;
+  } else {
+    parsedActions.forEach(function(entry) { addActionEntry('nr', entry); });
+  }
+}
+
+function hideNewRequest() {
+  document.getElementById('nr-panel').classList.add('hidden');
+  EDIT_TOKEN = null;
+}
+
+function toggleNRDoorSection() {
+  var val = document.getElementById('nr-ds').value;
+  var section = document.getElementById('nr-door-section');
+  if (val === 'Yes') {
+    section.style.display = '';
+    if (!_nrDoorBuilt) {
+      document.getElementById('nr-dd-placeholder').innerHTML = buildDoorDDInline('nr', '', DOOR_GROUPS.filter(function(g){ return g !== 'ALL'; }));
+      _nrDoorBuilt = true;
+    }
+  } else {
+    section.style.display = 'none';
+  }
+}
+
+function submitRequestModal() {
+  var eventName = document.getElementById('nr-event-name').value.trim();
+  if (!eventName) { showToast('Event name is required.', true); return; }
+
+  var isEdit = !!EDIT_TOKEN;
+  var btn = document.getElementById('nr-submit-btn');
+
+  var eventDate = document.getElementById('nr-edate').value;
+  var eventTime = document.getElementById('nr-etime').value;
+  var eventDateStr = eventDate ? (eventTime ? eventDate + ' ' + eventTime : eventDate) : '';
+
+  var dsVal = document.getElementById('nr-ds').value;
+  var target = '', start = '', end = '', doorActions = '', doorSchedule = 'No';
+
+  if (dsVal === 'Yes') {
+    var nrContainer = document.getElementById('ds-mode-container-nr');
+    var nrMode = nrContainer ? nrContainer.getAttribute('data-door-mode') : 'simple';
+    if (nrMode === 'simple') {
+      target = getDSDDValue('nr');
+      var startVal = document.getElementById('nr-start').value;
+      var endVal   = document.getElementById('nr-end').value;
+      if (startVal && endVal && endVal <= startVal) {
+        showToast('End time must be after start time.', true);
+        return;
+      }
+      start = (startVal && eventDate) ? eventDate + ' ' + startVal : '';
+      end   = (endVal   && eventDate) ? eventDate + ' ' + endVal   : '';
+      doorActions = '';
+    } else {
+      var actions = getActionEntries('nr');
+      var badRow = actions.filter(function(a) { return a.start && a.end && a.end <= a.start; })[0];
+      if (badRow) {
+        showToast('End time must be after start time for "' + (badRow.targets || 'an action') + '".', true);
+        return;
+      }
+      doorActions = formatDoorActionsClient(actions);
+      target = ''; start = ''; end = '';
+    }
+    doorSchedule = (target || doorActions) ? 'Yes, door schedule configured' : 'Yes';
+  }
+
+  var fields = {
+    requesterName: document.getElementById('nr-name-field').value.trim(),
+    eventName:     eventName,
+    eventType:     document.getElementById('nr-etype').value.trim(),
+    location:      document.getElementById('nr-loc').value.trim(),
+    eventDate:     eventDateStr,
+    setupDate:     document.getElementById('nr-setup').value,
+    avRequired:    document.getElementById('nr-av').value,
+    heavyItems:    document.getElementById('nr-heavy').value,
+    doorSchedule:  doorSchedule,
+    target:        target,
+    start:         start,
+    end:           end,
+    doorActions:   doorActions
+  };
+
+  function doSubmit() {
+    btn.disabled = true; btn.textContent = isEdit ? 'Saving…' : 'Submitting…';
+
+    if (isEdit) {
+      run('updateRequest', { token: EDIT_TOKEN, fields: JSON.stringify(fields) }, function(res) {
+        btn.disabled = false; btn.textContent = 'Save Changes';
+        if (res && res.success) {
+          showToast('Changes saved. Please refresh the page to see updates.', false);
+          hideNewRequest();
+        } else {
+          showToast((res && res.error) || 'Something went wrong.', true);
+        }
+      });
+    } else {
+      run('createRequest', fields, function(res) {
+        btn.disabled = false; btn.textContent = 'Submit Request';
+        if (res && res.success) {
+          showToast('Request submitted. Please refresh the page to see your request.', false);
+          hideNewRequest();
+        } else {
+          showToast((res && res.error) || 'Something went wrong.', true);
+        }
+      });
+    }
+  }
+
+  // Only warn when a change would actually restart the approval process (AV/IT, Heavy Items, or any
+  // door-schedule field) — not on every edit, so fixing a typo in the event name stays silent.
+  if (isEdit && _editOriginalReq) {
+    var APPROVAL_RESET_FIELDS_CLIENT = ['avRequired', 'heavyItems', 'doorSchedule', 'target', 'start', 'end', 'doorActions'];
+    var wouldReset = APPROVAL_RESET_FIELDS_CLIENT.some(function(f) {
+      return String(fields[f] || '') !== String(_editOriginalReq[f] || '');
+    });
+    if (wouldReset) {
+      showConfirmModal(
+        'Changing AV/IT, Heavy Items, or the door schedule will restart the approval process — every required group will need to re-approve.',
+        doSubmit,
+        { title: 'Restart Approval?', confirmLabel: 'Yes, Save & Restart Approval' }
+      );
+      return;
+    }
+  }
+
+  doSubmit();
+}
+
+/* ── Delete modal ─────────────────────────────────── */
+function openDelModal(token) {
+  pendingDelToken = token;
+  document.getElementById('confirmModal').classList.remove('hidden');
+  document.getElementById('confirmDeleteBtn').focus();
+}
+function closeModal() {
+  pendingDelToken = null;
+  document.getElementById('confirmModal').classList.add('hidden');
+}
+
+/* ── Generic in-app confirm modal (replaces window.confirm()) ──── */
+var _genericConfirmCallback = null;
+function showConfirmModal(message, onConfirm, opts) {
+  opts = opts || {};
+  document.getElementById('genericConfirmTitle').textContent = opts.title || 'Please Confirm';
+  document.getElementById('genericConfirmText').textContent = message;
+  document.getElementById('genericConfirmYesBtn').textContent = opts.confirmLabel || 'Yes, Continue';
+  _genericConfirmCallback = onConfirm;
+  document.getElementById('genericConfirmModal').classList.remove('hidden');
+}
+function _genericConfirmCancel() {
+  _genericConfirmCallback = null;
+  document.getElementById('genericConfirmModal').classList.add('hidden');
+}
+document.getElementById('genericConfirmYesBtn').onclick = function() {
+  var cb = _genericConfirmCallback;
+  document.getElementById('genericConfirmModal').classList.add('hidden');
+  _genericConfirmCallback = null;
+  if (cb) cb();
+};
+
+/* ── Event detail modal (approver "i" button) ──────── */
+function showRequestDetail(token) {
+  var req = REQUESTS.filter(function(r) { return r.token === token; })[0];
+  if (!req) { showToast('Request not found.', true); return; }
+
+  var doorsYes = (req.doorSchedule || '').trim().toLowerCase().startsWith('yes');
+  var rows = [
+    ['Requester', esc(req.requesterName) + (req.requesterEmail ? ' (' + esc(req.requesterEmail) + ')' : '')],
+    ['Event Name', esc(req.eventName)],
+    ['Event Type', esc(req.eventType || '—')],
+    ['Location', esc(req.location || '—')],
+    ['Event Date', esc(fmtDate(req.eventDate)) + (parseTime(req.eventDate) ? ' ' + esc(fmtTime(req.eventDate)) : '')],
+    ['Setup Date', req.setupDate ? esc(fmtDate(req.setupDate)) : '—'],
+    ['AV / IT Required', esc(req.avRequired || 'No')],
+    ['Heavy Items', esc(req.heavyItems || 'No')],
+    ['Door Schedule', doorsYes ? 'Yes' : 'No']
+  ];
+  if (doorsYes) {
+    if (req.doorActions) {
+      rows.push(['Door Actions', esc(req.doorActions)]);
+    } else {
+      rows.push(['Door Target', esc(req.target || '—')]);
+      rows.push(['Door Start', req.start ? esc(fmtTime(req.start)) : '—']);
+      rows.push(['Door End', req.end ? esc(fmtTime(req.end)) : '—']);
+    }
+  }
+  var statusLabel = req.status === 'Active' ? 'Approved' : (req.status === 'Denied' ? 'Denied' : 'Pending');
+  rows.push(['Status', statusLabel]);
+  if (req.requiredGroups && req.requiredGroups.length) {
+    var groupSummary = req.requiredGroups.map(function(g) {
+      var gs = req.groupApprovals[g] || { status: 'Pending' };
+      return esc(g) + ': ' + (gs.status === 'Approved' ? ('&#10003; by ' + esc(gs.by || '—')) : 'Waiting');
+    }).join('<br>');
+    rows.push(['Approval Groups', groupSummary]);
+  }
+  rows.push(['Submitted', esc(req.createdAt || '—')]);
+  rows.push(['Last Updated', esc(req.updatedAt || '—')]);
+
+  document.getElementById('detail-body').innerHTML = rows.map(function(r) {
+    return '<div class="detail-row"><div class="detail-label">' + r[0] + '</div>' +
+           '<div class="detail-value">' + (r[1] || '—') + '</div></div>';
+  }).join('');
+  document.getElementById('detailModal').classList.remove('hidden');
+}
+function closeDetailModal() {
+  document.getElementById('detailModal').classList.add('hidden');
+}
+
+/* ── Admin approve / deny ─────────────────────────── */
+function approveRequest(token, btn) {
+  btn.disabled = true; btn.textContent = 'Approving…';
+  run('approveRequest', { token: token }, function(res) {
+    if (res && res.success) { showToast('Request approved.', false); setTimeout(loadData, 800); }
+    else { showToast((res && res.error) || 'Error approving request.', true); btn.disabled = false; btn.textContent = 'Approve'; }
+  });
+}
+function denyRequest(token, btn) {
+  showConfirmModal('Deny this request? The requester will be notified.', function() {
+    btn.disabled = true; btn.textContent = 'Denying…';
+    run('denyRequest', { token: token }, function(res) {
+      if (res && res.success) { showToast('Request denied.', false); setTimeout(loadData, 800); }
+      else { showToast((res && res.error) || 'Error denying request.', true); btn.disabled = false; btn.textContent = 'Deny'; }
+    });
+  }, { title: 'Deny Request?', confirmLabel: 'Yes, Deny' });
+}
+document.getElementById('confirmDeleteBtn').onclick = function() {
+  var t = pendingDelToken;
+  if (!t) return;
+  var btn = document.getElementById('confirmDeleteBtn');
+  btn.disabled = true; btn.textContent = 'Canceling…';
+  run('cancelRequest', { token: t }, function(res) {
+    btn.disabled = false; btn.textContent = 'Yes, Cancel Request';
+    closeModal();
+    if (res && res.success) { showToast('Request canceled.', false); setTimeout(loadData, 800); }
+    else showToast((res&&res.error)||'Something went wrong.', true);
+  });
+};
+
+/* ── My Requests tile card (dedicated — separate from buildApprovalCard's Approvals-tab card) ── */
+function buildMyRequestCard(req) {
+  var statusKey = req.status === 'Active' ? 'approved' : (req.status === 'Denied' ? 'denied' : 'pending');
+  var badgeText = statusKey === 'approved' ? 'Approved' : (statusKey === 'denied' ? 'Denied' : 'Pending');
+  var ticket    = '#' + req.token.slice(-4).toUpperCase();
+  var upcoming  = isUpcoming(req.eventDate);
+
+  var progressHtml = '';
+  if (statusKey === 'pending' && req.requiredGroups && req.requiredGroups.length) {
+    var segs = req.requiredGroups.map(function(g) {
+      var approved = req.groupApprovals[g] && req.groupApprovals[g].status === 'Approved';
+      return '<div class="fd-seg ' + (approved ? 'approved' : 'pending') + '"></div>';
+    }).join('');
+    var rows = req.requiredGroups.map(function(g) {
+      var gs = req.groupApprovals[g] || { status: 'Pending' };
+      var approved = gs.status === 'Approved';
+      var label = approved ? '&#10003; Approved' : 'Waiting';
+      return '<div class="fd-group-row"><span class="fd-group-name">' + esc(g) + '</span>' +
+             '<span class="fd-group-status ' + (approved ? 'approved' : 'pending') + '">' + label + '</span></div>';
+    }).join('');
+    progressHtml = '<div class="fd-progress-wrap"><div class="fd-seg-bar">' + segs + '</div>' +
+                   '<div class="fd-group-rows">' + rows + '</div></div>';
+  }
+
+  var actionsHtml = upcoming
+    ? '<div class="fd-actions">' +
+        '<button class="fd-act-btn approve" onclick="openEditRequestModal(\'' + esc(req.token) + '\')">Edit</button>' +
+        '<button class="fd-act-btn" onclick="openDelModal(\'' + esc(req.token) + '\')">Cancel</button>' +
+      '</div>'
+    : '';
+
+  return '<div class="fd-card ' + statusKey + '">' +
+    '<div class="fd-card-top"><div class="fd-card-name">' + esc(req.eventName || 'Untitled Event') + '</div>' +
+      '<span class="fd-badge ' + statusKey + '">' + badgeText + '</span></div>' +
+    '<div class="fd-meta-row"><span class="ic">&#127963;&#65039;</span>' + esc(req.location || '—') + '</div>' +
+    '<div class="fd-meta-row"><span class="ic">&#128197;</span>' + (upcoming ? 'Starts: ' : '') + _fdDateText(req.eventDate) + '</div>' +
+    progressHtml +
+    '<div class="fd-ticket"><span class="fd-id">' + ticket + '</span>' + actionsHtml + '</div>' +
+  '</div>';
+}
+
+function renderMyRequestsDashboard() {
+  var mine = REQUESTS.filter(function(r) {
+    return !CURRENT_EMAIL || (r.requesterEmail || '').trim().toLowerCase() === CURRENT_EMAIL.trim().toLowerCase();
+  });
+
+  var buckets = { Pending: [], Active: [], Denied: [] };
+  mine.forEach(function(r) {
+    var key = r.status === 'Active' ? 'Active' : (r.status === 'Denied' ? 'Denied' : 'Pending');
+    buckets[key].push(r);
+  });
+  buckets.Pending.sort(function(a, b) { return a.eventDate.localeCompare(b.eventDate); });
+  buckets.Active.sort(function(a, b) { return b.updatedAt.localeCompare(a.updatedAt); });
+
+  function fill(gridId, emptyId, list) {
+    var grid = document.getElementById(gridId);
+    grid.innerHTML = list.map(buildMyRequestCard).join('');
+    document.getElementById(emptyId).style.display = list.length ? 'none' : 'block';
+  }
+  fill('mine-grid-pending',  'mine-empty-pending',  buckets.Pending);
+  fill('mine-grid-approved', 'mine-empty-approved', buckets.Active);
+  fill('mine-grid-denied',   'mine-empty-denied',   buckets.Denied);
+  document.getElementById('mine-count-pending').textContent = buckets.Pending.length;
+}
+
+/* ── Render all ───────────────────────────────────── */
+function renderContent(requests) {
+  var up = (requests || []).filter(function(r) { return isUpcoming(r.eventDate); });
+  REQUESTS = up;
+  renderMyRequestsDashboard();
+}
+
+function renderApprovalsDashboard() {
+  var search = (document.getElementById('appr-search').value || '').trim().toLowerCase();
+  var groupFilter = document.getElementById('appr-group-filter').value;
+  var viewFilter = document.getElementById('appr-view-filter').value;
+
+  var filtered = REQUESTS.filter(function(r) {
+    if (search) {
+      var hay = (r.eventName + ' ' + r.requesterName + ' ' + r.requesterEmail).toLowerCase();
+      if (hay.indexOf(search) === -1) return false;
+    }
+    if (groupFilter && r.requiredGroups.indexOf(groupFilter) === -1) return false;
+    if (viewFilter === 'mine' && r.status === 'Pending') {
+      var myPending = r.requiredGroups.filter(function(g) {
+        return MY_GROUPS.indexOf(g) !== -1 && !(r.groupApprovals[g] && r.groupApprovals[g].status === 'Approved');
+      });
+      if (!IS_SUPER_APPROVER && !myPending.length) return false;
+    }
+    return true;
+  });
+
+  var buckets = { Pending: [], Active: [], Denied: [] };
+  filtered.forEach(function(r) {
+    var key = r.status === 'Active' ? 'Active' : (r.status === 'Denied' ? 'Denied' : 'Pending');
+    buckets[key].push(r);
+  });
+
+  var sortMode = document.getElementById('appr-sort-pending').value;
+  buckets.Pending.sort(function(a, b) {
+    return sortMode === 'submitted' ? b.createdAt.localeCompare(a.createdAt) : a.eventDate.localeCompare(b.eventDate);
+  });
+  buckets.Active.sort(function(a, b) { return b.updatedAt.localeCompare(a.updatedAt); });
+
+  function fill(gridId, emptyId, list) {
+    var grid = document.getElementById(gridId);
+    grid.innerHTML = list.map(buildApprovalCard).join('');
+    document.getElementById(emptyId).style.display = list.length ? 'none' : 'block';
+  }
+  fill('appr-grid-pending',  'appr-empty-pending',  buckets.Pending);
+  fill('appr-grid-approved', 'appr-empty-approved', buckets.Active);
+  fill('appr-grid-denied',   'appr-empty-denied',   buckets.Denied);
+  document.getElementById('appr-count-pending').textContent = buckets.Pending.length;
+}
+
+function resetApprovalsFilters() {
+  document.getElementById('appr-search').value = '';
+  document.getElementById('appr-group-filter').value = '';
+  document.getElementById('appr-view-filter').value = 'all';
+  renderApprovalsDashboard();
+}
+
+/* ── Load data ────────────────────────────────────── */
+function loadData() {
+  document.getElementById('spinner').style.display = 'block';
+  document.getElementById('content').style.display = 'none';
+  document.getElementById('errorState').style.display = 'none';
+  run('getRequestData', {}, function(res) {
+    document.getElementById('spinner').style.display = 'none';
+    if (!res || res.error) {
+      var es = document.getElementById('errorState');
+      es.style.display = 'block';
+      if (res && res.error) document.getElementById('errorMsg').textContent = res.error;
+      return;
+    }
+    document.getElementById('new-req-bar').style.cssText = 'margin-bottom:20px; display:flex; justify-content:flex-end';
+    if (res.isAdmin !== undefined) IS_ADMIN = !!res.isAdmin;
+    DOORS = res.doors || [];
+    var doors = DOORS;
+    DOOR_GROUPS = (function() {
+      var groups = ['ALL'];
+      doors.forEach(function(d) {
+        if (d.group && groups.indexOf(d.group) === -1) groups.push(d.group);
+      });
+      return groups;
+    })();
+    MY_GROUPS         = res.myGroups || [];
+    ALL_GROUPS        = res.allGroups || [];
+    IS_SUPER_APPROVER = !!res.isSuperApprover;
+    var groupSel = document.getElementById('appr-group-filter');
+    groupSel.innerHTML = '<option value="">All Groups</option>' +
+      ALL_GROUPS.map(function(g) { return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join('');
+    document.getElementById('content').style.display = 'block';
+    renderContent(res.requests || []);
+    var c = document.getElementById('content');
+    c.classList.remove('tab-appr'); c.classList.add('tab-mine');   // default: My Requests
+    if (IS_ADMIN) document.getElementById('tab-bar').classList.add('show');  // Approvals tab only for approvers
+  });
+}
+
+// Approver-only tab switch: filters the single rendered list via CSS (no re-render). 'mine' = my own
+// requests + submit form; 'appr' = all pending requests + approve/deny.
+function switchReqTab(tab) {
+  var c = document.getElementById('content');
+  c.classList.remove('tab-mine', 'tab-appr');
+  c.classList.add(tab === 'appr' ? 'tab-appr' : 'tab-mine');
+  Array.prototype.forEach.call(document.querySelectorAll('.req-tab'), function(b) {
+    b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+  });
+  var bar = document.getElementById('new-req-bar');
+  if (bar) bar.style.display = (tab === 'appr') ? 'none' : 'flex';
+  if (tab === 'appr' && typeof hideNewRequest === 'function') hideNewRequest();
+  document.getElementById('appr-dashboard').classList.toggle('show', tab === 'appr');
+  document.getElementById('content').style.display = (tab === 'appr') ? 'none' : '';
+  if (tab === 'appr') renderApprovalsDashboard();
+}
+
+/* ── Keyboard ─────────────────────────────────────── */
+/* Global click-off: closes any open dropdown when clicking outside it */
+document.addEventListener('click', function(e) {
+  /* ds-dd-list dropdowns */
+  document.querySelectorAll('.dd-list').forEach(function(list) {
+    if (list.style.display === 'block') {
+      var wrap = list.parentElement;
+      if (wrap && !wrap.contains(e.target)) list.style.display = 'none';
+    }
+  });
+  /* door-dropdown-menu dropdowns */
+  document.querySelectorAll('.door-dropdown-menu.open').forEach(function(menu) {
+    var dd = menu.closest('.door-dropdown');
+    if (dd && !dd.contains(e.target)) {
+      menu.classList.remove('open');
+      var tog = dd.querySelector('.door-dropdown-toggle');
+      if (tog) { tog.classList.remove('open'); tog.setAttribute('aria-expanded','false'); }
+    }
+  });
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('card-header')) { e.preventDefault(); e.target.click(); }
+});
+document.getElementById('confirmModal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+/* ── Init ─────────────────────────────────────────── */
+window.onload = function() {
+  google.script.run
+    .withSuccessHandler(function(user) {
+      CURRENT_EMAIL = (user && user.email) || '';
+      IS_ADMIN      = !!(user && user.isAdmin);
+      if (CURRENT_EMAIL) document.getElementById('headerEmail').textContent =
+        CURRENT_EMAIL + (IS_ADMIN ? ' · Admin' : '');
+      loadData();
+    })
+    .withFailureHandler(function() { loadData(); })
+    .getLoggedInUser();
+};
+</script>
+</body>
+</html>

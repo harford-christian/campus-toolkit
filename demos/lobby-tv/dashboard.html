@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<!-- LobbyControl.html — authenticated remote control for the lobby display ("Lobby TV Project"). -->
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--red:#B22222;--gold:#D4AF37;}
+  body{font-family:'Inter',sans-serif;background:#f4f7f6;color:#222;}
+  .navbar{background:var(--red);} .navbar-brand{font-weight:800;color:#fff!important;}
+  .card{border:none;border-left:5px solid var(--gold);border-radius:10px;box-shadow:0 3px 10px rgba(0,0,0,.06);margin-bottom:14px;}
+  .lbl{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#666;margin-bottom:4px;}
+  .btn-red{background:var(--red);color:#fff;font-weight:700;} .btn-red:hover{background:#8e1b1b;color:#fff;}
+  .sched{display:flex;flex-wrap:wrap;gap:8px;}
+  .sched button{flex:1 1 30%;border:1px solid #ddd;background:#fff;border-radius:8px;padding:10px;font-weight:700;cursor:pointer;}
+  .sched button.on{background:var(--red);color:#fff;border-color:var(--red);}
+  #overlay{position:fixed;inset:0;background:rgba(255,255,255,.6);display:none;align-items:center;justify-content:center;z-index:999;}
+  #overlay.on{display:flex;}
+  /* ── Mobile layer (family pattern: body.is-mobile, toggled by matchMedia / ?ui) ── */
+  body.is-mobile{ font-size:1.05rem; padding-bottom:88px; }
+  body.is-mobile .container{ padding-left:10px; padding-right:10px; }
+  body.is-mobile .navbar-brand{ font-size:1.05rem; }
+  body.is-mobile .card{ padding:1rem!important; }
+  body.is-mobile .lbl{ font-size:.8rem; }
+  body.is-mobile .form-control, body.is-mobile .form-select{ font-size:1.05rem; padding:.6rem .7rem; }
+  body.is-mobile .sched button{ flex:1 1 46%; padding:14px 8px; font-size:1rem; }
+  body.is-mobile .btn{ padding:.6rem 1rem; font-size:1rem; }
+  body.is-mobile .btn-sm{ font-size:.95rem; padding:.5rem .8rem; }
+  /* sticky primary action on mobile so it's always reachable (family "FAB"-style) */
+  body.is-mobile #pushBtn{ position:fixed; left:12px; right:12px; bottom:12px; width:auto; z-index:1030; box-shadow:0 6px 18px rgba(140,18,18,.45); }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Lobby Control Dashboard" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<div id="overlay"><div class="spinner-border text-danger"></div></div>
+<nav class="navbar p-3"><div class="container">
+  <span class="navbar-brand">🦅 HCS Lobby Control</span>
+  <div class="d-flex align-items-center gap-3">
+    <a id="previewLink" href="#" target="_blank" rel="noopener"
+       class="btn btn-sm btn-outline-light fw-bold">👁️ Preview TV</a>
+    <span class="text-white-50 small" id="meta"></span>
+  </div>
+</div></nav>
+
+<div class="container my-3" style="max-width:680px;">
+  <div id="toast" class="alert py-2" style="display:none;"></div>
+
+  <div class="card p-3">
+    <div class="lbl">Saved presets</div>
+    <div class="d-flex gap-2 mb-2">
+      <select id="presetSel" class="form-select form-select-sm"></select>
+      <button class="btn btn-red btn-sm" onclick="applyPresetUI()">Apply</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="delPresetUI()">Delete</button>
+    </div>
+    <div class="input-group input-group-sm">
+      <input id="presetName" class="form-control" placeholder="Save current settings as…">
+      <button class="btn btn-outline-secondary" onclick="savePresetUI()">💾 Save</button>
+    </div>
+  </div>
+
+  <div class="card p-3">
+    <div class="lbl">Schedule</div>
+    <div class="sched" id="sched"></div>
+    <div class="form-check form-switch mt-3"><input class="form-check-input" type="checkbox" id="chapel">
+      <label class="form-check-label" for="chapel">Chapel cancelled (Thursday → regular)</label></div>
+  </div>
+
+  <div class="card p-3">
+    <div class="lbl">Main content</div>
+    <select id="contentMode" class="form-select mb-2" onchange="onMode()">
+      <option value="auto">Auto (PowerPoint / auto livestream)</option>
+      <option value="placeholder">Placeholder (logo screen)</option>
+      <option value="youtube">Force a YouTube video</option>
+      <option value="slides">Force a Google Slides URL</option>
+    </select>
+    <input id="videoId" class="form-control mb-2" placeholder="YouTube URL or 11-char video ID" style="display:none;">
+    <input id="slideUrl" class="form-control mb-2" placeholder="Google Slides /embed URL" style="display:none;">
+    <div id="contentNow" class="small text-muted"></div>
+    <hr>
+    <div class="lbl">Upload PowerPoint (becomes today's slideshow)</div>
+    <form id="pptForm" onsubmit="return false;"><input type="file" name="pptx" accept=".pptx,.ppt" class="form-control form-control-sm mb-2"></form>
+    <button class="btn btn-outline-secondary btn-sm mb-3" onclick="uploadPpt()">⬆️ Upload &amp; show PowerPoint</button>
+    <div class="lbl">Show an image now</div>
+    <form id="imgForm" onsubmit="return false;"><input type="file" name="image" accept="image/*" class="form-control form-control-sm mb-2"></form>
+    <button class="btn btn-outline-secondary btn-sm mb-3" onclick="uploadImg()">🖼️ Upload &amp; show image</button>
+    <div class="lbl">Image carousel (Google Drive folder)</div>
+    <input id="carFolder" class="form-control form-control-sm mb-2" placeholder="Paste a Google Drive folder link">
+    <div class="d-flex gap-2 align-items-center mb-2"><span class="small text-muted">Every</span>
+      <input id="carInterval" type="number" min="2" value="8" class="form-control form-control-sm" style="max-width:90px;">
+      <span class="small text-muted">seconds</span></div>
+    <button class="btn btn-outline-secondary btn-sm" onclick="startCarousel()">▶️ Start carousel</button>
+  </div>
+
+  <div class="card p-3">
+    <div class="lbl">Screen schedule (night off)</div>
+    <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="nightEnabled">
+      <label class="form-check-label" for="nightEnabled">Blank the screen (logo only) overnight</label></div>
+    <div class="d-flex gap-2 align-items-center"><span class="small text-muted">From</span>
+      <input id="nightStart" type="time" class="form-control" style="max-width:150px;">
+      <span class="small text-muted">to</span>
+      <input id="nightEnd" type="time" class="form-control" style="max-width:150px;"></div>
+  </div>
+
+  <div class="card p-3">
+    <div class="lbl">Game-day athlete photos</div>
+    <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="athEnabled">
+      <label class="form-check-label" for="athEnabled">Show athlete photos on home-game days</label></div>
+    <div class="d-flex gap-2 align-items-center flex-wrap mb-2"><span class="small text-muted">From</span>
+      <input id="athStart" type="time" class="form-control" style="max-width:130px;">
+      <span class="small text-muted">to</span>
+      <input id="athEnd" type="time" class="form-control" style="max-width:130px;">
+      <span class="small text-muted">·</span>
+      <input id="athInterval" type="number" min="3" max="60" class="form-control" style="max-width:80px;">
+      <span class="small text-muted">sec each</span></div>
+    <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" id="athLsWins">
+      <label class="form-check-label" for="athLsWins">A live game stream takes priority over the photos</label></div>
+    <div class="form-text mb-2">Saved with “Push to lobby display”. On a home-game day the triggered teams’ photos shuffle during the window, then revert to Auto on their own.</div>
+    <div class="d-flex gap-2 align-items-center">
+      <select id="athTestTeam" class="form-select" style="max-width:230px;"><option value="">(auto-pick a team with photos)</option></select>
+      <button class="btn btn-outline-secondary btn-sm" onclick="testNow()">▶ Test on TV (10 min)</button>
+    </div>
+  </div>
+
+  <div class="card p-3">
+    <div class="lbl">Lobby TVs</div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-success fw-bold" onclick="tvPower('on')">📺 Turn On</button>
+      <button class="btn btn-outline-secondary fw-bold" onclick="tvPower('off')">⏻ Turn Off</button>
+    </div>
+    <div class="form-text">Manually power the lobby TVs (turning on also switches them to HDMI 1). Overrides the automatic schedule until the next scheduled on/off time.</div>
+  </div>
+
+  <div class="card p-3">
+    <div class="lbl">Ticker messages (one per line)</div>
+    <textarea id="ticker" class="form-control" rows="4" placeholder="Leave blank to keep the current ticker"></textarea>
+    <div class="form-text">Saving with text replaces the display's ticker; blank = leave as-is.</div>
+  </div>
+
+  <button id="pushBtn" class="btn btn-red w-100 py-2 fw-bold" onclick="save()">💾 Push to lobby display</button>
+
+  <div class="card p-3 mt-3" style="border-left-color:#c0392b;">
+    <div class="lbl" style="color:#c0392b;">Emergency alert</div>
+    <input id="emMsg" class="form-control mb-2" placeholder="Message shown full-screen in red…">
+    <div class="d-flex gap-2"><button class="btn btn-danger fw-bold" onclick="emergency(true)">🚨 Activate</button>
+      <button class="btn btn-outline-secondary" onclick="emergency(false)">Clear</button>
+      <span id="emState" class="align-self-center small text-muted"></span></div>
+  </div>
+  <p class="text-center text-muted small mt-2">Changes reach the display within ~20 seconds.</p>
+</div>
+
+<script>
+var SCHEDULES=[['auto','Auto'],['regular','Regular'],['thursday','Thursday'],['delay2hr','2-Hr Delay'],['delay3hr','3-Hr Delay'],['earlyRelease','Early Release'],['noschool','No School']];
+var schedKey='auto', cur=null;
+
+// Preview button → open the read-only TV mockup (?page=preview) in a new tab.
+var EXEC_URL='preview.html';
+(function(){var a=document.getElementById('previewLink');
+  if(a&&EXEC_URL){a.href=EXEC_URL+(EXEC_URL.indexOf('?')>=0?'&':'?')+'page=preview';}})();
+
+// View mode (family pattern): auto by width, override with ?ui=mobile|desktop.
+var forceUI='';
+function applyViewMode(){
+  var m = (forceUI==='mobile') ? true : (forceUI==='desktop') ? false : window.matchMedia('(max-width: 768px)').matches;
+  document.body.classList.toggle('is-mobile', m);
+}
+applyViewMode();
+window.addEventListener('resize', function(){ clearTimeout(window.__vmT); window.__vmT=setTimeout(applyViewMode, 200); });
+function busy(on){document.getElementById('overlay').classList.toggle('on',!!on);}
+function toast(m,k){var t=document.getElementById('toast');t.className='alert py-2 alert-'+(k||'success');t.textContent=m;t.style.display='block';setTimeout(function(){t.style.display='none';},3500);}
+function call(fn){var a=[].slice.call(arguments,1);return new Promise(function(res,rej){
+  if(!(window.google&&google.script&&google.script.run)){rej(new Error('Open this from the Lobby TV Project web-app /exec URL.'));return;}
+  google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn].apply(google.script.run,a);});}
+
+function renderSched(){document.getElementById('sched').innerHTML=SCHEDULES.map(function(s){
+  return '<button class="'+(s[0]===schedKey?'on':'')+'" onclick="pickSched(\''+s[0]+'\')">'+s[1]+'</button>';}).join('');}
+function pickSched(k){
+  if(k!=='auto' && schedKey==='auto'){
+    if(!confirm('Heads up: this overrides only what the LOBBY DISPLAY shows (the bell countdown) until midnight — it does NOT change the actual bells or doors, and it resets to Auto overnight. Continue?')) return;
+  }
+  schedKey=k; renderSched();
+}
+function onMode(){var m=document.getElementById('contentMode').value;
+  document.getElementById('videoId').style.display=(m==='youtube')?'block':'none';
+  document.getElementById('slideUrl').style.display=(m==='slides')?'block':'none';}
+
+function populate(c){
+  cur=c; schedKey=c.scheduleOverride||'auto'; renderSched();
+  document.getElementById('chapel').checked=!!c.chapelCancelled;
+  document.getElementById('ticker').value=(c.tickerMessages||[]).join('\n');
+  document.getElementById('emMsg').value=(c.emergency&&c.emergency.message)||'';
+  document.getElementById('emState').textContent=(c.emergency&&c.emergency.active)?'● currently ACTIVE':'';
+  var mode=(c.content&&c.content.mode)||'auto';
+  document.getElementById('contentMode').value=(['auto','placeholder','youtube','slides'].indexOf(mode)>=0)?mode:'auto';
+  document.getElementById('videoId').value=(c.content&&c.content.videoId)||'';
+  document.getElementById('slideUrl').value=(c.content&&c.content.slideUrl)||'';
+  document.getElementById('contentNow').textContent =
+    mode==='image' ? 'Now showing: an uploaded image'
+    : mode==='carousel' ? ('Now showing: carousel — '+((c.content&&c.content.images&&c.content.images.length)||0)+' images, '+((c.content&&c.content.interval)||8)+'s')
+    : '';
+  var n=c.nightOff||{}; document.getElementById('nightEnabled').checked=!!n.enabled;
+  document.getElementById('nightStart').value=n.start||'21:00';
+  document.getElementById('nightEnd').value=n.end||'06:00';
+  var ap=c.athletePhotos||{};
+  document.getElementById('athEnabled').checked = ap.enabled!==false;
+  document.getElementById('athStart').value = ap.start||'15:30';
+  document.getElementById('athEnd').value = ap.end||'22:00';
+  document.getElementById('athInterval').value = ap.intervalSecs||8;
+  document.getElementById('athLsWins').checked = ap.livestreamWins!==false;
+  if(ap.testTeam) document.getElementById('athTestTeam').value = ap.testTeam;
+  onMode();
+  document.getElementById('meta').textContent='rev '+c.rev+(c.updatedBy?(' · '+c.updatedBy):'');
+}
+window.addEventListener('load',function(){
+  renderAthTeams();
+  busy(true);
+  call('getLobbyControl').then(function(c){ populate(c); loadPresets(); busy(false); })
+    .catch(function(e){busy(false);toast(e.message||e,'danger');});
+});
+
+function ytId(v){v=(v||'').trim();var m=v.match(/(?:v=|youtu\.be\/|embed\/|live\/)([A-Za-z0-9_-]{11})/);return m?m[1]:(v.length===11?v:'');}
+
+function buildPatch(){
+  var tk=document.getElementById('ticker').value.split('\n').map(function(s){return s.trim();}).filter(Boolean);
+  var mode=document.getElementById('contentMode').value;
+  var patch={
+    scheduleOverride:schedKey,
+    chapelCancelled:document.getElementById('chapel').checked,
+    content:{mode:mode, slideUrl:document.getElementById('slideUrl').value.trim(), videoId:ytId(document.getElementById('videoId').value)},
+    nightOff:{enabled:document.getElementById('nightEnabled').checked, start:document.getElementById('nightStart').value||'21:00', end:document.getElementById('nightEnd').value||'06:00'},
+    athletePhotos:{enabled:document.getElementById('athEnabled').checked, start:document.getElementById('athStart').value||'15:30', end:document.getElementById('athEnd').value||'22:00', intervalSecs:parseInt(document.getElementById('athInterval').value,10)||8, livestreamWins:document.getElementById('athLsWins').checked}
+  };
+  if(tk.length) patch.tickerMessages=tk;   // blank textarea = don't change the ticker
+  return patch;
+}
+function save(){
+  busy(true);
+  call('setLobbyControl',buildPatch()).then(function(c){busy(false);populate(c);toast('Pushed to the lobby display (rev '+c.rev+').');})
+    .catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+
+// ── Game-day athlete photos: team list + on-demand test ──
+var ATH_TEAMS=['JV Boys Baseball','MS Boys Baseball','V Boys Baseball','JV Boys Basketball','JV Girls Basketball','MS Boys Basketball','MS Girls Basketball','V Boys Basketball','V Girls Basketball','V Cross-Country','JV Flag Football','V Golf','JV Boys Soccer','MS Boys Soccer','MS Girls Soccer','V Boys Soccer','V Girls Soccer','V Girls Softball','JV Girls Volleyball','MS Girls Volleyball','V Girls Volleyball'];
+function renderAthTeams(){var sel=document.getElementById('athTestTeam');if(!sel||sel.options.length>1)return;ATH_TEAMS.forEach(function(t){var o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});}
+function testNow(){
+  var team=document.getElementById('athTestTeam').value;
+  var until=new Date(Date.now()+10*60*1000).toISOString();
+  busy(true);
+  call('setLobbyControl',{athletePhotos:{testUntil:until, testTeam:team}})
+    .then(function(c){busy(false);populate(c);toast('Test started — '+(team||'first team with photos')+' for 10 min (allow ~20s to appear on the TV).');})
+    .catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+function tvPower(action){
+  busy(true);
+  call('setLobbyControl',{tvPower:{command:action, commandAt:new Date().toISOString()}})
+    .then(function(){busy(false);toast('Lobby TVs: '+(action==='on'?'turning on (allow ~30s)…':'turning off…'));})
+    .catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+
+// ── Uploads + carousel (immediate actions) ──
+function uploadPpt(){
+  var f=document.getElementById('pptForm');
+  if(!f.pptx.files.length){toast('Choose a .pptx file first.','warning');return;}
+  var sz=f.pptx.files[0].size;
+  if(sz > 45*1024*1024){
+    toast('That file is '+(sz/1048576).toFixed(0)+' MB — too large to upload here (~45 MB max). Drop it straight into the "Lobby TV PowerPoints" Drive folder instead; it will still convert and show automatically.','warning');
+    return;
+  }
+  busy(true);
+  google.script.run.withSuccessHandler(function(r){busy(false);toast('Uploaded "'+r.file+'" (archived '+r.archived+'). It will convert & show shortly.');f.reset();})
+    .withFailureHandler(function(e){busy(false);toast(e.message||e,'danger');}).uploadPowerPoint(f);
+}
+function uploadImg(){
+  var f=document.getElementById('imgForm');
+  if(!f.image.files.length){toast('Choose an image first.','warning');return;}
+  busy(true);
+  google.script.run.withSuccessHandler(function(r){busy(false);toast('Image is now showing on the display.');f.reset();})
+    .withFailureHandler(function(e){busy(false);toast(e.message||e,'danger');}).uploadImage(f);
+}
+function startCarousel(){
+  var folder=document.getElementById('carFolder').value.trim();
+  if(!folder){toast('Paste a Google Drive folder link first.','warning');return;}
+  var iv=parseInt(document.getElementById('carInterval').value,10)||8;
+  busy(true);
+  call('setCarousel',folder,iv).then(function(r){busy(false);document.getElementById('contentNow').textContent='Now showing: carousel — '+r.count+' images, '+r.interval+'s';toast('Carousel started — '+r.count+' images, every '+r.interval+'s.');})
+    .catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+
+// ── Saved presets ──
+function esc2(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function loadPresets(){
+  call('listPresets').then(function(names){
+    document.getElementById('presetSel').innerHTML=(names&&names.length)
+      ? names.map(function(n){return '<option>'+esc2(n)+'</option>';}).join('')
+      : '<option value="">(no presets yet)</option>';
+  }).catch(function(){});
+}
+function applyPresetUI(){
+  var n=document.getElementById('presetSel').value; if(!n){toast('No preset selected.','warning');return;}
+  busy(true); call('applyPreset',n).then(function(c){busy(false);populate(c);toast('Applied preset "'+n+'".');}).catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+function savePresetUI(){
+  var n=document.getElementById('presetName').value.trim(); if(!n){toast('Enter a preset name.','warning');return;}
+  busy(true);
+  call('setLobbyControl',buildPatch()).then(function(){return call('savePreset',n);})
+    .then(function(){busy(false);document.getElementById('presetName').value='';loadPresets();toast('Saved preset "'+n+'" (and pushed current settings).');})
+    .catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+function delPresetUI(){
+  var n=document.getElementById('presetSel').value; if(!n){return;}
+  if(!confirm('Delete preset "'+n+'"?'))return;
+  busy(true); call('deletePreset',n).then(function(){busy(false);loadPresets();toast('Deleted preset.');}).catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+function emergency(active){
+  var msg=document.getElementById('emMsg').value.trim();
+  if(active&&!msg){toast('Enter an alert message first.','warning');return;}
+  busy(true);
+  call('setLobbyControl',{emergency:{active:active, message:msg}}).then(function(c){
+    busy(false);document.getElementById('emState').textContent=active?'● currently ACTIVE':'';
+    document.getElementById('meta').textContent='rev '+c.rev+' · '+c.updatedBy;
+    toast(active?'🚨 Emergency alert activated on the display.':'Alert cleared.');
+  }).catch(function(e){busy(false);toast(e.message||e,'danger');});
+}
+</script>
+</body>
+</html>

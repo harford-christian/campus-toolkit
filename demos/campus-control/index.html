@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Campus Control — Automation Suite — Showcase demo</title>
+<style>
+  :root { --maroon:#B40005; --gold:#C79A3D; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f0f12; }
+  .bar {
+    flex: none; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 10px 16px; color: #fff;
+    background: linear-gradient(120deg, #7d0003 0%, #B40005 60%, #d51f24 100%);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35); z-index: 2;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; }
+  .brand .logo { font-size: 1.5rem; }
+  .brand small { display: block; font-weight: 600; font-size: .72rem; opacity: .85; }
+  .seg { display: inline-flex; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+  .seg button {
+    border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: .88rem;
+    color: #fff; background: transparent; padding: 8px 14px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 7px; transition: background .12s;
+  }
+  .seg button:hover { background: rgba(255,255,255,.16); }
+  .seg button.active { background: var(--gold); color: #322400; }
+  .spacer { flex: 1; }
+  .back { color: #fff; text-decoration: none; font-weight: 700; font-size: .88rem; opacity: .9; border: 1px solid rgba(255,255,255,.3); padding: 7px 13px; border-radius: 999px; }
+  .back:hover { background: rgba(255,255,255,.12); }
+  .stage { flex: 1; position: relative; background: #0f0f12; }
+  .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+  @media (max-width: 720px) { .brand small { display: none; } .seg button { padding: 8px 10px; font-size: .8rem; } }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🛡️</span>
+      <span>Campus Control<small>Integrated automation suite</small></span>
+    </div>
+    <div class="seg" role="tablist" aria-label="Choose a tool">
+      <button data-src="../door/index.html" class="active" aria-selected="true">🚪 Door Control</button>
+      <button data-src="../door/dashboard.html" aria-selected="false">📊 Operations</button>
+      <button data-src="../door/leadership.html" aria-selected="false">🦅 Leadership</button>
+      <button data-src="../event-requests/index.html" aria-selected="false">📋 Event Requests</button>
+      <button data-src="../lockdown/index.html" aria-selected="false">🔒 Lockdown</button>
+    </div>
+    <span class="spacer"></span>
+    <a class="back" href="../../index.html" target="_top">← Gallery</a>
+  </div>
+  <div class="stage">
+    <iframe id="screen" src="../door/index.html" title="Campus Control tool"></iframe>
+  </div>
+<script>
+  // One suite, several tools — all read from the same master schedule. Switch in place.
+  var frame = document.getElementById('screen');
+  var btns = document.querySelectorAll('.seg button');
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      btns.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+      b.classList.add('active'); b.setAttribute('aria-selected', 'true');
+      frame.src = b.getAttribute('data-src');
+    });
+  });
+</script>
+</body>
+</html>

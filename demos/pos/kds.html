@@ -1,0 +1,1736 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <!-- shared/SharedStyles.html — brand tokens, display font, and shared keyframes
+     for every public-facing page (kiosk / TV / KDS). Values ported verbatim
+     from the production kiosk (legacy/ipad-pos/iPad_Kiosk.html). -->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
+
+  :root {
+    --hcs-maroon: #800000;
+    --hcs-gold: #FFD700;
+    --hcs-green: #28a745;
+    --page-bg: #000000;
+    --container-bg: #808080;
+    --active-bg: #fff9f9;
+    --cooking-blue: #007bff;
+  }
+
+  /* Pulsing border on the stage-1 name input. */
+  @keyframes pulse-border {
+    0%   { border-color: white; box-shadow: 0 0 0px white; }
+    50%  { border-color: var(--hcs-maroon); box-shadow: 0 0 15px var(--hcs-maroon); }
+    100% { border-color: white; box-shadow: 0 0 0px white; }
+  }
+
+  /* Pulsing glow on the blue "IN THE OVEN" badge. */
+  @keyframes pulse-blue {
+    0%   { box-shadow: 0 0 0px var(--cooking-blue); }
+    50%  { box-shadow: 0 0 10px var(--cooking-blue); }
+    100% { box-shadow: 0 0 0px var(--cooking-blue); }
+  }
+
+  /* Strobing maroon/white attendant banner ("Time to Pay"). */
+  @keyframes strobe-alert {
+    0%, 100% { background: var(--hcs-maroon); color: white; border-color: white; }
+    50%      { background: white; color: var(--hcs-maroon); border-color: var(--hcs-maroon); }
+  }
+
+  /* Flashing red/white low-stock warning. */
+  @keyframes flash-red-white {
+    from { background-color: #ff0000; color: #ffffff; }
+    to   { background-color: #ffffff; color: #ff0000; }
+  }
+
+  /* Loading spinner rotation. */
+  @keyframes spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+
+  <style>
+  /* KDS-local tokens (SharedStyles provides maroon/gold/green/cooking-blue). */
+  :root {
+    --kds-red: #dc3545;
+    --kds-amber: #ffc107;
+    --kds-bg: #121212;
+    --kds-card: #1e1e1e;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--kds-bg);
+    color: #ffffff;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #kds-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  /* ---- reconnect banner ---- */
+
+  #reconnect-banner {
+    display: none;
+    background: var(--kds-red);
+    color: #ffffff;
+    text-align: center;
+    font-weight: 900;
+    font-size: 20px;
+    letter-spacing: 2px;
+    padding: 8px 0;
+    text-transform: uppercase;
+    animation: banner-pulse 1s infinite alternate;
+    flex: 0 0 auto;
+  }
+
+  @keyframes banner-pulse {
+    from { opacity: 0.75; }
+    to   { opacity: 1; }
+  }
+
+  /* ---- fatal gate (missing / invalid key) ---- */
+
+  #gate {
+    display: none;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+  }
+
+  #gate h1 {
+    font-family: 'Bangers', cursive;
+    color: var(--hcs-gold);
+    font-size: 52px;
+    letter-spacing: 2px;
+    margin: 0 0 12px 0;
+  }
+
+  #gate p {
+    color: #aaaaaa;
+    font-size: 20px;
+    margin: 0;
+  }
+
+  /* ---- board ---- */
+
+  #board-wrap {
+    flex: 1 1 auto;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #board {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 16px;
+    height: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  #empty-state {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #555555;
+    font-size: 28px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    white-space: nowrap;
+  }
+
+  /* ---- order card ---- */
+
+  .card {
+    flex: 0 0 auto;
+    width: 300px;
+    max-height: 100%;
+    box-sizing: border-box;
+    background: var(--kds-card);
+    border: 5px solid var(--hcs-maroon);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    overflow-y: auto;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .card-name {
+    font-family: 'Bangers', cursive;
+    color: var(--hcs-gold);
+    font-size: 34px;
+    letter-spacing: 1px;
+    line-height: 1;
+    word-break: break-word;
+  }
+
+  .elapsed-chip {
+    flex: 0 0 auto;
+    font-weight: 900;
+    font-size: 18px;
+    padding: 4px 10px;
+    border-radius: 10px;
+    color: #000000;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .elapsed-chip.t-green { background: var(--hcs-green); color: #ffffff; }
+  .elapsed-chip.t-amber { background: var(--kds-amber); color: #000000; }
+  .elapsed-chip.t-red   { background: var(--kds-red);   color: #ffffff; }
+
+  .card-lines {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .card-lines li {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #f0f0f0;
+    padding: 6px 0;
+    border-bottom: 1px dashed #3a3a3a;
+  }
+
+  .card-lines li:last-child { border-bottom: none; }
+
+  /* Two-tap pattern: DONE only appears once the card is expanded. */
+  .done-btn {
+    display: none;
+    margin-top: 14px;
+    width: 100%;
+    padding: 18px 0;
+    border: none;
+    border-radius: 12px;
+    background: var(--hcs-green);
+    color: #ffffff;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .card.expanded {
+    border-color: var(--hcs-gold);
+    box-shadow: 0 0 18px rgba(255, 215, 0, 0.45);
+    transform: scale(1.02);
+  }
+
+  .card.expanded .done-btn { display: block; }
+
+  .card.slide-in { animation: slide-in 0.35s ease-out; }
+
+  @keyframes slide-in {
+    from { transform: translateX(70px) scale(0.94); opacity: 0; }
+    to   { transform: translateX(0) scale(1); opacity: 1; }
+  }
+
+  .card.flash-red { animation: flash-red 0.45s ease-in-out 3; }
+
+  @keyframes flash-red {
+    0%, 100% { border-color: var(--hcs-maroon); box-shadow: none; }
+    50%      { border-color: var(--kds-red); box-shadow: 0 0 20px var(--kds-red); }
+  }
+
+  /* ---- done rail ---- */
+
+  #done-rail {
+    display: none;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 12px;
+    background: #000000;
+    border-top: 2px solid #333333;
+    padding: 10px 16px;
+    box-sizing: border-box;
+    overflow-x: auto;
+  }
+
+  #done-rail-label {
+    flex: 0 0 auto;
+    font-family: 'Bangers', cursive;
+    color: #777777;
+    font-size: 22px;
+    letter-spacing: 2px;
+  }
+
+  #done-cards {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .done-chip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #1a1a1a;
+    border: 2px solid var(--hcs-green);
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+
+  .done-chip.flash-red { animation: chip-flash-red 0.45s ease-in-out 3; }
+
+  @keyframes chip-flash-red {
+    0%, 100% { border-color: var(--hcs-green); }
+    50%      { border-color: var(--kds-red); box-shadow: 0 0 12px var(--kds-red); }
+  }
+
+  .done-chip-name {
+    font-weight: 700;
+    font-size: 18px;
+    color: #cccccc;
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .undo-btn {
+    border: none;
+    border-radius: 8px;
+    background: var(--hcs-gold);
+    color: var(--hcs-maroon);
+    font-weight: 900;
+    font-size: 16px;
+    letter-spacing: 1px;
+    padding: 8px 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+</style>
+
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Eagles Nest — Kitchen Display (POS)" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div id="kds-root">
+    <div id="reconnect-banner">Reconnecting</div>
+    <div id="gate">
+      <h1 id="gate-title">Missing key</h1>
+      <p id="gate-detail">Open this page with ?key=&hellip; in the URL.</p>
+    </div>
+    <div id="board-wrap">
+      <div id="board"></div>
+      <div id="empty-state">Loading orders&hellip;</div>
+    </div>
+    <div id="done-rail">
+      <div id="done-rail-label">Done</div>
+      <div id="done-cards"></div>
+    </div>
+  </div>
+
+  <!-- GENERATED FILE — DO NOT HAND-EDIT.
+ * Source of truth: logic.js (unit-tested in Node).
+ * Regenerate with: npm run build -->
+<script>
+/**
+ * CartEngine — pure cart, pricing, validation, and badge logic for the
+ * Eagles Nest / Nest Express kiosk.
+ *
+ * Runs unchanged in three places: Node (npm test), the browser (kiosk client,
+ * wrapped into a script-tag partial by tools/wrap.js), and Apps Script
+ * (server repricing). Therefore: no DOM, no google.script.run, no Date.now() — time is
+ * always passed in. No import/export syntax; one global namespace + a
+ * module.exports shim.
+ *
+ * HOUSE RULES (see docs/BEHAVIOR-CONTRACT.md — do not "clean up"):
+ *  - Cart/pricing logic stays as explicit, readable branches per item type.
+ *    A past refactor that abstracted these broke the flavor engine in production.
+ *  - All money is INTEGER CENTS. Prices are absolute values from config —
+ *    never computed as base × 0.5 or component + upcharge (the $4.50 bug).
+ *  - Mutators treat inputs as immutable and return { cart: <new cart> }.
+ *    A rejected mutation returns the ORIGINAL cart object (=== comparable).
+ */
+var CartEngine = (function () {
+
+  // ---------- construction & lookup helpers ----------
+
+  function emptyCart() {
+    return { lines: {} };
+  }
+
+  function emptyLine(itemId) {
+    return { itemId: itemId, qty: 0, subs: {}, comboAlloc: {} };
+  }
+
+  function getItem(config, itemId) {
+    for (var i = 0; i < config.items.length; i++) {
+      if (config.items[i].id === itemId) return config.items[i];
+    }
+    return null;
+  }
+
+  function getLine(cart, itemId) {
+    return cart.lines[itemId] || null;
+  }
+
+  function cloneCart(cart) {
+    return JSON.parse(JSON.stringify(cart));
+  }
+
+  function sumValues(obj) {
+    var total = 0;
+    for (var k in obj) {
+      total += obj[k];
+    }
+    return total;
+  }
+
+  function findComboOption(item, optionId) {
+    if (!item.combo || !item.combo.options) return null;
+    for (var i = 0; i < item.combo.options.length; i++) {
+      if (item.combo.options[i].id === optionId) return item.combo.options[i];
+    }
+    return null;
+  }
+
+  // ---------- pricing lookups (absolute values only) ----------
+
+  function unitPriceCents(config, item) {
+    if (config.halfOff === true && item.discountable === true && typeof item.halfPriceCents === 'number') {
+      return item.halfPriceCents;
+    }
+    return item.priceCents;
+  }
+
+  function comboOptionPriceCents(config, option) {
+    if (config.halfOff === true && typeof option.halfPriceCents === 'number') {
+      return option.halfPriceCents;
+    }
+    return option.priceCents;
+  }
+
+  // ---------- internal in-place helpers (used by the public mutators) ----------
+
+  // Contract §3: soda flavor pruning, verbatim port of production updateCart.
+  function pruneFlavorsInPlace(line, newQty) {
+    var flavorsWithQty = [];
+    for (var f in line.subs) {
+      if (line.subs[f] > 0) flavorsWithQty.push(f);
+    }
+
+    if (newQty === 0) {
+      // qty reached 0 → every flavor resets
+      for (var a = 0; a < flavorsWithQty.length; a++) {
+        line.subs[flavorsWithQty[a]] = 0;
+      }
+    } else if (flavorsWithQty.length > 1) {
+      // multiple flavors selected → ALL reset to 0
+      for (var b = 0; b < flavorsWithQty.length; b++) {
+        line.subs[flavorsWithQty[b]] = 0;
+      }
+    } else if (flavorsWithQty.length === 1) {
+      // exactly one flavor → clamp it to the new qty
+      var only = flavorsWithQty[0];
+      if (line.subs[only] > newQty) {
+        line.subs[only] = newQty;
+      }
+    }
+    // zero flavors selected → nothing to prune
+  }
+
+  // Contract §2: combo drink picks mirror into the general drink cart line.
+  function mirrorIncludedInPlace(cart, config, option, deltaUnits) {
+    var itemId = option.includesItemId;
+    var item = getItem(config, itemId);
+    if (!item) return;
+    if (!cart.lines[itemId]) cart.lines[itemId] = emptyLine(itemId);
+    var line = cart.lines[itemId];
+    var prevQty = line.qty;
+    var units = (typeof option.includesQty === 'number') ? option.includesQty : 1;
+    var newQty = prevQty + deltaUnits * units;
+    if (newQty < 0) newQty = 0;
+    line.qty = newQty;
+    if (item.type === 'flavored' && newQty < prevQty) {
+      pruneFlavorsInPlace(line, newQty);
+    }
+  }
+
+  // Contract §3 [BUG — fix in rebuild]: production never pruned combo drink
+  // allocations on combo decrement, leaving orphaned allocations that
+  // overcharged. This implements the blueprint-intended behavior: trim excess
+  // allocations following combo.pruneOrder (CFA: soda first, then water),
+  // cascading each trimmed unit through the mirrored drink line so soda
+  // flavor pruning fires too.
+  function pruneComboAllocInPlace(cart, config, comboItemId) {
+    var item = getItem(config, comboItemId);
+    if (!item || !item.combo) return;
+    var line = cart.lines[comboItemId];
+    if (!line) return;
+
+    var order;
+    if (item.combo.pruneOrder && item.combo.pruneOrder.length > 0) {
+      order = item.combo.pruneOrder;
+    } else {
+      order = [];
+      for (var i = 0; i < item.combo.options.length; i++) {
+        order.push(item.combo.options[i].id);
+      }
+    }
+
+    var excess = sumValues(line.comboAlloc) - line.qty;
+    while (excess > 0) {
+      var trimmed = false;
+      for (var j = 0; j < order.length; j++) {
+        var optionId = order[j];
+        if ((line.comboAlloc[optionId] || 0) > 0) {
+          line.comboAlloc[optionId] = line.comboAlloc[optionId] - 1;
+          var option = findComboOption(item, optionId);
+          if (option) {
+            mirrorIncludedInPlace(cart, config, option, -1);
+          }
+          excess--;
+          trimmed = true;
+          break;
+        }
+      }
+      if (!trimmed) break; // nothing left to trim; avoid infinite loop
+    }
+  }
+
+  // ---------- public mutators ----------
+
+  function updateItemQty(cart, config, itemId, delta) {
+    var item = getItem(config, itemId);
+    if (!item) return { cart: cart };
+
+    var existing = getLine(cart, itemId);
+    var currentQty = existing ? existing.qty : 0;
+
+    // Contract §2: increments blocked at stock unless the item is cooking
+    // (cooking items are orderable at any stock, including 0).
+    if (delta > 0 && !item.cooking && currentQty >= item.stock) {
+      return { cart: cart };
+    }
+
+    var next = cloneCart(cart);
+    if (!next.lines[itemId]) next.lines[itemId] = emptyLine(itemId);
+    var line = next.lines[itemId];
+    var prevQty = line.qty;
+    var newQty = prevQty + delta;
+    if (newQty < 0) newQty = 0;
+    line.qty = newQty;
+
+    if (item.type === 'simple') {
+      // no sub-state to maintain
+    } else if (item.type === 'flavored') {
+      if (newQty < prevQty) {
+        pruneFlavorsInPlace(line, newQty);
+      }
+    } else if (item.type === 'combo') {
+      if (newQty < prevQty) {
+        pruneComboAllocInPlace(next, config, itemId);
+      }
+    }
+
+    return { cart: next };
+  }
+
+  function updateFlavorQty(cart, config, itemId, flavorName, delta) {
+    var item = getItem(config, itemId);
+    if (!item || item.type !== 'flavored') return { cart: cart };
+
+    var existing = getLine(cart, itemId);
+    if (!existing) return { cart: cart };
+
+    // Contract §3: flavor increments blocked when sum(flavors) >= item qty.
+    if (delta > 0 && sumValues(existing.subs) >= existing.qty) {
+      return { cart: cart };
+    }
+
+    var next = cloneCart(cart);
+    var line = next.lines[itemId];
+    var current = line.subs[flavorName] || 0;
+    var newSub = current + delta;
+    if (newSub < 0) newSub = 0;
+    line.subs[flavorName] = newSub;
+
+    return { cart: next };
+  }
+
+  function updateComboOption(cart, config, comboItemId, optionId, delta) {
+    var item = getItem(config, comboItemId);
+    if (!item || item.type !== 'combo') return { cart: cart };
+    var option = findComboOption(item, optionId);
+    if (!option) return { cart: cart };
+
+    var existing = getLine(cart, comboItemId);
+    var comboQty = existing ? existing.qty : 0;
+    var currentAllocs = existing ? sumValues(existing.comboAlloc) : 0;
+
+    if (delta > 0) {
+      // Contract §2: allocations capped by combo qty…
+      if (currentAllocs >= comboQty) {
+        return { cart: cart };
+      }
+      // …and blocked when the included drink's stock is exhausted by its
+      // cart line (unless the drink is cooking).
+      var incItem = getItem(config, option.includesItemId);
+      var incLine = getLine(cart, option.includesItemId);
+      var incQty = incLine ? incLine.qty : 0;
+      if (incItem && !incItem.cooking && incItem.stock <= incQty) {
+        return { cart: cart };
+      }
+    }
+
+    var next = cloneCart(cart);
+    if (!next.lines[comboItemId]) next.lines[comboItemId] = emptyLine(comboItemId);
+    var line = next.lines[comboItemId];
+    var prev = line.comboAlloc[optionId] || 0;
+    var newAlloc = prev + delta;
+    if (newAlloc < 0) newAlloc = 0;
+    var applied = newAlloc - prev;
+    if (applied === 0) {
+      return { cart: cart };
+    }
+    line.comboAlloc[optionId] = newAlloc;
+
+    // Mirror the change into the included drink line (production behavior).
+    mirrorIncludedInPlace(next, config, option, applied);
+
+    return { cart: next };
+  }
+
+  // Public, pure versions of the pruning rules (spec surface for tests).
+  function pruneFlavors(line, newQty) {
+    var copy = JSON.parse(JSON.stringify(line));
+    copy.qty = newQty;
+    pruneFlavorsInPlace(copy, newQty);
+    return copy;
+  }
+
+  function pruneComboAlloc(cart, config, comboItemId) {
+    var next = cloneCart(cart);
+    pruneComboAllocInPlace(next, config, comboItemId);
+    return { cart: next };
+  }
+
+  // ---------- derived / read-only ----------
+
+  // Contract §2: included-drink accounting is DERIVED, never stored.
+  function getComboIncludedUnits(cart, config) {
+    var included = {};
+    for (var itemId in cart.lines) {
+      var item = getItem(config, itemId);
+      if (!item || item.type !== 'combo' || !item.combo) continue;
+      var line = cart.lines[itemId];
+      for (var i = 0; i < item.combo.options.length; i++) {
+        var option = item.combo.options[i];
+        var alloc = line.comboAlloc[option.id] || 0;
+        if (alloc <= 0) continue;
+        var units = (typeof option.includesQty === 'number') ? option.includesQty : 1;
+        var target = option.includesItemId;
+        included[target] = (included[target] || 0) + alloc * units;
+      }
+    }
+    return included;
+  }
+
+  // Contract §1. Explicit branch per item type — keep it that way.
+  function calculateTotal(cart, config) {
+    var included = getComboIncludedUnits(cart, config);
+    var totalCents = 0;
+    var lines = [];
+
+    for (var itemId in cart.lines) {
+      var line = cart.lines[itemId];
+      var item = getItem(config, itemId);
+      if (!item) continue;
+      if (line.qty <= 0 && sumValues(line.comboAlloc) <= 0) continue;
+
+      if (item.type === 'combo') {
+        // Combos charge ONLY the absolute option rates for allocated units.
+        // Unallocated combo units bill $0 — checkout stays blocked until
+        // every combo has a drink type (validateCheckout).
+        var comboBreakdown = [];
+        var comboTotal = 0;
+        for (var i = 0; i < item.combo.options.length; i++) {
+          var option = item.combo.options[i];
+          var alloc = line.comboAlloc[option.id] || 0;
+          var rate = comboOptionPriceCents(config, option);
+          comboTotal += alloc * rate;
+          comboBreakdown.push({ optionId: option.id, qty: alloc, unitPriceCents: rate });
+        }
+        totalCents += comboTotal;
+        lines.push({
+          itemId: itemId,
+          qty: line.qty,
+          billableQty: sumValues(line.comboAlloc),
+          includedQty: 0,
+          unitPriceCents: null,
+          lineTotalCents: comboTotal,
+          comboBreakdown: comboBreakdown
+        });
+      } else if (item.type === 'flavored' || item.type === 'simple') {
+        // Drink lines bill only the excess over combo-included units.
+        var inc = included[itemId] || 0;
+        var billable = line.qty - inc;
+        if (billable < 0) billable = 0;
+        var unit = unitPriceCents(config, item);
+        var lineTotal = billable * unit;
+        totalCents += lineTotal;
+        lines.push({
+          itemId: itemId,
+          qty: line.qty,
+          billableQty: billable,
+          includedQty: (inc < line.qty) ? inc : line.qty,
+          unitPriceCents: unit,
+          lineTotalCents: lineTotal,
+          comboBreakdown: null
+        });
+      }
+    }
+
+    if (totalCents < 0) totalCents = 0;
+    return { totalCents: totalCents, lines: lines };
+  }
+
+  // Contract §4. Message precedence preserved from production: the combo
+  // message overwrites the soda message when both fail (combo errors are
+  // evaluated after flavored errors; `message` is the last non-empty one).
+  function validateCheckout(cart, config) {
+    var errors = [];
+
+    for (var itemId in cart.lines) {
+      var line = cart.lines[itemId];
+      var item = getItem(config, itemId);
+      if (!item || line.qty <= 0) continue;
+      if (item.type !== 'flavored') continue;
+      var picked = sumValues(line.subs);
+      if (picked < line.qty) {
+        var label = item.flavorLabel || item.name;
+        errors.push({
+          itemId: itemId,
+          code: 'FLAVORS_INCOMPLETE',
+          message: 'Pick ' + (line.qty - picked) + ' more options for ' + label + '.'
+        });
+      }
+    }
+
+    for (var comboId in cart.lines) {
+      var comboLine = cart.lines[comboId];
+      var comboItem = getItem(config, comboId);
+      if (!comboItem || comboItem.type !== 'combo') continue;
+      if (comboLine.qty > sumValues(comboLine.comboAlloc)) {
+        errors.push({
+          itemId: comboId,
+          code: 'COMBO_OPTION_MISSING',
+          message: comboItem.combo.prompt
+        });
+      }
+    }
+
+    var totals = calculateTotal(cart, config);
+    if (totals.totalCents <= 0) {
+      errors.push({ itemId: null, code: 'EMPTY_CART', message: '' });
+    }
+
+    var message = '';
+    for (var e = 0; e < errors.length; e++) {
+      if (errors[e].message) message = errors[e].message;
+    }
+
+    return { ok: errors.length === 0, errors: errors, message: message };
+  }
+
+  // Contract §5. Pure badge derivation; the renderer decides visuals.
+  function getBadge(item, inCartQty, nowMs) {
+    if (item.cooking && item.cooking.readyAtMs) {
+      var msLeft = item.cooking.readyAtMs - nowMs;
+      if (msLeft <= 0) {
+        // Client should refetch menu data when it sees this.
+        return { type: 'COOKING_EXPIRED', minutes: 0, remainingMs: 0, inCart: inCartQty > 0 };
+      }
+      // Production math: whole seconds, then ceil to minutes.
+      var secondsLeft = Math.floor(msLeft / 1000);
+      var minutes = Math.ceil(secondsLeft / 60);
+      return { type: 'COOKING', minutes: minutes, remainingMs: msLeft, inCart: inCartQty > 0 };
+    }
+
+    if (item.stock <= 0) {
+      return { type: 'SOLD_OUT' };
+    }
+    var remaining = item.stock - inCartQty;
+    if (remaining <= 0) {
+      return { type: 'LIMIT_REACHED' };
+    }
+    var threshold = (typeof item.lowStockThreshold === 'number') ? item.lowStockThreshold : 3;
+    if (remaining <= threshold) {
+      return { type: 'ONLY_N_LEFT', n: remaining };
+    }
+    return null;
+  }
+
+  // Reconcile a cart against fresh menu data (background refresh and the
+  // submit-CONFLICT path). Clamps every line to new stock, cascading the
+  // same prune rules as user-driven decrements, and reports plain-language
+  // changes for the conflict modal.
+  function applyStockUpdate(cart, config, newConfig) {
+    var next = cloneCart(cart);
+    var changes = [];
+
+    // Pass 1: remove lines whose item vanished; clamp line qty to new stock.
+    var itemIds = [];
+    for (var id in next.lines) itemIds.push(id);
+
+    for (var a = 0; a < itemIds.length; a++) {
+      var itemId = itemIds[a];
+      var line = next.lines[itemId];
+      var hadQty = line.qty > 0 || sumValues(line.comboAlloc) > 0;
+      var newItem = getItem(newConfig, itemId);
+
+      if (!newItem) {
+        if (hadQty) {
+          var oldItem = getItem(config, itemId);
+          var goneName = oldItem ? oldItem.name : itemId;
+          changes.push({
+            itemId: itemId,
+            kind: 'REMOVED',
+            message: goneName + ' is no longer available — removed from this order.'
+          });
+        }
+        delete next.lines[itemId];
+        continue;
+      }
+
+      var limit = newItem.cooking ? Infinity : newItem.stock;
+      if (line.qty > limit) {
+        var target = limit > 0 ? limit : 0;
+        // Decrement one unit at a time through the real mutator path so
+        // combo-alloc and flavor pruning cascade exactly as they would for
+        // a user-driven decrement.
+        while (next.lines[itemId] && next.lines[itemId].qty > target) {
+          var res = updateItemQty(next, newConfig, itemId, -1);
+          next = res.cart;
+        }
+        if (target === 0) {
+          changes.push({
+            itemId: itemId,
+            kind: 'REMOVED',
+            message: newItem.name + ' sold out while you were ordering — removed from this order.'
+          });
+        } else {
+          changes.push({
+            itemId: itemId,
+            kind: 'REDUCED',
+            message: newItem.name + ': only ' + target + ' left — quantity reduced.'
+          });
+        }
+      }
+
+      // Price-change notice (informational; server reprices anyway).
+      var oldItemStill = getItem(config, itemId);
+      if (oldItemStill && hadQty && next.lines[itemId]) {
+        var oldUnit = unitPriceCents(config, oldItemStill);
+        var newUnit = unitPriceCents(newConfig, newItem);
+        if (newItem.type !== 'combo' && oldUnit !== newUnit) {
+          changes.push({
+            itemId: itemId,
+            kind: 'PRICE_CHANGED',
+            message: newItem.name + ' price changed.'
+          });
+        }
+      }
+    }
+
+    // Pass 2: combo allocations must not exceed what their (possibly clamped)
+    // included-drink lines still hold. Trim allocs WITHOUT re-decrementing the
+    // drink line (it was already clamped above).
+    for (var comboId in next.lines) {
+      var comboItem = getItem(newConfig, comboId);
+      if (!comboItem || comboItem.type !== 'combo' || !comboItem.combo) continue;
+      var comboLine = next.lines[comboId];
+
+      for (var o = 0; o < comboItem.combo.options.length; o++) {
+        var option = comboItem.combo.options[o];
+        var drinkLine = next.lines[option.includesItemId];
+        var drinkQty = drinkLine ? drinkLine.qty : 0;
+        var included = getComboIncludedUnits(next, newConfig)[option.includesItemId] || 0;
+        while (included > drinkQty && (comboLine.comboAlloc[option.id] || 0) > 0) {
+          comboLine.comboAlloc[option.id] = comboLine.comboAlloc[option.id] - 1;
+          included -= (typeof option.includesQty === 'number') ? option.includesQty : 1;
+          changes.push({
+            itemId: comboId,
+            kind: 'REDUCED',
+            message: comboItem.name + ' ' + option.label + ' selection reduced — drink stock changed.'
+          });
+        }
+      }
+    }
+
+    return { cart: next, changes: changes };
+  }
+
+  return {
+    emptyCart: emptyCart,
+    emptyLine: emptyLine,
+    getItem: getItem,
+    getLine: getLine,
+    sumValues: sumValues,
+    unitPriceCents: unitPriceCents,
+    comboOptionPriceCents: comboOptionPriceCents,
+    updateItemQty: updateItemQty,
+    updateFlavorQty: updateFlavorQty,
+    updateComboOption: updateComboOption,
+    pruneFlavors: pruneFlavors,
+    pruneComboAlloc: pruneComboAlloc,
+    getComboIncludedUnits: getComboIncludedUnits,
+    calculateTotal: calculateTotal,
+    validateCheckout: validateCheckout,
+    getBadge: getBadge,
+    applyStockUpdate: applyStockUpdate
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = CartEngine;
+}
+
+/**
+ * Rules — alias resolution, recipe expansion (inventory deductions), and
+ * derived stock computation. Pure data in → data out; the SheetGateway
+ * (Phase 2) parses the Config_* sheets into the shapes consumed here.
+ *
+ * Recipe shape:  { <menuItemId>: [ { component, source, qtyPerUnit } ] }
+ *   component: row name in the Inventory or Game Day Specials sheet
+ *   source:    'Inventory' | 'Specials'
+ *   qtyPerUnit: units of component consumed per menu-item unit
+ *               (Pizza slice = 0.125 pie; Hot Dog = 1 bun + 1 meat)
+ * An item with NO recipe rows deducts itself 1:1 from its stockSource.
+ *
+ * DEDUCTION CONTRACT (§6, bug fixes approved by Josh):
+ *  - Drinks deduct exactly once. Payload drink lines already include the
+ *    combo-mirrored units, so combo expansion deducts ONLY the combo's own
+ *    recipe (e.g. CFA Sandwich) and never the drink — the drink line covers it.
+ *    (Production double-deducted Water and never deducted Soda at all.)
+ */
+var Rules = (function () {
+
+  function resolveAlias(name, aliasMap) {
+    if (aliasMap && Object.prototype.hasOwnProperty.call(aliasMap, name)) {
+      return aliasMap[name];
+    }
+    return name;
+  }
+
+  function defaultRecipeRow(item) {
+    return {
+      component: item.stockComponent || item.name,
+      source: item.stockSource || 'Inventory',
+      qtyPerUnit: 1
+    };
+  }
+
+  /**
+   * Expand payload lines into an aggregated deduction list:
+   *   [ { source: 'Inventory'|'Specials', component, qty } ]
+   */
+  function expandDeductions(payloadLines, config, recipes) {
+    var totals = {}; // "source|component" -> qty
+
+    function add(source, component, qty) {
+      var key = source + '|' + component;
+      totals[key] = (totals[key] || 0) + qty;
+    }
+
+    for (var i = 0; i < payloadLines.length; i++) {
+      var line = payloadLines[i];
+      var item = null;
+      for (var c = 0; c < config.items.length; c++) {
+        if (config.items[c].id === line.itemId) { item = config.items[c]; break; }
+      }
+      if (!item) continue;
+      if (line.qty <= 0) continue;
+
+      var rows = recipes[item.id];
+
+      if (item.type === 'combo') {
+        // Combo recipe rows (e.g. CFA Sandwich from Specials) scale with the
+        // combo qty. Drinks are NOT deducted here — the mirrored drink lines
+        // in the payload deduct them exactly once (see header contract).
+        if (rows && rows.length > 0) {
+          for (var r = 0; r < rows.length; r++) {
+            add(rows[r].source, rows[r].component, line.qty * rows[r].qtyPerUnit);
+          }
+        }
+      } else {
+        if (rows && rows.length > 0) {
+          for (var r2 = 0; r2 < rows.length; r2++) {
+            add(rows[r2].source, rows[r2].component, line.qty * rows[r2].qtyPerUnit);
+          }
+        } else {
+          var d = defaultRecipeRow(item);
+          add(d.source, d.component, line.qty * d.qtyPerUnit);
+        }
+      }
+    }
+
+    var out = [];
+    for (var key in totals) {
+      var sep = key.indexOf('|');
+      out.push({
+        source: key.slice(0, sep),
+        component: key.slice(sep + 1),
+        qty: totals[key]
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Available stock for a menu item, generalizing the legacy special cases:
+   *   Hot Dog = min(buns, meat)  → recipe rows → min(floor(avail / qtyPerUnit))
+   *   Specials-backed items      → Specials remaining
+   *   Plain items                → Inventory count
+   *   Unknown                    → 999 (legacy "untracked" sentinel)
+   */
+  function computeAvailableStock(item, recipes, inventoryMap, specialsMap) {
+    function availOf(source, component) {
+      if (source === 'Specials') {
+        if (specialsMap && Object.prototype.hasOwnProperty.call(specialsMap, component)) {
+          var rem = specialsMap[component];
+          return rem > 0 ? rem : 0;
+        }
+        return 0;
+      }
+      if (inventoryMap && Object.prototype.hasOwnProperty.call(inventoryMap, component)) {
+        return inventoryMap[component];
+      }
+      return null; // untracked
+    }
+
+    var rows = recipes[item.id];
+    if (rows && rows.length > 0) {
+      var minStock = Infinity;
+      for (var i = 0; i < rows.length; i++) {
+        var avail = availOf(rows[i].source, rows[i].component);
+        if (avail === null) continue; // untracked component doesn't cap stock
+        var units = Math.floor(avail / rows[i].qtyPerUnit);
+        if (units < minStock) minStock = units;
+      }
+      return minStock === Infinity ? 999 : minStock;
+    }
+
+    var d = defaultRecipeRow(item);
+    var plain = availOf(d.source, d.component);
+    return plain === null ? 999 : plain;
+  }
+
+  return {
+    resolveAlias: resolveAlias,
+    expandDeductions: expandDeductions,
+    computeAvailableStock: computeAvailableStock
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Rules;
+}
+
+/**
+ * Pricing — server-side authoritative repricing of an order payload.
+ * The server reconstructs a cart from the client's structured lines and
+ * prices it with the SAME CartEngine the kiosk used, from the server's own
+ * config. A tampered or stale client can therefore never set prices; a
+ * mismatch with clientTotalCents surfaces as a CONFLICT, not a charge.
+ */
+var Pricing = (function () {
+  var Engine;
+  if (typeof CartEngine !== 'undefined') {
+    Engine = CartEngine;
+  } else if (typeof require !== 'undefined') {
+    Engine = require('./cartEngine.js');
+  }
+
+  function cartFromPayloadLines(payloadLines) {
+    var cart = Engine.emptyCart();
+    for (var i = 0; i < payloadLines.length; i++) {
+      var pl = payloadLines[i];
+      var line = Engine.emptyLine(pl.itemId);
+      line.qty = pl.qty || 0;
+      if (pl.subs) {
+        for (var f in pl.subs) line.subs[f] = pl.subs[f];
+      }
+      if (pl.comboAlloc) {
+        for (var o in pl.comboAlloc) line.comboAlloc[o] = pl.comboAlloc[o];
+      }
+      cart.lines[pl.itemId] = line;
+    }
+    return cart;
+  }
+
+  /**
+   * -> { ok, totalCents, lines, validation, problems }
+   * problems collects structural rejects (unknown item, allocs > qty) that a
+   * well-behaved client can never produce; validation is the same checkout
+   * validation the kiosk ran.
+   */
+  function priceOrderPayload(payloadLines, config) {
+    var problems = [];
+
+    for (var i = 0; i < payloadLines.length; i++) {
+      var pl = payloadLines[i];
+      var item = Engine.getItem(config, pl.itemId);
+      if (!item) {
+        problems.push({ itemId: pl.itemId, code: 'UNKNOWN_ITEM' });
+        continue;
+      }
+      if (pl.qty < 0) {
+        problems.push({ itemId: pl.itemId, code: 'NEGATIVE_QTY' });
+      }
+      if (item.type === 'combo') {
+        var allocSum = 0;
+        if (pl.comboAlloc) {
+          for (var o in pl.comboAlloc) {
+            if (pl.comboAlloc[o] < 0) problems.push({ itemId: pl.itemId, code: 'NEGATIVE_ALLOC' });
+            allocSum += pl.comboAlloc[o];
+          }
+        }
+        if (allocSum > pl.qty) {
+          problems.push({ itemId: pl.itemId, code: 'ALLOC_EXCEEDS_QTY' });
+        }
+      }
+      if (item.type === 'flavored' && pl.subs) {
+        var subSum = 0;
+        for (var f in pl.subs) {
+          if (pl.subs[f] < 0) problems.push({ itemId: pl.itemId, code: 'NEGATIVE_SUB' });
+          subSum += pl.subs[f];
+        }
+        if (subSum > pl.qty) {
+          problems.push({ itemId: pl.itemId, code: 'SUBS_EXCEED_QTY' });
+        }
+      }
+    }
+
+    var cart = cartFromPayloadLines(payloadLines);
+    var totals = Engine.calculateTotal(cart, config);
+    var validation = Engine.validateCheckout(cart, config);
+
+    return {
+      ok: problems.length === 0 && validation.ok,
+      totalCents: totals.totalCents,
+      lines: totals.lines,
+      validation: validation,
+      problems: problems
+    };
+  }
+
+  return {
+    cartFromPayloadLines: cartFromPayloadLines,
+    priceOrderPayload: priceOrderPayload
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Pricing;
+}
+
+/**
+ * Payload — order payload construction, the human-readable order blob
+ * (volunteer display format preserved from production), and KDS line
+ * formatting. Pure: no DOM, no Date.now(); time and IDs are passed in.
+ */
+var Payload = (function () {
+  var Engine;
+  if (typeof CartEngine !== 'undefined') {
+    Engine = CartEngine;
+  } else if (typeof require !== 'undefined') {
+    Engine = require('./cartEngine.js');
+  }
+
+  // Contract §6: customer name TEST (case-insensitive, trimmed) → test order.
+  function isTestName(name) {
+    return (name || '').trim().toUpperCase() === 'TEST';
+  }
+
+  function buildOrderPayload(cart, config, customerName, nowMs, orderId, kioskId) {
+    var lines = [];
+    for (var itemId in cart.lines) {
+      var line = cart.lines[itemId];
+      var hasAlloc = Engine.sumValues(line.comboAlloc) > 0;
+      if (line.qty <= 0 && !hasAlloc) continue;
+
+      var out = { itemId: itemId, qty: line.qty };
+      var subs = {};
+      var hasSubs = false;
+      for (var f in line.subs) {
+        if (line.subs[f] > 0) { subs[f] = line.subs[f]; hasSubs = true; }
+      }
+      if (hasSubs) out.subs = subs;
+
+      var alloc = {};
+      var hasAllocOut = false;
+      for (var o in line.comboAlloc) {
+        if (line.comboAlloc[o] > 0) { alloc[o] = line.comboAlloc[o]; hasAllocOut = true; }
+      }
+      if (hasAllocOut) out.comboAlloc = alloc;
+
+      lines.push(out);
+    }
+
+    var totals = Engine.calculateTotal(cart, config);
+
+    return {
+      orderId: orderId,
+      kioskId: kioskId || 'kiosk-1',
+      customerName: (customerName || '').trim(),
+      isTest: isTestName(customerName),
+      createdAtMs: nowMs,
+      menuVersion: config.version || null,
+      lines: lines,
+      clientTotalCents: totals.totalCents
+    };
+  }
+
+  /**
+   * Human-readable order text, format preserved from production
+   * submitFinalOrder (contract §9): combo option lines first (drawer display
+   * order, e.g. "1x CFA Water Combo" before "2x CFA Soda Combo"), then every
+   * non-combo cart line as "Nx Name (1x Coke, 2x Sprite)". Mirrored drink
+   * lines appear here exactly as production wrote them — this blob is
+   * DISPLAY ONLY and is never parsed for deductions.
+   */
+  function buildOrderDetailsText(cart, config) {
+    var details = [];
+
+    for (var comboId in cart.lines) {
+      var comboItem = Engine.getItem(config, comboId);
+      if (!comboItem || comboItem.type !== 'combo' || !comboItem.combo) continue;
+      var comboLine = cart.lines[comboId];
+      for (var i = 0; i < comboItem.combo.options.length; i++) {
+        var option = comboItem.combo.options[i];
+        var alloc = comboLine.comboAlloc[option.id] || 0;
+        if (alloc > 0) {
+          var name = option.detailsName || (comboItem.name + ' ' + option.label);
+          details.push(alloc + 'x ' + name);
+        }
+      }
+    }
+
+    for (var itemId in cart.lines) {
+      var item = Engine.getItem(config, itemId);
+      if (!item || item.type === 'combo') continue;
+      var line = cart.lines[itemId];
+      if (line.qty <= 0) continue;
+
+      var subParts = [];
+      for (var f in line.subs) {
+        if (line.subs[f] > 0) subParts.push(line.subs[f] + 'x ' + f);
+      }
+      var suffix = subParts.length > 0 ? ' (' + subParts.join(', ') + ')' : '';
+      details.push(line.qty + 'x ' + item.name + suffix);
+    }
+
+    return details.join('\n');
+  }
+
+  /**
+   * Kitchen display lines from a payload. Combos flatten to kitchen language
+   * ("CFA Combo w/ Soda ×2"); flavored items list their flavors
+   * ("Soda/Gatorade ×2 — Coke ×2"). Drink units already included in a combo
+   * are not repeated as standalone lines.
+   */
+  function formatKitchenLines(payloadLines, config) {
+    var out = [];
+    var includedByItem = {};
+
+    for (var i = 0; i < payloadLines.length; i++) {
+      var pl = payloadLines[i];
+      var item = Engine.getItem(config, pl.itemId);
+      if (!item) continue;
+      if (item.type !== 'combo' || !item.combo) continue;
+      for (var o = 0; o < item.combo.options.length; o++) {
+        var option = item.combo.options[o];
+        var alloc = (pl.comboAlloc && pl.comboAlloc[option.id]) || 0;
+        if (alloc > 0) {
+          out.push(item.name + ' ' + option.label + ' ×' + alloc);
+          var units = (typeof option.includesQty === 'number') ? option.includesQty : 1;
+          includedByItem[option.includesItemId] =
+            (includedByItem[option.includesItemId] || 0) + alloc * units;
+        }
+      }
+    }
+
+    for (var j = 0; j < payloadLines.length; j++) {
+      var line = payloadLines[j];
+      var it = Engine.getItem(config, line.itemId);
+      if (!it || it.type === 'combo') continue;
+
+      var standalone = line.qty - (includedByItem[line.itemId] || 0);
+      if (standalone <= 0) continue;
+
+      var text = it.name + ' ×' + standalone;
+      if (line.subs) {
+        var flavorParts = [];
+        for (var f in line.subs) {
+          if (line.subs[f] > 0) flavorParts.push(f + ' ×' + line.subs[f]);
+        }
+        if (flavorParts.length > 0) text += ' — ' + flavorParts.join(', ');
+      }
+      out.push(text);
+    }
+
+    return out;
+  }
+
+  return {
+    isTestName: isTestName,
+    buildOrderPayload: buildOrderPayload,
+    buildOrderDetailsText: buildOrderDetailsText,
+    formatKitchenLines: formatKitchenLines
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Payload;
+}
+
+</script>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var URL_KEY = 'demo';
+
+      var POLL_BASE_MS = 5000;
+      var POLL_JITTER_MS = 1000;   // +/- 1s so multiple tablets don't sync up
+      var RAIL_MS = 2 * 60 * 1000; // completed cards stay undo-able for 2 minutes
+      // The server KDS feed is cached for ~10s, so a completed order can still
+      // appear in the next poll or two; suppress it well past the rail window.
+      var SUPPRESS_MS = 10 * 60 * 1000;
+      var RELOAD_MS = 4 * 60 * 60 * 1000;
+      var GREEN_UNDER_S = 180;
+      var AMBER_UNDER_S = 360;
+
+      var bannerEl = document.getElementById('reconnect-banner');
+      var gateEl = document.getElementById('gate');
+      var gateTitleEl = document.getElementById('gate-title');
+      var gateDetailEl = document.getElementById('gate-detail');
+      var boardWrapEl = document.getElementById('board-wrap');
+      var boardEl = document.getElementById('board');
+      var emptyEl = document.getElementById('empty-state');
+      var railEl = document.getElementById('done-rail');
+      var railCardsEl = document.getElementById('done-cards');
+
+      var feedOrders = [];   // last successful server feed, oldest first
+      var restored = {};     // orderId -> order; optimistic UNDO not yet visible in feed
+      var done = {};         // orderId -> { order, doneAt, status: 'pending'|'confirmed' }
+      var failFlash = {};    // orderId -> true; board card gets a red flash this render
+      var railFlash = {};    // orderId -> true; rail chip gets a red flash this render
+      var knownIds = null;   // null until first render, then orderId -> true (chime baseline)
+      var expandedId = null;
+      var hadFirstFeed = false;
+      var skewMs = 0;
+      var inFlight = false;
+      var failCount = 0;
+      var stopped = false;
+
+      // ---- helpers ----
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (c) {
+          if (c === '&') return '&amp;';
+          if (c === '<') return '&lt;';
+          if (c === '>') return '&gt;';
+          if (c === '"') return '&quot;';
+          return '&#39;';
+        });
+      }
+
+      function serverNowMs() {
+        return Date.now() + skewMs;
+      }
+
+      function elapsedInfo(createdAtMs) {
+        var totalSeconds = Math.max(0, Math.floor((serverNowMs() - createdAtMs) / 1000));
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+        var text = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+        var cls = 't-red';
+        if (totalSeconds < GREEN_UNDER_S) cls = 't-green';
+        else if (totalSeconds < AMBER_UNDER_S) cls = 't-amber';
+        return { text: text, cls: cls };
+      }
+
+      // ---- chime (Web Audio; must be unlocked by a user gesture on tablets) ----
+
+      var audioCtx = null;
+
+      function ensureAudio() {
+        try {
+          var Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          if (!audioCtx) audioCtx = new Ctx();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+        } catch (e) { /* no audio available; stay silent */ }
+      }
+
+      function chime() {
+        try {
+          ensureAudio();
+          if (!audioCtx || audioCtx.state !== 'running') return;
+          var osc = audioCtx.createOscillator();
+          var gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.4, audioCtx.currentTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime);
+          osc.stop(audioCtx.currentTime + 0.42);
+        } catch (e) { /* stay silent */ }
+      }
+
+      document.addEventListener('touchstart', ensureAudio, true);
+      document.addEventListener('click', ensureAudio, true);
+
+      // ---- rendering ----
+
+      function boardOrders() {
+        var list = [];
+        var seen = {};
+        var i;
+        for (i = 0; i < feedOrders.length; i++) {
+          var order = feedOrders[i];
+          if (done[order.orderId]) continue; // completed locally (or awaiting cache catch-up)
+          list.push(order);
+          seen[order.orderId] = true;
+        }
+        for (var id in restored) {
+          if (!seen[id] && !done[id]) list.push(restored[id]);
+        }
+        list.sort(function (a, b) { return a.createdAtMs - b.createdAtMs; }); // oldest LEFT
+        return list;
+      }
+
+      function cardHtml(order, isNew) {
+        var classes = 'card';
+        if (order.orderId === expandedId) classes += ' expanded';
+        if (isNew) classes += ' slide-in';
+        if (failFlash[order.orderId]) classes += ' flash-red';
+
+        var chip = elapsedInfo(order.createdAtMs);
+        var linesHtml = '';
+        for (var i = 0; i < order.lines.length; i++) {
+          linesHtml += '<li>' + escapeHtml(order.lines[i]) + '</li>';
+        }
+
+        return '<div class="' + classes + '" data-order-id="' + escapeHtml(order.orderId) + '">' +
+          '<div class="card-head">' +
+            '<div class="card-name">' + escapeHtml(order.customerName) + '</div>' +
+            '<div class="elapsed-chip ' + chip.cls + '" data-created="' + order.createdAtMs + '">' + chip.text + '</div>' +
+          '</div>' +
+          '<ul class="card-lines">' + linesHtml + '</ul>' +
+          '<button class="done-btn" type="button">Done</button>' +
+        '</div>';
+      }
+
+      function render() {
+        var list = boardOrders();
+
+        var newIds = {};
+        var sawNew = false;
+        if (knownIds !== null) {
+          for (var i = 0; i < list.length; i++) {
+            if (!knownIds[list[i].orderId]) {
+              newIds[list[i].orderId] = true;
+              sawNew = true;
+            }
+          }
+        }
+
+        var html = '';
+        var nextKnown = {};
+        for (var j = 0; j < list.length; j++) {
+          html += cardHtml(list[j], !!newIds[list[j].orderId]);
+          nextKnown[list[j].orderId] = true;
+        }
+        boardEl.innerHTML = html;
+
+        if (hadFirstFeed) {
+          emptyEl.textContent = 'No pending orders';
+        }
+        emptyEl.style.display = list.length === 0 ? 'block' : 'none';
+
+        var chimeNow = knownIds !== null && sawNew;
+        knownIds = nextKnown;
+        if (chimeNow) chime();
+      }
+
+      function renderRail() {
+        var now = Date.now();
+        var entries = [];
+        for (var id in done) {
+          if (now - done[id].doneAt < RAIL_MS) entries.push(done[id]);
+        }
+        entries.sort(function (a, b) { return b.doneAt - a.doneAt; }); // newest first
+
+        if (entries.length === 0) {
+          railEl.style.display = 'none';
+          railCardsEl.innerHTML = '';
+          return;
+        }
+
+        var html = '';
+        for (var i = 0; i < entries.length; i++) {
+          var order = entries[i].order;
+          var chipClasses = 'done-chip';
+          if (railFlash[order.orderId]) chipClasses += ' flash-red';
+          html += '<div class="' + chipClasses + '" data-order-id="' + escapeHtml(order.orderId) + '">' +
+            '<span class="done-chip-name">' + escapeHtml(order.customerName) + '</span>' +
+            '<button class="undo-btn" type="button">Undo</button>' +
+          '</div>';
+        }
+        railCardsEl.innerHTML = html;
+        railEl.style.display = 'flex';
+      }
+
+      // ---- complete / undo ----
+
+      function completeOrder(orderId) {
+        if (done[orderId]) return;
+        var order = null;
+        var list = boardOrders();
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].orderId === orderId) { order = list[i]; break; }
+        }
+        if (!order) return;
+
+        // Optimistic removal: off the board, into the Done rail immediately.
+        delete restored[orderId];
+        done[orderId] = { order: order, doneAt: Date.now(), status: 'pending' };
+        expandedId = null;
+        render();
+        renderRail();
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res && res.ok === true) {
+              if (done[orderId]) done[orderId].status = 'confirmed';
+            } else {
+              completeFailed(orderId);
+            }
+          })
+          .withFailureHandler(function () { completeFailed(orderId); })
+          .api_completeOrder(URL_KEY, order.orderId, order.rowIndex);
+      }
+
+      function completeFailed(orderId) {
+        var entry = done[orderId];
+        if (!entry) return;
+        delete done[orderId];
+        failFlash[orderId] = true;
+        render();
+        renderRail();
+        setTimeout(function () {
+          delete failFlash[orderId];
+          render();
+        }, 1500);
+      }
+
+      function undoOrder(orderId) {
+        var entry = done[orderId];
+        if (!entry) return;
+
+        // Optimistic restore: back on the board immediately; the feed will
+        // confirm it on a later poll (restored[] bridges the cache gap).
+        delete done[orderId];
+        restored[orderId] = entry.order;
+        render();
+        renderRail();
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (!res || res.ok !== true) undoFailed(orderId, entry);
+          })
+          .withFailureHandler(function () { undoFailed(orderId, entry); })
+          .api_reopenOrder(URL_KEY, entry.order.orderId, entry.order.rowIndex);
+      }
+
+      function undoFailed(orderId, entry) {
+        delete restored[orderId];
+        done[orderId] = entry; // original doneAt: the 2-minute rail window keeps counting
+        railFlash[orderId] = true;
+        render();
+        renderRail();
+        setTimeout(function () {
+          delete railFlash[orderId];
+          renderRail();
+        }, 1500);
+      }
+
+      // ---- tap handling (two-tap complete pattern) ----
+
+      boardEl.addEventListener('click', function (ev) {
+        var doneBtn = ev.target.closest ? ev.target.closest('.done-btn') : null;
+        if (doneBtn) {
+          var doneCard = doneBtn.closest('.card');
+          if (doneCard) completeOrder(doneCard.getAttribute('data-order-id'));
+          return;
+        }
+        var card = ev.target.closest ? ev.target.closest('.card') : null;
+        if (card) {
+          var id = card.getAttribute('data-order-id');
+          expandedId = (expandedId === id) ? null : id;
+          render();
+        }
+      });
+
+      railCardsEl.addEventListener('click', function (ev) {
+        var undoBtn = ev.target.closest ? ev.target.closest('.undo-btn') : null;
+        if (undoBtn) {
+          var chip = undoBtn.closest('.done-chip');
+          if (chip) undoOrder(chip.getAttribute('data-order-id'));
+        }
+      });
+
+      // ---- polling ----
+
+      function schedulePoll() {
+        if (stopped) return;
+        var jitter = Math.round(Math.random() * 2 * POLL_JITTER_MS) - POLL_JITTER_MS;
+        setTimeout(pollFeed, POLL_BASE_MS + jitter);
+      }
+
+      function pollFeed() {
+        if (stopped) return;
+        if (inFlight) { schedulePoll(); return; }
+        inFlight = true;
+        google.script.run
+          .withSuccessHandler(onFeed)
+          .withFailureHandler(onFeedFail)
+          .api_getKdsFeed(URL_KEY);
+      }
+
+      function onFeed(response) {
+        inFlight = false;
+        if (!response || response.ok !== true || !response.data) {
+          if (response && response.code === 'FORBIDDEN') {
+            showGate('Invalid key', 'This device is not authorized. Check the ?key= in the URL.');
+            return; // stop polling entirely
+          }
+          onFeedFail();
+          return;
+        }
+
+        failCount = 0;
+        bannerEl.style.display = 'none';
+        hadFirstFeed = true;
+        skewMs = response.data.serverNow - Date.now();
+
+        feedOrders = response.data.orders.slice();
+        feedOrders.sort(function (a, b) { return a.createdAtMs - b.createdAtMs; });
+
+        // Reopened orders confirmed by the feed no longer need the bridge copy.
+        for (var i = 0; i < feedOrders.length; i++) {
+          if (restored[feedOrders[i].orderId]) delete restored[feedOrders[i].orderId];
+        }
+
+        render();
+        renderRail();
+        schedulePoll();
+      }
+
+      function onFeedFail() {
+        inFlight = false;
+        failCount++;
+        if (failCount >= 2) bannerEl.style.display = 'block';
+        // Keep rendering the last known orders underneath the banner.
+        schedulePoll();
+      }
+
+      function showGate(title, detail) {
+        stopped = true;
+        gateTitleEl.textContent = title;
+        gateDetailEl.textContent = detail;
+        boardWrapEl.style.display = 'none';
+        railEl.style.display = 'none';
+        bannerEl.style.display = 'none';
+        gateEl.style.display = 'flex';
+      }
+
+      // ---- 1s ticker: elapsed chips + rail expiry ----
+
+      function tick() {
+        var chips = boardEl.querySelectorAll('.elapsed-chip');
+        for (var i = 0; i < chips.length; i++) {
+          var chip = chips[i];
+          var info = elapsedInfo(Number(chip.getAttribute('data-created')));
+          chip.textContent = info.text;
+          chip.className = 'elapsed-chip ' + info.cls;
+        }
+
+        var now = Date.now();
+        var railChanged = false;
+        for (var id in done) {
+          if (now - done[id].doneAt >= SUPPRESS_MS) {
+            // Old enough that the server feed has caught up; forget it fully.
+            delete done[id];
+            railChanged = true;
+          } else if (now - done[id].doneAt >= RAIL_MS && !done[id].railExpired) {
+            done[id].railExpired = true; // stays in done{} only to suppress stale feed rows
+            railChanged = true;
+          }
+        }
+        if (railChanged) renderRail();
+      }
+
+      // ---- boot ----
+
+      if (!URL_KEY) {
+        showGate('Missing key', 'Open this page with ?key=… in the URL.');
+        return;
+      }
+
+      pollFeed();
+      setInterval(tick, 1000);
+      setTimeout(function () { location.reload(); }, RELOAD_MS);
+    })();
+  </script>
+</body>
+</html>
