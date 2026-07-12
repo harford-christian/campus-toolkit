@@ -117,6 +117,15 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* FAQ accordion (faq field type) */
+  .faq-block { margin:4px 0 8px; }
+  .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
+  .faq-item > summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:.95rem; list-style:none; position:relative; padding-right:34px; }
+  .faq-item > summary::-webkit-details-marker { display:none; }
+  .faq-item > summary::after { content:'+'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--hcs-red); font-size:1.15rem; }
+  .faq-item[open] > summary::after { content:'\2013'; }
+  .faq-item > summary:hover { color:var(--hcs-red); }
+  .faq-a { padding:0 14px 12px; color:#444; font-size:.92rem; line-height:1.5; white-space:pre-wrap; }
   /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
   .hcsi { display:inline-block; vertical-align:middle; flex:none; }
   .hcsi-lg { width:44px; height:44px; }
@@ -385,7 +394,7 @@
   var EDITING = null;           // { meta, schema, structureLocked }
   var TAB = 'mine';
   var FIELD_TYPES = [
-    ['sectionHeader', 'Section'], ['description', 'Text block'], ['text', 'Short text'],
+    ['sectionHeader', 'Section'], ['description', 'Text block'], ['faq', 'FAQ (Q&A)'], ['text', 'Short text'],
     ['textarea', 'Paragraph'], ['email', 'Email'], ['phone', 'Phone'], ['number', 'Number'],
     ['date', 'Date'], ['time', 'Time'], ['dropdown', 'Dropdown'], ['radio', 'Multiple choice'],
     ['checkboxes', 'Checkboxes'], ['yesno', 'Yes / No'], ['rating', 'Rating'],
@@ -788,6 +797,7 @@
     if (locked) return;
     fs.forEach(function (f, i) {
       bindInput('lbl_' + f.id, function (v) { f.label = v; var lp = document.querySelector('.fieldcard[data-fid="' + f.id + '"] .fclabel'); if (lp) lp.textContent = v; });
+      var faqEl = document.getElementById('faq_' + f.id); if (faqEl) faqEl.oninput = function () { f.items = parseFaq(this.value); };
       bindInput('help_' + f.id, function (v) { f.help = v; });
       var reqEl = document.getElementById('req_' + f.id); if (reqEl) reqEl.onchange = function () { f.required = this.checked; };
       var optEl = document.getElementById('opt_' + f.id); if (optEl) optEl.oninput = function () { f.options = this.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); };
@@ -803,6 +813,7 @@
       var updCalc = function () { if (!f.calc) f.calc = { op: 'sum', fields: [] }; if (calcop) f.calc.op = calcop.value; if (calcsrc) f.calc.fields = Array.prototype.slice.call(calcsrc.querySelectorAll('input:checked')).map(function (i) { return i.value; }); };
       if (calcop) calcop.onchange = updCalc; if (calcsrc) calcsrc.addEventListener('change', updCalc);
       var rmaxEl = document.getElementById('rmax_' + f.id); if (rmaxEl) rmaxEl.oninput = function () { f.max = Number(this.value) || 5; };
+      var moneyEl = document.getElementById('money_' + f.id); if (moneyEl) moneyEl.onchange = function () { f.money = this.checked; };
       [['vmin_', 'min', 1], ['vmax_', 'max', 1], ['vminl_', 'minLen', 1], ['vmaxl_', 'maxLen', 1], ['vpat_', 'pattern', 0], ['vpmsg_', 'patternMsg', 0], ['vmind_', 'minDate', 0], ['vmaxd_', 'maxDate', 0], ['vnb_', 'notBefore', 0]].forEach(function (spec) {
         var el = document.getElementById(spec[0] + f.id); if (!el) return;
         var h = function () { if (!f.validation) f.validation = {}; f.validation[spec[1]] = spec[2] ? (this.value === '' ? null : Number(this.value)) : this.value; };
@@ -849,7 +860,17 @@
       return '<div class="fieldcard"><div class="fchead"><span class="ftype">' + esc(typeLabel) + '</span><strong>' + esc(f.label || '') + '</strong>' + (f.required ? '<span class="req">*</span>' : '') + '</div></div>';
     }
     var body = '';
-    if (f.type === 'sectionHeader' || f.type === 'description' || f.type === 'pageBreak') {
+    if (f.type === 'faq') {
+      body = '<input class="control" id="lbl_' + f.id + '" value="' + esc(f.label || '') + '" placeholder="FAQ section title">' +
+        '<label class="lbl">Questions &amp; answers</label>' +
+        '<textarea class="control" id="faq_' + f.id + '" rows="8" placeholder="Question on its own line, answer below it. Separate each entry with a blank line.">' + esc(faqToText(f.items)) + '</textarea>' +
+        '<p class="help">First line = the question; the line(s) below = its answer. Leave a blank line between entries.</p>' +
+        '<details class="adv"><summary>Conditional logic</summary><label class="lbl">Show this section only if…</label>' +
+        '<div class="frow">' +
+          '<select class="control" id="cif_' + f.id + '">' + condFieldOpts(f) + '</select>' +
+          '<select class="control" id="cop_' + f.id + '">' + condOpOpts(f.showIf) + '</select>' +
+          '<input class="control" id="cval_' + f.id + '" value="' + esc((f.showIf && f.showIf.value) || '') + '" placeholder="value"></div></details>';
+    } else if (f.type === 'sectionHeader' || f.type === 'description' || f.type === 'pageBreak') {
       var lblCtrl = f.type === 'description'
         ? '<textarea class="control" id="lbl_' + f.id + '" placeholder="Text / policy content (line breaks are kept)">' + esc(f.label || '') + '</textarea>'
         : '<input class="control" id="lbl_' + f.id + '" value="' + esc(f.label || '') + '" placeholder="' + (f.type === 'pageBreak' ? 'Next page title (optional)' : 'Section title') + '">';
@@ -897,6 +918,9 @@
       }
       if (f.type === 'rating') {
         body += '<label class="lbl">Scale maximum</label><input class="control" type="number" min="2" max="10" id="rmax_' + f.id + '" value="' + (f.max || 5) + '">';
+      }
+      if (f.type === 'number') {
+        body += '<label class="switchrow" style="margin-top:8px"><span>Format as money ($) in the response sheet</span><span class="toggle"><input type="checkbox" id="money_' + f.id + '"' + (f.money ? ' checked' : '') + '><span class="sl"></span></span></label>';
       }
       body += valBlock(f);
       body += '<details class="adv"><summary>Conditional logic</summary>' +
@@ -983,6 +1007,7 @@
     var f = { id: uid(), type: type, label: '', required: false };
     if (OPTION_TYPES[type]) f.options = ['Option 1'];
     if (type === 'sectionHeader') f.label = 'Section title';
+    if (type === 'faq') { f.label = 'Frequently Asked Questions'; f.items = [{ q: 'Question?', a: 'Answer.' }]; }
     if (type === 'calculation') f.calc = { op: 'sum', fields: [] };
     if (type === 'rating') f.max = 5;
     fields().push(f); renderCanvas(); markDirty();
@@ -1045,6 +1070,15 @@
   function opt(v, label, sel) { return '<option value="' + v + '"' + (sel === v ? ' selected' : '') + '>' + esc(label) + '</option>'; }
   // Small hover/focus tooltip icon for settings — native title + accessible label.
   function info(text) { return ' <span class="infoicon" tabindex="0" role="img" title="' + esc(text) + '" aria-label="' + esc(text) + '">' + FormsUI.icon('info', { size: 14 }) + '</span>'; }
+  // FAQ items <-> textarea: first line = question, following line(s) = answer, blank line separates entries.
+  function faqToText(items) { return (items || []).map(function (it) { return (it.q || '') + (it.a ? '\n' + it.a : ''); }).join('\n\n'); }
+  function parseFaq(text) {
+    return String(text || '').split(/\n\s*\n/).map(function (block) {
+      var lines = block.replace(/\r/g, '').split('\n');
+      var q = (lines.shift() || '').trim(), a = lines.join('\n').trim();
+      return q ? { q: q, a: a } : null;
+    }).filter(Boolean);
+  }
   function syncSideAccess() { var el = document.getElementById('sAccess'); if (el) el.value = EDITING.schema.settings.access; }
 
   function wireSide() {

@@ -117,6 +117,15 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* FAQ accordion (faq field type) */
+  .faq-block { margin:4px 0 8px; }
+  .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
+  .faq-item > summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:.95rem; list-style:none; position:relative; padding-right:34px; }
+  .faq-item > summary::-webkit-details-marker { display:none; }
+  .faq-item > summary::after { content:'+'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--hcs-red); font-size:1.15rem; }
+  .faq-item[open] > summary::after { content:'\2013'; }
+  .faq-item > summary:hover { color:var(--hcs-red); }
+  .faq-a { padding:0 14px 12px; color:#444; font-size:.92rem; line-height:1.5; white-space:pre-wrap; }
   /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
   .hcsi { display:inline-block; vertical-align:middle; flex:none; }
   .hcsi-lg { width:44px; height:44px; }
@@ -342,6 +351,7 @@ function computeCalc(field, answers) {
           { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
           { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail' },
           { id:'stu', type:'studentPicker', label:'Student', required:true },
+          { id:'sports', type:'checkboxes', label:'Sport(s) this year', options:['Soccer','Volleyball','Cross Country','Basketball','Cheerleading','Baseball','Softball','Track & Field','Golf','Tennis','Esports'], help:'Multi-select (real form pre-checks last year’s sports).' },
           { id:'up', type:'file', label:'Upload the physical (PDF or photo)', required:true, accept:'.pdf,image/*', help:'Max 10 MB.' },
           { id:'sig', type:'signature', label:'Parent signature', required:true, help:'Sign in the box; type your name below.' } ]}] } },
       'demo-trip': { access:'open', form:{ id:'demo-trip', title:'Field Trip Request (demo)',
@@ -351,14 +361,19 @@ function computeCalc(field, answers) {
           { id:'dest', type:'text', label:'Destination', required:true },
           { id:'overnight', type:'yesno', label:'Is this an overnight trip?', required:true },
           { id:'lodging', type:'textarea', label:'Overnight lodging & chaperone plan', required:true, showIf:{ field:'overnight', op:'equals', value:'Yes' } },
-          { id:'transport', type:'dropdown', label:'Transportation', required:true, options:['School van','Charter bus','Parent drivers','Walking'] } ]}] } },
+          { id:'transport', type:'dropdown', label:'Transportation', required:true, options:['School bus','School van','Charter bus','Parent drivers','Walking'] },
+          { id:'cost', type:'number', label:'Estimated cost per student', money:true, help:'Recorded as a dollar amount in the sheet.' } ]}] } },
       'demo-course': { access:'private', form:{ id:'demo-course', title:'Course Selection Guide',
         description:'Shows CONDITIONAL SECTIONS — choose a grade and only that grade’s courses appear. Verify with any email + any 6-digit code.',
         confirmationMessage:'Course selections submitted! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
+          { id:'faq', type:'faq', label:'Frequently Asked Questions', items:[
+            { q:'How many study halls can I take?', a:'Up to one per semester for grades 9–11; seniors may take two.' },
+            { q:'What about dual enrollment?', a:'Juniors and seniors in good standing may dual-enroll at approved colleges; see the registrar.' },
+            { q:'How do I reach Calculus by senior year?', a:'Algebra I (9) → Geometry (10) → Algebra II (11) → Pre-Calculus, then Calculus (12).' } ] },
           { id:'secS', type:'sectionHeader', label:'Student & family' },
           { id:'stu', type:'studentPicker', label:'Student', required:true },
           { id:'pe', type:'email', label:'Parent email', required:true, prefillFrom:'parentEmail' },
-          { id:'gradeReg', type:'dropdown', label:'Which grade are you registering FOR (next year)?', required:true, options:['9','10','11','12'] },
+          { id:'gradeReg', type:'dropdown', label:'Which grade are you registering FOR (next year)?', required:true, options:['9','10','11','12'], help:'Real form defaults this to your student’s next grade.' },
           { id:'pb1', type:'pageBreak', label:'Course selection' },
           { id:'h9', type:'sectionHeader', label:'9th Grade Courses', showIf:{field:'gradeReg',op:'equals',value:'9'} },
           { id:'m9', type:'radio', label:'Math', required:true, options:['Algebra I','Geometry','Algebra II'], showIf:{field:'gradeReg',op:'equals',value:'9'} },
@@ -779,6 +794,14 @@ function computeCalc(field, answers) {
   function renderField(f) {
     if (f.type === 'sectionHeader') { VISALL.push(f); return FormsUI.el('div', { 'class': 'section-head', 'data-fid': f.id }, FormsUI.esc(f.label)); }
     if (f.type === 'description') { VISALL.push(f); return FormsUI.el('p', { 'class': 'desc-block', 'data-fid': f.id }, FormsUI.esc(f.label)); }
+    if (f.type === 'faq') {
+      VISALL.push(f);
+      var acc = (Array.isArray(f.items) ? f.items : []).map(function (it) {
+        return '<details class="faq-item"><summary>' + FormsUI.esc(it.q || '') + '</summary><div class="faq-a">' + FormsUI.esc(it.a || '') + '</div></details>';
+      }).join('');
+      return FormsUI.el('div', { 'class': 'faq-block', 'data-fid': f.id },
+        (f.label ? '<div class="section-head">' + FormsUI.esc(f.label) + '</div>' : '') + acc);
+    }
 
     FIELDS.push(f); VISALL.push(f);
     var wrap = FormsUI.el('div', { 'class': 'field', 'data-fid': f.id });

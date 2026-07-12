@@ -117,6 +117,15 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* FAQ accordion (faq field type) */
+  .faq-block { margin:4px 0 8px; }
+  .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
+  .faq-item > summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:.95rem; list-style:none; position:relative; padding-right:34px; }
+  .faq-item > summary::-webkit-details-marker { display:none; }
+  .faq-item > summary::after { content:'+'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--hcs-red); font-size:1.15rem; }
+  .faq-item[open] > summary::after { content:'\2013'; }
+  .faq-item > summary:hover { color:var(--hcs-red); }
+  .faq-a { padding:0 14px 12px; color:#444; font-size:.92rem; line-height:1.5; white-space:pre-wrap; }
   /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
   .hcsi { display:inline-block; vertical-align:middle; flex:none; }
   .hcsi-lg { width:44px; height:44px; }
