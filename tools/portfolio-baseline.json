@@ -1,0 +1,172 @@
+{
+  "library": {
+    "files": [
+      "hcs-library-portal/library-portal/BrowseCatalog.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "getBookDetail",
+      "getInventoryPage",
+      "getStaffPicks"
+    ],
+    "hash": "fe07587dd720848b"
+  },
+  "campus-control": {
+    "files": [
+      "campus-control/door-automation/Dashboard.html",
+      "campus-control/door-automation/Edit.html",
+      "campus-control/door-automation/Index.html",
+      "campus-control/door-automation/Leadership.html",
+      "campus-control/door-automation/QuickControlDisplay.html",
+      "campus-control/door-automation/Schedules.html",
+      "campus-control/door-automation/Styles.html",
+      "campus-control/door-automation/Today.html",
+      "campus-control/event-requests/RequestView.html",
+      "campus-control/lockdown/Lockdown.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "getLeadershipStatus",
+      "getLoggedInUser",
+      "processPost"
+    ],
+    "hash": "70ca46ce8e8643e0"
+  },
+  "athletics": {
+    "files": [
+      "talon-hub/apps/staff/pages/Staff.html",
+      "talon-hub/apps/staff/pages/StaffApp.html",
+      "talon-hub/apps/staff/pages/StaffStyles.html",
+      "talon-hub/apps/staff/pages/Theme.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "api"
+    ],
+    "hash": "228fe13788c888bb"
+  },
+  "purchasing": {
+    "files": [
+      "hcs-purchasing-system/Index.html",
+      "hcs-purchasing-system/JavaScript.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "addOrderComment",
+      "approveCancellation",
+      "beckyPublishRejection",
+      "beckyUpdateOrder",
+      "bryanHoldOrder",
+      "bryanRejectOrder",
+      "bryanVerifyAndSign",
+      "cancelOrder",
+      "deleteSavedView",
+      "denyCancellation",
+      "editOrder",
+      "generateAnalyticsReportPDF",
+      "generatePOPDF",
+      "getActiveStaffForPicker",
+      "getAnalytics",
+      "getApproverSettings",
+      "getCatalogItems",
+      "getDepartmentStats",
+      "getDepartments",
+      "getEmailRulesList",
+      "getFullCatalog",
+      "getMasterQueue",
+      "getOrderComments",
+      "getOrderDocuments",
+      "getProcessingMetrics",
+      "getSavedViews",
+      "getTeamOrders",
+      "getTrendsMetrics",
+      "getUserAvailableDepts",
+      "getUserList",
+      "getUserOrderHistory",
+      "getVendorList",
+      "markOrderClosed",
+      "requestCancellation",
+      "saveDepartment",
+      "saveView",
+      "scanDriveForNewSlips",
+      "setDepartmentActive",
+      "syncFromGoogleAdmin",
+      "updateApproverPIN",
+      "updateApproverSettings",
+      "updateEmailRules",
+      "updateSheetData",
+      "uploadOrderDocument",
+      "verifyApproverPin"
+    ],
+    "hash": "8cdba37d1351daf0"
+  },
+  "leave-sub": {
+    "files": [
+      "leave-sub-automation/public-interface/Public.html",
+      "leave-sub-automation/public-interface/PublicForecast.html",
+      "leave-sub-automation/public-interface/PublicHeatmap.html",
+      "leave-sub-automation/public-interface/PublicPersonal.html",
+      "leave-sub-automation/public-interface/PublicSubs.html",
+      "leave-sub-automation/public-interface/PublicSummary.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "getLoggedInUser",
+      "getPersonalLeaveData",
+      "getPublicAnalytics",
+      "getRankingData",
+      "getStaffHandbook",
+      "getSubData"
+    ],
+    "hash": "e8610159cc875710"
+  },
+  "concessions": {
+    "files": [
+      "athletics/eagles-landing/apps/public/kds/Kds.html",
+      "athletics/eagles-landing/apps/public/kiosk/Kiosk.html",
+      "athletics/eagles-landing/apps/public/kiosk/KioskFlow.html",
+      "athletics/eagles-landing/apps/public/kiosk/KioskUI.html",
+      "athletics/eagles-landing/apps/public/shared/CartEngine.html",
+      "athletics/eagles-landing/apps/public/tv/Tv.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "The",
+      "api_completeOrder",
+      "api_getKdsFeed",
+      "api_getMenuState",
+      "api_placeOrder",
+      "api_reopenOrder",
+      "api_verifyPin"
+    ],
+    "hash": "68123af7d28051be"
+  },
+  "lobby-tv": {
+    "files": [
+      "lobby-tv-project/LobbyControlDashboard.html",
+      "lobby-tv-project/LobbyPreview.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "getPreviewData",
+      "getUpcomingEvents",
+      "uploadImage",
+      "uploadPowerPoint"
+    ],
+    "hash": "6fa3f64a2db47729"
+  },
+  "custom-forms": {
+    "files": [
+      "custom-forms/preview/admin.html",
+      "custom-forms/preview/fill.html",
+      "custom-forms/preview/index.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "authRequestOtp",
+      "authVerifyOtp",
+      "withdrawSubmission"
+    ],
+    "hash": "73ea891224f73c7b"
+  }
+}

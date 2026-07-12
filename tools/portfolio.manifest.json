@@ -1,0 +1,121 @@
+{
+  "_note": "Hand-authored map of showcased tools -> their source projects, used by scan-portfolio.mjs to detect NEW demoable projects and SIGNIFICANT changes to existing demos. Paths are relative to the Projects root (the parent of apps-script-showcase). Fingerprint baselines live in portfolio-baseline.json (machine-written by `node scan-portfolio.mjs mark`). buildMethod records how the demo was assembled; exact build-demo.mjs configs are reconstructed per-run.",
+  "tools": {
+    "library": {
+      "title": "Library Catalog",
+      "demoFolder": "demos/library",
+      "launch": "demos/library/index.html",
+      "sourceProject": ["hcs-library-portal/library-portal"],
+      "builtFrom": ["hcs-library-portal/library-portal/BrowseCatalog.html"],
+      "buildMethod": "sed (lib-inject) + hand data/mock"
+    },
+    "campus-control": {
+      "title": "Campus Control (suite)",
+      "demoFolder": "demos/campus-control",
+      "launch": "demos/campus-control/index.html",
+      "sourceProject": ["campus-control/door-automation", "campus-control/event-requests", "campus-control/lockdown"],
+      "builtFrom": [
+        "campus-control/door-automation/Index.html",
+        "campus-control/door-automation/Today.html",
+        "campus-control/door-automation/Edit.html",
+        "campus-control/door-automation/Schedules.html",
+        "campus-control/door-automation/QuickControlDisplay.html",
+        "campus-control/door-automation/Styles.html",
+        "campus-control/door-automation/Dashboard.html",
+        "campus-control/door-automation/Leadership.html",
+        "campus-control/event-requests/RequestView.html",
+        "campus-control/lockdown/Lockdown.html"
+      ],
+      "buildMethod": "build-demo.mjs (per sub-page) + hand wrapper/data/mock"
+    },
+    "athletics": {
+      "title": "Athletics Logistics (Talon Hub)",
+      "demoFolder": "demos/talon-hub",
+      "launch": "demos/talon-hub/index.html",
+      "sourceProject": ["talon-hub/apps/staff"],
+      "builtFrom": ["talon-hub/apps/staff/pages/Staff.html", "talon-hub/apps/staff/pages/StaffApp.html", "talon-hub/apps/staff/pages/StaffStyles.html", "talon-hub/apps/staff/pages/Theme.html"],
+      "buildMethod": "build-demo.mjs + hand data/mock"
+    },
+    "purchasing": {
+      "title": "Purchasing & Procurement",
+      "demoFolder": "demos/purchasing",
+      "launch": "demos/purchasing/index.html",
+      "sourceProject": ["hcs-purchasing-system"],
+      "builtFrom": ["hcs-purchasing-system/Index.html", "hcs-purchasing-system/JavaScript.html"],
+      "buildMethod": "custom node assembly (inline JavaScript.html) + hand data/mock"
+    },
+    "leave-sub": {
+      "title": "Leave & Substitute Tracker",
+      "demoFolder": "demos/leave-sub",
+      "launch": "demos/leave-sub/index.html",
+      "sourceProject": ["leave-sub-automation/public-interface"],
+      "builtFrom": [
+        "leave-sub-automation/public-interface/Public.html",
+        "leave-sub-automation/public-interface/PublicForecast.html",
+        "leave-sub-automation/public-interface/PublicHeatmap.html",
+        "leave-sub-automation/public-interface/PublicPersonal.html",
+        "leave-sub-automation/public-interface/PublicSubs.html",
+        "leave-sub-automation/public-interface/PublicSummary.html"
+      ],
+      "buildMethod": "build-demo.mjs + hand data/mock"
+    },
+    "concessions": {
+      "title": "Concessions Ordering System",
+      "demoFolder": "demos/pos",
+      "launch": "demos/pos/index.html",
+      "sourceProject": ["athletics/eagles-landing/apps/public"],
+      "builtFrom": [
+        "athletics/eagles-landing/apps/public/kiosk/Kiosk.html",
+        "athletics/eagles-landing/apps/public/kiosk/KioskUI.html",
+        "athletics/eagles-landing/apps/public/kiosk/KioskFlow.html",
+        "athletics/eagles-landing/apps/public/tv/Tv.html",
+        "athletics/eagles-landing/apps/public/kds/Kds.html",
+        "athletics/eagles-landing/apps/public/shared/CartEngine.html"
+      ],
+      "buildMethod": "build-demo.mjs (per surface) + hand wrapper/data/mock"
+    },
+    "lobby-tv": {
+      "title": "Lobby Display TV",
+      "demoFolder": "demos/lobby-tv",
+      "launch": "demos/lobby-tv/index.html",
+      "sourceProject": ["lobby-tv-project"],
+      "builtFrom": ["lobby-tv-project/LobbyControlDashboard.html", "lobby-tv-project/LobbyPreview.html"],
+      "buildMethod": "build-demo.mjs (dashboard+preview) + hand wrapper/data/mock/samples"
+    },
+    "custom-forms": {
+      "title": "Custom Forms",
+      "demoFolder": "demos/custom-forms",
+      "launch": "demos/custom-forms/index.html",
+      "sourceProject": ["custom-forms"],
+      "builtFrom": ["custom-forms/preview/index.html", "custom-forms/preview/fill.html", "custom-forms/preview/admin.html"],
+      "buildMethod": "reuse project's own preview build + scrub + banner"
+    }
+  },
+  "coveredProjects": [
+    "hcs-library-portal/library-portal",
+    "hcs-library-portal/library-management",
+    "campus-control/door-automation",
+    "campus-control/event-requests",
+    "campus-control/lockdown",
+    "talon-hub/apps/staff",
+    "talon-hub/apps/parent",
+    "talon-hub/apps/student",
+    "talon-hub/apps/tryout",
+    "hcs-purchasing-system",
+    "leave-sub-automation/public-interface",
+    "leave-sub-automation/admin-interface",
+    "athletics/eagles-landing/apps/public",
+    "athletics/eagles-landing/apps/admin",
+    "lobby-tv-project",
+    "custom-forms"
+  ],
+  "excludeDirs": [
+    "apps-script-showcase",
+    "_door-import-temp",
+    "talon-hub-private-data",
+    "node_modules",
+    ".git",
+    "/legacy/",
+    "/.clasp-store/"
+  ]
+}
