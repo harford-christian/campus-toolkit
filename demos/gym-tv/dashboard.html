@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<!--
+  GymControlDashboard.html — admin control (the default /exec page).
+  Auth = Google identity + staff allow-list. Open via the DOMAIN-restricted deployment so
+  Session.getActiveUser() resolves; whoAmI() gates the UI and every WRITE calls _requireStaff_().
+  Manage editors in the editor: setGymAdminEmails('admin@harfordchristian.org, ...').
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --maroon:#800000; --maroon2:#a11; --gold:#FFD700; --bg:#f4f4f6; --line:#e3e3e6; }
+    * { box-sizing:border-box; }
+    body { font-family:Inter,Arial,sans-serif; background:var(--bg); color:#141414; margin:0; }
+    .wrap { max-width:900px; margin:0 auto; padding:16px; }
+    header { background:linear-gradient(90deg,var(--maroon),var(--maroon2)); color:#fff; padding:16px; display:flex; align-items:center; gap:12px; }
+    header h1 { font-size:20px; margin:0; letter-spacing:.3px; }
+    header .dot { width:12px; height:12px; border-radius:50%; background:var(--gold); }
+    header .spacer { flex:1; }
+    .top-actions { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:16px; margin:14px 0; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+    .card h2 { font-size:15px; margin:0 0 12px; color:var(--maroon); letter-spacing:.3px; }
+    label { display:block; font-size:12px; font-weight:600; color:#555; margin:8px 0 2px; }
+    input, select, textarea { width:100%; padding:9px 10px; border:1px solid #cfcfd4; border-radius:9px; font-size:14px; font-family:inherit; }
+    textarea { resize:vertical; }
+    button { background:var(--maroon); color:#fff; border:0; border-radius:9px; padding:10px 14px; font-weight:700; font-size:14px; cursor:pointer; }
+    button:hover { background:var(--maroon2); }
+    button.ghost { background:#ececf0; color:#333; }
+    button.gold { background:var(--gold); color:#3a2a00; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:end; }
+    .row > * { flex:1; min-width:120px; }
+    .seg { display:flex; gap:8px; }
+    .seg button { flex:1; background:#ececf0; color:#333; }
+    .seg button.on { background:var(--maroon); color:#fff; }
+    .status { font-size:12.5px; color:#444; white-space:pre-wrap; background:#0d0d0f; color:#cfe; border-radius:9px; padding:12px; overflow:auto; max-height:320px; font-family:ui-monospace,Menlo,Consolas,monospace; }
+    .hint { font-size:12.5px; color:#777; margin-top:6px; }
+    .pill { display:inline-block; font-size:12px; font-weight:700; padding:3px 10px; border-radius:20px; }
+    .pill.on { background:#e6ffed; color:#0a7f34; } .pill.off { background:#f3f3f5; color:#666; }
+    /* login */
+    #gate { position:fixed; inset:0; background:linear-gradient(160deg,var(--maroon),#400); display:flex; align-items:center; justify-content:center; z-index:50; }
+    #gate .box { background:#fff; border-radius:16px; padding:28px; width:320px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.3); }
+    #gate h1 { color:var(--maroon); font-size:20px; margin:0 0 4px; }
+    #gate p { color:#777; font-size:13px; margin:0 0 16px; }
+    #gate input { text-align:center; font-size:22px; letter-spacing:6px; }
+    #gate button { width:100%; margin-top:12px; }
+    #gateMsg { color:#b00; font-size:13px; min-height:18px; margin-top:8px; }
+    #app { display:none; }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Gym TV — Control" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <!-- Access gate (Google identity + staff allow-list) -->
+  <div id="gate">
+    <div class="box">
+      <h1>🏀 Gym TV Control</h1>
+      <p id="gateMsg">Checking access…</p>
+      <button id="gateBtn" class="ghost" style="display:none" onclick="location.reload()">Reload</button>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div id="app">
+    <header>
+      <span class="dot"></span>
+      <h1>Gym TV Control</h1>
+      <span class="spacer"></span>
+      <span id="whoami" style="font-size:12px;opacity:.85"></span>
+    </header>
+    <div class="wrap">
+      <div class="top-actions">
+        <button class="ghost" onclick="openDisplay()">Open Display</button>
+        <button class="ghost" onclick="viewGymData()">View gymdata</button>
+        <button class="ghost" onclick="refreshStatus()">Refresh status</button>
+      </div>
+
+      <div class="card">
+        <h2>Game-day mode</h2>
+        <div class="seg" id="seg">
+          <button data-s="auto" onclick="setState('auto')">Auto (calendar)</button>
+          <button data-s="on"   onclick="setState('on')">Force ON</button>
+          <button data-s="off"  onclick="setState('off')">Force OFF</button>
+        </div>
+        <div id="forceBox" style="display:none; margin-top:12px;">
+          <div class="row">
+            <div><label>Sport</label><select id="sport"></select></div>
+            <div><label>For (hours, optional)</label><input id="hours" type="number" min="0" step="0.5" placeholder="blank = until midnight"></div>
+            <div style="flex:0 0 auto"><label>&nbsp;</label><button class="gold" onclick="applyForceOn()">Apply</button></div>
+          </div>
+        </div>
+        <div class="hint" id="detNote"></div>
+      </div>
+
+      <div class="card">
+        <h2>Idle photo carousel (Drive folder)</h2>
+        <label>Drive folder link or ID</label>
+        <input id="folder" placeholder="Same as Lobby, or a gym-specific folder">
+        <div class="row" style="margin-top:8px">
+          <div><label>Seconds per photo</label><input id="interval" type="number" value="8" min="2"></div>
+          <div style="flex:0 0 auto"><label>&nbsp;</label><button onclick="applyCarousel()">Set carousel</button></div>
+        </div>
+        <div class="hint">Copies up to 25 images into GCS so the Pi needs no Drive auth.</div>
+      </div>
+
+      <div class="card">
+        <h2>Ticker messages</h2>
+        <textarea id="ticker" rows="3" placeholder="One message per line (blank = leave current)"></textarea>
+        <div style="margin-top:8px"><button onclick="applyTicker()">Update ticker</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Idle info cards</h2>
+        <textarea id="info" rows="3" placeholder="One card per line — rotates in the idle rail (records, spirit week, reminders…)"></textarea>
+        <div style="margin-top:8px"><button onclick="applyInfo()">Update info cards</button></div>
+      </div>
+
+      <div class="card">
+        <h2>Emergency alert</h2>
+        <input id="emsg" placeholder="Alert message">
+        <div class="row" style="margin-top:8px">
+          <div><button onclick="emergency(true)">Activate</button></div>
+          <div><button class="ghost" onclick="emergency(false)">Clear</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔎 Diagnostics</h2>
+        <div class="row">
+          <div><button class="ghost" onclick="runSample()">Calendar sample</button></div>
+          <div><button class="ghost" onclick="openYearbook()">Yearbook folders</button></div>
+        </div>
+        <pre class="status" id="sample" style="margin-top:10px; display:none;"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Live control state</h2>
+        <pre class="status" id="status">—</pre>
+      </div>
+    </div>
+  </div>
+
+<script>
+  var EXEC = "display.html";
+  var _state = 'auto';
+
+  // ---- access gate (Google identity + staff allow-list) ----
+  function initAuth() {
+    google.script.run.withSuccessHandler(function (me) {
+      if (me && me.isStaff) {
+        document.getElementById('gate').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('whoami').textContent = me.email;
+        loadSports(); refreshStatus();
+      } else { showDenied(me); }
+    }).withFailureHandler(function (e) { showDenied({ email: '', err: e.message }); }).whoAmI();
+  }
+  function showDenied(me) {
+    document.getElementById('gate').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('gateMsg').textContent = (me && me.email)
+      ? ('Signed in as ' + me.email + ' — not on the gym-TV admin list. Ask IT to add you (setGymAdminEmails), or use an approved HCS account.')
+      : 'Please open this page signed in to your Harford Christian (@harfordchristian.org) account.';
+    document.getElementById('gateBtn').style.display = 'inline-block';
+  }
+  function onFail(e) { if (/authoriz|not signed/i.test(e.message)) showDenied({ email: '' }); else alert(e.message); }
+
+  function openDisplay() { window.open(EXEC + '?page=display', '_blank'); }
+  function viewGymData() { window.open(EXEC + '?page=gymdata', '_blank'); }
+  function openYearbook() { window.open(EXEC + '?page=yearbook', '_blank'); }
+
+  // ---- game mode ----
+  function setSeg(s) {
+    _state = s;
+    var btns = document.querySelectorAll('#seg button');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].getAttribute('data-s') === s);
+    document.getElementById('forceBox').style.display = (s === 'on') ? 'block' : 'none';
+  }
+  function setState(s) {
+    setSeg(s);
+    if (s === 'on') return;                          // wait for Apply (needs sport)
+    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setGameOverride(s, '', '');
+  }
+  function applyForceOn() {
+    var sport = document.getElementById('sport').value;
+    var hrs = parseFloat(document.getElementById('hours').value);
+    var until = hrs > 0 ? new Date(Date.now() + hrs * 3600000).toISOString() : '';
+    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setGameOverride('on', sport, until);
+  }
+  function applyCarousel() {
+    google.script.run.withSuccessHandler(function (r) { alert('Carousel set: ' + r.count + ' images'); })
+      .withFailureHandler(onFail).setGymCarousel(document.getElementById('folder').value, document.getElementById('interval').value);
+  }
+  function applyTicker() {
+    var lines = document.getElementById('ticker').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setTicker(lines);
+  }
+  function applyInfo() {
+    var lines = document.getElementById('info').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setInfoCards(lines);
+  }
+  function emergency(on) {
+    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setEmergency(on, document.getElementById('emsg').value);
+  }
+  function runSample() {
+    var el = document.getElementById('sample'); el.style.display = 'block'; el.textContent = 'Running…';
+    google.script.run.withSuccessHandler(function (rows) { el.textContent = JSON.stringify(rows, null, 2) || '(no gym-sport events in window)'; })
+      .withFailureHandler(function (e) { el.textContent = 'Error: ' + e.message; }).getSampleGameEvents();
+  }
+
+  // ---- status (read-only, no token needed) ----
+  function refreshStatus() { google.script.run.withSuccessHandler(renderStatus).getGymControl(); }
+  function renderStatus(c) {
+    if (!c) return;
+    setSeg(c.gameMode.state);
+    var d = c.gameMode.detected || {};
+    document.getElementById('detNote').innerHTML =
+      'Detector: <span class="pill ' + (d.active ? 'on' : 'off') + '">' + (d.active ? ('LIVE — ' + d.sport) : 'inactive') + '</span> ' +
+      '<span style="color:#999">(' + (d.note || '') + (d.checkedAt ? ', checked ' + new Date(d.checkedAt).toLocaleString() : '') + ')</span>';
+    // Pre-fill editors with current values
+    document.getElementById('ticker').value = (c.tickerMessages || []).join('\n');
+    document.getElementById('info').value = ((c.content && c.content.infoCards) || []).join('\n');
+    document.getElementById('status').textContent = JSON.stringify(c, null, 2);
+  }
+  function loadSports() {
+    google.script.run.withSuccessHandler(function (arr) {
+      document.getElementById('sport').innerHTML = (arr || []).map(function (s) { return '<option>' + s + '</option>'; }).join('');
+    }).listGymSports();
+  }
+
+  initAuth();
+</script>
+</body>
+</html>

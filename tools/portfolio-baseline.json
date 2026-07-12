@@ -167,6 +167,26 @@
       "authVerifyOtp",
       "withdrawSubmission"
     ],
-    "hash": "73ea891224f73c7b"
+    "hash": "b86585ccca0b3da3"
+  },
+  "gym-tv": {
+    "files": [
+      "athletics/gym-tv-project/GymControlDashboard.html",
+      "athletics/gym-tv-project/GymDisplay.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "getGymControl",
+      "getGymState",
+      "getSampleGameEvents",
+      "listGymSports",
+      "setEmergency",
+      "setGameOverride",
+      "setGymCarousel",
+      "setInfoCards",
+      "setTicker",
+      "whoAmI"
+    ],
+    "hash": "c346e82870193fd2"
   }
 }

@@ -89,6 +89,14 @@
       "sourceProject": ["custom-forms"],
       "builtFrom": ["custom-forms/preview/index.html", "custom-forms/preview/fill.html", "custom-forms/preview/admin.html"],
       "buildMethod": "reuse project's own preview build + scrub + banner"
+    },
+    "gym-tv": {
+      "title": "Gym Display TV",
+      "demoFolder": "demos/gym-tv",
+      "launch": "demos/gym-tv/index.html",
+      "sourceProject": ["athletics/gym-tv-project"],
+      "builtFrom": ["athletics/gym-tv-project/GymControlDashboard.html", "athletics/gym-tv-project/GymDisplay.html"],
+      "buildMethod": "build-demo.mjs (dashboard+display) + hand wrapper/data/mock"
     }
   },
   "coveredProjects": [
@@ -107,7 +115,8 @@
     "athletics/eagles-landing/apps/public",
     "athletics/eagles-landing/apps/admin",
     "lobby-tv-project",
-    "custom-forms"
+    "custom-forms",
+    "athletics/gym-tv-project"
   ],
   "excludeDirs": [
     "apps-script-showcase",

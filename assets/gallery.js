@@ -91,6 +91,17 @@
         '<h4>How it helps now</h4>' +
         '<p>A form builder that lives entirely inside the school&rsquo;s own Google Workspace. Staff design forms in one branded builder with 18+ field types, conditional logic, calculations, file uploads, e-signatures, and approval routing. Parents verify with a one-time code sent to the email the school already has on file, then the form <b>auto-fills their name and their own children</b> from the student directory — so the right student is always attached.</p>' +
         '<p>Every form, response, and uploaded file stays on school-owned Drive and Sheets, and it costs nothing per form or per response.</p>'
+    },
+
+    'gym-tv': {
+      icon: '🏀', title: 'Gym Display TV', launch: 'demos/gym-tv/index.html',
+      summary: 'An unattended gym TV that auto-detects home games from the athletics calendar — showing the live concession menu (stock + half-off specials) on game nights and a rotating photo/announcement carousel otherwise, all set from a control dashboard.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>The gym’s second display had to be switched on and loaded by hand off a shared PC — someone had to remember, and there was no live view of what concessions were still in stock, so fans crowded the stand asking and staff juggled an extra screen on game night.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>A gym TV that runs itself. It flips to game mode automatically from the athletics calendar and mirrors the concession stand’s live inventory in real time — &ldquo;Only 3 left,&rdquo; &ldquo;Sold out,&rdquo; half-off specials, a cooking countdown — next to team photos. The rest of the time it’s an idle board: photo carousel, upcoming games, weather, and a ticker. A simple dashboard sets manual overrides, messages, and a full-screen emergency alert.</p>' +
+        '<p>Same pattern as the lobby display, running on a ~$35 Raspberry Pi in kiosk mode — no touch on game night.</p>'
     }
   };
 
