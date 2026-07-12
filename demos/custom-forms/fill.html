@@ -1,0 +1,1112 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta name="theme-color" content="#8B1E1E">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCS Forms — Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --hcs-red:#8B1E1E; --hcs-red-hover:#701818; --hcs-gold:#D4AF37; --hcs-gold-soft:#f6ecd0;
+    --bg:#f4f5f7; --card:#ffffff; --panel:#fbfafa;
+    --text:#2b2b2b; --muted:#6b7280; --line:#e2e4e8; --line-strong:#cfd3da;
+    --ok:#2e7d32; --ok-bg:#e8f5e9; --err:#b42318; --err-bg:#fdeceb; --warn:#b45309; --warn-bg:#fdf3e7;
+    --radius:12px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(16,24,40,.06), 0 6px 22px rgba(16,24,40,.06);
+    --ring:0 0 0 3px rgba(139,30,30,.16);
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { background:var(--bg); color:var(--text); line-height:1.5;
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+
+  /* ---- layout ---- */
+  .page { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
+  .page.wide { max-width:1080px; }
+  .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
+    padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
+  .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
+  .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
+  .brandbar .spacer { margin-left:auto; }
+  .goldrule { height:4px; background:var(--hcs-gold); }
+
+  /* ---- card / surfaces ---- */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .card.flush-top { border-top-left-radius:0; border-top-right-radius:0; }
+  .card-pad { padding:22px; }
+  .stack > * + * { margin-top:16px; }
+  .divider { height:1px; background:var(--line); border:0; margin:20px 0; }
+
+  /* ---- headings / text ---- */
+  .form-title { font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.02em; }
+  .form-desc { color:var(--muted); margin:0; }
+  .section-head { font-size:1.05rem; font-weight:700; color:var(--hcs-red); margin:8px 0 2px;
+    padding-bottom:6px; border-bottom:2px solid var(--hcs-gold-soft); }
+  .help { font-size:.83rem; color:var(--muted); margin:3px 0 0; }
+  .muted { color:var(--muted); } .center { text-align:center; }
+
+  /* ---- fields ---- */
+  .field { margin:0; }
+  .field > label { display:block; font-weight:600; font-size:.92rem; margin-bottom:6px; }
+  .req { color:var(--err); margin-left:2px; }
+  .control, input.control, select.control, textarea.control {
+    width:100%; font:inherit; font-size:1rem; color:var(--text); background:var(--card);
+    border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; transition:border-color .12s, box-shadow .12s; }
+  textarea.control { min-height:96px; resize:vertical; }
+  .control:focus, .control:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .control:disabled, .control[readonly] { background:#f3f4f6; color:#4b5563; cursor:not-allowed; }
+  .field.invalid .control { border-color:var(--err); }
+  .field .error { display:none; color:var(--err); font-size:.82rem; margin-top:5px; }
+  .field.invalid .error { display:block; }
+
+  /* choice groups (radio/checkbox) */
+  .choices { display:flex; flex-direction:column; gap:8px; }
+  .choice { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line);
+    border-radius:var(--radius-sm); cursor:pointer; background:var(--card); }
+  .choice:hover { border-color:var(--line-strong); }
+  .choice:focus-within { border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .choice input { margin-top:2px; accent-color:var(--hcs-red); width:18px; height:18px; }
+  .choice.selected { border-color:var(--hcs-red); background:#fbf4f4; }
+
+  /* ---- buttons ---- */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    border:1px solid transparent; border-radius:var(--radius-sm); font-weight:700; font-size:.95rem;
+    padding:11px 18px; background:var(--hcs-red); color:#fff; transition:background .12s, box-shadow .12s; }
+  .btn:hover { background:var(--hcs-red-hover); }
+  .btn:focus-visible { outline:none; box-shadow:var(--ring); }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .btn.block { width:100%; }
+  .btn.ghost { background:transparent; color:var(--hcs-red); border-color:var(--line-strong); }
+  .btn.ghost:hover { background:#fbf4f4; }
+  .btn.gold { background:var(--hcs-gold); color:#3a2e00; }
+  .btn.sm { padding:7px 12px; font-size:.85rem; }
+
+  /* ---- badges / pills (status system, reused from purchasing) ---- */
+  .pill { display:inline-block; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; text-transform:capitalize; }
+  .pill.draft { background:#eef1f5; color:#475467; }
+  .pill.published, .pill.open, .pill.approved { background:var(--ok-bg); color:var(--ok); }
+  .pill.private { background:var(--hcs-gold-soft); color:#7a5b00; }
+  .pill.staff { background:#e7edfb; color:#2b4a9b; }
+  .pill.locked, .pill.closed, .pill.rejected { background:var(--err-bg); color:var(--err); }
+  .pill.pending { background:var(--warn-bg); color:var(--warn); }
+
+  /* ---- notices ---- */
+  .notice { border-radius:var(--radius-sm); padding:12px 14px; font-size:.9rem; }
+  .notice.info { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; }
+  .notice.err { background:var(--err-bg); border:1px solid #f3c6c2; color:var(--err); }
+  .notice.ok { background:var(--ok-bg); border:1px solid #bfe0c1; color:var(--ok); }
+
+  /* ---- toast + spinner ---- */
+  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#1f2430; color:#fff;
+    padding:11px 18px; border-radius:999px; font-size:.88rem; font-weight:600; box-shadow:var(--shadow); z-index:60; }
+  .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%;
+    display:inline-block; animation:spin .7s linear infinite; }
+  .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; }
+  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; }
+  .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
+  .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
+  .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; }
+  .sigbar { margin-top:6px; }
+  .filelist { margin-top:6px; }
+  .filelist .fitem { display:flex; align-items:center; gap:8px; font-size:.82rem; color:var(--text); }
+  .desc-block { font-size:.9rem; color:var(--text); white-space:pre-wrap; line-height:1.5; margin:0; }
+  .progress { height:6px; background:var(--line); border-radius:999px; overflow:hidden; margin-bottom:4px; }
+  .progress-bar { height:100%; background:var(--hcs-red); transition:width .2s ease; }
+  .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
+  .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
+  @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
+  .hcsi { display:inline-block; vertical-align:middle; flex:none; }
+  .hcsi-lg { width:44px; height:44px; }
+  .infoicon { color:var(--muted); cursor:help; }
+  .infoicon:hover { color:var(--hcs-red); }
+</style>
+<style>
+  #pvbar { position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:#2b2b2b; color:#fff; padding:8px 14px; font-family:'Inter',sans-serif; }
+  #pvbar .pvtag { font-size:.66rem; font-weight:800; letter-spacing:.06em; background:var(--hcs-gold); color:#3a2e00; padding:3px 8px; border-radius:999px; }
+  #pvbar a, #pvbar .pvlink { color:#fff; font-size:.8rem; text-decoration:none; }
+  #pvbar select { font:inherit; padding:3px 6px; border-radius:6px; }
+  #pvbar .sp { margin-left:auto; }
+  .chooser { max-width:820px; margin:0 auto; padding:48px 16px; }
+  .chooser h1 { font-size:1.8rem; margin:0 0 6px; }
+  .chooser .cards { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:26px; }
+  @media (max-width:640px){ .chooser .cards { grid-template-columns:1fr; } }
+  .chooser a.choice-card { display:block; text-decoration:none; color:var(--text); background:var(--card);
+    border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; transition:border-color .12s, transform .08s; }
+  .chooser a.choice-card:hover { border-color:var(--hcs-red); transform:translateY(-2px); }
+  .chooser .ic { font-size:2rem; }
+  .chooser h2 { margin:8px 0 4px; color:var(--hcs-red); font-size:1.2rem; }
+</style>
+
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Custom Forms" };</script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<div id="pvbar"></div>
+<div id="app"></div>
+<script>
+  /* HCS logo (base64 data URI, downscaled from harfordchristian.org) — embedded so it never 404s. */
+  var HCS_LOGO = "data:image/png;base64,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";
+  /* FormsUI — tiny dependency-free client helpers shared by builder + runner. */
+  var FormsUI = (function () {
+    function esc(s){ var d=document.createElement('div'); d.textContent = (s==null?'':String(s)); return d.innerHTML; }
+    function toast(msg, ms){ var t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); t.textContent=msg;
+      document.body.appendChild(t); setTimeout(function(){ t.remove(); }, ms||2600); }
+    function el(tag, attrs, html){ var e=document.createElement(tag);
+      if(attrs) Object.keys(attrs).forEach(function(k){ e.setAttribute(k, attrs[k]); });
+      if(html!=null) e.innerHTML=html; return e; }
+    function trap_(ov){
+      ov.addEventListener('keydown', function(e){
+        if(e.key!=='Tab') return;
+        var f=ov.querySelectorAll('button,input,select,textarea,a[href]'); if(!f.length) return;
+        var first=f[0], last=f[f.length-1];
+        if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+      });
+    }
+    function modal(title, bodyHtml, btnLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div><button class="btn block">'+esc(btnLabel||'Got it')+'</button></div>';
+        var b=ov.querySelector('button');
+        b.onclick=function(){ ov.remove(); resolve(); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape'){ ov.remove(); resolve(); } });
+        document.body.appendChild(ov); trap_(ov); b.focus();
+      });
+    }
+    function confirm(title, bodyHtml, okLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(okLabel||'OK')+'</button></div></div>';
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(false); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(true); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape') done(false); });
+        document.body.appendChild(ov); trap_(ov); ov.querySelector('[data-x="1"]').focus();
+      });
+    }
+    function prompt(title, opts){
+      opts = opts || {};
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        var input = opts.multiline ? '<textarea class="control" id="_pmt"></textarea>'
+          : '<input class="control" id="_pmt" value="'+esc(opts.value||'')+'" placeholder="'+esc(opts.placeholder||'')+'">';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+(opts.body||'')+input+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(opts.okLabel||'OK')+'</button></div></div>';
+        var field=ov.querySelector('#_pmt'); if(opts.multiline && opts.value) field.value=opts.value;
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(null); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(field.value); };
+        field.addEventListener('keydown', function(e){ if(e.key==='Enter' && !opts.multiline){ e.preventDefault(); done(field.value); } if(e.key==='Escape') done(null); });
+        document.body.appendChild(ov); trap_(ov); field.focus();
+      });
+    }
+    /* Inline SVG icon set (stroke = currentColor). Replaces emoji glyphs so the UI renders
+       identically across platforms/fonts. Usage: FormsUI.icon('trash') or icon('info',{size:14}). */
+    var ICON_PATHS = {
+      up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+      down:'<path d="M12 5v14M19 12l-7 7-7-7"/>',
+      dup:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
+      trash:'<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
+      chevron:'<path d="M6 9l6 6 6-6"/>',
+      check:'<path d="M20 6L9 17l-5-5"/>',
+      eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+      clip:'<path d="M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8"/>',
+      plus:'<path d="M12 5v14M5 12h14"/>',
+      info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+      edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+      more:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+      grip:'<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>'
+    };
+    function icon(name, opts){
+      opts = opts || {}; var s = opts.size || 16;
+      return '<svg class="hcsi'+(opts.cls?' '+opts.cls:'')+'" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(ICON_PATHS[name]||'')+'</svg>';
+    }
+    return { esc:esc, toast:toast, el:el, modal:modal, confirm:confirm, prompt:prompt, icon:icon };
+  })();
+</script>
+<script>
+/**
+ * Logic.js — the SINGLE canonical source for conditional-logic + calculation, used by
+ * the server directly (globals) AND by the client verbatim: tools/build-shared-logic.js
+ * regenerates SharedLogic.html from this file, so the runner never keeps its own copy.
+ * Kept tiny and dependency-free; unit-tested in Node (tests/logic.test.js).
+ *
+ * A showIf rule: { field: <fieldId>, op: 'equals'|'notEquals'|'contains'|'notEmpty'|'empty', value: <string> }
+ * No rule (null/empty/no field) → always visible / condition met.
+ */
+function evalShowIf(rule, answers) {
+  if (!rule || !rule.field) return true;
+  var raw = answers ? answers[rule.field] : undefined;
+  var target = rule.value == null ? '' : String(rule.value);
+
+  if (Array.isArray(raw)) {
+    switch (rule.op) {
+      case 'contains':  return raw.indexOf(target) > -1;
+      case 'notEmpty':  return raw.length > 0;
+      case 'empty':     return raw.length === 0;
+      case 'equals':    return raw.join(', ') === target;
+      case 'notEquals': return raw.join(', ') !== target;
+      default:          return true;
+    }
+  }
+  var val = raw == null ? '' : String(raw);
+  switch (rule.op) {
+    case 'equals':    return val === target;
+    case 'notEquals': return val !== target;
+    case 'contains':  return val.toLowerCase().indexOf(target.toLowerCase()) > -1;
+    case 'notEmpty':  return val.trim() !== '';
+    case 'empty':     return val.trim() === '';
+    default:          return true;
+  }
+}
+
+/**
+ * Compute a calculation field's value. op 'count' = number of non-empty source answers
+ * (each selected checkbox counts once); anything else = sum of numeric source answers.
+ * Callers must pass VISIBLE-only answers (hidden fields blanked) so client + server agree.
+ */
+function computeCalc(field, answers) {
+  var calc = (field && field.calc) || {}, src = calc.fields || [];
+  if (calc.op === 'count') {
+    var n = 0;
+    src.forEach(function (fid) { var v = answers[fid]; n += Array.isArray(v) ? v.length : (v !== '' && v != null ? 1 : 0); });
+    return String(n);
+  }
+  var sum = 0;
+  src.forEach(function (fid) {
+    var v = answers[fid];
+    if (Array.isArray(v)) v.forEach(function (x) { var num = parseFloat(x); if (isFinite(num)) sum += num; });
+    else { var num = parseFloat(v); if (isFinite(num)) sum += num; }
+  });
+  return String(Math.round(sum * 100) / 100);
+}
+</script>
+
+<script>
+  (function () {
+    var slots = ['Tue — 3:00–3:20 PM','Tue — 3:20–3:40 PM','Tue — 3:40–4:00 PM','Thu — 3:00–3:20 PM','Thu — 3:20–3:40 PM'];
+    var STAFF = ['Mrs. Karen Adams','Mr. David Boyer','Ms. Rachel Cho','Mr. Thomas Elder','Mrs. Lauren Frey'];
+    var PREFILL = { parent: { first:'Jordan', last:'Sample', email:'parent@example.com' },
+      students: [ { key:'s1', displayName:'Alex Sample', first:'Alex', last:'Sample', grade:'9' },
+                  { key:'s2', displayName:'Bailey Sample', first:'Bailey', last:'Sample', grade:'11' } ] };
+    var FORMS = {
+      'demo-open': { access:'open', form:{ id:'demo-open', title:'Sample Interest Form',
+        description:'A quick demo (open — no login). Fabricated data for review only.',
+        confirmationMessage:'Thanks! (Demo — nothing was saved.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
+          { id:'sec1', type:'sectionHeader', label:'Your details' },
+          { id:'fn', type:'text', label:'First name', required:true },
+          { id:'ln', type:'text', label:'Last name', required:true },
+          { id:'em', type:'email', label:'Email', required:true },
+          { id:'grade', type:'dropdown', label:'Student grade', required:true, options:['K4','K5','1','2','3','4','5','6','7','8','9','10','11','12'] },
+          { id:'interest', type:'radio', label:'How interested are you?', required:true, options:['Very','Somewhat','Just browsing'] },
+          { id:'topics', type:'checkboxes', label:'Topics you care about', options:['Academics','Athletics','Arts','Spiritual life'] },
+          { id:'comments', type:'textarea', label:'Anything else?' } ]}] } },
+      'demo-parent': { access:'private', form:{ id:'demo-parent', title:'Field Trip Permission',
+        description:'Private demo — verify with any email + any 6-digit code to see auto-prefill (fabricated family).',
+        confirmationMessage:'Thank you — permission recorded. (Demo.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
+          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
+          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
+          { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
+          { id:'pe', type:'email', label:'Your email', required:true, prefillFrom:'parentEmail', help:'Verified — the email you signed in with.' },
+          { id:'secS', type:'sectionHeader', label:'Student(s)' },
+          { id:'stu', type:'studentPicker', label:'Which student(s)?', required:true, multiple:true, help:'Pick one or more of your children.' },
+          { id:'perm', type:'yesno', label:'I give permission to attend.', required:true },
+          { id:'notes', type:'textarea', label:'Notes (allergies, meds, etc.)' } ]}] } },
+      'demo-conference': { access:'private', form:{ id:'demo-conference', title:'HS Parent/Teacher Conference',
+        description:'Private demo — verify with any email + any 6-digit code. Fabricated family + teachers.',
+        confirmationMessage:'Thank you — your conference request was received. (Demo.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
+          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
+          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
+          { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
+          { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail', help:'Verified.' },
+          { id:'secS', type:'sectionHeader', label:'Student' },
+          { id:'stu', type:'studentPicker', label:'Student', required:true },
+          { id:'grade', type:'text', label:'Grade', prefillFrom:'studentGrade' },
+          { id:'secC', type:'sectionHeader', label:'Conference request' },
+          { id:'teachers', type:'staffPicker', label:'Which teacher(s) would you like to meet with?', required:true, multiple:true, options:STAFF },
+          { id:'t1', type:'dropdown', label:'First choice — meeting time', required:true, options:slots, capacityLeft:{ 'Tue — 3:00–3:20 PM':0, 'Tue — 3:20–3:40 PM':2, 'Tue — 3:40–4:00 PM':5 } },
+          { id:'t2', type:'dropdown', label:'Second choice — meeting time', options:slots },
+          { id:'t3', type:'dropdown', label:'Third choice — meeting time', options:slots },
+          { id:'info', type:'textarea', label:'Anything else we should know?' } ]}] } },
+      'demo-physical': { access:'private', form:{ id:'demo-physical', title:'Sports Physical + Signature',
+        description:'Private demo showing file upload + e-signature. Verify with any email + any 6-digit code.',
+        confirmationMessage:'Received! (Demo.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
+          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
+          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
+          { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
+          { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail' },
+          { id:'stu', type:'studentPicker', label:'Student', required:true },
+          { id:'up', type:'file', label:'Upload the physical (PDF or photo)', required:true, accept:'.pdf,image/*', help:'Max 10 MB.' },
+          { id:'sig', type:'signature', label:'Parent signature', required:true, help:'Sign in the box; type your name below.' } ]}] } },
+      'demo-trip': { access:'open', form:{ id:'demo-trip', title:'Field Trip Request (demo)',
+        description:'Shows CONDITIONAL LOGIC — the overnight section appears only if you answer Yes.',
+        confirmationMessage:'Submitted for approval! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
+          { id:'trip', type:'text', label:'Trip name / purpose', required:true },
+          { id:'dest', type:'text', label:'Destination', required:true },
+          { id:'overnight', type:'yesno', label:'Is this an overnight trip?', required:true },
+          { id:'lodging', type:'textarea', label:'Overnight lodging & chaperone plan', required:true, showIf:{ field:'overnight', op:'equals', value:'Yes' } },
+          { id:'transport', type:'dropdown', label:'Transportation', required:true, options:['School van','Charter bus','Parent drivers','Walking'] } ]}] } },
+      'demo-course': { access:'private', form:{ id:'demo-course', title:'Course Selection Guide',
+        description:'Shows CONDITIONAL SECTIONS — choose a grade and only that grade’s courses appear. Verify with any email + any 6-digit code.',
+        confirmationMessage:'Course selections submitted! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
+          { id:'secS', type:'sectionHeader', label:'Student & family' },
+          { id:'stu', type:'studentPicker', label:'Student', required:true },
+          { id:'pe', type:'email', label:'Parent email', required:true, prefillFrom:'parentEmail' },
+          { id:'gradeReg', type:'dropdown', label:'Which grade are you registering FOR (next year)?', required:true, options:['9','10','11','12'] },
+          { id:'pb1', type:'pageBreak', label:'Course selection' },
+          { id:'h9', type:'sectionHeader', label:'9th Grade Courses', showIf:{field:'gradeReg',op:'equals',value:'9'} },
+          { id:'m9', type:'radio', label:'Math', required:true, options:['Algebra I','Geometry','Algebra II'], showIf:{field:'gradeReg',op:'equals',value:'9'} },
+          { id:'s9', type:'radio', label:'Science', required:true, options:['Physical Science','Biology'], showIf:{field:'gradeReg',op:'equals',value:'9'} },
+          { id:'h12', type:'sectionHeader', label:'12th Grade Courses', showIf:{field:'gradeReg',op:'equals',value:'12'} },
+          { id:'m12', type:'radio', label:'Math', required:true, options:['Pre-Calculus','Calculus','Statistics'], showIf:{field:'gradeReg',op:'equals',value:'12'} },
+          { id:'s12', type:'radio', label:'Science', required:true, options:['Physics','Anatomy & Physiology'], showIf:{field:'gradeReg',op:'equals',value:'12'} },
+          { id:'cc', type:'calculation', label:'Courses selected', calc:{op:'count',fields:['m9','s9','m12','s12']} },
+          { id:'pb2', type:'pageBreak', label:'Sign-off' },
+          { id:'ssig', type:'signature', label:'Student signature', required:true } ]}] } },
+      'demo-homeschool': { access:'private', form:{ id:'demo-homeschool', title:'Homeschool Opportunities Sign Up',
+        description:'Homeschool families sign up for HCS opportunities. Verify with any email + any 6-digit code.',
+        confirmationMessage:'Sign-up received! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
+          { id:'secF', type:'sectionHeader', label:'Family' },
+          { id:'pf', type:'text', label:'Parent first name', required:true, prefillFrom:'parentFirst' },
+          { id:'pe', type:'email', label:'Parent email', required:true, prefillFrom:'parentEmail' },
+          { id:'students', type:'studentPicker', label:'Which student(s) are you signing up?', required:true, multiple:true },
+          { id:'umbrella', type:'yesno', label:'Are you enrolled in the HCS Homeschool Umbrella?', required:true },
+          { id:'secSp', type:'sectionHeader', label:'Specials Classes' },
+          { id:'specials', type:'checkboxes', label:'Select any specials classes', options:['Art','Music','Physical Education','Science Lab','Spanish'] },
+          { id:'secT', type:'sectionHeader', label:'Standardized Testing' },
+          { id:'tests', type:'checkboxes', label:'Which test(s)?', options:['PSAT','SAT','Iowa / Terra Nova','MACS Academic Testing'] },
+          { id:'pic', type:'radio', label:'Spring Picture Day', options:['Yes — order a package','Yes — digital only','No thank you'] } ]}] } },
+      'demo-preapproved': { access:'private', form:{ id:'demo-preapproved', title:'Pre-Approved Trip Request',
+        description:'Request pre-approval for a student absence. Verify with any email + any 6-digit code.',
+        confirmationMessage:'Trip request submitted! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
+          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
+          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
+          { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail' },
+          { id:'students', type:'studentPicker', label:'Which student(s) will be absent?', required:true, multiple:true },
+          { id:'sd', type:'date', label:'First day of absence', required:true },
+          { id:'ed', type:'date', label:'Last day of absence', required:true },
+          { id:'reason', type:'textarea', label:'Reason / destination for the trip', required:true },
+          { id:'sig', type:'signature', label:'Parent / guardian signature', required:true } ]}] } }
+    };
+    var ORDER = ['demo-open','demo-parent','demo-conference','demo-physical','demo-trip','demo-course','demo-homeschool','demo-preapproved'];
+    function qs(k){ return new URLSearchParams(location.search).get(k); }
+    window.FORM_ID = qs('form') && FORMS[qs('form')] ? qs('form') : 'demo-open';
+    window.PREVIEW = true;
+    try { localStorage.removeItem('hcsFormsToken'); } catch(e){}
+    var API = {
+      getPublicForm: function(formId, token){ var s=FORMS[formId]; if(!s) return {ok:false,reason:'not-found'};
+        if(s.access==='private' && !token) return {ok:false,reason:'auth-required',access:'private'};
+        return {ok:true, form:s.form, verifiedVia: token?'otp':'open', prefill: token?PREFILL:null }; },
+      authRequestOtp: function(){ return {ok:true, msg:'(Demo) enter any 6-digit code.'}; },
+      authVerifyOtp: function(email, code){ return /^\d{6}$/.test(String(code||'')) ? {ok:true,token:'demo',email:email} : {ok:false,msg:'Enter any 6-digit code (demo).'}; },
+      submitForm: function(formId){ return {ok:true, submissionId:'DEMO-'+Math.floor(Math.random()*100000), message:FORMS[formId].form.confirmationMessage}; }
+    };
+    function runnerObj(){ var s=null,f=null; var o={ withSuccessHandler:function(fn){s=fn;return o;}, withFailureHandler:function(fn){f=fn;return o;} };
+      Object.keys(API).forEach(function(m){ o[m]=function(){ var a=arguments; setTimeout(function(){ try{ s&&s(API[m].apply(null,a)); }catch(e){ f&&f(e); } },140); }; }); return o; }
+    window.google = { script: { get run(){ return runnerObj(); } } };
+    window.addEventListener('DOMContentLoaded', function(){
+      var bar=document.getElementById('pvbar');
+      bar.innerHTML='<span class="pvtag">PREVIEW · demo</span> <label style="font-size:.82rem">Sample form: '+
+        '<select id="pvsel">'+ORDER.map(function(id){return '<option value="'+id+'"'+(id===window.FORM_ID?' selected':'')+'>'+FORMS[id].form.title+'</option>';}).join('')+'</select></label>'+
+        '<a class="sp" href="index.html">← All views</a>';
+      document.getElementById('pvsel').onchange=function(){ location.search='?form='+this.value; };
+    });
+  })();
+</script>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var TOKEN_KEY = 'hcsFormsToken';
+  var TOKEN = null; try { TOKEN = localStorage.getItem(TOKEN_KEY); } catch (e) {}
+  var IS_PREVIEW = (typeof PREVIEW_MODE !== 'undefined' && PREVIEW_MODE === '1');
+  var EDIT_ID = (typeof EDIT_SUB !== 'undefined' && EDIT_SUB) ? EDIT_SUB : '';
+  var EDIT_T  = (typeof EDIT_TOKEN !== 'undefined' && EDIT_TOKEN) ? EDIT_TOKEN : '';
+  var IS_EDIT = !!EDIT_ID;
+  var EDIT_ANSWERS = null; // stored answers to pre-fill when editing
+  var ON_FILE = {};        // fieldId -> true when a file/signature is already on record
+  var FIELDS = [];      // flat INPUT-field metadata (values + validation)
+  var VISALL = [];      // ALL fields incl. section headers/descriptions (for show/hide)
+  var PREFILL = null;   // { parent:{first,last,email}, students:[...] } for verified parents
+  var VIA = 'open';
+  var otpEmail = '';
+  var ATTACH = {};      // fieldId -> [{ name, mimeType, b64 }] for file/signature fields
+  var SIG_DRAWN = {};   // fieldId -> true once the signature canvas has strokes
+  var PENDING_READS = 0; // in-flight FileReader count; block submit/next until 0
+  var PAGES = [];       // [{ title, fields:[...] }] split at pageBreak markers
+  var CUR = 0;          // current page index
+  var LOCKED = false;
+
+  loadForm();
+
+  function loadForm() {
+    shell('<div class="card flush-top card-pad center"><span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span><p class="help" style="margin-top:10px">Loading form…</p></div>');
+    var runner = google.script.run
+      .withSuccessHandler(onForm)
+      .withFailureHandler(function (e) { message('Something went wrong', String(e && e.message || e)); });
+    if (IS_PREVIEW) runner.getFormPreview(FORM_ID);
+    else if (IS_EDIT) runner.getSubmissionForEdit(FORM_ID, EDIT_ID, EDIT_T);
+    else runner.getPublicForm(FORM_ID, TOKEN);
+  }
+
+  function onForm(res) {
+    if (!res) return message('Unavailable', 'This form can’t be shown right now.');
+    if (!res.ok) {
+      if (res.reason === 'auth-required' && res.access === 'private') return renderOtp();
+      return message.apply(null, reasonText(res));
+    }
+    PREFILL = res.prefill || null;
+    VIA = res.verifiedVia || 'open';
+    if (IS_EDIT) {
+      EDIT_ANSWERS = res.answers || {}; ON_FILE = res.onFile || {};
+      // No FACTS session in edit mode — rebuild a minimal prefill so any studentPicker
+      // renders its stored option(s) and can show the saved selection.
+      var studs = [];
+      (res.form.pages || []).forEach(function (pg) { (pg.fields || []).forEach(function (f) {
+        if (f.type !== 'studentPicker') return;
+        var v = EDIT_ANSWERS[f.id];
+        (Array.isArray(v) ? v : (v ? [v] : [])).forEach(function (name) {
+          if (name && !studs.some(function (s) { return s.displayName === name; })) studs.push({ displayName: name, grade: '', first: '', last: '' });
+        });
+      }); });
+      PREFILL = { parent: {}, students: studs };
+    }
+    renderForm(res.form);
+  }
+
+  // ---------- shell / messages ----------
+  function shell(inner) {
+    app.innerHTML =
+      '<div class="page">' +
+        '<div class="brandbar">' +
+          '<img class="logo" src="' + HCS_LOGO + '" alt="HCS">' +
+          '<span class="name">HCS Forms</span>' +
+        '</div><div class="goldrule"></div>' +
+        inner +
+        '<div class="footer">Harford Christian School</div>' +
+      '</div>';
+  }
+  function message(title, body) {
+    shell('<div class="card flush-top card-pad"><h1 class="form-title">' + FormsUI.esc(title) + '</h1>' +
+      '<p class="form-desc">' + FormsUI.esc(body || '') + '</p></div>');
+  }
+  function reasonText(res) {
+    var r = res && res.reason;
+    if (r === 'not-found') return ['Form not found', 'This form does not exist or the link is incorrect.'];
+    if (r === 'not-open') return ['Not open yet', 'This form opens ' + fmtWhen(res.openDate) + '. Please check back then.'];
+    if (r === 'closed') return ['This form is closed', 'The deadline' + (res.closeDate ? ' (' + fmtWhen(res.closeDate) + ')' : '') + ' has passed.'];
+    if (r === 'full') return ['This form is full', 'It has reached its response limit and can no longer accept submissions.'];
+    if (r === 'locked' || r === 'not-published') return ['Form unavailable', 'This form is not currently accepting responses.'];
+    if (r === 'auth-required') return ['Sign-in required', 'This form is only available to staff.'];
+    if (r === 'bad-token') return ['Link expired', 'This edit link is no longer valid. Please use the most recent confirmation email.'];
+    if (r === 'edit-disabled') return ['Editing is off', 'This form’s responses can’t be edited after submitting.'];
+    if (r === 'not-editable') return ['Can’t edit this response', 'This response has already been ' + (String(res.status || '').toLowerCase() || 'processed') + ' and can no longer be changed.'];
+    return ['Unavailable', 'This form can’t be shown right now.'];
+  }
+  function fmtWhen(s) {
+    if (!s) return 'soon';
+    var d = new Date(String(s).indexOf('T') === -1 ? s + 'T00:00:00' : s);
+    if (isNaN(d.getTime())) return String(s);
+    try { return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return d.toLocaleString(); }
+  }
+
+  // ---------- OTP login (Private forms) ----------
+  function renderOtp() {
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Verify your email</h1>' +
+        '<p class="form-desc">Enter the email Harford Christian has on file. We’ll send you a 6-digit code.</p></div>' +
+        '<div class="field"><label for="otpEmail">Email address</label><input class="control" id="otpEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>' +
+        '<div id="otpErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="otpSend" class="btn block" type="button">Send code</button>' +
+      '</div>');
+    document.getElementById('otpSend').addEventListener('click', sendCode);
+    document.getElementById('otpEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendCode(); });
+  }
+
+  function sendCode() {
+    var email = (document.getElementById('otpEmail').value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return otpError('Enter a valid email address.');
+    otpEmail = email;
+    var btn = document.getElementById('otpSend'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
+    google.script.run.withSuccessHandler(function () { renderCodeEntry(); })
+      .withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Send code'; otpError(String(e && e.message || e)); })
+      .authRequestOtp(email);
+  }
+
+  function renderCodeEntry() {
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Enter your code</h1>' +
+        '<p class="form-desc">If <strong>' + FormsUI.esc(otpEmail) + '</strong> is on file, a 6-digit code is on its way. It expires in 10 minutes.</p></div>' +
+        '<div class="field"><label for="otpCode">6-digit code</label><input class="control" id="otpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>' +
+        '<div id="otpErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="otpVerify" class="btn block" type="button">Verify</button>' +
+        '<div style="display:flex;gap:10px;margin-top:8px"><button id="otpResend" class="btn ghost block" type="button">Resend code</button>' +
+        '<button id="otpBack" class="btn ghost block" type="button">Use a different email</button></div>' +
+      '</div>');
+    document.getElementById('otpVerify').addEventListener('click', verifyCode);
+    document.getElementById('otpBack').addEventListener('click', renderOtp);
+    var resend = document.getElementById('otpResend');
+    resend.addEventListener('click', function () {
+      resend.disabled = true; var n = 20;
+      resend.textContent = 'Resend in ' + n + 's';
+      google.script.run.authRequestOtp(otpEmail);
+      FormsUI.toast('New code sent (if the email is on file)');
+      var t = setInterval(function () { n--; resend.textContent = n > 0 ? 'Resend in ' + n + 's' : 'Resend code'; if (n <= 0) { clearInterval(t); resend.disabled = false; } }, 1000);
+    });
+    var codeEl = document.getElementById('otpCode');
+    codeEl.focus();
+    codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') verifyCode(); });
+  }
+
+  function verifyCode() {
+    var code = (document.getElementById('otpCode').value || '').trim();
+    if (!/^\d{6}$/.test(code)) return otpError('Enter the 6-digit code.');
+    var btn = document.getElementById('otpVerify'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Verifying…';
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.ok && res.token) {
+        TOKEN = res.token; try { localStorage.setItem(TOKEN_KEY, TOKEN); } catch (e) {}
+        loadForm();
+      } else {
+        btn.disabled = false; btn.textContent = 'Verify';
+        otpError((res && res.msg) || 'That code is not correct.');
+      }
+    }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Verify'; otpError(String(e && e.message || e)); })
+      .authVerifyOtp(otpEmail, code);
+  }
+
+  function otpError(msg) { var e = document.getElementById('otpErr'); if (e) { e.style.display = 'block'; e.textContent = msg; } }
+
+  function signOut() {
+    TOKEN = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    loadForm();
+  }
+
+  // ---------- render form ----------
+  function renderForm(form) {
+    FIELDS = []; VISALL = [];
+    var body = '<div class="card flush-top card-pad stack">';
+    if (IS_PREVIEW) body += '<div class="notice info">' + FormsUI.icon('eye') + ' <strong>Preview</strong> — this is exactly what submitters see (with sample data). Nothing is saved.</div>';
+    if (IS_EDIT) body += '<div class="notice info">' + FormsUI.icon('edit') + ' <strong>Editing your response</strong> — make your changes below and save. You can also withdraw it entirely.</div>';
+    // honeypot (bots fill it; humans never see it) — server drops any submission with this set
+    body += '<input type="text" id="hpField" name="hp_addr" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute!important;left:-9999px;top:auto;width:1px;height:1px;opacity:0">';
+    if (VIA === 'otp' && PREFILL && PREFILL.parent) {
+      body += '<div class="notice info" style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+        '<span>Signed in as <strong>' + FormsUI.esc(PREFILL.parent.email) + '</strong></span>' +
+        '<button id="signOut" class="btn ghost sm" type="button">Not you?</button></div>';
+    } else if (TOKEN && !IS_EDIT) {
+      // A parent session is still stored on this device (e.g. a shared/library computer) even though
+      // this form didn't need it — always offer a way to clear it so the next person starts fresh.
+      body += '<div class="notice info" style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+        '<span>You’re still signed in on this device from a previous form.</span>' +
+        '<button id="signOut" class="btn ghost sm" type="button">Sign out</button></div>';
+    }
+    body += '<div><h1 class="form-title">' + FormsUI.esc(form.title) + '</h1>' +
+            (form.description ? '<p class="form-desc">' + FormsUI.esc(form.description) + '</p>' : '') + '</div>';
+    if (form.locked) body += '<div class="notice err">This form is not currently accepting responses.</div>';
+    body += '<div id="fields"></div>';
+    body += '<div id="formErr" class="notice err" role="alert" style="display:none"></div>';
+    body += '<div id="pageNav"></div>';
+    body += '</div>';
+    shell(body);
+
+    LOCKED = !!form.locked;
+    var flat = [];
+    (form.pages || []).forEach(function (pg) { (pg.fields || []).forEach(function (f) { flat.push(f); }); });
+    PAGES = [{ title: '', fields: [] }];
+    flat.forEach(function (f) {
+      if (f.type === 'pageBreak') PAGES.push({ title: f.label || '', fields: [] });
+      else PAGES[PAGES.length - 1].fields.push(f);
+    });
+    var host = document.getElementById('fields');
+    PAGES.forEach(function (pg, pi) {
+      var pdiv = FormsUI.el('div', { 'class': 'formpage stack', 'data-page': pi });
+      if (PAGES.length > 1 && pg.title) pdiv.appendChild(FormsUI.el('div', { 'class': 'section-head' }, FormsUI.esc(pg.title)));
+      pg.fields.forEach(function (f) { pdiv.appendChild(renderField(f)); });
+      host.appendChild(pdiv);
+    });
+
+    if (!IS_EDIT) applyPrefill();
+    initSignatures();
+    if (IS_EDIT) {
+      FIELDS.forEach(function (f) { if (EDIT_ANSWERS && EDIT_ANSWERS[f.id] != null) writeValue(f, EDIT_ANSWERS[f.id]); });
+      markOnFileFields();
+    } else {
+      restoreDraft();
+      // URL-parameter prefill (staff-shared links): ?fieldId=value
+      if (typeof URL_PREFILL === 'object' && URL_PREFILL) {
+        FIELDS.forEach(function (f) { if (URL_PREFILL[f.id] != null && URL_PREFILL[f.id] !== '') writeValue(f, URL_PREFILL[f.id]); });
+      }
+    }
+    recomputeCalc();
+    applyVisibility();
+    host.addEventListener('input', onFieldChange);
+    host.addEventListener('change', onFieldChange);
+    var so = document.getElementById('signOut'); if (so) so.addEventListener('click', signOut);
+    CUR = 0; showPage(0);
+
+    if (form.reviewMode) {
+      var demo = (typeof window !== 'undefined' && window.PREVIEW) ? ' <em>(This is a demo — no email is actually sent.)</em>' : '';
+      FormsUI.modal('Before you begin',
+        'The email address you enter will receive <strong>two emails</strong> after you submit: a <strong>confirmation</strong> (to you as the requester) and a copy of the <strong>notification the form’s owner receives</strong>.' + demo,
+        'Got it');
+    }
+  }
+
+  // ---------- pagination ----------
+  function showPage(i) {
+    CUR = Math.max(0, Math.min(i, PAGES.length - 1));
+    document.querySelectorAll('.formpage').forEach(function (p) {
+      p.style.display = (LOCKED || Number(p.getAttribute('data-page')) === CUR) ? '' : 'none';
+    });
+    renderNav();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+  }
+  function renderNav() {
+    var nav = document.getElementById('pageNav'); if (!nav) return;
+    if (LOCKED) { nav.innerHTML = ''; document.querySelectorAll('.formpage').forEach(function (p) { p.style.display = ''; }); return; }
+    var multi = PAGES.length > 1;
+    var prog = multi ? '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + PAGES.length + '" aria-valuenow="' + (CUR + 1) + '" aria-label="Step ' + (CUR + 1) + ' of ' + PAGES.length + '"><div class="progress-bar" style="width:' + Math.round((CUR + 1) / PAGES.length * 100) + '%"></div></div>' +
+      '<p class="help center">Step ' + (CUR + 1) + ' of ' + PAGES.length + (PAGES[CUR].title ? ' — ' + FormsUI.esc(PAGES[CUR].title) : '') + '</p>' : '';
+    var btns = '<div style="display:flex;gap:10px;margin-top:14px">';
+    if (multi && CUR > 0) btns += '<button class="btn ghost" id="prevBtn" type="button">← Back</button>';
+    var lastPage = CUR >= PAGES.length - 1;
+    btns += lastPage
+      ? '<button class="btn block" id="submitBtn" type="button">' + (IS_EDIT ? 'Save changes' : 'Submit') + '</button>'
+      : '<button class="btn block" id="nextBtn" type="button">Next →</button>';
+    btns += '</div>';
+    if (IS_EDIT && lastPage) btns += '<div style="margin-top:10px"><button class="btn ghost block" id="withdrawBtn" type="button" style="color:var(--hcs-red)">Withdraw this response</button></div>';
+    nav.innerHTML = prog + btns;
+    var pv = document.getElementById('prevBtn'); if (pv) pv.onclick = function () { showPage(CUR - 1); };
+    var nx = document.getElementById('nextBtn'); if (nx) nx.onclick = onNext;
+    var sb = document.getElementById('submitBtn'); if (sb) sb.onclick = onSubmit;
+    var wb = document.getElementById('withdrawBtn'); if (wb) wb.onclick = onWithdraw;
+  }
+  function onNext() {
+    if (uploadsPending('nextBtn')) return;
+    var r = validatePage(CUR);
+    var formErr = document.getElementById('formErr');
+    if (!r.ok) { formErr.style.display = 'block'; formErr.textContent = 'Please fix the highlighted fields.'; navigateToField(r.firstBad); return; }
+    formErr.style.display = 'none';
+    showPage(CUR + 1);
+  }
+  // if files are still being read, wait and retry so an attachment is never dropped
+  function uploadsPending(btnId) {
+    if (PENDING_READS <= 0) return false;
+    var fe = document.getElementById('formErr'); if (fe) { fe.style.display = 'block'; fe.textContent = 'Your file is still attaching — one moment…'; }
+    setTimeout(function () { var b = document.getElementById(btnId); if (b) b.click(); }, 350);
+    return true;
+  }
+  function validatePage(pi) {
+    var ans = currentAnswers(), ok = true, firstBad = null;
+    PAGES[pi].fields.forEach(function (f) {
+      if (f.type === 'sectionHeader' || f.type === 'description' || f.type === 'calculation') return;
+      if (!evalShowIf(f.showIf, ans)) { setErr(f, ''); return; }
+      var msg = '';
+      if (f.type === 'file') { if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please attach a file.'; }
+      else if (f.type === 'signature') { captureSignature(f); if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !readValue(f) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please sign in the box, or type your full name.'; }
+      else { var v = readValue(f); if (f.required && fieldEmpty(f, v)) msg = 'This field is required.'; else if (!fieldEmpty(f, v) && f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = 'Enter a valid email address.'; }
+      setErr(f, msg); if (msg) { ok = false; if (!firstBad) firstBad = f; }
+    });
+    return { ok: ok, firstBad: firstBad };
+  }
+  function pageOfField(fid) { for (var i = 0; i < PAGES.length; i++) if (PAGES[i].fields.some(function (f) { return f.id === fid; })) return i; return CUR; }
+  function navigateToField(f) {
+    if (!f) return; var pi = pageOfField(f.id); if (pi !== CUR) showPage(pi);
+    var w = document.querySelector('[data-fid="' + f.id + '"]'); if (!w) return;
+    w.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var c = w.querySelector('input:not([type=hidden]),select,textarea,canvas'); if (c) { try { c.focus({ preventScroll: true }); } catch (e) { try { c.focus(); } catch (x) {} } }
+  }
+  function onFieldChange() { applyVisibility(); recomputeCalc(); saveDraft(); }
+
+  // ---------- calculation fields ----------
+  // evalShowIf + computeCalc come from SharedLogic.html (generated from Logic.js) — one source, server-identical.
+  function recomputeCalc() {
+    var ans = currentAnswers();
+    // mirror the server: hidden fields don't count
+    FIELDS.forEach(function (f) { if (!evalShowIf(f.showIf, ans)) ans[f.id] = isMultiField(f) ? [] : ''; });
+    FIELDS.forEach(function (f) { if (f.type === 'calculation') { var el = document.getElementById('f_' + f.id); if (el) el.textContent = computeCalc(f, ans); } });
+  }
+
+  // ---------- save & resume (localStorage) ----------
+  function draftKey() { return 'hcsFormsDraft:' + FORM_ID; }
+  function saveDraft() {
+    if (IS_EDIT) return; // editing an existing response — don't touch the new-submission draft
+    try { var d = {}; FIELDS.forEach(function (f) { if (f.type === 'file' || f.type === 'signature' || f.type === 'calculation') return; d[f.id] = readValue(f); }); localStorage.setItem(draftKey(), JSON.stringify(d)); } catch (e) {}
+  }
+  // In edit mode, note which file/signature fields already have a value so re-upload is optional.
+  function markOnFileFields() {
+    Object.keys(ON_FILE || {}).forEach(function (id) {
+      var wrap = document.querySelector('[data-fid="' + id + '"]');
+      if (wrap) wrap.appendChild(FormsUI.el('div', { 'class': 'help' }, FormsUI.icon('clip', { size: 14 }) + ' A file is already on record — leave blank to keep it, or add a new one to replace it.'));
+    });
+  }
+  function clearDraft() { try { localStorage.removeItem(draftKey()); } catch (e) {} }
+  function restoreDraft() {
+    var raw; try { raw = localStorage.getItem(draftKey()); } catch (e) {}
+    if (!raw) return;
+    var d; try { d = JSON.parse(raw); } catch (e) { return; }
+    var any = false;
+    FIELDS.forEach(function (f) {
+      if (!(f.id in d)) return;
+      var v = d[f.id];
+      if (v === '' || (Array.isArray(v) && !v.length)) return;
+      writeValue(f, v); any = true;
+    });
+    if (any) {
+      var host = document.getElementById('fields');
+      var note = FormsUI.el('div', { 'class': 'notice info' }, 'We restored your saved progress. <a href="#" id="startOver">Start over</a>');
+      host.parentNode.insertBefore(note, host);
+      document.getElementById('startOver').onclick = function (e) { e.preventDefault(); clearDraft(); location.reload(); };
+    }
+  }
+  function writeValue(f, v) {
+    var name = 'f_' + f.id;
+    if (isMultiField(f) || f.type === 'radio' || f.type === 'yesno' || f.type === 'rating') {
+      var arr = Array.isArray(v) ? v : [v];
+      document.querySelectorAll('input[name="' + name + '"]').forEach(function (inp) {
+        if (arr.indexOf(inp.value) > -1) { inp.checked = true; var box = inp.closest('.choice'); if (box) box.classList.add('selected'); }
+      });
+    } else { var el = document.getElementById(name); if (el && v != null) el.value = v; }
+  }
+
+  function renderField(f) {
+    if (f.type === 'sectionHeader') { VISALL.push(f); return FormsUI.el('div', { 'class': 'section-head', 'data-fid': f.id }, FormsUI.esc(f.label)); }
+    if (f.type === 'description') { VISALL.push(f); return FormsUI.el('p', { 'class': 'desc-block', 'data-fid': f.id }, FormsUI.esc(f.label)); }
+
+    FIELDS.push(f); VISALL.push(f);
+    var wrap = FormsUI.el('div', { 'class': 'field', 'data-fid': f.id });
+    var lbl = '<label id="lbl-' + f.id + '" class="fieldlabel">' + FormsUI.esc(f.label) + (f.required ? '<span class="req" aria-hidden="true">*</span>' : '') + '</label>';
+    var name = 'f_' + f.id;
+    var ctrl = '';
+
+    switch (f.type) {
+      case 'textarea':
+        ctrl = '<textarea class="control" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '"></textarea>'; break;
+      case 'studentPicker': {
+        var studs = (PREFILL && PREFILL.students) || [];
+        var sOpts = studs.map(function (s) { return { v: s.displayName, label: s.displayName + (s.grade ? ' (Grade ' + s.grade + ')' : '') }; });
+        ctrl = pickerControl(name, sOpts, f.multiple, '— Choose student —'); break;
+      }
+      case 'staffPicker': {
+        var tOpts = (f.options || []).map(function (o) { return { v: o, label: o }; });
+        ctrl = pickerControl(name, tOpts, f.multiple, '— Choose —'); break;
+      }
+      case 'dropdown':
+        ctrl = '<select class="control" id="' + name + '"><option value="">— Choose —</option>' +
+          (f.options || []).map(function (o) { var c = capNote(f, o); return '<option value="' + FormsUI.esc(o) + '"' + (c.full ? ' disabled' : '') + '>' + FormsUI.esc(o) + c.suffix + '</option>'; }).join('') + '</select>'; break;
+      case 'radio':
+      case 'yesno': {
+        var opts = f.type === 'yesno' ? ['Yes', 'No'] : (f.options || []);
+        ctrl = '<div class="choices">' + opts.map(function (o) {
+          var c = capNote(f, o);
+          return '<label class="choice"' + (c.full ? ' style="opacity:.55"' : '') + '><input type="radio" name="' + name + '" value="' + FormsUI.esc(o) + '"' + (c.full ? ' disabled' : '') + '><span>' + FormsUI.esc(o) + c.suffix + '</span></label>';
+        }).join('') + '</div>'; break;
+      }
+      case 'checkboxes':
+        ctrl = '<div class="choices">' + (f.options || []).map(function (o) {
+          var c = capNote(f, o);
+          return '<label class="choice"' + (c.full ? ' style="opacity:.55"' : '') + '><input type="checkbox" name="' + name + '" value="' + FormsUI.esc(o) + '"' + (c.full ? ' disabled' : '') + '><span>' + FormsUI.esc(o) + c.suffix + '</span></label>';
+        }).join('') + '</div>'; break;
+      case 'file': {
+        var acc = f.accept ? ' accept="' + FormsUI.esc(f.accept) + '"' : '';
+        ctrl = '<input class="control" type="file" id="' + name + '"' + (f.multiple ? ' multiple' : '') + acc + '><div class="filelist help" id="fl_' + f.id + '"></div>'; break;
+      }
+      case 'signature': {
+        ctrl = '<canvas class="sigpad" id="sig_' + f.id + '"></canvas>' +
+          '<div class="sigbar"><button type="button" class="btn ghost sm" id="sigclr_' + f.id + '">Clear</button></div>' +
+          '<input class="control" id="' + name + '" placeholder="Type your full name" style="margin-top:8px">'; break;
+      }
+      case 'date':  ctrl = '<input class="control" type="date" id="' + name + '">'; break;
+      case 'time':  ctrl = '<input class="control" type="time" id="' + name + '">'; break;
+      case 'rating': {
+        var rmax = Number(f.max) || 5;
+        var rOpts = []; for (var ri = 1; ri <= rmax; ri++) rOpts.push(String(ri));
+        ctrl = '<div class="choices" style="flex-direction:row;flex-wrap:wrap">' + rOpts.map(function (o) {
+          return '<label class="choice" style="flex:0 0 auto"><input type="radio" name="' + name + '" value="' + o + '"><span>' + o + '</span></label>';
+        }).join('') + '</div>'; break;
+      }
+      case 'number':ctrl = '<input class="control" type="number" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '">'; break;
+      case 'email': ctrl = '<input class="control" type="email" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '">'; break;
+      case 'phone': ctrl = '<input class="control" type="tel" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '">'; break;
+      case 'calculation': ctrl = '<div class="control calc-value" id="' + name + '" aria-readonly="true">0</div>'; break;
+      default:      ctrl = '<input class="control" type="text" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '">';
+    }
+    wrap.innerHTML = lbl + ctrl + (f.help ? '<p class="help">' + FormsUI.esc(f.help) + '</p>' : '') + '<p class="error" id="err-' + f.id + '"></p>';
+
+    wrap.querySelectorAll('.choice input').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        if (inp.type === 'radio') wrap.querySelectorAll('.choice').forEach(function (c) { c.classList.remove('selected'); });
+        var box = inp.closest('.choice');
+        if (inp.type === 'checkbox') box.classList.toggle('selected', inp.checked);
+        else box.classList.add('selected');
+      });
+    });
+    var fileInp = wrap.querySelector('input[type="file"]');
+    if (fileInp) fileInp.addEventListener('change', function () { handleFiles(f, fileInp); });
+    var clr = wrap.querySelector('#sigclr_' + f.id);
+    if (clr) clr.addEventListener('click', function () { clearSignature(f.id); });
+
+    // accessibility: associate label, mark required, describe errors, group choices
+    var lblEl = wrap.querySelector('label.fieldlabel');
+    var primary = wrap.querySelector('#f_' + f.id);            // null for choice-group fields
+    var grp = wrap.querySelector('.choices');
+    if (grp) { grp.setAttribute('role', 'group'); grp.setAttribute('aria-labelledby', 'lbl-' + f.id); grp.setAttribute('aria-describedby', 'err-' + f.id); if (f.required) grp.setAttribute('aria-required', 'true'); }
+    if (primary && lblEl) lblEl.setAttribute('for', 'f_' + f.id);
+    if (primary) { if (f.required) primary.setAttribute('aria-required', 'true'); primary.setAttribute('aria-describedby', 'err-' + f.id); }
+    var canv = wrap.querySelector('canvas'); if (canv) { canv.setAttribute('role', 'img'); canv.setAttribute('aria-label', (f.label || 'Signature') + ' — draw with mouse or finger'); }
+    return wrap;
+  }
+
+  // ---------- file uploads ----------
+  function handleFiles(f, input) {
+    var list = document.getElementById('fl_' + f.id);
+    var arr = Array.prototype.slice.call(input.files);
+    if (!f.multiple) arr = arr.slice(0, 1);
+    ATTACH[f.id] = [];
+    list.innerHTML = '';
+    arr.forEach(function (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        list.innerHTML += '<div class="fitem" style="color:var(--err)">' + FormsUI.esc(file.name) + ' — too large (max 10 MB)</div>';
+        return;
+      }
+      var reader = new FileReader();
+      PENDING_READS++;
+      reader.onload = function () { ATTACH[f.id].push({ name: file.name, mimeType: file.type || 'application/octet-stream', b64: String(reader.result).split(',')[1] }); PENDING_READS = Math.max(0, PENDING_READS - 1); };
+      reader.onerror = function () { PENDING_READS = Math.max(0, PENDING_READS - 1); };
+      reader.readAsDataURL(file);
+      list.innerHTML += '<div class="fitem">📎 ' + FormsUI.esc(file.name) + ' (' + Math.round(file.size / 1024) + ' KB)</div>';
+    });
+    if (arr.length) {
+      list.innerHTML += '<button type="button" class="btn ghost sm" id="clr_' + f.id + '" style="margin-top:4px">Remove file' + (arr.length > 1 ? 's' : '') + '</button>';
+      var clr = document.getElementById('clr_' + f.id);
+      if (clr) clr.onclick = function () { ATTACH[f.id] = []; input.value = ''; list.innerHTML = ''; };
+    }
+  }
+
+  // ---------- signature pad ----------
+  function initSignatures() {
+    FIELDS.forEach(function (f) { if (f.type === 'signature') { var c = document.getElementById('sig_' + f.id); if (c) setupSigPad(c, f.id); } });
+  }
+  function setupSigPad(canvas, fid) {
+    var ratio = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth || 600, h = canvas.clientHeight || 180;
+    canvas.width = w * ratio; canvas.height = h * ratio;
+    var ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#1f2430';
+    var drawing = false, last = null;
+    function pos(e) { var r = canvas.getBoundingClientRect(); var p = (e.touches && e.touches[0]) || e; return { x: p.clientX - r.left, y: p.clientY - r.top }; }
+    function start(e) { e.preventDefault(); drawing = true; last = pos(e); }
+    function move(e) { if (!drawing) return; e.preventDefault(); var p = pos(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; SIG_DRAWN[fid] = true; }
+    function end() { drawing = false; }
+    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); canvas.addEventListener('touchend', end);
+  }
+  function clearSignature(fid) { var c = document.getElementById('sig_' + fid); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); SIG_DRAWN[fid] = false; delete ATTACH[fid]; }
+  function captureSignature(f) {
+    if (SIG_DRAWN[f.id]) { var c = document.getElementById('sig_' + f.id); ATTACH[f.id] = [{ name: 'signature.png', mimeType: 'image/png', b64: c.toDataURL('image/png').split(',')[1] }]; }
+    else { delete ATTACH[f.id]; }
+  }
+
+  // dropdown (single) or checkbox group (multiple) shared by student/staff pickers
+  function pickerControl(name, opts, multiple, ph) {
+    if (multiple) {
+      return '<div class="choices">' + opts.map(function (o) {
+        return '<label class="choice"><input type="checkbox" name="' + name + '" value="' + FormsUI.esc(o.v) + '"><span>' + FormsUI.esc(o.label) + '</span></label>';
+      }).join('') + '</div>';
+    }
+    return '<select class="control" id="' + name + '">' +
+      (opts.length !== 1 ? '<option value="">' + FormsUI.esc(ph) + '</option>' : '') +
+      opts.map(function (o) { return '<option value="' + FormsUI.esc(o.v) + '">' + FormsUI.esc(o.label) + '</option>'; }).join('') + '</select>';
+  }
+  function isMultiField(f) { return f.type === 'checkboxes' || ((f.type === 'studentPicker' || f.type === 'staffPicker') && f.multiple); }
+  // capacity remaining for an option (from server); full options are disabled + labeled
+  function capNote(f, o) {
+    if (!f.capacityLeft || f.capacityLeft[o] == null) return { full: false, suffix: '' };
+    var left = f.capacityLeft[o];
+    return { full: left <= 0, suffix: left <= 0 ? ' (full)' : ' (' + left + ' left)' };
+  }
+
+  // conditional logic (evalShowIf) + calc (computeCalc) live in SharedLogic.html — one source, generated from Logic.js.
+  function currentAnswers() { var a = {}; FIELDS.forEach(function (f) { a[f.id] = readValue(f); }); return a; }
+  function applyVisibility() {
+    var ans = currentAnswers();
+    VISALL.forEach(function (f) {
+      var w = document.querySelector('[data-fid="' + f.id + '"]');
+      if (w) w.style.display = evalShowIf(f.showIf, ans) ? '' : 'none';
+    });
+  }
+
+  // ---------- prefill ----------
+  function selectedStudent() {
+    var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
+    if (!picker || !PREFILL) return null;
+    var v = readValue(picker);
+    var arr = Array.isArray(v) ? v : (v ? [v] : []);
+    if (arr.length !== 1) return null; // grade derive only makes sense for a single selected student
+    return (PREFILL.students || []).filter(function (s) { return s.displayName === arr[0]; })[0] || null;
+  }
+  function setVal(id, v) { var el = document.getElementById('f_' + id); if (el != null && v != null) el.value = v; }
+
+  function applyPrefill() {
+    if (!PREFILL) return;
+    var p = PREFILL.parent || {};
+    var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
+
+    // auto-select when the parent has exactly one student
+    if (picker && (PREFILL.students || []).length === 1) {
+      if (picker.multiple) {
+        var cb = document.querySelector('input[name="f_' + picker.id + '"]');
+        if (cb) { cb.checked = true; cb.closest('.choice').classList.add('selected'); }
+      } else { setVal(picker.id, PREFILL.students[0].displayName); }
+    }
+
+    FIELDS.forEach(function (f) {
+      switch (f.prefillFrom) {
+        case 'parentFirst': setVal(f.id, p.first); break;
+        case 'parentLast':  setVal(f.id, p.last); break;
+        case 'parentEmail':
+          setVal(f.id, p.email);
+          var el = document.getElementById('f_' + f.id);
+          if (el) { el.readOnly = true; el.setAttribute('readonly', 'readonly'); }
+          break;
+      }
+    });
+    refreshStudentDerived();
+
+    if (picker) {
+      if (picker.multiple) {
+        document.querySelectorAll('input[name="f_' + picker.id + '"]').forEach(function (cb) { cb.addEventListener('change', refreshStudentDerived); });
+      } else {
+        var pel = document.getElementById('f_' + picker.id);
+        if (pel) pel.addEventListener('change', refreshStudentDerived);
+      }
+    }
+  }
+
+  function refreshStudentDerived() {
+    var s = selectedStudent();
+    FIELDS.forEach(function (f) {
+      if (f.prefillFrom !== 'studentGrade' && f.prefillFrom !== 'studentName') return;
+      var v = s ? (f.prefillFrom === 'studentGrade' ? s.grade : s.displayName) : '';
+      setVal(f.id, v);
+      // Only lock when we actually derived a value; otherwise leave it editable so a parent
+      // with 0 or >1 students selected can still complete a required field (no dead-end).
+      if (v) lockField(f.id, true); else lockField(f.id, false);
+    });
+  }
+  function lockField(id, on) {
+    var el = document.getElementById('f_' + id);
+    if (!el) return;
+    el.readOnly = !!on;
+    if (on) el.setAttribute('readonly', 'readonly'); else el.removeAttribute('readonly');
+  }
+
+  // ---------- collect + validate + submit ----------
+  function readValue(f) {
+    var name = 'f_' + f.id;
+    if (f.type === 'calculation') { var ce = document.getElementById(name); return ce ? ce.textContent.trim() : ''; }
+    if (isMultiField(f)) return Array.prototype.slice.call(document.querySelectorAll('input[name="' + name + '"]:checked')).map(function (i) { return i.value; });
+    if (f.type === 'radio' || f.type === 'yesno' || f.type === 'rating') { var c = document.querySelector('input[name="' + name + '"]:checked'); return c ? c.value : ''; }
+    var el = document.getElementById(name); return el ? el.value.trim() : '';
+  }
+  function fieldEmpty(f, v) { return isMultiField(f) ? v.length === 0 : v === ''; }
+  function setErr(f, msg) {
+    var wrap = document.querySelector('[data-fid="' + f.id + '"]');
+    if (!wrap) return;
+    wrap.classList.toggle('invalid', !!msg);
+    wrap.querySelector('.error').textContent = msg || '';
+    var primary = wrap.querySelector('#f_' + f.id) || wrap.querySelector('.choices');
+    if (primary) { if (msg) primary.setAttribute('aria-invalid', 'true'); else primary.removeAttribute('aria-invalid'); }
+  }
+
+  function onSubmit() {
+    if (uploadsPending('submitBtn')) return;
+    var answers = {}, firstBad = null, ok = true;
+    var ans0 = currentAnswers(), vis = {};
+    FIELDS.forEach(function (f) { vis[f.id] = evalShowIf(f.showIf, ans0); });
+    FIELDS.forEach(function (f) {
+      if (!vis[f.id]) return; // hidden by conditional logic — don't validate or submit
+      var msg = '';
+      if (f.type === 'file') {
+        if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please attach a file.';
+      } else if (f.type === 'signature') {
+        captureSignature(f);
+        answers[f.id] = readValue(f); // printed name
+        if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !readValue(f) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please sign in the box, or type your full name.';
+      } else {
+        var v = readValue(f); answers[f.id] = v;
+        if (f.required && fieldEmpty(f, v)) msg = 'This field is required.';
+        else if (!fieldEmpty(f, v) && f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = 'Enter a valid email address.';
+      }
+      setErr(f, msg);
+      if (msg) { ok = false; if (!firstBad) firstBad = f; }
+    });
+    var formErr = document.getElementById('formErr');
+    if (!ok) {
+      formErr.style.display = 'block'; formErr.textContent = 'Please fix the highlighted fields.';
+      navigateToField(firstBad);
+      return;
+    }
+    formErr.style.display = 'none';
+    if (IS_PREVIEW) { onSubmitDone({ ok: true, message: 'This is a preview — your response was NOT saved.', submissionId: 'PREVIEW' }); return; }
+    var btn = document.getElementById('submitBtn'); btn.disabled = true;
+    var label = IS_EDIT ? 'Save changes' : 'Submit';
+    btn.innerHTML = '<span class="spinner"></span> ' + (IS_EDIT ? 'Saving…' : 'Submitting…');
+    var run = google.script.run
+      .withSuccessHandler(onSubmitDone)
+      .withFailureHandler(function (e) { btn.disabled = false; btn.textContent = label; formErr.style.display = 'block'; formErr.textContent = String(e && e.message || e); });
+    if (IS_EDIT) run.updateSubmission(FORM_ID, EDIT_ID, EDIT_T, answers, ATTACH);
+    else run.submitForm(FORM_ID, answers, TOKEN, ATTACH, ((document.getElementById('hpField') || {}).value || ''));
+  }
+
+  function onWithdraw() {
+    FormsUI.confirm('Withdraw this response?', 'This cancels your submission. This can’t be undone, but you can submit the form again afterward.', 'Withdraw', 'Keep it')
+      .then(function (yes) {
+        if (!yes) return;
+        var wb = document.getElementById('withdrawBtn'); if (wb) { wb.disabled = true; wb.innerHTML = '<span class="spinner"></span> Withdrawing…'; }
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res && res.ok) {
+              shell('<div class="card flush-top card-pad center stack"><div style="color:var(--hcs-red)">' + FormsUI.icon('check', { cls: 'hcsi-lg' }) + '</div>' +
+                '<h1 class="form-title">Response withdrawn</h1>' +
+                '<p class="form-desc">' + FormsUI.esc(res.message || 'Your response has been withdrawn.') + '</p></div>');
+            } else {
+              if (wb) { wb.disabled = false; wb.textContent = 'Withdraw this response'; }
+              var fe = document.getElementById('formErr'); if (fe) { fe.style.display = 'block'; fe.textContent = (res && res.message) || (res && reasonText(res)[1]) || 'Could not withdraw this response.'; }
+            }
+          })
+          .withFailureHandler(function (e) { if (wb) { wb.disabled = false; wb.textContent = 'Withdraw this response'; } var fe = document.getElementById('formErr'); if (fe) { fe.style.display = 'block'; fe.textContent = String(e && e.message || e); } })
+          .withdrawSubmission(FORM_ID, EDIT_ID, EDIT_T);
+      });
+  }
+
+  function onSubmitDone(res) {
+    var btn = document.getElementById('submitBtn'), formErr = document.getElementById('formErr');
+    if (!res || !res.ok) {
+      if (btn) { btn.disabled = false; btn.textContent = IS_EDIT ? 'Save changes' : 'Submit'; }
+      if (res && res.errors) { FIELDS.forEach(function (f) { if (res.errors[f.id]) setErr(f, res.errors[f.id]); }); formErr.style.display = 'block'; formErr.textContent = 'Please fix the highlighted fields.'; }
+      else { formErr.style.display = 'block'; formErr.textContent = (res && res.message) || 'Submission failed. Please try again.'; }
+      return;
+    }
+    if (!IS_EDIT) clearDraft();
+    var nextStep = res.status === 'Pending Approval'
+      ? '<div class="notice info" style="text-align:left">Your submission will be reviewed. You’ll get an email with the decision.</div>' : '';
+    shell('<div class="card flush-top card-pad center stack">' +
+      '<div style="color:var(--hcs-red)">' + FormsUI.icon('check', { cls: 'hcsi-lg' }) + '</div>' +
+      '<h1 class="form-title">' + (IS_EDIT ? 'Changes saved' : 'Submitted') + '</h1>' +
+      '<p class="form-desc">' + FormsUI.esc(res.message) + '</p>' +
+      nextStep +
+      '<p class="help">Reference: ' + FormsUI.esc(res.submissionId) + '</p>' +
+      (IS_PREVIEW || IS_EDIT ? '' : '<button class="btn ghost" type="button" onclick="location.reload()">Submit another response</button>') +
+      '</div>');
+  }
+})();
+</script>
+</body></html>

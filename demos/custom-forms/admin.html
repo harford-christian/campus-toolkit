@@ -1,0 +1,1152 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta name="theme-color" content="#8B1E1E">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCS Forms — Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --hcs-red:#8B1E1E; --hcs-red-hover:#701818; --hcs-gold:#D4AF37; --hcs-gold-soft:#f6ecd0;
+    --bg:#f4f5f7; --card:#ffffff; --panel:#fbfafa;
+    --text:#2b2b2b; --muted:#6b7280; --line:#e2e4e8; --line-strong:#cfd3da;
+    --ok:#2e7d32; --ok-bg:#e8f5e9; --err:#b42318; --err-bg:#fdeceb; --warn:#b45309; --warn-bg:#fdf3e7;
+    --radius:12px; --radius-sm:9px;
+    --shadow:0 1px 2px rgba(16,24,40,.06), 0 6px 22px rgba(16,24,40,.06);
+    --ring:0 0 0 3px rgba(139,30,30,.16);
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { background:var(--bg); color:var(--text); line-height:1.5;
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+
+  /* ---- layout ---- */
+  .page { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
+  .page.wide { max-width:1080px; }
+  .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
+    padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
+  .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
+  .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
+  .brandbar .spacer { margin-left:auto; }
+  .goldrule { height:4px; background:var(--hcs-gold); }
+
+  /* ---- card / surfaces ---- */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .card.flush-top { border-top-left-radius:0; border-top-right-radius:0; }
+  .card-pad { padding:22px; }
+  .stack > * + * { margin-top:16px; }
+  .divider { height:1px; background:var(--line); border:0; margin:20px 0; }
+
+  /* ---- headings / text ---- */
+  .form-title { font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.02em; }
+  .form-desc { color:var(--muted); margin:0; }
+  .section-head { font-size:1.05rem; font-weight:700; color:var(--hcs-red); margin:8px 0 2px;
+    padding-bottom:6px; border-bottom:2px solid var(--hcs-gold-soft); }
+  .help { font-size:.83rem; color:var(--muted); margin:3px 0 0; }
+  .muted { color:var(--muted); } .center { text-align:center; }
+
+  /* ---- fields ---- */
+  .field { margin:0; }
+  .field > label { display:block; font-weight:600; font-size:.92rem; margin-bottom:6px; }
+  .req { color:var(--err); margin-left:2px; }
+  .control, input.control, select.control, textarea.control {
+    width:100%; font:inherit; font-size:1rem; color:var(--text); background:var(--card);
+    border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; transition:border-color .12s, box-shadow .12s; }
+  textarea.control { min-height:96px; resize:vertical; }
+  .control:focus, .control:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .control:disabled, .control[readonly] { background:#f3f4f6; color:#4b5563; cursor:not-allowed; }
+  .field.invalid .control { border-color:var(--err); }
+  .field .error { display:none; color:var(--err); font-size:.82rem; margin-top:5px; }
+  .field.invalid .error { display:block; }
+
+  /* choice groups (radio/checkbox) */
+  .choices { display:flex; flex-direction:column; gap:8px; }
+  .choice { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line);
+    border-radius:var(--radius-sm); cursor:pointer; background:var(--card); }
+  .choice:hover { border-color:var(--line-strong); }
+  .choice:focus-within { border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .choice input { margin-top:2px; accent-color:var(--hcs-red); width:18px; height:18px; }
+  .choice.selected { border-color:var(--hcs-red); background:#fbf4f4; }
+
+  /* ---- buttons ---- */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    border:1px solid transparent; border-radius:var(--radius-sm); font-weight:700; font-size:.95rem;
+    padding:11px 18px; background:var(--hcs-red); color:#fff; transition:background .12s, box-shadow .12s; }
+  .btn:hover { background:var(--hcs-red-hover); }
+  .btn:focus-visible { outline:none; box-shadow:var(--ring); }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .btn.block { width:100%; }
+  .btn.ghost { background:transparent; color:var(--hcs-red); border-color:var(--line-strong); }
+  .btn.ghost:hover { background:#fbf4f4; }
+  .btn.gold { background:var(--hcs-gold); color:#3a2e00; }
+  .btn.sm { padding:7px 12px; font-size:.85rem; }
+
+  /* ---- badges / pills (status system, reused from purchasing) ---- */
+  .pill { display:inline-block; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; text-transform:capitalize; }
+  .pill.draft { background:#eef1f5; color:#475467; }
+  .pill.published, .pill.open, .pill.approved { background:var(--ok-bg); color:var(--ok); }
+  .pill.private { background:var(--hcs-gold-soft); color:#7a5b00; }
+  .pill.staff { background:#e7edfb; color:#2b4a9b; }
+  .pill.locked, .pill.closed, .pill.rejected { background:var(--err-bg); color:var(--err); }
+  .pill.pending { background:var(--warn-bg); color:var(--warn); }
+
+  /* ---- notices ---- */
+  .notice { border-radius:var(--radius-sm); padding:12px 14px; font-size:.9rem; }
+  .notice.info { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; }
+  .notice.err { background:var(--err-bg); border:1px solid #f3c6c2; color:var(--err); }
+  .notice.ok { background:var(--ok-bg); border:1px solid #bfe0c1; color:var(--ok); }
+
+  /* ---- toast + spinner ---- */
+  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#1f2430; color:#fff;
+    padding:11px 18px; border-radius:999px; font-size:.88rem; font-weight:600; box-shadow:var(--shadow); z-index:60; }
+  .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%;
+    display:inline-block; animation:spin .7s linear infinite; }
+  .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; }
+  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; }
+  .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
+  .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
+  .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; }
+  .sigbar { margin-top:6px; }
+  .filelist { margin-top:6px; }
+  .filelist .fitem { display:flex; align-items:center; gap:8px; font-size:.82rem; color:var(--text); }
+  .desc-block { font-size:.9rem; color:var(--text); white-space:pre-wrap; line-height:1.5; margin:0; }
+  .progress { height:6px; background:var(--line); border-radius:999px; overflow:hidden; margin-bottom:4px; }
+  .progress-bar { height:100%; background:var(--hcs-red); transition:width .2s ease; }
+  .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
+  .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
+  @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
+  .hcsi { display:inline-block; vertical-align:middle; flex:none; }
+  .hcsi-lg { width:44px; height:44px; }
+  .infoicon { color:var(--muted); cursor:help; }
+  .infoicon:hover { color:var(--hcs-red); }
+</style>
+<style>
+  #pvbar { position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:#2b2b2b; color:#fff; padding:8px 14px; font-family:'Inter',sans-serif; }
+  #pvbar .pvtag { font-size:.66rem; font-weight:800; letter-spacing:.06em; background:var(--hcs-gold); color:#3a2e00; padding:3px 8px; border-radius:999px; }
+  #pvbar a, #pvbar .pvlink { color:#fff; font-size:.8rem; text-decoration:none; }
+  #pvbar select { font:inherit; padding:3px 6px; border-radius:6px; }
+  #pvbar .sp { margin-left:auto; }
+  .chooser { max-width:820px; margin:0 auto; padding:48px 16px; }
+  .chooser h1 { font-size:1.8rem; margin:0 0 6px; }
+  .chooser .cards { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:26px; }
+  @media (max-width:640px){ .chooser .cards { grid-template-columns:1fr; } }
+  .chooser a.choice-card { display:block; text-decoration:none; color:var(--text); background:var(--card);
+    border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; transition:border-color .12s, transform .08s; }
+  .chooser a.choice-card:hover { border-color:var(--hcs-red); transform:translateY(-2px); }
+  .chooser .ic { font-size:2rem; }
+  .chooser h2 { margin:8px 0 4px; color:var(--hcs-red); font-size:1.2rem; }
+</style>
+<style>
+  .bwrap { max-width:1080px; margin:0 auto; padding:0 16px 64px; }
+  .topbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff; padding:12px 18px; }
+  .topbar .logo { height:32px; background:#fff; border-radius:6px; padding:3px 5px; }
+  .topbar .name { font-weight:800; }
+  .topbar .who { margin-left:auto; font-size:.8rem; opacity:.92; display:flex; align-items:center; gap:8px; min-width:0; }
+  .topbar .who span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  @media (max-width:520px){ .bwrap { padding:0 10px 48px; } .topbar { padding:10px 12px; } .editor { gap:12px; } }
+  .adminchip { background:var(--hcs-gold); color:#3a2e00; font-size:.62rem; font-weight:800; padding:2px 7px; border-radius:999px; text-transform:uppercase; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin:18px 0; flex-wrap:wrap; }
+  .tab { padding:9px 14px; font-weight:600; font-size:.9rem; color:var(--muted); background:none; border:0; border-bottom:2px solid transparent; cursor:pointer; }
+  .tab.on { color:var(--hcs-red); border-bottom-color:var(--hcs-red); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
+  .fcard { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .fcard h3 { margin:0; font-size:1.02rem; }
+  .fcard .meta { font-size:.78rem; color:var(--muted); }
+  .fcard .pills { display:flex; gap:6px; flex-wrap:wrap; }
+  .fcard .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:auto; align-items:center; }
+  .moremenu { position:relative; display:inline-block; }
+  .moremenu > .btn { display:inline-flex; align-items:center; gap:5px; }
+  .moremenu .menu { position:absolute; right:0; top:calc(100% + 4px); min-width:180px; background:var(--card); border:1px solid var(--line-strong); border-radius:10px; box-shadow:0 10px 26px rgba(0,0,0,.16); padding:5px; z-index:30; display:flex; flex-direction:column; gap:2px; }
+  .moremenu .menu[hidden] { display:none; }
+  .moremenu .menu button { display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:none; border:0; border-radius:7px; padding:8px 10px; font:inherit; font-size:.85rem; cursor:pointer; color:var(--text); }
+  .moremenu .menu button:hover { background:var(--panel); }
+  .moremenu .menu button.danger { color:var(--hcs-red); }
+  .moremenu .menu button.danger:hover { background:#fbeaea; }
+  .btn.ghost.danger { color:var(--hcs-red); border-color:var(--hcs-red); background:none; }
+  .btn.ghost.danger:hover { background:#fbeaea; }
+  .editor { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
+  @media (max-width:820px){ .editor { grid-template-columns:1fr; } }
+  .palette { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  .palette button { font-size:.8rem; padding:6px 10px; border:1px solid var(--line-strong); border-radius:999px; background:var(--card); cursor:pointer; }
+  .palette button:hover { border-color:var(--hcs-red); color:var(--hcs-red); }
+  .fieldcard { border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; background:var(--panel); }
+  .fieldcard { cursor:default; }
+  .fieldcard .fchead { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .draghandle { cursor:grab; color:var(--muted); font-size:1.05rem; user-select:none; }
+  .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
+  .toolbar input, .toolbar select { padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); font:inherit; }
+  .toolbar input { flex:1; min-width:180px; }
+  .fieldcard .ftype { font-size:.66rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:800; background:#eef1f5; padding:2px 7px; border-radius:6px; }
+  .fieldcard .fcacts { margin-left:auto; display:flex; gap:4px; }
+  .fieldcard .fclabel { font-weight:600; font-size:.9rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:38%; }
+  .fieldcard.collapsed .fcbody { display:none; }
+  .col-chevron { transition:transform .15s ease; }
+  .fieldcard.collapsed .col-chevron { transform:rotate(-90deg); }
+  .iconbtn { display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line-strong); background:var(--card); border-radius:7px; width:30px; height:30px; cursor:pointer; font-size:.9rem; line-height:1; color:var(--muted); }
+  .iconbtn:hover { border-color:var(--hcs-red); color:var(--hcs-red); }
+  .frow { display:flex; gap:8px; flex-wrap:wrap; }
+  .frow > * { flex:1; min-width:120px; }
+  .side { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; position:sticky; top:12px; }
+  .side h4 { margin:0 0 10px; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+  .side label.lbl { display:block; font-size:.8rem; font-weight:600; margin:12px 0 4px; }
+  .switchrow { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:10px 0; font-size:.9rem; }
+  .toggle { position:relative; width:42px; height:24px; flex:none; }
+  .toggle input { opacity:0; width:0; height:0; }
+  .toggle .sl { position:absolute; inset:0; background:#cbd0d8; border-radius:999px; transition:.15s; }
+  .toggle .sl:before { content:''; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.15s; }
+  .toggle input:checked + .sl { background:var(--hcs-red); }
+  .toggle input:checked + .sl:before { transform:translateX(18px); }
+  .rtable { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .rtable th, .rtable td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  .rtable th { background:var(--panel); font-weight:700; position:sticky; top:0; }
+  .adv { margin-top:8px; }
+  .adv summary { font-size:.78rem; color:var(--muted); cursor:pointer; }
+  .banner { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; border-radius:var(--radius-sm); padding:10px 12px; font-size:.85rem; margin-bottom:14px; }
+</style>
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Custom Forms" };</script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<div id="pvbar"></div>
+<div id="app"></div>
+<script>
+  /* HCS logo (base64 data URI, downscaled from harfordchristian.org) — embedded so it never 404s. */
+  var HCS_LOGO = "data:image/png;base64,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";
+  /* FormsUI — tiny dependency-free client helpers shared by builder + runner. */
+  var FormsUI = (function () {
+    function esc(s){ var d=document.createElement('div'); d.textContent = (s==null?'':String(s)); return d.innerHTML; }
+    function toast(msg, ms){ var t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); t.textContent=msg;
+      document.body.appendChild(t); setTimeout(function(){ t.remove(); }, ms||2600); }
+    function el(tag, attrs, html){ var e=document.createElement(tag);
+      if(attrs) Object.keys(attrs).forEach(function(k){ e.setAttribute(k, attrs[k]); });
+      if(html!=null) e.innerHTML=html; return e; }
+    function trap_(ov){
+      ov.addEventListener('keydown', function(e){
+        if(e.key!=='Tab') return;
+        var f=ov.querySelectorAll('button,input,select,textarea,a[href]'); if(!f.length) return;
+        var first=f[0], last=f[f.length-1];
+        if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+      });
+    }
+    function modal(title, bodyHtml, btnLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div><button class="btn block">'+esc(btnLabel||'Got it')+'</button></div>';
+        var b=ov.querySelector('button');
+        b.onclick=function(){ ov.remove(); resolve(); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape'){ ov.remove(); resolve(); } });
+        document.body.appendChild(ov); trap_(ov); b.focus();
+      });
+    }
+    function confirm(title, bodyHtml, okLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(okLabel||'OK')+'</button></div></div>';
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(false); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(true); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape') done(false); });
+        document.body.appendChild(ov); trap_(ov); ov.querySelector('[data-x="1"]').focus();
+      });
+    }
+    function prompt(title, opts){
+      opts = opts || {};
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        var input = opts.multiline ? '<textarea class="control" id="_pmt"></textarea>'
+          : '<input class="control" id="_pmt" value="'+esc(opts.value||'')+'" placeholder="'+esc(opts.placeholder||'')+'">';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+(opts.body||'')+input+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(opts.okLabel||'OK')+'</button></div></div>';
+        var field=ov.querySelector('#_pmt'); if(opts.multiline && opts.value) field.value=opts.value;
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(null); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(field.value); };
+        field.addEventListener('keydown', function(e){ if(e.key==='Enter' && !opts.multiline){ e.preventDefault(); done(field.value); } if(e.key==='Escape') done(null); });
+        document.body.appendChild(ov); trap_(ov); field.focus();
+      });
+    }
+    /* Inline SVG icon set (stroke = currentColor). Replaces emoji glyphs so the UI renders
+       identically across platforms/fonts. Usage: FormsUI.icon('trash') or icon('info',{size:14}). */
+    var ICON_PATHS = {
+      up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+      down:'<path d="M12 5v14M19 12l-7 7-7-7"/>',
+      dup:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
+      trash:'<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
+      chevron:'<path d="M6 9l6 6 6-6"/>',
+      check:'<path d="M20 6L9 17l-5-5"/>',
+      eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+      clip:'<path d="M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8"/>',
+      plus:'<path d="M12 5v14M5 12h14"/>',
+      info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+      edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+      more:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+      grip:'<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>'
+    };
+    function icon(name, opts){
+      opts = opts || {}; var s = opts.size || 16;
+      return '<svg class="hcsi'+(opts.cls?' '+opts.cls:'')+'" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(ICON_PATHS[name]||'')+'</svg>';
+    }
+    return { esc:esc, toast:toast, el:el, modal:modal, confirm:confirm, prompt:prompt, icon:icon };
+  })();
+</script>
+
+<script>
+  (function () {
+    window.PREVIEW = true; window.STAFF_EMAIL = 'you@harfordchristian.org';
+    var idc = 100; function nid(p){ return (p||'f-new-')+(idc++); }
+    var ME = { email:'you@harfordchristian.org', isAdmin:true, name:'Demo Admin' };
+    var ADMINS = [{email:'you@harfordchristian.org',name:'Demo Admin'},{email:'aholloway@harfordchristian.org',name:'Anne Holloway'}];
+    function meta(o){ return Object.assign({ owner:ME.email, lifecycle:'published', access:'open', locked:false,
+      isTemplate:false, templateScope:'', layoutLock:'', category:'', responseSheetId:'demo', updatedAt:'2026-02-01', submissions:0 }, o); }
+    var STORE = {};
+    function add(id, m, schema){ schema.id=id; schema.settings=schema.settings||{}; STORE[id]={ meta:meta(Object.assign({id:id},m)), schema:schema }; }
+    function pg(fields){ return [{ title:'Main', fields:fields }]; }
+    function base(access){ return { access:access||'open', lifecycle:'published', locked:false, reviewMode:false, confirmationMessage:'Thank you — your response was recorded.', notifyEmails:[ME.email] }; }
+
+    add('f-interest', {title:'Sample Interest Form', access:'open', submissions:42}, { title:'Sample Interest Form', description:'Tell us about your interest in HCS.', settings:base('open'), pages:pg([
+      {id:'fn',type:'text',label:'First name',required:true},{id:'ln',type:'text',label:'Last name',required:true},
+      {id:'em',type:'email',label:'Email',required:true},{id:'g',type:'dropdown',label:'Grade of interest',options:['K4','K5','1','2','3','4','5','6','7','8','9','10','11','12']}]) });
+    add('f-trip', {title:'Field Trip Request', access:'staff', submissions:8, category:'Staff'}, { title:'Field Trip Request', description:'Staff trip request — approval routing + conditional overnight section.', settings:Object.assign(base('staff'),{approval:{enabled:true,approvers:['principal@harfordchristian.org'],mode:'any'}}), pages:pg([
+      {id:'trip',type:'text',label:'Trip name / purpose',required:true},{id:'dest',type:'text',label:'Destination',required:true},
+      {id:'overnight',type:'yesno',label:'Is this an overnight trip?',required:true},
+      {id:'lodging',type:'textarea',label:'Overnight lodging & chaperone plan',required:true,showIf:{field:'overnight',op:'equals',value:'Yes'}},
+      {id:'cost',type:'number',label:'Estimated cost per student ($)'}]) });
+    add('f-conf', {title:'HS Parent/Teacher Conference', access:'private', submissions:63, category:'High School'}, { title:'HS Parent/Teacher Conference', description:'Request a conference.', settings:base('private'), pages:pg([
+      {id:'pf',type:'text',label:'First name',required:true,prefillFrom:'parentFirst'},{id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},
+      {id:'stu',type:'studentPicker',label:'Student',required:true},{id:'teach',type:'staffPicker',label:'Teacher(s) to meet',required:true,multiple:true,staffLevel:'HS'},
+      {id:'t1',type:'dropdown',label:'First choice time',required:true,options:['Tue 3:00','Tue 3:20','Thu 3:00']}]) });
+    add('f-phys', {title:'Sports Physical Submission', access:'private', submissions:27, category:'Athletics'}, { title:'Sports Physical Submission', description:'Upload the completed physical.', settings:base('private'), pages:pg([
+      {id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},{id:'stu',type:'studentPicker',label:'Student',required:true},
+      {id:'up',type:'file',label:'Upload physical (PDF/photo)',required:true,accept:'.pdf,image/*'},{id:'sig',type:'signature',label:'Parent signature',required:true}]) });
+    add('f-draft', {title:'Volunteer Signup (draft)', access:'open', lifecycle:'draft', submissions:0}, { title:'Volunteer Signup', description:'', settings:base('open'), pages:pg([
+      {id:'n',type:'text',label:'Name',required:true},{id:'e',type:'email',label:'Email',required:true}]) });
+    add('f-homeschool', {title:'HCS Homeschool Opportunities Sign Up', access:'private', submissions:31, category:'Homeschool'}, { title:'HCS Homeschool Opportunities Sign Up', description:'A-la-carte homeschool sign-ups (specials, testing, MACS, events).', settings:base('private'), pages:pg([
+      {id:'pe',type:'email',label:'Parent email',required:true,prefillFrom:'parentEmail'},{id:'students',type:'studentPicker',label:'Which student(s)?',required:true,multiple:true},
+      {id:'umbrella',type:'yesno',label:'HCS Homeschool Umbrella?',required:true},{id:'tests',type:'checkboxes',label:'Standardized testing',options:['PSAT','SAT','MACS Academic Testing']}]) });
+    add('f-trip2', {title:'Pre-Approved Trip Request', access:'private', submissions:12, category:'Attendance'}, { title:'Pre-Approved Trip Request', description:'Pre-approval for a student absence.', settings:base('private'), pages:pg([
+      {id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},{id:'students',type:'studentPicker',label:'Which student(s) will be absent?',required:true,multiple:true},
+      {id:'sd',type:'date',label:'First day of absence',required:true},{id:'ed',type:'date',label:'Last day of absence',required:true},{id:'sig',type:'signature',label:'Parent signature',required:true}]) });
+    add('t-permission', {title:'Permission Slip', isTemplate:true, templateScope:'shared', layoutLock:'starter', lifecycle:'template', category:'General'}, { title:'Permission Slip', description:'Reusable permission slip.', settings:base('private'), pages:pg([
+      {id:'pf',type:'text',label:'First name',required:true,prefillFrom:'parentFirst'},{id:'stu',type:'studentPicker',label:'Student',required:true},{id:'ok',type:'yesno',label:'I give permission.',required:true}]) });
+    add('t-medical', {title:'Medical Authorization (locked)', isTemplate:true, templateScope:'shared', layoutLock:'useAsIs', lifecycle:'template', category:'Health'}, { title:'Medical Authorization', description:'Standardized medical authorization — used as-is.', settings:base('private'), pages:pg([
+      {id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},{id:'stu',type:'studentPicker',label:'Student',required:true},{id:'sig',type:'signature',label:'Signature',required:true}]) });
+    add('t-mine', {title:'My Survey Starter', isTemplate:true, templateScope:'personal', layoutLock:'starter', lifecycle:'template'}, { title:'My Survey Starter', description:'', settings:base('open'), pages:pg([{id:'q',type:'textarea',label:'Your feedback'}]) });
+
+    function metas(pred){ return Object.keys(STORE).map(function(k){ return JSON.parse(JSON.stringify(STORE[k].meta)); }).filter(pred); }
+    function rows(n){ var o=[],names=['Jordan','Alex','Sam','Riley','Casey']; for(var i=0;i<n;i++) o.push(['SUB-'+(1000+i),'2/'+(i+1)+'/26 9:15 AM','parent'+i+'@example.com',names[i%5],'Sample','Submitted']); return o; }
+
+    var API = {
+      whoAmI: function(){ return ME; },
+      listMyForms: function(){ return metas(function(m){ return !m.isTemplate; }); },
+      listLibrary: function(){ return metas(function(m){ return m.isTemplate; }); },
+      listAllForms: function(){ return metas(function(){ return true; }); },
+      createForm: function(title){ var id=nid(); add(id,{title:title||'Untitled form',lifecycle:'draft'},{ title:title||'Untitled form', description:'', settings:base('open'), pages:pg([]) }); STORE[id].meta.lifecycle='draft'; return {ok:true,formId:id}; },
+      createFromTemplate: function(id){ return API.duplicateForm(id,{}); },
+      duplicateForm: function(id){ var src=STORE[id]; var n=nid(); var sc=JSON.parse(JSON.stringify(src.schema)); sc.id=n;
+        var lock=(src.meta.isTemplate && src.meta.layoutLock==='useAsIs')?'useAsIs':''; add(n,{title:sc.title,lifecycle:'draft',layoutLock:lock},sc); STORE[n].meta.lifecycle='draft'; return {ok:true,formId:n,layoutLock:lock}; },
+      loadFormForEdit: function(id){ var f=STORE[id]; return {ok:true, meta:JSON.parse(JSON.stringify(f.meta)), schema:JSON.parse(JSON.stringify(f.schema)), structureLocked:false, isAdmin:ME.isAdmin}; },
+      saveForm: function(id, schema){ STORE[id].schema=schema; STORE[id].meta.title=schema.title||STORE[id].meta.title; return {ok:true}; },
+      setFormState: function(id, st){ var m=STORE[id].meta; if(st.lifecycle)m.lifecycle=st.lifecycle; if(st.access)m.access=st.access; if(typeof st.locked==='boolean')m.locked=st.locked; return {ok:true,meta:JSON.parse(JSON.stringify(m))}; },
+      saveAsTemplate: function(id, opts){ var n=nid('t-new-'); var sc=JSON.parse(JSON.stringify(STORE[id].schema)); sc.id=n; add(n,{title:sc.title,isTemplate:true,templateScope:opts.scope,layoutLock:opts.layoutLock,lifecycle:'template'},sc); return {ok:true,templateId:n,scope:opts.scope,layoutLock:opts.layoutLock}; },
+      deleteForm: function(id){ delete STORE[id]; return {ok:true}; },
+      setTemplateScope: function(id, scope){ STORE[id].meta.templateScope = (scope==='shared'?'shared':'personal'); return {ok:true, scope:STORE[id].meta.templateScope}; },
+      listAdmins: function(){ return ADMINS.slice(); },
+      addAdmin: function(email, name){ if(!ADMINS.some(function(a){return a.email.toLowerCase()===String(email).toLowerCase();})) ADMINS.push({email:String(email).toLowerCase(),name:name||''}); return {ok:true, admins:ADMINS.slice()}; },
+      removeAdmin: function(email){ ADMINS = ADMINS.filter(function(a){return a.email.toLowerCase()!==String(email).toLowerCase();}); return {ok:true, admins:ADMINS.slice()}; },
+      getShareUrl: function(id){ return {ok:true, url: location.href.replace(/admin\.html.*$/, 'fill.html?form=demo-open'), access: STORE[id].meta.access}; },
+      getResponses: function(id){ var m=STORE[id].meta; return {ok:true, headers:['SubmissionID','Timestamp','Email','First name','Last name','Status'], rows:rows(Math.min(6,m.submissions)), count:m.submissions, sheetUrl:''}; },
+      getApprovalQueue: function(){ return {ok:true, items:[
+        {formId:'f-trip', formTitle:'Field Trip Request', submissionId:'SUB-2001', respondentEmail:'teacher@harfordchristian.org', timestamp:'2/3/26 8:10 AM', summary:'Trip name: Zoo Trip · Destination: Baltimore · Is this an overnight trip?: No'},
+        {formId:'f-trip', formTitle:'Field Trip Request', submissionId:'SUB-2002', respondentEmail:'coach@harfordchristian.org', timestamp:'2/4/26 1:20 PM', summary:'Trip name: State Tournament · Is this an overnight trip?: Yes · Overnight lodging & chaperone plan: Hampton Inn; 4 chaperones'} ]}; },
+      decideApproval: function(formId, subId, decision){ return {ok:true, status:decision}; }
+    };
+    function runnerObj(){ var s=null,f=null; var o={ withSuccessHandler:function(fn){s=fn;return o;}, withFailureHandler:function(fn){f=fn;return o;} };
+      Object.keys(API).forEach(function(mm){ o[mm]=function(){ var a=arguments; setTimeout(function(){ try{ s&&s(API[mm].apply(null,a)); }catch(e){ f&&f(e); } },120); }; }); return o; }
+    window.google = { script: { get run(){ return runnerObj(); } } };
+    window.addEventListener('DOMContentLoaded', function(){
+      var bar=document.getElementById('pvbar');
+      bar.innerHTML='<span class="pvtag">PREVIEW · admin/backend · demo</span>'+
+        '<a class="sp" href="index.html">← All views</a>'+
+        '<a href="mailto:joshmay@harfordchristian.org" target="_blank" style="margin-left:14px">Leave a comment ↗</a>';
+    });
+  })();
+</script>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var ME = null;                // { email, isAdmin, name }
+  var EDITING = null;           // { meta, schema, structureLocked }
+  var TAB = 'mine';
+  var FIELD_TYPES = [
+    ['sectionHeader', 'Section'], ['description', 'Text block'], ['text', 'Short text'],
+    ['textarea', 'Paragraph'], ['email', 'Email'], ['phone', 'Phone'], ['number', 'Number'],
+    ['date', 'Date'], ['time', 'Time'], ['dropdown', 'Dropdown'], ['radio', 'Multiple choice'],
+    ['checkboxes', 'Checkboxes'], ['yesno', 'Yes / No'], ['rating', 'Rating'],
+    ['studentPicker', 'Student picker'], ['staffPicker', 'Staff / teacher picker'],
+    ['file', 'File upload'], ['signature', 'Signature'],
+    ['pageBreak', 'Page break'], ['calculation', 'Calculation']
+  ];
+  var OPTION_TYPES = { dropdown: 1, radio: 1, checkboxes: 1 };
+  var DIRTY = false, SAVING = false, AUTOSAVE_T = null, DRAG_FROM = null;
+  window.addEventListener('beforeunload', function (e) { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
+  var esc = FormsUI.esc;
+
+  function call(fn, args) {
+    return new Promise(function (resolve, reject) {
+      var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      runner[fn].apply(runner, args || []);
+    });
+  }
+  function uid() { return 'fld_' + Math.random().toString(36).slice(2, 8); }
+
+  // ---------- shell ----------
+  function chrome(inner) {
+    app.innerHTML =
+      '<div class="topbar">' +
+        '<img class="logo" src="' + HCS_LOGO + '" alt="HCS">' +
+        '<span class="name">HCS Forms</span>' +
+        '<span class="who">' + (ME ? esc(ME.email) + (ME.isAdmin ? ' <span class="adminchip">admin</span>' : '') : '') + '</span>' +
+      '</div><div class="goldrule"></div><div class="bwrap">' + inner + '</div>';
+  }
+
+  boot();
+  function boot() {
+    chrome('<p class="help" style="padding:24px">Loading…</p>');
+    call('whoAmI').then(function (me) {
+      ME = me;
+      var v = new URLSearchParams(location.search).get('view');
+      if (v === 'approvals') TAB = 'approvals';
+      renderDashboard();
+    }).catch(function (e) { chrome('<div class="card card-pad"><h1 class="form-title">Access denied</h1><p class="form-desc">' + esc(String(e && e.message || e)) + '</p></div>'); });
+  }
+
+  // ---------- dashboard ----------
+  function renderDashboard() {
+    var tabs = '<div class="tabs">' +
+      tabBtn('mine', 'My forms') + tabBtn('library', 'Template library') +
+      (ME.isAdmin ? tabBtn('all', 'All forms') : '') + tabBtn('approvals', 'Approvals') + '</div>';
+    var header = '<div style="display:flex;align-items:center;gap:10px;margin-top:18px">' +
+      '<h1 class="form-title" style="margin:0">Forms</h1>' +
+      '<div style="margin-left:auto;display:flex;gap:8px">' +
+        '<button class="btn" id="newBlank">+ New form</button>' +
+        '<button class="btn ghost" id="newTpl">From template</button>' +
+        (ME.isAdmin ? '<button class="btn ghost" id="mngAdmins">Manage admins</button>' : '') +
+      '</div></div>';
+    chrome(header + tabs + '<div id="list"><p class="help">Loading…</p></div>');
+    document.getElementById('newBlank').onclick = newBlank;
+    document.getElementById('newTpl').onclick = function () { TAB = 'library'; renderDashboard(); };
+    var ma = document.getElementById('mngAdmins'); if (ma) ma.onclick = manageAdmins;
+    ['mine', 'library', 'all', 'approvals'].forEach(function (t) { var b = document.getElementById('tab_' + t); if (b) b.onclick = function () { TAB = t; renderDashboard(); }; });
+    loadList();
+  }
+  function tabBtn(id, label) { return '<button class="tab ' + (TAB === id ? 'on' : '') + '" id="tab_' + id + '">' + esc(label) + '</button>'; }
+
+  function loadList() {
+    var host = function () { return document.getElementById('list'); };
+    if (TAB === 'approvals') {
+      call('getApprovalQueue').then(function (res) { renderApprovalQueue(res.items || []); }).catch(err);
+    } else if (TAB === 'library') {
+      call('listLibrary').then(function (items) { renderLibrary(items); }).catch(err);
+    } else {
+      call(TAB === 'all' ? 'listAllForms' : 'listMyForms').then(function (items) { renderForms(items); }).catch(err);
+    }
+    function err(e) { host().innerHTML = '<div class="notice err">' + esc(String(e && e.message || e)) + '</div>'; }
+  }
+
+  function renderApprovalQueue(items) {
+    var host = document.getElementById('list');
+    if (!items.length) { host.innerHTML = '<p class="help">Nothing is awaiting your approval right now. 🎉</p>'; return; }
+    host.innerHTML = '<div class="grid">' + items.map(function (it) {
+      return '<div class="fcard"><h3>' + esc(it.formTitle) + '</h3>' +
+        '<div class="meta">from ' + esc(it.respondentEmail || '—') + ' · ' + esc(it.timestamp) + '</div>' +
+        '<div class="help">' + esc(it.summary || '') + '</div>' +
+        '<div class="acts"><button class="btn sm" data-ap="Approved" data-f="' + esc(it.formId) + '" data-s="' + esc(it.submissionId) + '">Approve</button>' +
+        '<button class="btn ghost sm" data-ap="Rejected" data-f="' + esc(it.formId) + '" data-s="' + esc(it.submissionId) + '">Reject</button></div></div>';
+    }).join('') + '</div>';
+    document.querySelectorAll('[data-ap]').forEach(function (b) {
+      b.onclick = function () { decide(b.getAttribute('data-ap'), b.getAttribute('data-f'), b.getAttribute('data-s')); };
+    });
+  }
+  function decide(decision, formId, subId) {
+    FormsUI.prompt(decision, { body: '<p class="help">Add a note for the requester (optional).</p>', placeholder: 'Note (optional)', okLabel: decision, multiline: true }).then(function (comment) {
+      if (comment === null) return;
+      call('decideApproval', [formId, subId, decision, comment]).then(function (res) {
+        FormsUI.toast(res.ok ? ('Marked ' + res.status) : (res.message || 'Error'));
+        loadList();
+      }).catch(alertErr);
+    });
+  }
+
+  function renderForms(items) {
+    var host = document.getElementById('list');
+    if (!items.length) { host.innerHTML = '<p class="help">No forms yet. Click “New form” to start.</p>'; return; }
+    host.innerHTML =
+      '<div class="toolbar"><input id="fSearch" type="search" placeholder="Search forms…" aria-label="Search forms">' +
+        '<select id="fStatus" aria-label="Filter by status"><option value="">All statuses</option><option>draft</option><option>published</option><option>closed</option></select>' +
+        '<select id="fSort" aria-label="Sort"><option value="updated">Recently updated</option><option value="title">Title A–Z</option><option value="responses">Most responses</option></select></div>' +
+      '<div id="grid"></div>';
+    var draw = function () {
+      var q = (document.getElementById('fSearch').value || '').toLowerCase();
+      var st = document.getElementById('fStatus').value;
+      var sort = document.getElementById('fSort').value;
+      var list = items.filter(function (m) {
+        return (!q || String(m.title || '').toLowerCase().indexOf(q) > -1 || String(m.owner || '').toLowerCase().indexOf(q) > -1) && (!st || m.lifecycle === st);
+      });
+      if (sort === 'title') list.sort(function (a, b) { return String(a.title).localeCompare(String(b.title)); });
+      else if (sort === 'responses') list.sort(function (a, b) { return (b.submissions || 0) - (a.submissions || 0); });
+      document.getElementById('grid').innerHTML = list.length ? '<div class="grid">' + list.map(formCardHtml).join('') + '</div>' : '<p class="help">No forms match.</p>';
+      wireCardButtons();
+    };
+    document.getElementById('fSearch').oninput = draw;
+    document.getElementById('fStatus').onchange = draw;
+    document.getElementById('fSort').onchange = draw;
+    draw();
+  }
+  function formCardHtml(m) {
+    var id = m.id;
+    var canDel = ME.isAdmin || String(m.owner || '').toLowerCase() === ME.email.toLowerCase();
+    var menu =
+      menuItem('Duplicate', 'dup', id, 'dup') +
+      menuItem('Save as template', 'tpl', id, 'dup') +
+      (canDel ? menuItem('Delete', 'del', id, 'trash', 'danger') : '');
+    return '<div class="fcard"><h3>' + esc(m.title || '(untitled)') + '</h3>' +
+        '<div class="pills">' + statePills(m) + '</div>' +
+        '<div class="meta">' + m.submissions + ' response' + (m.submissions === 1 ? '' : 's') +
+          (TAB === 'all' ? ' · ' + esc(m.owner) : '') + '</div>' +
+        '<div class="acts">' +
+          btn('Edit', 'edit', id) + btn('Preview', 'preview', id, 'ghost') + btn('Responses', 'resp', id) + btn('Share', 'share', id, 'ghost') +
+          '<div class="moremenu">' +
+            '<button class="btn ghost sm" data-act="more" data-id="' + id + '" aria-haspopup="true" aria-expanded="false" title="More actions">' + FormsUI.icon('more') + ' More</button>' +
+            '<div class="menu" id="menu_' + id + '" hidden>' + menu + '</div>' +
+          '</div>' +
+        '</div></div>';
+  }
+  function menuItem(label, act, id, iconName, cls) {
+    return '<button class="' + (cls || '') + '" data-act="' + act + '" data-id="' + id + '">' + FormsUI.icon(iconName, { size: 15 }) + esc(label) + '</button>';
+  }
+
+  function renderLibrary(items) {
+    var host = document.getElementById('list');
+    if (!items.length) { host.innerHTML = '<p class="help">No templates yet.</p>'; return; }
+    host.innerHTML = '<div class="grid">' + items.map(function (m) {
+      var lock = m.layoutLock === 'useAsIs' ? '<span class="pill locked">use as-is</span>' : '<span class="pill draft">starter</span>';
+      var scope = m.templateScope === 'shared' ? '<span class="pill staff">shared</span>' : '<span class="pill private">personal</span>';
+      var canEdit = ME.isAdmin || m.owner.toLowerCase() === ME.email.toLowerCase();
+      // Admin curation: publish/unpublish from the school-wide shared library.
+      var curate = ME.isAdmin
+        ? (m.templateScope === 'shared'
+            ? btn('Unpublish', 'unpub', m.id, 'ghost')
+            : btn('Make shared', 'pub', m.id, 'ghost'))
+        : '';
+      return '<div class="fcard"><h3>' + esc(m.title || '(untitled)') + '</h3>' +
+        '<div class="pills">' + scope + lock + (m.category ? '<span class="pill draft">' + esc(m.category) + '</span>' : '') + '</div>' +
+        '<div class="meta">by ' + esc(m.owner) + '</div>' +
+        '<div class="acts">' + btn('Use this template', 'use', m.id) + btn('Preview', 'preview', m.id, 'ghost') +
+          (canEdit ? btn('Edit', 'edit', m.id, 'ghost') : '') + curate +
+          (canEdit
+            ? '<button class="btn ghost danger sm" data-act="del" data-id="' + m.id + '" title="Delete template" style="display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('trash', { size: 15 }) + ' Delete</button>' : '') +
+        '</div></div>';
+    }).join('') + '</div>';
+    wireCardButtons();
+  }
+
+  function statePills(m) {
+    var p = '<span class="pill ' + m.lifecycle + '">' + m.lifecycle + '</span>' +
+            '<span class="pill ' + m.access + '">' + accessLabel(m.access) + '</span>';
+    if (m.locked) p += '<span class="pill locked">not accepting</span>';
+    return p;
+  }
+  function accessLabel(a) { return a === 'staff' ? 'staff-only' : a; }
+  function btn(label, act, id, cls) { return '<button class="btn ' + (cls || '') + ' sm" data-act="' + act + '" data-id="' + id + '">' + esc(label) + '</button>'; }
+
+  function closeMenus() {
+    document.querySelectorAll('.moremenu .menu').forEach(function (mn) { mn.setAttribute('hidden', 'hidden'); });
+    document.querySelectorAll('[data-act="more"]').forEach(function (bb) { bb.setAttribute('aria-expanded', 'false'); });
+  }
+  function wireCardButtons() {
+    if (!window.__hcsMenuClose) { // close any open "More" menu when clicking outside it
+      window.__hcsMenuClose = true;
+      document.addEventListener('click', function (e) { if (!e.target.closest('.moremenu')) closeMenus(); });
+    }
+    document.querySelectorAll('[data-act]').forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+        if (act === 'more') {
+          var menu = document.getElementById('menu_' + id), wasHidden = menu && menu.hasAttribute('hidden');
+          closeMenus();
+          if (menu && wasHidden) { menu.removeAttribute('hidden'); b.setAttribute('aria-expanded', 'true'); }
+          return;
+        }
+        closeMenus();
+        if (act === 'edit') return openEditor(id);
+        if (act === 'preview') return doPreview(id);
+        if (act === 'resp') return openResponses(id);
+        if (act === 'share') return doShare(id);
+        if (act === 'dup') return doDuplicate(id);
+        if (act === 'use') return doUse(id);
+        if (act === 'tpl') return doSaveAsTemplate(id);
+        if (act === 'pub') return doSetTemplateScope(id, 'shared');
+        if (act === 'unpub') return doSetTemplateScope(id, 'personal');
+        if (act === 'del') return doDelete(id);
+      };
+    });
+  }
+
+  // generic bespoke modal that reads its inputs on OK (before closing)
+  function modalWith(title, bodyHtml, okLabel, onOk) {
+    var ov = document.createElement('div'); ov.className = 'modal-overlay';
+    ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + esc(title) + '</h3><div class="mbody">' + bodyHtml + '</div>' +
+      '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Close</button>' +
+      (okLabel ? '<button class="btn block" data-x="1" type="button">' + esc(okLabel) + '</button>' : '') + '</div></div>';
+    function close() { ov.remove(); }
+    ov.querySelector('[data-x="0"]').onclick = close;
+    var ok = ov.querySelector('[data-x="1"]'); if (ok) ok.onclick = function () { if (onOk) onOk(ov); close(); };
+    ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    document.body.appendChild(ov); (ok || ov.querySelector('[data-x="0"]')).focus();
+    return ov;
+  }
+
+  function newBlank() {
+    FormsUI.prompt('New form', { placeholder: 'Form name', value: 'Untitled form', okLabel: 'Create' }).then(function (title) {
+      if (title === null) return;
+      call('createForm', [title || 'Untitled form']).then(function (r) { openEditor(r.formId); }).catch(alertErr);
+    });
+  }
+  function doUse(id) { call('createFromTemplate', [id]).then(function (r) { FormsUI.toast('Copied — review Access & Approval in Settings before publishing'); openEditor(r.formId); }).catch(alertErr); }
+  function doSetTemplateScope(id, scope) {
+    var msg = scope === 'shared' ? 'Publish to the shared library (all staff can browse it)?' : 'Unpublish — make this personal so only its owner and admins see it?';
+    FormsUI.confirm(scope === 'shared' ? 'Make shared?' : 'Unpublish template?', msg, scope === 'shared' ? 'Make shared' : 'Unpublish').then(function (ok) {
+      if (!ok) return;
+      call('setTemplateScope', [id, scope]).then(function () { FormsUI.toast(scope === 'shared' ? 'Published to shared library' : 'Made personal'); loadList(); }).catch(alertErr);
+    });
+  }
+  function doDuplicate(id) {
+    FormsUI.confirm('Duplicate this form?', 'This creates an editable copy as a new Draft in “My forms.”', 'Duplicate').then(function (ok) {
+      if (!ok) return;
+      call('duplicateForm', [id, {}]).then(function (r) { openEditor(r.formId); }).catch(alertErr);
+    });
+  }
+  function doDelete(id, after) {
+    FormsUI.confirm('Delete this form?', 'The form and any responses move to Drive trash (recoverable for ~30 days) and disappear from your dashboard. This can’t be undone from here.', 'Delete').then(function (ok) {
+      if (!ok) return;
+      call('deleteForm', [id]).then(function (res) {
+        if (res && res.ok) { DIRTY = false; FormsUI.toast('Form deleted'); (after || loadList)(); }
+        else alert((res && res.message) || 'Could not delete.');
+      }).catch(alertErr);
+    });
+  }
+  function doPreview(id) {
+    if (typeof window !== 'undefined' && window.PREVIEW) { window.open('fill.html', '_blank'); return; } // public demo
+    var base = (ME && ME.execUrl) || '';
+    if (!base) return alert('Preview URL not available yet.');
+    window.open(base + '?form=' + encodeURIComponent(id) + '&preview=1', '_blank');
+  }
+  function doShare(id) {
+    call('getShareUrl', [id]).then(function (r) {
+      if (!r.url) return alert('Set the public/builder URL in the Config tab first (this form’s access: ' + accessLabel(r.access) + ').');
+      var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(r.url);
+      var body = '<p class="help" style="margin-bottom:8px">Access: ' + esc(accessLabel(r.access)) + '</p>' +
+        '<input class="control" id="_shareurl" readonly value="' + esc(r.url) + '" style="margin-bottom:8px">' +
+        '<button class="btn block sm" id="_copybtn" type="button">Copy link</button>' +
+        '<div class="center" style="margin-top:12px"><img alt="QR code for this form" src="' + esc(qr) + '" style="width:180px;height:180px;border:1px solid var(--line);border-radius:8px"></div>';
+      var ov = modalWith('Share form', body, null);
+      ov.querySelector('#_copybtn').onclick = function () {
+        var i = ov.querySelector('#_shareurl'); i.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        try { navigator.clipboard.writeText(i.value); } catch (e) {}
+        FormsUI.toast('Link copied');
+      };
+    }).catch(alertErr);
+  }
+  function doSaveAsTemplate(id) {
+    var body = '<label class="lbl">Library</label><select class="control" id="_tscope">' +
+        '<option value="shared">Shared — all staff can browse &amp; use it</option>' +
+        '<option value="personal">Personal — only me</option></select>' +
+      '<label class="lbl">When someone uses it</label><select class="control" id="_tlock">' +
+        '<option value="starter">Starter — they copy &amp; edit freely</option>' +
+        '<option value="useAsIs">Use as-is — layout locked to the HCS design</option></select>' +
+      '<p class="help">“Use as-is” locks the fields/layout so it’s used unchanged every time (admins can still edit it).</p>';
+    modalWith('Save as template', body, 'Save', function (ov) {
+      var scope = (ov.querySelector('#_tscope') || {}).value || 'personal';
+      var lock = (ov.querySelector('#_tlock') || {}).value || 'starter';
+      call('saveAsTemplate', [id, { scope: scope, layoutLock: lock }])
+        .then(function () { FormsUI.toast('Saved to ' + scope + ' library'); }).catch(alertErr);
+    });
+  }
+
+  // ---------- admin roster (admin-only) ----------
+  function manageAdmins() {
+    call('listAdmins').then(function (admins) {
+      var ov = document.createElement('div'); ov.className = 'modal-overlay';
+      function render(list) {
+        var rows = list.map(function (a) {
+          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">' +
+            '<div style="flex:1;min-width:0"><strong style="word-break:break-all">' + esc(a.email) + '</strong>' + (a.name ? '<div class="help">' + esc(a.name) + '</div>' : '') + '</div>' +
+            '<button class="btn ghost danger sm" data-rm="' + esc(a.email) + '" style="display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('trash', { size: 14 }) + ' Remove</button></div>';
+        }).join('');
+        return '<p class="help">Admins can view and edit <strong>every</strong> form and template (including ones others created), and manage this list.</p>' +
+          '<div id="_admlist">' + rows + '</div>' +
+          '<div class="divider"></div><label class="lbl">Add an admin</label>' +
+          '<div class="frow"><input class="control" id="_admEmail" type="email" placeholder="name@harfordchristian.org" style="flex:2;min-width:200px"><input class="control" id="_admName" placeholder="Name (optional)" style="flex:1"></div>' +
+          '<button class="btn block" id="_admAdd" style="margin-top:8px">Add admin</button>';
+      }
+      ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true" aria-label="Manage admins"><h3>Manage admins</h3>' +
+        '<div class="mbody" id="_admBody">' + render(admins) + '</div>' +
+        '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Close</button></div></div>';
+      function close() { ov.remove(); }
+      function refresh(list) { ov.querySelector('#_admBody').innerHTML = render(list); wire(); }
+      function wire() {
+        ov.querySelectorAll('[data-rm]').forEach(function (b) {
+          b.onclick = function () {
+            var em = b.getAttribute('data-rm');
+            FormsUI.confirm('Remove admin?', esc(em) + ' will lose admin access.', 'Remove').then(function (ok) {
+              if (!ok) return;
+              call('removeAdmin', [em]).then(function (res) { refresh(res.admins); FormsUI.toast('Admin removed'); }).catch(alertErr);
+            });
+          };
+        });
+        var add = ov.querySelector('#_admAdd');
+        if (add) add.onclick = function () {
+          var em = (ov.querySelector('#_admEmail').value || '').trim(), nm = (ov.querySelector('#_admName').value || '').trim();
+          if (!em) return;
+          add.disabled = true; add.innerHTML = '<span class="spinner"></span> Adding…';
+          call('addAdmin', [em, nm]).then(function (res) { refresh(res.admins); FormsUI.toast('Admin added'); })
+            .catch(function (e) { add.disabled = false; add.textContent = 'Add admin'; alertErr(e); });
+        };
+      }
+      ov.querySelector('[data-x="0"]').onclick = close;
+      ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+      document.body.appendChild(ov); wire();
+    }).catch(alertErr);
+  }
+
+  // ---------- editor ----------
+  function openEditor(formId) {
+    chrome('<p class="help" style="padding:24px">Loading editor…</p>');
+    call('loadFormForEdit', [formId]).then(function (res) {
+      EDITING = { meta: res.meta, schema: normalizeSchema(res.schema), structureLocked: res.structureLocked, isAdmin: res.isAdmin };
+      renderEditor();
+    }).catch(function (e) { chrome('<div class="card card-pad"><p class="notice err">' + esc(String(e && e.message || e)) + '</p></div>'); });
+  }
+  function normalizeSchema(s) {
+    s = s || {}; s.settings = s.settings || {}; s.pages = s.pages && s.pages.length ? s.pages : [{ title: 'Main', fields: [] }];
+    s.pages[0].fields = s.pages[0].fields || [];
+    return s;
+  }
+  function fields() { return EDITING.schema.pages[0].fields; }
+
+  function renderEditor() {
+    var locked = EDITING.structureLocked;
+    var back = '<button class="btn ghost sm" id="back">← All forms</button>';
+    var palette = locked ? '' : '<div class="palette">' + FIELD_TYPES.map(function (t) {
+      return '<button data-type="' + t[0] + '">+ ' + esc(t[1]) + '</button>'; }).join('') + '</div>';
+    var lockBanner = locked ? '<div class="banner">This form’s layout is locked (use as-is). You can change most settings, but its fields, access, and approval routing are locked to the HCS template. An admin can change them.</div>' : '';
+
+    DIRTY = false; clearTimeout(AUTOSAVE_T);
+    chrome(
+      '<div style="display:flex;align-items:center;gap:10px;margin:16px 0">' + back +
+        '<h1 class="form-title" style="margin:0;font-size:1.2rem">Editing: ' + esc(EDITING.meta.title) + '</h1>' +
+        '<span id="saveState" class="help" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('check', { size: 14 }) + ' Saved</span></div>' +
+      '<div class="editor" id="editorRoot"><div>' + lockBanner +
+        '<div class="field"><label for="fTitle">Form title</label><input class="control" id="fTitle" value="' + esc(EDITING.schema.title || '') + '"' + (locked ? ' readonly' : '') + '></div>' +
+        '<div class="field" style="margin-top:10px"><label for="fDesc">Description</label><textarea class="control" id="fDesc"' + (locked ? ' readonly' : '') + '>' + esc(EDITING.schema.description || '') + '</textarea></div>' +
+        '<div class="divider"></div>' + palette +
+        '<div id="canvas"></div>' +
+      '</div>' + sidePanel() + '</div>');
+
+    document.getElementById('back').onclick = function () {
+      // save pending edits before leaving so nothing is lost
+      var go = function () { DIRTY = false; renderDashboard(); };
+      if (DIRTY && !EDITING.structureLocked) doSave(true).then(go); else go();
+    };
+    if (!locked) {
+      document.querySelectorAll('.palette button').forEach(function (b) { b.onclick = function () { addField(b.getAttribute('data-type')); }; });
+      document.getElementById('fTitle').oninput = function () { EDITING.schema.title = this.value; };
+      document.getElementById('fDesc').oninput = function () { EDITING.schema.description = this.value; };
+      // one delegated listener → any field/setting edit marks dirty + schedules autosave
+      var root = document.getElementById('editorRoot');
+      root.addEventListener('input', markDirty);
+      root.addEventListener('change', markDirty);
+    }
+    wireSide();
+    renderCanvas();
+  }
+
+  function renderCanvas() {
+    var host = document.getElementById('canvas');
+    var locked = EDITING.structureLocked;
+    var fs = fields();
+    if (!fs.length) { host.innerHTML = '<p class="help">No fields yet. Add one from the palette above' + (EDITING.structureLocked ? '' : '') + '.</p>'; return; }
+    host.innerHTML = fs.map(function (f, i) { return fieldCard(f, i, locked); }).join('');
+    if (locked) return;
+    fs.forEach(function (f, i) {
+      bindInput('lbl_' + f.id, function (v) { f.label = v; var lp = document.querySelector('.fieldcard[data-fid="' + f.id + '"] .fclabel'); if (lp) lp.textContent = v; });
+      bindInput('help_' + f.id, function (v) { f.help = v; });
+      var reqEl = document.getElementById('req_' + f.id); if (reqEl) reqEl.onchange = function () { f.required = this.checked; };
+      var optEl = document.getElementById('opt_' + f.id); if (optEl) optEl.oninput = function () { f.options = this.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); };
+      var pfEl = document.getElementById('pf_' + f.id); if (pfEl) pfEl.onchange = function () { f.prefillFrom = this.value; };
+      var multEl = document.getElementById('mult_' + f.id); if (multEl) multEl.onchange = function () { f.multiple = this.checked; };
+      var lvlEl = document.getElementById('lvl_' + f.id); if (lvlEl) lvlEl.onchange = function () { f.staffLevel = this.value; };
+      var accEl = document.getElementById('acc_' + f.id); if (accEl) accEl.oninput = function () { f.accept = this.value; };
+      var capEl = document.getElementById('cap_' + f.id); if (capEl) capEl.oninput = function () { f.capacity = parseCap(this.value); };
+      var cif = document.getElementById('cif_' + f.id), cop = document.getElementById('cop_' + f.id), cval = document.getElementById('cval_' + f.id);
+      var updCond = function () { if (!cif || !cif.value) { delete f.showIf; } else { f.showIf = { field: cif.value, op: cop.value, value: cval.value }; } };
+      if (cif) cif.onchange = updCond; if (cop) cop.onchange = updCond; if (cval) cval.oninput = updCond;
+      var calcop = document.getElementById('calcop_' + f.id), calcsrc = document.getElementById('calcsrc_' + f.id);
+      var updCalc = function () { if (!f.calc) f.calc = { op: 'sum', fields: [] }; if (calcop) f.calc.op = calcop.value; if (calcsrc) f.calc.fields = Array.prototype.slice.call(calcsrc.querySelectorAll('input:checked')).map(function (i) { return i.value; }); };
+      if (calcop) calcop.onchange = updCalc; if (calcsrc) calcsrc.addEventListener('change', updCalc);
+      var rmaxEl = document.getElementById('rmax_' + f.id); if (rmaxEl) rmaxEl.oninput = function () { f.max = Number(this.value) || 5; };
+      [['vmin_', 'min', 1], ['vmax_', 'max', 1], ['vminl_', 'minLen', 1], ['vmaxl_', 'maxLen', 1], ['vpat_', 'pattern', 0], ['vpmsg_', 'patternMsg', 0], ['vmind_', 'minDate', 0], ['vmaxd_', 'maxDate', 0], ['vnb_', 'notBefore', 0]].forEach(function (spec) {
+        var el = document.getElementById(spec[0] + f.id); if (!el) return;
+        var h = function () { if (!f.validation) f.validation = {}; f.validation[spec[1]] = spec[2] ? (this.value === '' ? null : Number(this.value)) : this.value; };
+        if (el.tagName === 'SELECT') el.onchange = h; else el.oninput = h;
+      });
+      var colEl = document.getElementById('col_' + f.id);
+      if (colEl) colEl.onclick = function () { var c = document.querySelector('.fieldcard[data-fid="' + f.id + '"]'); if (c) c.classList.toggle('collapsed'); };
+      document.getElementById('up_' + f.id).onclick = function () { move(i, -1); markDirty(); };
+      document.getElementById('dn_' + f.id).onclick = function () { move(i, 1); markDirty(); };
+      document.getElementById('dup_' + f.id).onclick = function () { duplicateFieldAt(i); };
+      document.getElementById('del_' + f.id).onclick = function () { deleteFieldAt(i); };
+    });
+    // drag-and-drop reorder (dragging from within an input is ignored)
+    host.querySelectorAll('.fieldcard').forEach(function (card) {
+      card.addEventListener('dragstart', function (e) {
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) { e.preventDefault(); return; }
+        DRAG_FROM = Number(card.getAttribute('data-idx')); try { e.dataTransfer.effectAllowed = 'move'; } catch (x) {} card.style.opacity = '.45';
+      });
+      card.addEventListener('dragend', function () { card.style.opacity = ''; });
+      card.addEventListener('dragover', function (e) { e.preventDefault(); card.style.borderColor = 'var(--hcs-red)'; });
+      card.addEventListener('dragleave', function () { card.style.borderColor = ''; });
+      card.addEventListener('drop', function (e) {
+        e.preventDefault(); card.style.borderColor = '';
+        var to = Number(card.getAttribute('data-idx'));
+        if (DRAG_FROM == null || DRAG_FROM === to) return;
+        var fs2 = fields(); var moved = fs2.splice(DRAG_FROM, 1)[0]; fs2.splice(to, 0, moved);
+        DRAG_FROM = null; renderCanvas(); markDirty();
+      });
+    });
+  }
+  function duplicateFieldAt(i) {
+    var fs = fields(); var c = JSON.parse(JSON.stringify(fs[i])); c.id = uid();
+    fs.splice(i + 1, 0, c); renderCanvas(); markDirty();
+  }
+  function deleteFieldAt(i) {
+    FormsUI.confirm('Delete this field?', 'This removes the field from the form.', 'Delete').then(function (ok) {
+      if (!ok) return; fields().splice(i, 1); renderCanvas(); markDirty();
+    });
+  }
+
+  function fieldCard(f, i, locked) {
+    var typeLabel = (FIELD_TYPES.filter(function (t) { return t[0] === f.type; })[0] || [f.type, f.type])[1];
+    if (locked) {
+      return '<div class="fieldcard"><div class="fchead"><span class="ftype">' + esc(typeLabel) + '</span><strong>' + esc(f.label || '') + '</strong>' + (f.required ? '<span class="req">*</span>' : '') + '</div></div>';
+    }
+    var body = '';
+    if (f.type === 'sectionHeader' || f.type === 'description' || f.type === 'pageBreak') {
+      var lblCtrl = f.type === 'description'
+        ? '<textarea class="control" id="lbl_' + f.id + '" placeholder="Text / policy content (line breaks are kept)">' + esc(f.label || '') + '</textarea>'
+        : '<input class="control" id="lbl_' + f.id + '" value="' + esc(f.label || '') + '" placeholder="' + (f.type === 'pageBreak' ? 'Next page title (optional)' : 'Section title') + '">';
+      var cond = f.type === 'pageBreak' ? '' :
+        '<details class="adv"><summary>Conditional logic</summary><label class="lbl">Show this section only if…</label>' +
+        '<div class="frow">' +
+          '<select class="control" id="cif_' + f.id + '">' + condFieldOpts(f) + '</select>' +
+          '<select class="control" id="cop_' + f.id + '">' + condOpOpts(f.showIf) + '</select>' +
+          '<input class="control" id="cval_' + f.id + '" value="' + esc((f.showIf && f.showIf.value) || '') + '" placeholder="value"></div></details>';
+      body = (f.type === 'pageBreak' ? '<p class="help">⎯ Fields after this become a new page ⎯</p>' : '') + lblCtrl + cond;
+    } else {
+      body = '<input class="control" id="lbl_' + f.id + '" value="' + esc(f.label || '') + '" placeholder="Question label">' +
+        '<div class="frow" style="margin-top:8px">' +
+          '<input class="control" id="help_' + f.id + '" value="' + esc(f.help || '') + '" placeholder="Helper text (optional)">' +
+          '<label class="switchrow" style="flex:0 0 auto;margin:0"><span>Required</span><span class="toggle"><input type="checkbox" id="req_' + f.id + '"' + (f.required ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+        '</div>';
+      if (OPTION_TYPES[f.type]) body += '<label class="lbl">Options (one per line)</label><textarea class="control" id="opt_' + f.id + '" placeholder="Option 1&#10;Option 2">' + esc((f.options || []).join('\n')) + '</textarea>';
+      if (f.type === 'studentPicker' || f.type === 'staffPicker' || f.type === 'file') {
+        body += '<label class="switchrow" style="margin-top:8px"><span>Allow ' + (f.type === 'file' ? 'multiple files' : 'choosing multiple') + '</span><span class="toggle"><input type="checkbox" id="mult_' + f.id + '"' + (f.multiple ? ' checked' : '') + '><span class="sl"></span></span></label>';
+      }
+      if (OPTION_TYPES[f.type]) {
+        body += '<details class="adv"><summary>Limit sign-ups per option (capacity)</summary>' +
+          '<label class="lbl">One per line: <code>Option = number</code></label>' +
+          '<textarea class="control" id="cap_' + f.id + '" placeholder="Tue 3:00 = 5">' + esc(capToText(f.capacity)) + '</textarea>' +
+          '<p class="help">Blank = unlimited. A full option is hidden from submitters and rejected on submit.</p></details>';
+      }
+      if (f.type === 'staffPicker') {
+        body += '<label class="lbl">Which staff to list</label><select class="control" id="lvl_' + f.id + '">' +
+          [['', 'All staff'], ['HS', 'High School'], ['MS', 'Middle School'], ['EL', 'Elementary']].map(function (o) {
+            return '<option value="' + o[0] + '"' + ((f.staffLevel || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+          '</select><p class="help">Pulled from the Staff tab in _System.</p>';
+      }
+      if (f.type === 'file') {
+        body += '<label class="lbl">Accepted file types (optional)</label><input class="control" id="acc_' + f.id + '" value="' + esc(f.accept || '') + '" placeholder=".pdf,image/*"><p class="help">Blank = any. Max 10 MB per file.</p>';
+      }
+      if (f.type === 'calculation') {
+        body += '<label class="lbl">Calculate</label><select class="control" id="calcop_' + f.id + '">' +
+          [['sum', 'Sum of number fields'], ['count', 'Count of selected options']].map(function (o) {
+            return '<option value="' + o[0] + '"' + (((f.calc && f.calc.op) || 'sum') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+          '<label class="lbl">Using these fields</label><div id="calcsrc_' + f.id + '">' + sourceFieldChecks(f) + '</div>';
+      }
+      if (['studentPicker', 'staffPicker', 'file', 'signature', 'calculation'].indexOf(f.type) === -1) {
+        body += '<details class="adv"><summary>Advanced</summary><label class="lbl">Auto-fill from FACTS</label>' +
+          '<select class="control" id="pf_' + f.id + '">' + prefillOpts(f.prefillFrom) + '</select></details>';
+      }
+      if (f.type === 'rating') {
+        body += '<label class="lbl">Scale maximum</label><input class="control" type="number" min="2" max="10" id="rmax_' + f.id + '" value="' + (f.max || 5) + '">';
+      }
+      body += valBlock(f);
+      body += '<details class="adv"><summary>Conditional logic</summary>' +
+        '<label class="lbl">Show this field only if…</label>' +
+        '<div class="frow">' +
+          '<select class="control" id="cif_' + f.id + '">' + condFieldOpts(f) + '</select>' +
+          '<select class="control" id="cop_' + f.id + '">' + condOpOpts(f.showIf) + '</select>' +
+          '<input class="control" id="cval_' + f.id + '" value="' + esc((f.showIf && f.showIf.value) || '') + '" placeholder="value"></div></details>';
+    }
+    return '<div class="fieldcard" draggable="true" data-idx="' + i + '" data-fid="' + f.id + '"><div class="fchead">' +
+      '<span class="draghandle" title="Drag to reorder" aria-hidden="true">' + FormsUI.icon('grip') + '</span>' +
+      '<span class="ftype">' + esc(typeLabel) + '</span>' +
+      '<span class="fclabel">' + esc(f.label || '') + '</span>' +
+      '<div class="fcacts">' +
+      '<button class="iconbtn" id="col_' + f.id + '" title="Collapse / expand" aria-label="Collapse or expand this field">' + FormsUI.icon('chevron', { cls: 'col-chevron' }) + '</button>' +
+      '<button class="iconbtn" id="up_' + f.id + '" title="Move up" aria-label="Move up">' + FormsUI.icon('up') + '</button>' +
+      '<button class="iconbtn" id="dn_' + f.id + '" title="Move down" aria-label="Move down">' + FormsUI.icon('down') + '</button>' +
+      '<button class="iconbtn" id="dup_' + f.id + '" title="Duplicate field" aria-label="Duplicate field">' + FormsUI.icon('dup') + '</button>' +
+      '<button class="iconbtn" id="del_' + f.id + '" title="Delete field" aria-label="Delete field">' + FormsUI.icon('trash') + '</button></div></div>' +
+      '<div class="fcbody">' + body + '</div></div>';
+  }
+  function condFieldOpts(cur) {
+    var sel = (cur.showIf && cur.showIf.field) || '';
+    var opts = '<option value="">— always show —</option>';
+    fields().forEach(function (f) {
+      if (f.id === cur.id || f.type === 'sectionHeader' || f.type === 'description') return;
+      opts += '<option value="' + f.id + '"' + (sel === f.id ? ' selected' : '') + '>' + esc(f.label || f.id) + '</option>';
+    });
+    return opts;
+  }
+  function condOpOpts(showIf) {
+    var sel = (showIf && showIf.op) || 'equals';
+    return [['equals', 'equals'], ['notEquals', 'does not equal'], ['contains', 'contains'], ['notEmpty', 'is not empty'], ['empty', 'is empty']]
+      .map(function (o) { return '<option value="' + o[0] + '"' + (sel === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+  }
+  function dateFieldOpts(cur, sel) {
+    var o = '<option value="">— none —</option>';
+    fields().forEach(function (f) { if (f.id === cur.id || f.type !== 'date') return; o += '<option value="' + f.id + '"' + (sel === f.id ? ' selected' : '') + '>' + esc(f.label || f.id) + '</option>'; });
+    return o;
+  }
+  function valBlock(f) {
+    var vr = f.validation || {}, inner = '';
+    if (f.type === 'number') {
+      inner = '<div class="frow"><input class="control" type="number" id="vmin_' + f.id + '" value="' + esc(vr.min != null ? vr.min : '') + '" placeholder="Min"><input class="control" type="number" id="vmax_' + f.id + '" value="' + esc(vr.max != null ? vr.max : '') + '" placeholder="Max"></div>';
+    } else if (['text', 'textarea', 'email', 'phone'].indexOf(f.type) > -1) {
+      inner = '<div class="frow"><input class="control" type="number" id="vminl_' + f.id + '" value="' + esc(vr.minLen || '') + '" placeholder="Min length"><input class="control" type="number" id="vmaxl_' + f.id + '" value="' + esc(vr.maxLen || '') + '" placeholder="Max length"></div>' +
+        '<input class="control" id="vpat_' + f.id + '" value="' + esc(vr.pattern || '') + '" placeholder="Pattern (regex, optional)" style="margin-top:6px">' +
+        '<input class="control" id="vpmsg_' + f.id + '" value="' + esc(vr.patternMsg || '') + '" placeholder="Message if pattern fails" style="margin-top:6px">';
+    } else if (f.type === 'date') {
+      inner = '<div class="frow"><input class="control" type="date" id="vmind_' + f.id + '" value="' + esc(vr.minDate || '') + '"><input class="control" type="date" id="vmaxd_' + f.id + '" value="' + esc(vr.maxDate || '') + '"></div>' +
+        '<label class="lbl">Must be on/after another date field</label><select class="control" id="vnb_' + f.id + '">' + dateFieldOpts(f, vr.notBefore) + '</select>';
+    } else { return ''; }
+    return '<details class="adv"><summary>Validation</summary>' + inner + '</details>';
+  }
+  function capToText(cap) { cap = cap || {}; return Object.keys(cap).map(function (k) { return k + ' = ' + cap[k]; }).join('\n'); }
+  function parseCap(text) {
+    var m = {};
+    String(text).split('\n').forEach(function (line) {
+      var i = line.lastIndexOf('='); if (i < 0) return;
+      var k = line.slice(0, i).trim(); var n = parseInt(line.slice(i + 1).trim(), 10);
+      if (k && isFinite(n) && n >= 0) m[k] = n;
+    });
+    return m;
+  }
+  function sourceFieldChecks(cur) {
+    var sel = (cur.calc && cur.calc.fields) || [];
+    var eligible = fields().filter(function (f) {
+      return f.id !== cur.id && ['number', 'checkboxes', 'radio', 'dropdown', 'studentPicker', 'staffPicker'].indexOf(f.type) > -1;
+    });
+    if (!eligible.length) return '<p class="help">Add number or choice fields first, then pick them here.</p>';
+    return eligible.map(function (f) {
+      return '<label class="choice" style="padding:6px 10px"><input type="checkbox" value="' + f.id + '"' + (sel.indexOf(f.id) > -1 ? ' checked' : '') + '><span>' + esc(f.label || f.id) + '</span></label>';
+    }).join('');
+  }
+  function prefillOpts(sel) {
+    return [['', '— none —'], ['parentFirst', 'Parent first name'], ['parentLast', 'Parent last name'],
+      ['parentEmail', 'Parent email (locked)'], ['studentGrade', 'Student grade'], ['studentName', 'Student name']]
+      .map(function (o) { return '<option value="' + o[0] + '"' + (sel === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
+  }
+  function bindInput(id, cb) { var el = document.getElementById(id); if (el) el.oninput = function () { cb(this.value); }; }
+  function move(i, d) { var fs = fields(); var j = i + d; if (j < 0 || j >= fs.length) return; var t = fs[i]; fs[i] = fs[j]; fs[j] = t; renderCanvas(); }
+
+  function addField(type) {
+    var f = { id: uid(), type: type, label: '', required: false };
+    if (OPTION_TYPES[type]) f.options = ['Option 1'];
+    if (type === 'sectionHeader') f.label = 'Section title';
+    if (type === 'calculation') f.calc = { op: 'sum', fields: [] };
+    if (type === 'rating') f.max = 5;
+    fields().push(f); renderCanvas(); markDirty();
+    setTimeout(function () { var el = document.getElementById('lbl_' + f.id); if (el) el.focus(); }, 30);
+  }
+
+  function addParentBlock() {
+    if (!confirm('Add the parent identity block?\n\nThis inserts First/Last name, a locked verified Email, and a student picker, and sets the form to Private (parents verify by email).')) return;
+    var blk = [
+      { id: uid(), type: 'sectionHeader', label: 'Parent / guardian' },
+      { id: uid(), type: 'text', label: 'First name', required: true, prefillFrom: 'parentFirst' },
+      { id: uid(), type: 'text', label: 'Last name', required: true, prefillFrom: 'parentLast' },
+      { id: uid(), type: 'email', label: 'Your email', required: true, prefillFrom: 'parentEmail', help: 'Verified — the email you sign in with.' },
+      { id: uid(), type: 'sectionHeader', label: 'Student' },
+      { id: uid(), type: 'studentPicker', label: 'Which student?', required: true, help: 'Only your students are listed.' },
+      { id: uid(), type: 'text', label: 'Grade', required: false, prefillFrom: 'studentGrade' }
+    ];
+    EDITING.schema.pages[0].fields = blk.concat(fields());
+    EDITING.schema.settings.access = 'private';
+    renderCanvas(); syncSideAccess();
+    FormsUI.toast('Parent block added · access set to Private');
+  }
+
+  // ---------- side settings panel ----------
+  function sidePanel() {
+    var s = EDITING.schema.settings, m = EDITING.meta;
+    var ap = s.approval || {};
+    return '<div class="side"><h4>Settings</h4>' +
+      '<label class="lbl">Access</label><select class="control" id="sAccess">' +
+        opt('open', 'Open (anyone with link)', s.access) + opt('private', 'Private (FACTS email)', s.access) + opt('staff', 'Staff only (SSO)', s.access) + '</select>' +
+      '<label class="lbl">Status</label><select class="control" id="sLife">' +
+        opt('draft', 'Draft', s.lifecycle) + opt('published', 'Published', s.lifecycle) + opt('closed', 'Closed', s.lifecycle) + '</select>' +
+      '<div class="switchrow"><span>Not accepting responses' + info('Temporarily closes the form to new submissions without unpublishing it — submitters see a friendly “not accepting responses” message.') + '</span><span class="toggle"><input type="checkbox" id="sLock"' + (s.locked ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '<div class="switchrow"><span>Review mode — send both emails to the submitter' + info('The email the submitter enters gets BOTH the confirmation (as the requester) and a copy of the owner notification (as the reviewer). Useful when one person builds and submits the form.') + '</span><span class="toggle"><input type="checkbox" id="sReview"' + (s.reviewMode ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '<div class="switchrow"><span>Limit to one response per person' + info('Blocks a second submission from the same email address (verified email for parent/staff forms, or the entered email on open forms).') + '</span><span class="toggle"><input type="checkbox" id="sOnce"' + (s.onePerEmail ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '<label class="lbl">Notify on submit (emails, comma-sep)</label><input class="control" id="sNotify" value="' + esc((s.notifyEmails || []).join(', ')) + '"><div id="sNotifyWarn" class="help" style="color:var(--hcs-red);display:none">Only @harfordchristian.org addresses are allowed — others are dropped when you save.</div>' +
+      '<label class="lbl">Confirmation message</label><textarea class="control" id="sConfirm">' + esc(s.confirmationMessage || '') + '</textarea>' +
+      '<div class="divider"></div><h4>Response record</h4>' +
+      '<div class="switchrow"><span>Attach a PDF copy to the confirmation email' + info('The submitter’s receipt email includes a branded PDF of their answers. Great for signed permission slips, physicals, and KI forms. A copy is also saved in the form’s Uploads folder.') + '</span><span class="toggle"><input type="checkbox" id="sPdf"' + (s.pdfCopy ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '<div class="switchrow"><span>Let people edit or withdraw their response' + info('Adds a secure “Edit or withdraw” link to the receipt email. They can change answers or cancel while the response is still Submitted or Pending Approval — no login needed.') + '</span><span class="toggle"><input type="checkbox" id="sEdit"' + (s.allowEdit ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '<div class="divider"></div><h4>Scheduling &amp; limits</h4>' +
+      '<label class="lbl">Opens (optional)</label><input class="control" id="sOpen" type="datetime-local" value="' + esc(s.openDate || '') + '">' +
+      '<label class="lbl">Closes (optional)</label><input class="control" id="sClose" type="datetime-local" value="' + esc(s.closeDate || '') + '">' +
+      '<label class="lbl">Max total responses (0 = unlimited)</label><input class="control" id="sMax" type="number" min="0" value="' + esc(s.maxResponses || 0) + '">' +
+      '<div class="divider"></div><h4>Approvals</h4>' +
+      '<div class="switchrow"><span>Require approval before it’s final' + info('Submissions land as “Pending Approval” and route to the approvers below. They approve/reject from the Approvals tab; the submitter is emailed the decision.') + '</span><span class="toggle"><input type="checkbox" id="aEn"' + (ap.enabled ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '<label class="lbl">Approvers (emails or group names, comma-sep)</label><input class="control" id="aWho" value="' + esc((ap.approvers || []).join(', ')) + '">' +
+      '<label class="lbl">Require</label><select class="control" id="aMode">' + opt('any', 'Any one approver', ap.mode || 'any') + opt('all', 'All approvers', ap.mode || 'any') + '</select>' +
+      '<div class="divider"></div>' +
+      (EDITING.structureLocked ? '' : '<button class="btn gold block" id="btnParent" style="margin-bottom:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px">' + FormsUI.icon('plus') + ' This form is for Parents</button>') +
+      '<button class="btn block" id="btnSave">Save</button>' +
+      '<button class="btn ghost block" id="btnPreview" style="margin-top:8px">Preview as submitter</button>' +
+      '<button class="btn ghost block" id="btnShare" style="margin-top:8px">Get share link</button>' +
+      '<button class="btn ghost block" id="btnResp" style="margin-top:8px">View responses</button>' +
+      '<div class="divider"></div>' +
+      '<button class="btn ghost danger block" id="btnDelete" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">' + FormsUI.icon('trash') + ' Delete this form</button>' +
+      '<p class="help" style="margin-top:6px">To simply stop accepting responses, set <strong>Status</strong> to Closed instead — the form and its data stay put.</p>' +
+      '</div>';
+  }
+  function opt(v, label, sel) { return '<option value="' + v + '"' + (sel === v ? ' selected' : '') + '>' + esc(label) + '</option>'; }
+  // Small hover/focus tooltip icon for settings — native title + accessible label.
+  function info(text) { return ' <span class="infoicon" tabindex="0" role="img" title="' + esc(text) + '" aria-label="' + esc(text) + '">' + FormsUI.icon('info', { size: 14 }) + '</span>'; }
+  function syncSideAccess() { var el = document.getElementById('sAccess'); if (el) el.value = EDITING.schema.settings.access; }
+
+  function wireSide() {
+    var s = EDITING.schema.settings;
+    document.getElementById('sAccess').onchange = function () { s.access = this.value; };
+    document.getElementById('sLife').onchange = function () { s.lifecycle = this.value; };
+    document.getElementById('sLock').onchange = function () { s.locked = this.checked; };
+    document.getElementById('sReview').onchange = function () { s.reviewMode = this.checked; };
+    document.getElementById('sOnce').onchange = function () { s.onePerEmail = this.checked; };
+    document.getElementById('sPdf').onchange = function () { s.pdfCopy = this.checked; };
+    document.getElementById('sEdit').onchange = function () { s.allowEdit = this.checked; };
+    document.getElementById('sOpen').onchange = function () { s.openDate = this.value; };
+    document.getElementById('sClose').onchange = function () { s.closeDate = this.value; };
+    document.getElementById('sMax').oninput = function () { s.maxResponses = Number(this.value) || 0; };
+    if (!s.approval) s.approval = { enabled: false, approvers: [], mode: 'any' };
+    document.getElementById('aEn').onchange = function () { s.approval.enabled = this.checked; };
+    document.getElementById('aWho').oninput = function () { s.approval.approvers = this.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean); };
+    document.getElementById('aMode').onchange = function () { s.approval.mode = this.value; };
+    document.getElementById('sNotify').oninput = function () {
+      s.notifyEmails = this.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+      var bad = s.notifyEmails.some(function (e) { return e.indexOf('@') > -1 && !/@harfordchristian\.org$/i.test(e); });
+      var w = document.getElementById('sNotifyWarn'); if (w) w.style.display = bad ? 'block' : 'none';
+    };
+    // Use-as-is (layout-locked) forms freeze access + approval for non-admins.
+    if (EDITING.structureLocked) {
+      ['sAccess', 'aEn', 'aWho', 'aMode'].forEach(function (idd) { var el = document.getElementById(idd); if (el) el.disabled = true; });
+    }
+    document.getElementById('sConfirm').oninput = function () { s.confirmationMessage = this.value; };
+    var bp = document.getElementById('btnParent'); if (bp) bp.onclick = addParentBlock;
+    document.getElementById('btnSave').onclick = saveAll;
+    document.getElementById('btnPreview').onclick = function () {
+      // save current edits first so the preview reflects them, then open
+      doSave(true).then(function () { doPreview(EDITING.meta.id); });
+    };
+    document.getElementById('btnShare').onclick = function () { doShare(EDITING.meta.id); };
+    document.getElementById('btnResp').onclick = function () { openResponses(EDITING.meta.id); };
+    var bd = document.getElementById('btnDelete'); if (bd) bd.onclick = function () { doDelete(EDITING.meta.id, function () { DIRTY = false; renderDashboard(); }); };
+  }
+
+  function stateFromSettings_(s) {
+    return { lifecycle: s.lifecycle, access: s.access, locked: s.locked, reviewMode: !!s.reviewMode, onePerEmail: !!s.onePerEmail, pdfCopy: !!s.pdfCopy, allowEdit: !!s.allowEdit, openDate: s.openDate || '', closeDate: s.closeDate || '', maxResponses: Number(s.maxResponses) || 0, approval: s.approval || { enabled: false, approvers: [], mode: 'any' }, notifyEmails: s.notifyEmails, confirmationMessage: s.confirmationMessage };
+  }
+  function markDirty() { DIRTY = true; setDirtyDot(true); scheduleAutosave(); }
+  function setDirtyDot(on) { var d = document.getElementById('saveState'); if (d) d.innerHTML = on ? '● Unsaved…' : FormsUI.icon('check', { size: 14 }) + ' Saved'; }
+  function scheduleAutosave() { if (EDITING && EDITING.structureLocked) return; clearTimeout(AUTOSAVE_T); AUTOSAVE_T = setTimeout(function () { doSave(true); }, 1500); }
+  /** Save schema + settings. silent=true for autosave (no toast, no button spinner). Returns a promise. */
+  function doSave(silent) {
+    if (!EDITING) return Promise.resolve();
+    if (SAVING) { scheduleAutosave(); return Promise.resolve(); }
+    SAVING = true;
+    var s = EDITING.schema.settings;
+    var btn = document.getElementById('btnSave');
+    if (!silent && btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving…'; }
+    var save1 = EDITING.structureLocked ? Promise.resolve({ ok: true }) : call('saveForm', [EDITING.meta.id, EDITING.schema]);
+    return save1
+      .then(function () { return call('setFormState', [EDITING.meta.id, stateFromSettings_(s)]); })
+      .then(function (res) {
+        SAVING = false; DIRTY = false; setDirtyDot(false); if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+        if (res && res.droppedNotify && res.droppedNotify.length) {
+          // off-domain notify addresses are never stored (parent/student PII stays in-house)
+          var dropped = res.droppedNotify.map(function (x) { return String(x).toLowerCase(); });
+          s.notifyEmails = (s.notifyEmails || []).filter(function (e) { return dropped.indexOf(String(e).toLowerCase()) < 0; });
+          var nEl = document.getElementById('sNotify'); if (nEl) nEl.value = (s.notifyEmails || []).join(', ');
+          FormsUI.toast('Removed non-HCS notify address: ' + res.droppedNotify.join(', '));
+        } else if (!silent) FormsUI.toast('Saved');
+      })
+      .catch(function (e) {
+        SAVING = false; if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+        var msg = String(e && e.message || e) === 'LAYOUT_LOCKED' ? 'This form’s layout is locked and can’t be changed.' : String(e && e.message || e);
+        if (!silent) alert(msg);
+      });
+  }
+  function saveAll() { return doSave(false); }
+
+  // ---------- responses ----------
+  function openResponses(formId) {
+    chrome('<p class="help" style="padding:24px">Loading responses…</p>');
+    call('getResponses', [formId, 100]).then(function (r) {
+      var head = '<div style="display:flex;align-items:center;gap:10px;margin:16px 0">' +
+        '<button class="btn ghost sm" id="back">← Back</button>' +
+        '<h1 class="form-title" style="margin:0;font-size:1.2rem">Responses (' + r.count + ')</h1>' +
+        '<button class="btn ghost sm" id="exportCsv" style="margin-left:auto">Export CSV</button>' +
+        (r.sheetUrl ? '<a class="btn ghost sm" style="text-decoration:none" target="_blank" href="' + esc(r.sheetUrl) + '">Open Sheet ↗</a>' : '') + '</div>';
+      var table = !r.rows.length ? '<p class="help">No responses yet.</p>' :
+        '<div style="overflow:auto"><table class="rtable"><thead><tr>' +
+          r.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+          r.rows.map(function (row) { return '<tr>' + row.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') +
+          '</tbody></table></div>';
+      chrome(head + table);
+      document.getElementById('back').onclick = renderDashboard;
+      var ex = document.getElementById('exportCsv');
+      if (ex) ex.onclick = function () {
+        call('exportResponsesCsv', [formId]).then(function (res) {
+          var blob = new Blob([res.csv], { type: 'text/csv;charset=utf-8' });
+          var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = res.filename; a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+        }).catch(alertErr);
+      };
+    }).catch(alertErr);
+  }
+
+  function alertErr(e) { alert(String(e && e.message || e)); }
+})();
+</script>
+</body></html>

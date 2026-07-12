@@ -14,6 +14,7 @@ Christian School. Each demo is the **real app UI** running standalone in the bro
 | Leave & Substitute | `demos/leave-sub/` | Read-only analytics: personal, forecast, heatmap, subs, summary |
 | Concessions Ordering System | `demos/pos/` | `index.html` is a unified switcher framing the three screens — `kiosk.html` (order kiosk) + `tv.html` (menu board) + `kds.html` (kitchen display). Kiosk PIN is `1234` |
 | Lobby Display TV | `demos/lobby-tv/` | `index.html` switcher: **Control Dashboard** (`dashboard.html`) + the **TV** (`preview.html?mode=slides\|pictures\|livestream\|emergency`). Local sample content (`slides-sample.html`, `live-sample.html`) — no real YouTube. Note: the production TV renderer is a separate non-Apps-Script kiosk; `preview.html` is the project's own faithful reproduction of it |
+| Custom Forms | `demos/custom-forms/` | `index.html` chooser → `admin.html` (staff builder + responses + admin) and `fill.html` (form runner). Reuses the project's own mock-backed preview build — no login, fabricated forms/submissions |
 
 **Online vs. offline:** the site works from `file://`, but a few tools pull CDN assets (Bootstrap, Chart.js, Inter font) and the library covers from the network — those render fully only with an internet connection. Everything degrades gracefully offline.
 

@@ -80,6 +80,17 @@
         '<h4>How it helps now</h4>' +
         '<p>A control dashboard any staffer opens from a phone or desktop pushes content to the TV in about 20 seconds — rotate a Google Slides / PowerPoint deck, run a photo carousel from a Drive folder, drop in a single image, or switch to a live game stream. Around the content it overlays the bell-schedule countdown, upcoming athletics events, weather, and a scrolling ticker, plus full-screen emergency alerts and an automatic overnight &ldquo;resting&rdquo; mode. A lightweight kiosk polls a small control file, so the screen updates without anyone touching the TV.</p>' +
         '<p><b>Where content comes from:</b> slides from Google Slides or an auto-converted PowerPoint in Drive, photos from a Drive folder or a quick upload, and the livestream from the school&rsquo;s YouTube channel.</p>'
+    },
+
+    'custom-forms': {
+      icon: '📝', title: 'Custom Forms', launch: 'demos/custom-forms/index.html',
+      summary: 'A school-owned form builder that replaces JotForm — staff design forms (18+ field types, conditional logic, e-signatures, approvals); parents verify by email and forms auto-fill their own children from the student directory.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Forms ran on JotForm — a paid third-party service where every parent and student&rsquo;s information lived on a vendor&rsquo;s servers, with per-form limits and no connection to the school&rsquo;s student directory. Parents hand-typed which child a permission slip was for (and sometimes picked a sibling or the wrong student), branding was inconsistent, and identity wasn&rsquo;t really verified.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>A form builder that lives entirely inside the school&rsquo;s own Google Workspace. Staff design forms in one branded builder with 18+ field types, conditional logic, calculations, file uploads, e-signatures, and approval routing. Parents verify with a one-time code sent to the email the school already has on file, then the form <b>auto-fills their name and their own children</b> from the student directory — so the right student is always attached.</p>' +
+        '<p>Every form, response, and uploaded file stays on school-owned Drive and Sheets, and it costs nothing per form or per response.</p>'
     }
   };
 
