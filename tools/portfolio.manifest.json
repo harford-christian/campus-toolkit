@@ -97,6 +97,14 @@
       "sourceProject": ["athletics/gym-tv-project"],
       "builtFrom": ["athletics/gym-tv-project/GymControlDashboard.html", "athletics/gym-tv-project/GymDisplay.html"],
       "buildMethod": "build-demo.mjs (dashboard+display) + hand wrapper/data/mock"
+    },
+    "lunch-inventory": {
+      "title": "Lunch Inventory",
+      "demoFolder": "demos/lunch-inventory",
+      "launch": "demos/lunch-inventory/index.html",
+      "sourceProject": ["lunch-inventory-management"],
+      "builtFrom": ["lunch-inventory-management/Lunch_Home.html", "lunch-inventory-management/Lunch_Kiosk.html", "lunch-inventory-management/Lunch_Shipment.html", "lunch-inventory-management/Lunch_Admin.html"],
+      "buildMethod": "build-demo.mjs (4 pages) + hand wrapper/data/mock"
     }
   },
   "coveredProjects": [
@@ -116,7 +124,8 @@
     "athletics/eagles-landing/apps/admin",
     "lobby-tv-project",
     "custom-forms",
-    "athletics/gym-tv-project"
+    "athletics/gym-tv-project",
+    "lunch-inventory-management"
   ],
   "excludeDirs": [
     "apps-script-showcase",

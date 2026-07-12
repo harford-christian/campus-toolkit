@@ -188,5 +188,24 @@
       "whoAmI"
     ],
     "hash": "c346e82870193fd2"
+  },
+  "lunch-inventory": {
+    "files": [
+      "lunch-inventory-management/Lunch_Admin.html",
+      "lunch-inventory-management/Lunch_Home.html",
+      "lunch-inventory-management/Lunch_Kiosk.html",
+      "lunch-inventory-management/Lunch_Shipment.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "addLunchItem",
+      "getAdminData",
+      "getLunchData",
+      "logBuonGusto",
+      "logShipment",
+      "processLunchAction",
+      "saveItemEdits"
+    ],
+    "hash": "96f540404393630b"
   }
 }

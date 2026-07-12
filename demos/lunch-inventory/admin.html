@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HCS Lunch Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:    #0f0f0f;
+      --white:    #fafaf8;
+      --ink:      #1c1c1a;
+      --muted:    #767670;
+      --border:   #e2e2de;
+      --surface:  #f5f5f2;
+      --sidebar:  #141412;
+      --green:    #1a7a3c;
+      --green-bg: #e8f5ed;
+      --amber:    #92600a;
+      --amber-bg: #fef3dc;
+      --red:      #b82c2c;
+      --red-bg:   #fdeaea;
+      --orange:   #c45a10;
+      --orange-bg:#fef0e6;
+      --radius:   12px;
+      --font:     'DM Sans', sans-serif;
+      --mono:     'DM Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--surface);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── LOADING ── */
+    #loadingOverlay {
+      position: fixed; inset: 0; background: var(--surface);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; z-index: 999;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--black);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loadingOverlay p { font-size: 14px; color: var(--muted); }
+
+    /* ── LAYOUT ── */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; width: 220px;
+      background: var(--sidebar); color: var(--white);
+      display: flex; flex-direction: column;
+      padding: 24px 0; z-index: 100;
+    }
+    .sidebar-logo {
+      padding: 0 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-logo h1 { font-size: 15px; font-weight: 600; line-height: 1.3; }
+    .sidebar-logo p { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+
+    .sidebar nav { padding: 12px 0; flex: 1; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; font-size: 14px;
+      color: rgba(255,255,255,0.55);
+      cursor: pointer; border-radius: 0;
+      transition: color 0.15s, background 0.15s;
+      border: none; background: none; width: 100%; text-align: left;
+      font-family: var(--font);
+    }
+    .nav-item:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.05); }
+    .nav-item.active { color: white; background: rgba(255,255,255,0.1); }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .badge-count {
+      margin-left: auto; background: var(--red);
+      color: white; font-size: 11px; font-weight: 600;
+      padding: 1px 6px; border-radius: 20px;
+      font-family: var(--mono);
+    }
+
+    .main { margin-left: 220px; padding: 32px; min-height: 100vh; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── PAGE HEADER ── */
+    .page-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; margin-bottom: 28px; gap: 16px;
+    }
+    .page-header h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; }
+    .page-header p { font-size: 14px; color: var(--muted); margin-top: 3px; }
+
+    /* ── CARDS ── */
+    .card {
+      background: white; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 22px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.8px;
+      color: var(--muted); margin-bottom: 16px;
+    }
+
+    /* ── STAT ROW ── */
+    .stat-row {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px; margin-bottom: 24px;
+    }
+    .stat-card {
+      background: white; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 600; font-family: var(--mono); line-height: 1; }
+    .stat-value.danger { color: var(--red); }
+    .stat-value.warning { color: var(--amber); }
+    .stat-value.ok { color: var(--green); }
+
+    /* ── REORDER TABLE ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th {
+      text-align: left; padding: 8px 12px;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.7px;
+      color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    td { padding: 12px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface); }
+
+    .qty-badge {
+      font-family: var(--mono); font-size: 13px; font-weight: 500;
+      padding: 3px 8px; border-radius: 6px; display: inline-block;
+    }
+    .qty-low  { background: var(--red-bg);    color: var(--red); }
+    .qty-warn { background: var(--amber-bg);  color: var(--amber); }
+    .qty-ok   { background: var(--green-bg);  color: var(--green); }
+
+    .expiry-badge {
+      font-family: var(--mono); font-size: 12px; font-weight: 500;
+      padding: 2px 7px; border-radius: 5px;
+    }
+    .exp-expired { background: var(--red-bg);    color: var(--red); }
+    .exp-urgent  { background: var(--orange-bg); color: var(--orange); }
+    .exp-warning { background: var(--amber-bg);  color: var(--amber); }
+    .exp-ok      { background: var(--green-bg);  color: var(--green); }
+
+    .order-link {
+      font-size: 13px; color: #1a4f8a;
+      text-decoration: none; display: inline-flex;
+      align-items: center; gap: 4px;
+    }
+    .order-link:hover { text-decoration: underline; }
+
+    /* ── EXPIRY UPDATE ── */
+    .expiry-input-group {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .expiry-date-input {
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 8px; font-family: var(--font); font-size: 13px;
+      color: var(--ink); background: white;
+    }
+    .expiry-date-input:focus { outline: none; border-color: var(--black); }
+    .btn-set-expiry {
+      background: var(--black); color: white; border: none;
+      border-radius: 6px; padding: 6px 10px;
+      font-family: var(--font); font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+    }
+    .btn-set-expiry:hover { opacity: 0.8; }
+
+    /* ── INVENTORY VIEW ── */
+    .inv-category-header {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin: 24px 0 8px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between;
+    }
+    .inv-item-card {
+      background: white; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 18px;
+      margin-bottom: 10px; position: relative;
+    }
+    .inv-item-card.expiry-urgent  { border-left: 3px solid var(--red); }
+    .inv-item-card.expiry-warning { border-left: 3px solid var(--orange); }
+    .inv-item-card.low-stock      { border-left: 3px solid var(--amber); }
+    .inv-item-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px;
+    }
+    .inv-item-name { font-size: 15px; font-weight: 600; }
+    .inv-item-meta { font-size: 12px; color: var(--muted); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .inv-qty { font-family: var(--mono); font-size: 26px; font-weight: 500; text-align: right; white-space: nowrap; }
+    .inv-qty-label { font-size: 11px; color: var(--muted); text-align: right; }
+    .inv-batches { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .inv-batch-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border);
+      color: var(--ink);
+    }
+    .inv-batch-row:last-child { border-bottom: none; }
+    .inv-no-batches { font-size: 13px; color: var(--muted); font-style: italic; }
+
+    /* ── CHART ── */
+    .chart-wrap { position: relative; height: 260px; }
+
+    /* ── BG TABLE ── */
+    .bg-stat-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 12px; margin-bottom: 20px;
+    }
+    .bg-stat {
+      background: var(--surface); border-radius: 8px;
+      padding: 14px 16px; text-align: center;
+    }
+    .bg-stat-num { font-family: var(--mono); font-size: 26px; font-weight: 500; }
+    .bg-stat-lbl { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* ── CYCLE INFO ── */
+    .cycle-info {
+      background: var(--surface); border-radius: 8px;
+      padding: 12px 16px; font-size: 13px; color: var(--muted);
+      margin-bottom: 20px; display: flex; align-items: center; gap: 8px;
+    }
+    .cycle-info strong { color: var(--ink); }
+
+    /* ── EMPTY STATE ── */
+    .empty-state {
+      text-align: center; padding: 48px 20px;
+      color: var(--muted); font-size: 14px;
+    }
+    .empty-state .emoji { font-size: 36px; display: block; margin-bottom: 12px; }
+
+    /* ── PRINT ── */
+    .btn-print {
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 16px;
+      font-family: var(--font); font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-print:hover { background: var(--surface); }
+
+    @media print {
+      .sidebar, .btn-print { display: none; }
+      .main { margin-left: 0; padding: 20px; }
+      .tab-panel { display: block !important; }
+    }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Lunch Inventory — Admin" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <p>Loading admin data...</p>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>🍱 HCS Lunch<br>Admin</h1>
+      <p id="sidebarDate">—</p>
+    </div>
+    <nav>
+      <button class="nav-item active" onclick="showTab('reorder')" id="nav-reorder">
+        <span class="nav-icon">📋</span> Re-Order List
+        <span class="badge-count" id="reorder-badge" style="display:none">0</span>
+      </button>
+      <button class="nav-item" onclick="showTab('expiry')" id="nav-expiry">
+        <span class="nav-icon">📦</span> Inventory View
+        <span class="badge-count" id="expiry-badge" style="display:none">0</span>
+      </button>
+      <button class="nav-item" onclick="showTab('buongusto')" id="nav-buongusto">
+        <span class="nav-icon">🍕</span> Buon Gusto Log
+      </button>
+      <button class="nav-item" onclick="showTab('shipments')" id="nav-shipments">
+        <span class="nav-icon">📦</span> Shipment History
+      </button>
+      <button class="nav-item" onclick="showTab('trends')" id="nav-trends">
+        <span class="nav-icon">📊</span> Usage Trends
+      </button>
+    </nav>
+    <div style="padding:12px 20px;border-top:1px solid rgba(255,255,255,0.08)">
+      <button onclick="goHome()"
+        style="width:100%;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.6);padding:10px 16px;border-radius:8px;font-family:var(--font);font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:background .15s"
+        onmouseover="this.style.background='rgba(255,255,255,0.14)'"
+        onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+        ⌂ Back to Home
+      </button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- ── RE-ORDER TAB ── -->
+    <div class="tab-panel active" id="tab-reorder">
+      <div class="page-header">
+        <div>
+          <h2>Re-Order List</h2>
+          <p>Items at or below their minimum stock level</p>
+        </div>
+        <button class="btn-print" onclick="window.print()">⎙ Print</button>
+      </div>
+      <div class="cycle-info">
+        ℹ️ Order cycle: <strong id="cycleDays">7 days</strong> &nbsp;·&nbsp;
+        Items shown here are at or below their minimum stock level and should be reordered.
+      </div>
+      <div class="stat-row" id="reorderStats"></div>
+      <div class="card">
+        <div class="card-title">Items needing re-order</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Item</th><th>In Stock</th><th>Min Level</th><th>Category</th><th>Order</th>
+            </tr></thead>
+            <tbody id="reorderTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── INVENTORY VIEW TAB ── -->
+    <div class="tab-panel" id="tab-expiry">
+      <div class="page-header">
+        <div>
+          <h2>Inventory View</h2>
+          <p>All items · Current stock · Expiry status per batch</p>
+        </div>
+        <button class="btn-print" onclick="window.print()">⎙ Print</button>
+      </div>
+      <div id="inventoryViewContent"></div>
+    </div>
+
+    <!-- ── BUON GUSTO TAB ── -->
+    <div class="tab-panel" id="tab-buongusto">
+      <div class="page-header">
+        <div>
+          <h2>Buon Gusto Pizza Log</h2>
+          <p>Tuesday &amp; Thursday hot delivery — no carryover · $2.50/slice</p>
+        </div>
+      </div>
+      <div class="bg-stat-row" id="bgStats"></div>
+      <div class="card" id="bgSuggestion" style="display:none;border-left:3px solid var(--green)">
+        <div class="card-title">Suggested order quantity</div>
+        <div id="bgSuggestionContent"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent deliveries</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Day</th><th>Received</th><th>Sold</th><th>Leftover</th><th>Sell-through</th></tr></thead>
+            <tbody id="bgTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SHIPMENT HISTORY TAB ── -->
+    <div class="tab-panel" id="tab-shipments">
+      <div class="page-header">
+        <div>
+          <h2>Shipment History</h2>
+          <p>All logged incoming shipments · Stock additions over time</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Recent shipments</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Shipment ID</th><th>Items</th><th>Notes</th></tr></thead>
+            <tbody id="shipmentsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TRENDS TAB ── -->
+    <div class="tab-panel" id="tab-trends">
+      <div class="page-header">
+        <div>
+          <h2>Usage Trends</h2>
+          <p>Consumption over time · 2-week cycle view</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Daily withdrawals (last 28 days)</div>
+        <div class="chart-wrap"><canvas id="timeChart"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="card">
+          <div class="card-title">By item</div>
+          <div class="chart-wrap"><canvas id="itemChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">By category</div>
+          <div class="chart-wrap"><canvas id="catChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const BASE_URL = '';
+    function goHome() { window.location.href = BASE_URL + 'home.html'; }
+
+    let adminData = null;
+    let charts = {};
+
+    window.onload = () => {
+      google.script.run
+        .withSuccessHandler(init)
+        .withFailureHandler(err => {
+          document.getElementById('loadingOverlay').innerHTML =
+            '<p style="color:var(--red);padding:20px">Error: ' + err.message + '</p>';
+        })
+        .getAdminData();
+    };
+
+    function init(data) {
+      adminData = data;
+      document.getElementById('loadingOverlay').style.display = 'none';
+
+      const today = new Date(data.serverTime);
+      document.getElementById('sidebarDate').textContent =
+        today.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
+      document.getElementById('cycleDays').textContent = data.config.ORDER_CYCLE_DAYS + ' days';
+
+      renderReorder();
+      renderInventoryView();
+      renderBuonGusto();
+      renderShipments();
+      renderTrends();
+
+      // Badges
+      if (data.reorderList.length > 0) {
+        const b = document.getElementById('reorder-badge');
+        b.textContent = data.reorderList.length; b.style.display = '';
+      }
+      const urgentExpiry = data.expiryAlerts.filter(i => i.daysUntilExpiry <= data.config.EXPIRY_URGENT_DAYS);
+      if (urgentExpiry.length > 0) {
+        const b = document.getElementById('expiry-badge');
+        b.textContent = urgentExpiry.length; b.style.display = '';
+      }
+    }
+
+    function showTab(id) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('tab-' + id).classList.add('active');
+      document.getElementById('nav-' + id).classList.add('active');
+    }
+
+    // ── REORDER ──────────────────────────────────────────────────────────────
+    function renderReorder() {
+      const list = adminData.reorderList;
+      const allItems = adminData.items.filter(i => !i.isBuonGusto);
+
+      document.getElementById('reorderStats').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-label">Items to reorder</div>
+          <div class="stat-value ${list.length > 0 ? 'danger' : 'ok'}">${list.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total tracked items</div>
+          <div class="stat-value">${allItems.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Expiry alerts</div>
+          <div class="stat-value ${adminData.expiryAlerts.length > 0 ? 'warning' : 'ok'}">${adminData.expiryAlerts.length}</div>
+        </div>`;
+
+      const tbody = document.getElementById('reorderTable');
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="emoji">✅</span>All items are above minimum levels.</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(i => {
+        const qtyClass = i.qty === 0 ? 'qty-low' : 'qty-warn';
+        return `<tr>
+          <td><b>${i.name}</b><br><small style="color:var(--muted)">${i.unit}</small></td>
+          <td><span class="qty-badge ${qtyClass}">${i.qty}</span></td>
+          <td><span style="color:var(--muted);font-family:var(--mono)">${i.minLevel}</span></td>
+          <td>${i.category}</td>
+          <td>${i.supplierUrl
+            ? `<a class="order-link" href="${i.supplierUrl}" target="_blank">Order ↗</a>`
+            : '<span style="color:var(--muted)">—</span>'}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── INVENTORY VIEW ───────────────────────────────────────────────────────
+    function renderInventoryView() {
+      const cfg   = adminData.config;
+      const items = adminData.items.filter(i => !i.isBuonGusto);
+      const cats  = [...new Set(items.map(i => i.category))];
+      let html = '';
+
+      // Alert strip at top if anything urgent
+      const urgent = adminData.expiryAlerts.filter(b => b.daysUntilExpiry <= cfg.EXPIRY_URGENT_DAYS);
+      if (urgent.length > 0) {
+        html += `<div style="background:var(--red-bg);border:1px solid #f0b8b8;border-radius:var(--radius);padding:12px 16px;margin-bottom:20px">
+          <div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:6px">⚠ ${urgent.length} batch${urgent.length!==1?'es':''} expiring within ${cfg.EXPIRY_URGENT_DAYS} days</div>
+          ${urgent.map(b => `<div style="font-size:13px;color:var(--red);padding:2px 0">${b.itemName} — ${b.qtyRemaining} units, exp ${b.expiryStr}</div>`).join('')}
+        </div>`;
+      }
+
+      cats.forEach(cat => {
+        const catItems = items.filter(i => i.category === cat);
+        html += `<div class="inv-category-header"><span>${cat}</span><span>${catItems.reduce((s,i)=>s+i.qty,0)} total units</span></div>`;
+        catItems.forEach(item => {
+          const isLow = item.qty <= item.minLevel;
+          // Determine worst expiry status across batches
+          let cardClass = isLow ? 'low-stock' : '';
+          if (item.daysUntilExpiry !== null) {
+            if      (item.daysUntilExpiry <= cfg.EXPIRY_URGENT_DAYS)  cardClass = 'expiry-urgent';
+            else if (item.daysUntilExpiry <= cfg.EXPIRY_WARNING_DAYS) cardClass = 'expiry-warning';
+          }
+
+          // Batch rows
+          let batchHtml = '';
+          if (item.trackExpiry) {
+            if (!item.batches || item.batches.length === 0) {
+              batchHtml = `<div class="inv-batches"><div class="inv-no-batches">No shipment batches logged yet.</div></div>`;
+            } else {
+              batchHtml = `<div class="inv-batches">` + item.batches.map(b => {
+                let bc = 'exp-ok', bt = b.expiryStr || 'No date';
+                if (!b.expiryStr)                                          { bc = 'exp-warning'; }
+                else if (b.daysUntilExpiry <= 0)                          { bc = 'exp-expired'; bt = 'EXPIRED'; }
+                else if (b.daysUntilExpiry <= cfg.EXPIRY_URGENT_DAYS)     { bc = 'exp-urgent';  bt = b.daysUntilExpiry + 'd left'; }
+                else if (b.daysUntilExpiry <= cfg.EXPIRY_WARNING_DAYS)    { bc = 'exp-warning'; bt = b.daysUntilExpiry + 'd left'; }
+                else                                                       { bt = 'exp ' + b.expiryStr; }
+                return `<div class="inv-batch-row">
+                  <span style="color:var(--muted);font-size:12px">Received ${b.receivedStr}</span>
+                  <span style="display:flex;align-items:center;gap:8px">
+                    <span style="font-family:var(--mono)">${b.qtyRemaining} remaining</span>
+                    <span class="expiry-badge ${bc}">${bt}</span>
+                  </span>
+                </div>`;
+              }).join('') + `</div>`;
+            }
+          }
+
+          html += `<div class="inv-item-card ${cardClass}">
+            <div class="inv-item-top">
+              <div>
+                <div class="inv-item-name">${item.name}</div>
+                <div class="inv-item-meta">
+                  <span>$${parseFloat(item.price).toFixed(2)}</span>
+                  <span>Min: ${item.minLevel}</span>
+                  ${isLow ? '<span style="color:var(--amber);font-weight:600">LOW STOCK</span>' : ''}
+                  ${item.lastCounted ? '<span>Counted: ' + item.lastCounted + '</span>' : ''}
+                </div>
+              </div>
+              <div>
+                <div class="inv-qty">${item.qty}</div>
+                <div class="inv-qty-label">${item.unit}s in stock</div>
+              </div>
+            </div>
+            ${batchHtml}
+          </div>`;
+        });
+      });
+
+      if (!html) html = '<div class="empty-state"><span class="emoji">📦</span>No inventory data yet.</div>';
+      document.getElementById('inventoryViewContent').innerHTML = html;
+    }
+
+    // ── SHIPMENT HISTORY ──────────────────────────────────────────────────────
+    function renderShipments() {
+      const history = adminData.recentShipments || [];
+      const tbody = document.getElementById('shipmentsTable');
+      if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><span class="emoji">📦</span>No shipments logged yet. Use the New Shipment button on the home screen.</div></td></tr>';
+        return;
+      }
+      tbody.innerHTML = [...history].reverse().map(s => `<tr>
+        <td style="font-family:var(--mono);white-space:nowrap">${s.date}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--muted)">${s.shipmentId}</td>
+        <td><span style="font-family:var(--mono)">${s.itemCount}</span> item type${s.itemCount !== 1 ? 's' : ''}</td>
+        <td style="font-size:13px;color:var(--muted)">${s.notes || '—'}</td>
+      </tr>`).join('');
+    }
+
+    // ── BUON GUSTO ────────────────────────────────────────────────────────────
+    function renderBuonGusto() {
+      const history = adminData.bgHistory || [];
+      const PRICE = 2.50;
+
+      // Split by day of week — dates are stored as MM/DD so we need to reconstruct
+      // bgHistory entries have .date as "MM/DD" — we use the full log for day-of-week
+      // Since bgHistory only has MM/DD, we infer day from the pattern (Tue/Thu).
+      // Better: tag each entry with day using index parity of tue/thu entries.
+      // We'll compute averages from all entries and from the last 4 of each type.
+      const totalReceived = history.reduce((s, r) => s + r.received, 0);
+      const totalSold     = history.reduce((s, r) => s + r.sold, 0);
+      const avgSellThru   = totalReceived > 0 ? Math.round(totalSold / totalReceived * 100) : 0;
+      const estRevenue    = (totalSold * PRICE).toFixed(2);
+
+      // Split by actual day of week now that we have dayName
+      const tueEntries = history.filter(r => r.dayName === 'Tue');
+      const thuEntries = history.filter(r => r.dayName === 'Thu');
+      const avgTue = tueEntries.length > 0
+        ? Math.round(tueEntries.reduce((s,r) => s+r.sold, 0) / tueEntries.length) : null;
+      const avgThu = thuEntries.length > 0
+        ? Math.round(thuEntries.reduce((s,r) => s+r.sold, 0) / thuEntries.length) : null;
+
+      const recent = history.slice(-8);
+      const avgSoldRecent = recent.length > 0
+        ? Math.round(recent.reduce((s, r) => s + r.sold, 0) / recent.length) : 0;
+      const suggestedOrder = Math.ceil(avgSoldRecent * 1.1);
+
+      document.getElementById('bgStats').innerHTML = `
+        <div class="bg-stat">
+          <div class="bg-stat-num">${totalReceived}</div>
+          <div class="bg-stat-lbl">Total slices received</div>
+        </div>
+        <div class="bg-stat">
+          <div class="bg-stat-num">${totalSold}</div>
+          <div class="bg-stat-lbl">Total slices sold</div>
+        </div>
+        <div class="bg-stat">
+          <div class="bg-stat-num">${history.reduce((s,r)=>s+r.leftover,0)}</div>
+          <div class="bg-stat-lbl">Total leftover (discarded)</div>
+        </div>
+        <div class="bg-stat">
+          <div class="bg-stat-num">${avgSellThru}%</div>
+          <div class="bg-stat-lbl">Overall sell-through</div>
+        </div>
+        <div class="bg-stat">
+          <div class="bg-stat-num">$${estRevenue}</div>
+          <div class="bg-stat-lbl">Est. total revenue</div>
+        </div>`;
+
+      // Suggested order card
+      if (history.length >= 2) {
+        document.getElementById('bgSuggestion').style.display = 'block';
+        const tueLine = avgTue !== null ? `<div><div style="font-size:13px;color:var(--muted);margin-bottom:4px">Avg sold on Tuesdays (${tueEntries.length} logged)</div><div style="font-size:20px;font-weight:600;font-family:var(--mono)">${avgTue} slices</div></div>` : '';
+        const thuLine = avgThu !== null ? `<div><div style="font-size:13px;color:var(--muted);margin-bottom:4px">Avg sold on Thursdays (${thuEntries.length} logged)</div><div style="font-size:20px;font-weight:600;font-family:var(--mono)">${avgThu} slices</div></div>` : '';
+        document.getElementById('bgSuggestionContent').innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-top:4px">
+            ${tueLine}${thuLine}
+            <div>
+              <div style="font-size:13px;color:var(--muted);margin-bottom:4px">Suggested order (recent avg + 10%)</div>
+              <div style="font-size:20px;font-weight:600;font-family:var(--mono);color:var(--green)">${suggestedOrder} slices</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:10px">Based on the last ${recent.length} logged deliveries. Will become more accurate over time.</div>`;
+      }
+
+      const tbody = document.getElementById('bgTable');
+      if (history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="emoji">🍕</span>No Buon Gusto logs yet. Data appears on Tues/Thurs.</div></td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = [...history].reverse().map((r) => {
+        const pct = r.received > 0 ? Math.round(r.sold / r.received * 100) : 0;
+        const leftoverStyle = r.leftover > 5 ? 'color:var(--red);font-weight:600' : r.leftover > 2 ? 'color:var(--amber)' : '';
+        const dayLabel = r.dayName ? `<span style="font-size:12px;padding:1px 7px;border-radius:4px;background:var(--surface);color:var(--muted)">${r.dayName}</span>` : '—';
+        return `<tr>
+          <td style="font-family:var(--mono);white-space:nowrap">${r.date}</td>
+          <td>${dayLabel}</td>
+          <td style="font-family:var(--mono)">${r.received}</td>
+          <td style="font-family:var(--mono)">${r.sold}</td>
+          <td style="font-family:var(--mono);${leftoverStyle}">${r.leftover}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;min-width:60px">
+                <div style="width:${pct}%;height:100%;background:${pct>=80?'var(--green)':pct>=50?'var(--amber)':'var(--red)'};border-radius:3px"></div>
+              </div>
+              <span style="font-family:var(--mono);font-size:12px;min-width:36px">${pct}%</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── TRENDS ────────────────────────────────────────────────────────────────
+    function renderTrends() {
+      renderTimeChart();
+      renderItemChart();
+      renderCatChart();
+    }
+
+    function renderTimeChart() {
+      const ts = adminData.timeSeries || {};
+      const sorted = Object.entries(ts).sort((a,b) => a[0].localeCompare(b[0])).slice(-28);
+      const ctx = document.getElementById('timeChart').getContext('2d');
+      if (charts.time) charts.time.destroy();
+      charts.time = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: sorted.map(d => {
+            const parts = d[0].split('-');
+            return (parseInt(parts[1])) + '/' + parseInt(parts[2]);
+          }),
+          datasets: [{
+            label: 'Units withdrawn',
+            data: sorted.map(d => d[1]),
+            backgroundColor: '#0f0f0f',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { family: "'DM Mono'" } } },
+            y: { beginAtZero: true, grid: { color: '#e2e2de' }, ticks: { font: { family: "'DM Mono'" } } }
+          }
+        }
+      });
+    }
+
+    function renderItemChart() {
+      const velocity = adminData.itemVelocity || {};
+      const top = Object.entries(velocity).sort((a,b) => b[1]-a[1]).slice(0,8);
+      const ctx = document.getElementById('itemChart').getContext('2d');
+      if (charts.item) charts.item.destroy();
+      if (top.length === 0) { ctx.canvas.parentElement.innerHTML = '<div class="empty-state"><span class="emoji">📊</span>No withdrawal data yet.</div>'; return; }
+      charts.item = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: top.map(d => d[0]),
+          datasets: [{ data: top.map(d => d[1]), backgroundColor: '#1a7a3c', borderRadius: 4 }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: '#e2e2de' } },
+            y: { grid: { display: false }, ticks: { font: { size: 12 } } }
+          }
+        }
+      });
+    }
+
+    function renderCatChart() {
+      const cats = adminData.categoryUsage || {};
+      const entries = Object.entries(cats);
+      const ctx = document.getElementById('catChart').getContext('2d');
+      if (charts.cat) charts.cat.destroy();
+      if (entries.length === 0) { ctx.canvas.parentElement.innerHTML = '<div class="empty-state"><span class="emoji">📊</span>No data yet.</div>'; return; }
+      charts.cat = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: entries.map(e => e[0]),
+          datasets: [{
+            data: entries.map(e => e[1]),
+            backgroundColor: ['#0f0f0f','#1a7a3c','#92600a','#1a4f8a','#b82c2c'],
+            borderWidth: 2, borderColor: 'white'
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 12 } } } }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

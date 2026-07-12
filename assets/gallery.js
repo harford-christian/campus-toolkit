@@ -102,6 +102,16 @@
         '<h4>How it helps now</h4>' +
         '<p>A gym TV that runs itself. It flips to game mode automatically from the athletics calendar and mirrors the concession stand’s live inventory in real time — &ldquo;Only 3 left,&rdquo; &ldquo;Sold out,&rdquo; half-off specials, a cooking countdown — next to team photos. The rest of the time it’s an idle board: photo carousel, upcoming games, weather, and a ticker. A simple dashboard sets manual overrides, messages, and a full-screen emergency alert.</p>' +
         '<p>Same pattern as the lobby display, running on a ~$35 Raspberry Pi in kiosk mode — no touch on game night.</p>'
+    },
+
+    'lunch-inventory': {
+      icon: '🍎', title: 'Lunch Inventory', launch: 'demos/lunch-inventory/index.html',
+      summary: 'A four-screen lunch-program system: a touch count kiosk, a shipment-intake screen with per-batch expiry tracking, and an admin dashboard with reorder lists, expiry alerts, pizza sell-through, and usage-trend charts.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Lunch inventory lived on paper and manual spreadsheet counts — no expiry tracking per delivery batch, no automatic reorder flagging when stock ran low, and no view of how fast items sold or how much hot pizza got thrown away. Staff eyeballed the shelf and guessed reorder amounts.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>A shared, phone-friendly system on top of the same Google Sheet. Staff do shelf counts on a touch <b>kiosk</b>, log incoming <b>shipments</b> with per-box expiry dates, and the <b>admin dashboard</b> surfaces FIFO expiry warnings, at-a-glance low-stock reorder lists, hot-pizza sell-through, shipment history, and usage-trend charts — right-sizing orders and cutting waste.</p>'
     }
   };
 

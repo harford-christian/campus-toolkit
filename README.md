@@ -15,6 +15,8 @@ Christian School. Each demo is the **real app UI** running standalone in the bro
 | Concessions Ordering System | `demos/pos/` | `index.html` is a unified switcher framing the three screens — `kiosk.html` (order kiosk) + `tv.html` (menu board) + `kds.html` (kitchen display). Kiosk PIN is `1234` |
 | Lobby Display TV | `demos/lobby-tv/` | `index.html` switcher: **Control Dashboard** (`dashboard.html`) + the **TV** (`preview.html?mode=slides\|pictures\|livestream\|emergency`). Local sample content (`slides-sample.html`, `live-sample.html`) — no real YouTube. Note: the production TV renderer is a separate non-Apps-Script kiosk; `preview.html` is the project's own faithful reproduction of it |
 | Custom Forms | `demos/custom-forms/` | `index.html` chooser → `admin.html` (staff builder + responses + admin) and `fill.html` (form runner). Reuses the project's own mock-backed preview build — no login, fabricated forms/submissions |
+| Gym Display TV | `demos/gym-tv/` | `index.html` switcher: Control Dashboard + display (`display.html?mode=game\|idle\|emergency`). Auto-detects home games; game mode mirrors the live concession menu |
+| Lunch Inventory | `demos/lunch-inventory/` | `index.html` switcher: Home / Count Kiosk / Shipment / Admin. Per-batch expiry tracking, reorder lists, pizza sell-through, usage charts |
 
 **Online vs. offline:** the site works from `file://`, but a few tools pull CDN assets (Bootstrap, Chart.js, Inter font) and the library covers from the network — those render fully only with an internet connection. Everything degrades gracefully offline.
 
