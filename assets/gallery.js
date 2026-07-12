@@ -28,7 +28,9 @@
         '<p><b>Now:</b> one portal figures out which approval groups are required (AV, facilities, security, business office), routes to them with a live progress bar and notifications, and — once approved — feeds the unlock times straight into Door Automation. No chains, no double entry.</p>' +
         '<h4>🔒 Emergency Lockdown</h4>' +
         '<p><b>Before:</b> starting a lockdown meant finding an administrator, making a PA announcement, and hoping every exterior door got locked in time — with no fast way to log the incident or alert the right people.</p>' +
-        '<p><b>Now:</b> any authorized staffer hits one big button from their phone. Exterior doors lock instantly via the relays, leadership is alerted, and the app captures incident details for the record. A maintenance mode lets facilities test specific doors without triggering a real alert.</p>'
+        '<p><b>Now:</b> any authorized staffer hits one big button from their phone. Exterior doors lock instantly via the relays, leadership is alerted, and the app captures incident details for the record. A maintenance mode lets facilities test specific doors without triggering a real alert.</p>' +
+        '<h4>🔔 Bell Scheduler &amp; 📟 Monitoring</h4>' +
+        '<p>The suite also includes a <b>bell schedule hub</b> — one calendar that resolves which bell pattern rings each day (normal, delay, chapel, exam week) so paging, doors, and the lobby TV all inherit it — and a <b>campus monitoring board</b> showing live freezer/fridge temperatures, water-leak sensors, and device status, flagging problems within minutes instead of after they fail.</p>'
     },
 
     'athletics': {

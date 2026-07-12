@@ -8,7 +8,7 @@ Christian School. Each demo is the **real app UI** running standalone in the bro
 | Tool | Folder | Notes |
 |------|--------|-------|
 | Library Catalog | `demos/library/` | Real cover art on the featured books (loaded from OpenLibrary; falls back to placeholder covers offline) |
-| Campus Control (suite) | `demos/campus-control/` | Unified switcher (`index.html`) that frames three campus-control tools in one system: **Door Automation** (`demos/door/` — tabs + `dashboard.html` + `leadership.html`), **Event Requests** (`demos/event-requests/`), and **Emergency Lockdown** (`demos/lockdown/`) |
+| Campus Control (suite) | `demos/campus-control/` | Unified switcher (`index.html`) that frames three campus-control tools in one system: **Door Automation** (`demos/door/` — tabs + `dashboard.html` + `leadership.html`), **Event Requests** (`demos/event-requests/`), **Emergency Lockdown** (`demos/lockdown/`), **Bell Scheduler** (`demos/bell-schedule/`), and **Campus Monitoring** (`demos/monitoring/`) |
 | Athletics Logistics (Talon Hub) | `demos/talon-hub/` | Rosters, travel manifests, check-offs — fully fabricated athletes/guardians |
 | Purchasing & Procurement | `demos/purchasing/` | New Order, Order History, Management queue, and all 3 Analytics tabs are live. Secondary management sub-tabs (Products/Vendors/Users/Departments/Saved Views/Team Orders) and write-actions render empty by design — not wired for the demo |
 | Leave & Substitute | `demos/leave-sub/` | Read-only analytics: personal, forecast, heatmap, subs, summary |

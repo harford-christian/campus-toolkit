@@ -13,6 +13,7 @@
   },
   "campus-control": {
     "files": [
+      "campus-control/bell-schedule/Index.html",
       "campus-control/door-automation/Dashboard.html",
       "campus-control/door-automation/Edit.html",
       "campus-control/door-automation/Index.html",
@@ -22,15 +23,17 @@
       "campus-control/door-automation/Styles.html",
       "campus-control/door-automation/Today.html",
       "campus-control/event-requests/RequestView.html",
-      "campus-control/lockdown/Lockdown.html"
+      "campus-control/lockdown/Lockdown.html",
+      "campus-control/monitoring/Dashboard.html"
     ],
     "missing": [],
     "gsr": [
       "getLeadershipStatus",
       "getLoggedInUser",
+      "getMonitorSnapshotForClient",
       "processPost"
     ],
-    "hash": "70ca46ce8e8643e0"
+    "hash": "e4e67000e5daaeec"
   },
   "athletics": {
     "files": [
@@ -43,7 +46,7 @@
     "gsr": [
       "api"
     ],
-    "hash": "228fe13788c888bb"
+    "hash": "621226da4b439182"
   },
   "purchasing": {
     "files": [
@@ -167,7 +170,7 @@
       "authVerifyOtp",
       "withdrawSubmission"
     ],
-    "hash": "b86585ccca0b3da3"
+    "hash": "739247a65e0a1eed"
   },
   "gym-tv": {
     "files": [

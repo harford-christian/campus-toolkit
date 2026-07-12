@@ -13,7 +13,7 @@
       "title": "Campus Control (suite)",
       "demoFolder": "demos/campus-control",
       "launch": "demos/campus-control/index.html",
-      "sourceProject": ["campus-control/door-automation", "campus-control/event-requests", "campus-control/lockdown"],
+      "sourceProject": ["campus-control/door-automation", "campus-control/event-requests", "campus-control/lockdown", "campus-control/bell-schedule", "campus-control/monitoring"],
       "builtFrom": [
         "campus-control/door-automation/Index.html",
         "campus-control/door-automation/Today.html",
@@ -24,7 +24,9 @@
         "campus-control/door-automation/Dashboard.html",
         "campus-control/door-automation/Leadership.html",
         "campus-control/event-requests/RequestView.html",
-        "campus-control/lockdown/Lockdown.html"
+        "campus-control/lockdown/Lockdown.html",
+        "campus-control/bell-schedule/Index.html",
+        "campus-control/monitoring/Dashboard.html"
       ],
       "buildMethod": "build-demo.mjs (per sub-page) + hand wrapper/data/mock"
     },
@@ -113,6 +115,8 @@
     "campus-control/door-automation",
     "campus-control/event-requests",
     "campus-control/lockdown",
+    "campus-control/bell-schedule",
+    "campus-control/monitoring",
     "talon-hub/apps/staff",
     "talon-hub/apps/parent",
     "talon-hub/apps/student",
