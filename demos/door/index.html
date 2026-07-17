@@ -164,7 +164,7 @@ body.hcs-app *{box-sizing:border-box;}
   }
 
   /* ── Content ── */
-  .content { padding: 24px 16px 60px; max-width: 900px; margin: 0 auto; }
+  .content { padding: 24px 16px 60px; max-width: 1400px; margin: 0 auto; }
 
   /* ── Cards (hcs surface; signature gold-accent variant) ── */
   .card {
@@ -530,7 +530,7 @@ body.hcs-app *{box-sizing:border-box;}
   <div class="hcs-brand">&#x1F511;</div>
   <h1>Door Automation</h1>
   <button class="nav-btn active" data-tab="today" onclick="showTab('today', this)">Today</button>
-  <button class="nav-btn" data-tab="edit" onclick="showTab('edit', this)">Edit</button>
+  <button class="nav-btn" data-tab="edit" onclick="showTab('edit', this)">Events</button>
   <button class="nav-btn" data-tab="schedules" onclick="showTab('schedules', this)">Schedules</button>
   
   <button class="nav-btn" data-tab="quick" onclick="showTab('quick', this)">Quick Control</button>
@@ -547,7 +547,7 @@ body.hcs-app *{box-sizing:border-box;}
     </button>
     <button class="bottom-tab" data-tab="edit" onclick="showTab('edit', this)">
       <span class="bottom-tab-icon">&#9999;&#65039;</span>
-      <span>Edit</span>
+      <span>Events</span>
     </button>
     <button class="bottom-tab" data-tab="schedules" onclick="showTab('schedules', this)">
       <span class="bottom-tab-icon">&#128336;</span>
@@ -822,10 +822,11 @@ body.hcs-app *{box-sizing:border-box;}
       } catch(e) { dateLabel = data.today; }
     }
     var churchStatus = data.todayChurchStatus || '';
-    // Church meets Sun/Wed only — on every other day show N/A (no service today), not the raw
-    // col-G open/closed flag (which defaults to "open" and would falsely read as church being on).
+    // Church meets Sun/Wed only — on every other day, don't show a church badge at all rather than
+    // an N/A placeholder (the raw col-G open/closed flag defaults to "open" and would falsely read
+    // as church being on, which is why todayChurchMeets gates this instead of churchStatus alone).
     var churchBadge = !data.todayChurchMeets
-      ? '<span class="badge" style="font-size:0.85rem;padding:4px 12px;margin-left:6px;background:#9ca3af;color:#fff">&#9963; Church: N/A</span>'
+      ? ''
       : churchStatus === 'closed'
         ? '<span class="badge badge-red" style="font-size:0.85rem;padding:4px 12px;margin-left:6px">&#9963; Church: Closed</span>'
         : '<span class="badge badge-green" style="font-size:0.85rem;padding:4px 12px;margin-left:6px">&#9963; Church: Open</span>';
@@ -1612,19 +1613,7 @@ body.hcs-app *{box-sizing:border-box;}
     }, 250);
   }
 </script></div>
-  <div id="tab-edit"   class="tab-panel"><!-- Emergency Modal -->
-<div id="emergency-modal" class="modal-overlay hidden">
-  <div id="emergency-modal-card" class="modal-card danger">
-    <h3 id="emergency-modal-title"></h3>
-    <p id="emergency-modal-body"></p>
-    <div class="modal-actions">
-      <button id="emergency-confirm-btn" onclick="emergencyConfirm()">Confirm</button>
-      <button class="btn btn-gray" onclick="hideEmergencyModal()">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- Conflict Modal -->
+  <div id="tab-edit"   class="tab-panel"><!-- Conflict Modal -->
 <div id="conflict-modal" class="modal-overlay hidden">
   <div class="modal-card warning">
     <h3>&#x26A0; Conflict Detected</h3>
@@ -1641,85 +1630,68 @@ body.hcs-app *{box-sizing:border-box;}
   </div>
 </div>
 
-<!-- Schedule Controls -->
-<div class="card">
-  <h2>Schedule Controls</h2>
-  <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px">The CMS controls the active schedule. Lockdown now lives in the dedicated <b>Lockdown</b> app; use Restore to resync today's doors to the CMS schedule.</p>
-  <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <button class="btn btn-warning" id="btn-restore"
-      onclick="confirmAction('restoreNormal','Restore to CMS Schedule','This will rebuild today\'s schedule from the CMS.','Restore','warning',this)">
-      Restore to CMS Schedule
-    </button>
+<!-- Event Modal (create/edit) -->
+<div id="event-modal" class="modal-overlay hidden">
+  <div class="modal-card modal-card-wide">
+    <h3 id="event-modal-title">New Event</h3>
+    <div id="event-modal-body"></div>
   </div>
 </div>
 
-<!-- Custom Events Section -->
+<!-- Events Section — tile grid, popup create/edit -->
 <div class="card">
-  <h2>Custom Events</h2>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Name</label>
-      <input type="text" id="evt-name" placeholder="e.g., Church Service">
-    </div>
-    <div class="form-group">
-      <label id="evt-date-label">Date</label>
-      <input type="date" id="evt-date">
-    </div>
-    <div class="form-group">
-      <label>Recurrence</label>
-      <select id="evt-recurrence" onchange="updateDateInput()">
-        <option value="ONE_TIME">One-time</option>
-        <option value="ANNUAL">Annual (same date each year)</option>
-        <option value="CONSECUTIVE">Consecutive Days</option>
-      </select>
-    </div>
-    <div class="form-group" id="evt-days-group" style="display:none">
-      <label>Repeat for N Days</label>
-      <input type="number" id="evt-days" min="2" max="365" value="2" placeholder="e.g., 5">
-    </div>
-  </div>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Unlock Time (local)</label>
-      <input type="time" id="evt-unlock">
-    </div>
-    <div class="form-group">
-      <label>Lock Time (local)</label>
-      <input type="time" id="evt-lock">
-    </div>
-    <div class="form-group">
-      <label>Doors / Groups</label>
-      <div class="group-dropdown" id="groups-dropdown">
-        <button type="button" class="group-dropdown-toggle" id="groups-toggle"
-                onclick="toggleGroupsDropdown(event)">ALL GROUPS ▾</button>
-        <div class="group-dropdown-menu" id="groups-menu" style="display:none"></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Event Type</label>
-      <select id="evt-type">
-        <option value="Unlock" selected>Unlock (normal)</option>
-        <option value="Lock">Lock (blocks unlocks)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Category</label>
-      <select id="evt-category">
-        <option value="School" selected>School</option>
-        <option value="Church">Church</option>
-        <option value="Both">Both</option>
-      </select>
-    </div>
-    <div class="form-group" style="justify-content:flex-end;align-items:center;gap:8px;">
-      <label>&nbsp;</label>
-      <button id="btn-add-event" class="btn btn-primary btn-block-mobile" onclick="submitEvent()">Add Event</button>
-      <a id="cancel-edit-link" href="#" style="display:none;font-size:0.85rem;color:var(--muted)"
-         onclick="cancelEditMode();return false;">Cancel Edit</a>
-    </div>
-  </div>
-  <div id="events-list" style="margin-top:16px;overflow-x:auto;">
-    <div class="skeleton-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
-    <div class="skeleton-row"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+  <style>
+    .modal-card-wide { max-width: 640px !important; }
+    .ev-sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .ev-sec-head .bar { width: 4px; height: 22px; background: var(--hcs-red, #B22222); border-radius: 2px; }
+    .ev-sec-head b { font-size: 1.05rem; letter-spacing: .02em; }
+    .ev-sec-head .cnt { background: #c9a227; color: #fff; font-weight: 800; font-size: .8rem; padding: 2px 10px; border-radius: 7px; }
+    .ev-add-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--hcs-red, #B22222); color: #fff;
+      font-weight: 700; font-size: .85rem; padding: 9px 18px; border-radius: 9px; margin-bottom: 14px; cursor: pointer; border: none; }
+    .ev-add-btn:hover { background: var(--hcs-red-dark, #8f1b1b); }
+    .ev-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    @media (max-width: 900px) { .ev-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .ev-grid { grid-template-columns: 1fr; } }
+    .ev-card { background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); display: flex;
+      overflow: hidden; border-left: 5px solid #c9a227; }
+    .ev-card.lock { border-left-color: var(--hcs-red, #B22222); }
+    .ev-card.dimmed { opacity: 0.5; }
+    .ev-rail { width: 72px; flex-shrink: 0; background: #faf6ea; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; padding: 6px 4px; text-align: center; }
+    .ev-card.lock .ev-rail { background: #fdeeee; }
+    .ev-rail .d { font-size: 1.45rem; font-weight: 800; color: #7a4a0a; line-height: 1.15;
+      font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ev-card.lock .ev-rail .d { color: #8a1414; }
+    .ev-rail .m { font-size: .66rem; color: #8a6a2a; text-transform: uppercase; font-weight: 700; margin-top: 2px; }
+    .ev-card.lock .ev-rail .m { color: #a04848; }
+    .ev-rail .d.range { display: flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.1; position: relative; }
+    .ev-rail .d.range span { display: inline-block; min-width: 2ch; text-align: center; font-variant-numeric: tabular-nums; }
+    .ev-rail .d.range span:first-child { padding-bottom: 5px; position: relative; }
+    .ev-rail .d.range span:first-child::after { content: ''; position: absolute; left: 50%; bottom: 0;
+      transform: translateX(-50%); width: 9px; height: 0; border-top: 1.5px solid #d9c090; }
+    .ev-card.lock .ev-rail .d.range span:first-child::after { border-top-color: #e0b0b0; }
+    .ev-rail .d.range span:last-child { padding-top: 4px; }
+    .ev-body { padding: 16px 18px; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .ev-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .ev-name { font-weight: 800; font-size: 1.05rem; }
+    .ev-pill { font-size: .68rem; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+      background: #fbe7c6; color: #7a4a0a; white-space: nowrap; }
+    .ev-pill.lockb { background: #fbd6d6; color: #8a1414; }
+    .ev-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: .86rem; color: #333; }
+    .ev-row .ic { width: 18px; text-align: center; color: #888; }
+    .ev-time { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .ev-foot { margin-top: auto; padding-top: 14px; border-top: 1px dashed #e5e5e5; display: flex;
+      justify-content: space-between; align-items: center; }
+    .ev-cat { font-size: .75rem; color: #999; }
+    .ev-edit-btn { font-size: .75rem; font-weight: 700; padding: 5px 13px; border-radius: 7px;
+      border: 1px solid var(--line, #e7e9ee); background: #fff; color: #333; cursor: pointer; }
+    .ev-edit-btn:hover { background: #f7f7f9; }
+  </style>
+  <div class="ev-sec-head"><div class="bar"></div><b>EVENTS</b><span class="cnt" id="ev-count">0</span></div>
+  <button type="button" class="ev-add-btn" onclick="showNewEventForm()">+ New Event</button>
+  <div class="ev-grid" id="ev-list">
+    <div class="skeleton-row"><div class="skeleton"></div></div>
+    <div class="skeleton-row"><div class="skeleton"></div></div>
   </div>
 </div>
 
@@ -1727,6 +1699,98 @@ body.hcs-app *{box-sizing:border-box;}
 <script>
   function escHtml(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Calendar-safe (DST-safe) date math on "YYYY-MM-DD" strings — uses Date.UTC so day-boundary
+  // arithmetic is never perturbed by a local-timezone DST transition (raw ms*86400000 math can be off
+  // by an hour across a spring/fall DST change).
+  function _addDaysStr(dateStr, n) {
+    var p = dateStr.split('-').map(Number);
+    var d = new Date(Date.UTC(p[0], p[1] - 1, p[2]));
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+  function _daysBetweenInclusive(startStr, endStr) {
+    var s = startStr.split('-').map(Number), e = endStr.split('-').map(Number);
+    var sUTC = Date.UTC(s[0], s[1] - 1, s[2]), eUTC = Date.UTC(e[0], e[1] - 1, e[2]);
+    return Math.round((eUTC - sUTC) / 86400000) + 1;
+  }
+  // Converts a daysSpec ('' | 'DAILY' | 'WEEKDAYS' | 'WEEKENDS' | '1,2,3' | '1-5') into an array of
+  // checked day-of-week numbers (0=Sun..6=Sat), for pre-filling the checkbox row on edit.
+  function _daysSpecToArray(spec) {
+    var s = String(spec || '').trim().toUpperCase();
+    if (!s || s === 'DAILY') return [0, 1, 2, 3, 4, 5, 6];
+    if (s === 'WEEKDAYS') return [1, 2, 3, 4, 5];
+    if (s === 'WEEKENDS') return [0, 6];
+    var result = [];
+    s.split(',').forEach(function(part) {
+      part = part.trim();
+      var dash = part.indexOf('-');
+      if (dash > 0) {
+        var a = parseInt(part.substring(0, dash), 10), b = parseInt(part.substring(dash + 1), 10);
+        for (var i = a; i <= b; i++) result.push(i);
+      } else if (part !== '') {
+        result.push(parseInt(part, 10));
+      }
+    });
+    return result;
+  }
+
+  // CE_CREATED_BY holds either an admin's email or the literal source tag written by an automated
+  // creator (e.g. SportsCalendarSync.js's SPORTS_SYNC_SOURCE constant) — map known tags to a friendly label.
+  var _CREATED_BY_LABELS = { 'SPORTS_SYNC': 'Sports Calendar' };
+  function _formatCreatedBy(createdBy) {
+    return _CREATED_BY_LABELS[createdBy] || createdBy;
+  }
+
+  // Renders the create/edit form INTO the event modal. `e` is an event object (null => create mode).
+  function renderEventForm(e) {
+    var isEdit = !!e;
+    document.getElementById('event-modal-title').textContent = isEdit ? 'Edit Event' : 'New Event';
+    var html =
+      '<div class="form-row">' +
+        '<div class="form-group"><label>Name</label><input type="text" id="evt-name" placeholder="e.g., Church Service"></div>' +
+        '<div class="form-group"><label id="evt-date-label">Date</label><input type="date" id="evt-date"></div>' +
+        '<div class="form-group"><label>Recurrence</label><select id="evt-recurrence" onchange="updateDateInput()">' +
+          '<option value="ONE_TIME">One-time</option><option value="ANNUAL">Annual (same date each year)</option>' +
+          '<option value="CONSECUTIVE">Consecutive Days</option></select></div>' +
+        '<div class="form-group" id="evt-enddate-group" style="display:none"><label>End Date</label>' +
+          '<input type="date" id="evt-enddate"></div>' +
+      '</div>' +
+      '<div class="form-group" id="evt-daysfilter-group" style="display:none;margin-bottom:12px">' +
+        '<label>On these days</label>' +
+        '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px 0">' +
+          ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(lbl, i) {
+            return '<label style="display:flex;align-items:center;gap:5px;font-weight:400;font-size:0.86rem">' +
+              '<input type="checkbox" class="evt-dow" value="' + i + '" checked> ' + lbl + '</label>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="form-group"><label>Unlock Time (local)</label><input type="time" id="evt-unlock"></div>' +
+        '<div class="form-group"><label>Lock Time (local)</label><input type="time" id="evt-lock"></div>' +
+        '<div class="form-group"><label>Doors / Groups</label>' +
+          '<div class="group-dropdown" id="groups-dropdown">' +
+            '<button type="button" class="group-dropdown-toggle" id="groups-toggle" onclick="toggleGroupsDropdown(event)">ALL GROUPS &#9662;</button>' +
+            '<div class="group-dropdown-menu" id="groups-menu" style="display:none"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="form-group"><label>Event Type</label><select id="evt-type">' +
+          '<option value="Unlock" selected>Unlock (normal)</option><option value="Lock">Lock (blocks unlocks)</option></select></div>' +
+        '<div class="form-group"><label>Category</label><select id="evt-category">' +
+          '<option value="School" selected>School</option><option value="Church">Church</option><option value="Both">Both</option></select></div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">' +
+        (isEdit ? '<span><button class="btn btn-gray btn-sm" onclick="cancelEvent(' + e.rowIndex + ', this)">Cancel Event</button></span>' : '<span></span>') +
+        '<span><button class="btn btn-gray btn-sm" onclick="closeEventModal()" style="margin-right:8px">Close</button>' +
+        '<button id="btn-add-event" class="btn btn-primary" onclick="submitEvent()">' + (isEdit ? 'Update Event' : 'Add Event') + '</button></span>' +
+      '</div>';
+    document.getElementById('event-modal-body').innerHTML = html;
+    document.getElementById('event-modal').classList.remove('hidden');
+  }
+
+  function closeEventModal() {
+    document.getElementById('event-modal').classList.add('hidden');
   }
 
   var _editRowIndex = null;
@@ -1759,15 +1823,22 @@ body.hcs-app *{box-sizing:border-box;}
   function editEvent(rowIndex, eJson) {
     _editRowIndex = rowIndex;
     var e = eJson;
+    renderEventForm(e);
     document.getElementById('evt-name').value = e.name || '';
     var recurStr  = String(e.recurrence || 'ONE_TIME').toUpperCase();
     var recurType = recurStr.indexOf('CONSECUTIVE') === 0 ? 'CONSECUTIVE' : recurStr;
     document.getElementById('evt-recurrence').value = recurType;
     updateDateInput(); // resets date value — re-set it below
     if (recurType === 'CONSECUTIVE') {
-      var n = parseInt(recurStr.split(':')[1] || '2', 10);
-      document.getElementById('evt-days').value = n;
-      document.getElementById('evt-date').value = e.date || '';
+      var recurParts = recurStr.split(':');
+      var n = parseInt(recurParts[1] || '2', 10);
+      var startDate = e.date || '';
+      document.getElementById('evt-date').value = startDate;
+      document.getElementById('evt-enddate').value = startDate ? _addDaysStr(startDate, n - 1) : '';
+      var checkedSet = _daysSpecToArray(recurParts[2] || '');
+      document.querySelectorAll('.evt-dow').forEach(function(cb) {
+        cb.checked = checkedSet.indexOf(parseInt(cb.value, 10)) !== -1;
+      });
     } else {
       document.getElementById('evt-date').value = e.resolvedDate || e.date || '';
     }
@@ -1775,48 +1846,45 @@ body.hcs-app *{box-sizing:border-box;}
     document.getElementById('evt-lock').value   = e.lockTime   || '';
     document.getElementById('evt-type').value     = e.type     || 'Unlock';
     document.getElementById('evt-category').value = e.category || 'School';
+    populateGroupsDropdown(_editGroupsCache, _editDoors);
     setGroupsDropdown(e.groups || 'ALL');
-    document.getElementById('btn-add-event').textContent = 'Update Event';
-    document.getElementById('cancel-edit-link').style.display = 'inline';
-    // Scroll to form
-    var form = document.getElementById('btn-add-event');
-    if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  function cancelEditMode() {
+  function showNewEventForm() {
     _editRowIndex = null;
-    ['evt-name', 'evt-date', 'evt-unlock', 'evt-lock'].forEach(function(id) {
-      document.getElementById(id).value = '';
-    });
+    renderEventForm(null);
     document.getElementById('evt-recurrence').value = 'ONE_TIME';
     updateDateInput();
     document.getElementById('evt-type').value     = 'Unlock';
     document.getElementById('evt-category').value = 'School';
+    populateGroupsDropdown(_editGroupsCache, _editDoors);
     setGroupsDropdown('ALL');
-    document.getElementById('btn-add-event').textContent = 'Add Event';
-    document.getElementById('cancel-edit-link').style.display = 'none';
   }
 
   function updateDateInput() {
     var recur = document.getElementById('evt-recurrence').value;
     var input = document.getElementById('evt-date');
     var label = document.getElementById('evt-date-label');
-    var daysGroup = document.getElementById('evt-days-group');
+    var daysGroup = document.getElementById('evt-enddate-group');
+    var daysFilterGroup = document.getElementById('evt-daysfilter-group');
     if (recur === 'ANNUAL') {
       input.type = 'text';
       input.placeholder = 'MM-DD (e.g., 09-15)';
       label.textContent = 'Date (MM-DD, annual)';
       daysGroup.style.display = 'none';
+      daysFilterGroup.style.display = 'none';
     } else if (recur === 'CONSECUTIVE') {
       input.type = 'date';
       input.placeholder = '';
       label.textContent = 'Start Date';
       daysGroup.style.display = '';
+      daysFilterGroup.style.display = '';
     } else {
       input.type = 'date';
       input.placeholder = '';
       label.textContent = 'Date';
       daysGroup.style.display = 'none';
+      daysFilterGroup.style.display = 'none';
     }
     input.value = '';
   }
@@ -1838,6 +1906,7 @@ body.hcs-app *{box-sizing:border-box;}
   });
 
   var _editDoors = [];
+  var _editGroupsCache = ['ALL'];
 
   function onGroupCheck(cb) {
     var menu = document.getElementById('groups-menu');
@@ -1922,45 +1991,6 @@ body.hcs-app *{box-sizing:border-box;}
     updateGroupsLabel();
   }
 
-  var _pendingEmergency = null;
-
-  function confirmAction(action, title, body, confirmLabel, severity, btn) {
-    _pendingEmergency = { action: action, btn: btn, category: null };
-    document.getElementById('emergency-modal-title').textContent = title;
-    document.getElementById('emergency-modal-body').textContent  = body;
-    var confirmBtn = document.getElementById('emergency-confirm-btn');
-    confirmBtn.textContent  = confirmLabel || 'Confirm';
-    confirmBtn.className    = 'btn btn-' + (severity || 'danger');
-    document.getElementById('emergency-modal-card').className = 'modal-card ' + (severity || 'danger');
-    document.getElementById('emergency-modal').classList.remove('hidden');
-  }
-
-  function emergencyConfirm() {
-    hideEmergencyModal();
-    if (!_pendingEmergency) return;
-    _executeEmergencyAction();
-  }
-
-  function _executeEmergencyAction() {
-    if (!_pendingEmergency) return;
-    var action = _pendingEmergency.action;
-    var btn    = _pendingEmergency.btn;
-    _pendingEmergency = null;
-    var loadText = 'Restoring…';
-    if (btn) btnLoad(btn, loadText);
-    post(action, {}, function() {
-      toast('Done');
-      invalidateTab('today');
-      loadEditData();
-    }, btn ? function() { btnReset(btn); } : null);
-  }
-
-  function hideEmergencyModal() {
-    document.getElementById('emergency-modal').classList.add('hidden');
-    _pendingEmergency = null;
-  }
-
-
   var _pendingSubmit = null;
 
   function _todayLocalStr() {
@@ -1974,9 +2004,15 @@ body.hcs-app *{box-sizing:border-box;}
     var recurSel = document.getElementById('evt-recurrence').value;
     var recurrence = recurSel;
     if (recurSel === 'CONSECUTIVE') {
-      var n = parseInt(document.getElementById('evt-days').value, 10);
-      if (!n || n < 1) { toast('Enter a valid number of days (min 1)', true); return; }
-      recurrence = 'CONSECUTIVE:' + n;
+      var startDate = document.getElementById('evt-date').value.trim();
+      var endDate   = document.getElementById('evt-enddate').value.trim();
+      if (!startDate || !endDate) { toast('Start and end dates are required', true); return; }
+      if (endDate < startDate) { toast('End date must be on or after the start date', true); return; }
+      var n = _daysBetweenInclusive(startDate, endDate);
+      var checkedDays = Array.from(document.querySelectorAll('.evt-dow:checked')).map(function(cb) { return parseInt(cb.value, 10); });
+      var daysFilter = checkedDays.length === 7 ? '' : checkedDays.sort(function(a,b){return a-b;}).join(',');
+      if (checkedDays.length === 0) { toast('Select at least one day of the week', true); return; }
+      recurrence = 'CONSECUTIVE:' + n + (daysFilter ? ':' + daysFilter : '');
     }
 
     var selected   = getSelectedGroups();
@@ -2054,9 +2090,10 @@ body.hcs-app *{box-sizing:border-box;}
     var action   = isEdit ? 'updateEvent'  : 'createEvent';
     var loadText = isEdit ? 'Updating…'    : 'Adding…';
     var doneMsg  = isEdit ? 'Event updated' : 'Event created';
-    postBtn(document.getElementById('btn-add-event'), loadText, action, params, function() {
+    var btn = document.getElementById('btn-add-event');
+    postBtn(btn, loadText, action, params, function() {
       toast(doneMsg);
-      cancelEditMode();
+      closeEventModal();
       invalidateTab('today');
       loadEditData();
     });
@@ -2064,107 +2101,114 @@ body.hcs-app *{box-sizing:border-box;}
 
   /* ---- Cancel event (inline confirmation) ---- */
   function cancelEvent(rowIndex, btn) {
-    var cell = btn.parentNode;
-    cell._origHtml = cell.innerHTML;
-    cell.innerHTML =
-      '<button class="btn btn-danger btn-sm" onclick="confirmCancel(' + rowIndex + ',this)">Confirm cancel</button>' +
-      ' <button class="btn btn-gray btn-sm" onclick="revertCancel(this)">Nevermind</button>';
+    var host = btn.parentNode;
+    host._origHtml = host.innerHTML;
+    host.innerHTML =
+      '<button class="btn btn-danger btn-sm" onclick="confirmCancel(' + rowIndex + ',this)">Confirm cancel</button> ' +
+      '<button class="btn btn-gray btn-sm" onclick="revertCancel(this)">Nevermind</button>';
   }
 
   function revertCancel(btn) {
-    var cell = btn.parentNode;
-    cell.innerHTML = cell._origHtml || '';
+    var host = btn.parentNode;
+    host.innerHTML = host._origHtml || '';
   }
 
   function confirmCancel(rowIndex, btn) {
     postBtn(btn, 'Canceling…', 'cancelEvent', { rowIndex: rowIndex }, function() {
       toast('Event canceled');
+      closeEventModal();
       loadEditData();
       post('syncTodaySchedule', {}, function() {});
     });
   }
 
-  function _parseConsecutiveDateRange(startDate, recurStr) {
+  var _MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Parses a "YYYY-MM-DD" or "MM-DD" (annual) string into {day, month} for the rail.
+  function _railDayMonth(dateStr) {
+    var m = /^\d{4}-(\d{2})-(\d{2})$/.exec(dateStr || '') || /^(\d{2})-(\d{2})$/.exec(dateStr || '');
+    if (!m) return { day: '—', month: '' };
+    return { day: m[2], month: _MONTH_ABBR[parseInt(m[1], 10) - 1] || '' };
+  }
+
+  function _parseConsecutiveEndDate(startDate, recurStr) {
     var n = parseInt((recurStr.split(':')[1] || '1'), 10);
-    var endMs = new Date(startDate + 'T12:00:00').getTime() + (n - 1) * 86400000;
-    var endDate = new Date(endMs).toLocaleDateString('en-CA'); /* YYYY-MM-DD */
-    return startDate + ' &ndash; ' + endDate + ' <span style="color:var(--muted)">(' + n + ' days)</span>';
+    return { endDate: _addDaysStr(startDate, n - 1), n: n };
   }
 
   function loadEditData() {
     post('getEditData', {}, function(data) {
       if (typeof _loaded !== 'undefined') _loaded.edit = true;
 
-      /* Door groups + individual doors dropdown */
-      populateGroupsDropdown(data.doorGroups || ['ALL'], data.doors || []);
+      _editGroupsCache = data.doorGroups || ['ALL'];
+      _editDoors = data.doors || [];
 
-      /* Upcoming events table */
-      var evEl = document.getElementById('events-list');
+      var listEl  = document.getElementById('ev-list');
+      var countEl = document.getElementById('ev-count');
+      countEl.textContent = (data.events || []).length;
+
       if (!data.events || data.events.length === 0) {
-        evEl.innerHTML = '<p style="color:var(--muted);font-size:0.88rem">No upcoming active events.</p>';
-      } else {
-        var now      = new Date();
-        var todayStr = now.getFullYear() + '-' +
-          String(now.getMonth() + 1).padStart(2, '0') + '-' +
-          String(now.getDate()).padStart(2, '0');
-        var nowHHMM  = String(now.getHours()).padStart(2, '0') + ':' +
-          String(now.getMinutes()).padStart(2, '0');
-
-        // Store event objects by rowIndex for the Edit button onclick
-        _eventsMap = {};
-        data.events.forEach(function(e) { _eventsMap[e.rowIndex] = e; });
-
-        evEl.innerHTML = '<table><thead><tr><th>Name</th><th>Date / Range</th><th>Recurrence</th><th>Type</th><th>Unlock</th><th>Lock</th><th>Target</th><th>Category</th><th></th></tr></thead><tbody>' +
-          data.events.map(function(e) {
-            var recurStr  = String(e.recurrence || 'ONE_TIME').toUpperCase();
-            var recurLabel, dateDisplay;
-            if (recurStr.indexOf('CONSECUTIVE') === 0) {
-              recurLabel  = '<span class="badge badge-yellow">Consecutive</span>';
-              dateDisplay = _parseConsecutiveDateRange(e.date || e.resolvedDate, recurStr);
-            } else if (recurStr === 'ANNUAL') {
-              recurLabel  = '<span class="badge badge-blue">Annual</span>';
-              dateDisplay = e.date;
-            } else {
-              recurLabel  = '<span class="badge badge-gray">One-time</span>';
-              dateDisplay = e.resolvedDate || e.date;
-            }
-
-            // Past / in-progress detection
-            var evDate     = e.resolvedDate || e.date || '';
-            var isPast     = evDate !== '' && evDate < todayStr;
-            var isToday    = evDate === todayStr;
-            var lockPast   = isToday && e.lockTime   && e.lockTime   <= nowHHMM;
-            var unlockPast = isToday && e.unlockTime && e.unlockTime <= nowHHMM;
-            var inProgress = isToday && unlockPast && !lockPast;
-            var isDimmed   = isPast || lockPast;
-            var rowStyle   = isDimmed ? ' style="opacity:0.4"' : '';
-            var statusBadge = inProgress
-              ? '<span class="badge badge-yellow" style="margin-left:4px;font-size:0.75rem">In Progress</span>'
-              : '';
-
-            var isLockEvt  = (e.type || 'Unlock') === 'Lock';
-            var typeBadge  = isLockEvt
-              ? '<span class="badge badge-red">&#128274; Lock</span>'
-              : '<span class="badge badge-gray">Unlock</span>';
-
-            return '<tr' + rowStyle + '>' +
-              '<td>' + escHtml(e.name) + statusBadge + '</td>' +
-              '<td style="font-size:0.84rem">' + escHtml(dateDisplay) + '</td>' +
-              '<td>' + recurLabel + '</td>' +
-              '<td>' + typeBadge + '</td>' +
-              '<td style="font-family:monospace;color:var(--accent2)">' + (e.unlockTime || '&mdash;') + '</td>' +
-              '<td style="font-family:monospace;color:var(--accent2)">' + (e.lockTime   || '&mdash;') + '</td>' +
-              '<td>' + escHtml(e.groups) + '</td>' +
-              '<td><span class="badge ' + (e.category === 'Church' ? 'badge-blue' : 'badge-gray') + '">' + escHtml(e.category || 'School') + '</span></td>' +
-              '<td>' +
-                '<button class="btn btn-gray btn-sm" style="margin-right:4px" ' +
-                  'onclick="editEvent(' + e.rowIndex + ',_eventsMap[' + e.rowIndex + '])">Edit</button>' +
-                '<button class="btn btn-gray btn-sm" ' + (isDimmed ? 'disabled ' : '') +
-                  'onclick="cancelEvent(' + e.rowIndex + ',this)">Cancel</button>' +
-              '</td>' +
-              '</tr>';
-          }).join('') + '</tbody></table>';
+        listEl.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;padding:4px 2px">No upcoming active events.</p>';
+        return;
       }
+
+      var now      = new Date();
+      var todayStr = now.getFullYear() + '-' +
+        String(now.getMonth() + 1).padStart(2, '0') + '-' +
+        String(now.getDate()).padStart(2, '0');
+      var nowHHMM  = String(now.getHours()).padStart(2, '0') + ':' +
+        String(now.getMinutes()).padStart(2, '0');
+
+      _eventsMap = {};
+      data.events.forEach(function(e) { _eventsMap[e.rowIndex] = e; });
+
+      var tiles = data.events.map(function(e) {
+        var recurStr  = String(e.recurrence || 'ONE_TIME').toUpperCase();
+        var isConsec  = recurStr.indexOf('CONSECUTIVE') === 0;
+        var startDate = e.date || e.resolvedDate || '';
+
+        var railHtml, typeBadgeHtml;
+        if (isConsec) {
+          var range = _parseConsecutiveEndDate(startDate, recurStr);
+          var start = _railDayMonth(startDate);
+          var end   = _railDayMonth(range.endDate);
+          railHtml = '<div class="d range"><span>' + escHtml(start.day) + '</span><span>' + escHtml(end.day) + '</span></div>' +
+            '<div class="m">' + escHtml(start.month) + '</div>';
+          typeBadgeHtml = '<span class="ev-pill">' + range.n + ' days</span>';
+        } else {
+          var dm = _railDayMonth(e.resolvedDate || e.date || '');
+          railHtml = '<div class="d">' + escHtml(dm.day) + '</div><div class="m">' + escHtml(dm.month) + '</div>';
+          typeBadgeHtml = '<span class="ev-pill">' + (recurStr === 'ANNUAL' ? 'Annual' : 'One-time') + '</span>';
+        }
+
+        var isLockEvt = (e.type || 'Unlock') === 'Lock';
+        if (isLockEvt) typeBadgeHtml = '<span class="ev-pill lockb">&#128274; Lock</span>';
+
+        var evDate     = e.resolvedDate || e.date || '';
+        var isPast     = evDate !== '' && evDate < todayStr;
+        var isToday    = evDate === todayStr;
+        var lockPast   = isToday && e.lockTime   && e.lockTime   <= nowHHMM;
+        var unlockPast = isToday && e.unlockTime && e.unlockTime <= nowHHMM;
+        var inProgress = isToday && unlockPast && !lockPast;
+        var isDimmed   = isPast || lockPast;
+
+        return '<div class="ev-card' + (isLockEvt ? ' lock' : '') + (isDimmed ? ' dimmed' : '') + '">' +
+          '<div class="ev-rail">' + railHtml + '</div>' +
+          '<div class="ev-body">' +
+            '<div class="ev-top"><div class="ev-name">' + escHtml(e.name) +
+              (inProgress ? ' <span class="badge badge-yellow" style="font-size:0.65rem">In Progress</span>' : '') +
+              '</div>' + typeBadgeHtml + '</div>' +
+            '<div class="ev-row"><span class="ic">&#128337;</span><span class="ev-time">' +
+              (e.unlockTime || '&mdash;') + ' &ndash; ' + (e.lockTime || '&mdash;') + '</span></div>' +
+            '<div class="ev-row"><span class="ic">&#128205;</span>' + escHtml(e.groups || 'ALL') + '</div>' +
+            (e.createdBy ? '<div class="ev-row"><span class="ic">&#128100;</span>' + escHtml(_formatCreatedBy(e.createdBy)) + '</div>' : '') +
+            '<div class="ev-foot"><span class="ev-cat">' + escHtml(e.category || 'School') + '</span>' +
+              '<button type="button" class="ev-edit-btn" onclick="editEvent(' + e.rowIndex + ',_eventsMap[' + e.rowIndex + '])">Edit</button></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      listEl.innerHTML = tiles;
     });
   }
 </script></div>
@@ -2178,22 +2222,26 @@ body.hcs-app *{box-sizing:border-box;}
   .sch-muted { color: var(--muted, #6b7280); font-size: 0.88rem; padding: 8px 2px; }
 
   .sch-type { background: #fff; border: 1px solid var(--line, #e7e9ee); border-radius: 12px; margin-bottom: 14px; overflow: hidden; }
-  .sch-type-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: #f7f8fa; cursor: pointer; user-select: none; }
-  .sch-type-head:hover { background: #f1f2f5; }
+  .sch-type-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+    background: #fff; border-left: 4px solid #c9a227; cursor: pointer; user-select: none; }
+  .sch-type-head:hover { background: #fafafa; }
   .sch-type.open .sch-type-head { border-bottom: 1px solid var(--line, #e7e9ee); }
-  .sch-type-name { font-weight: 800; font-size: 0.98rem; }
-  .sch-type-count { color: var(--muted, #6b7280); font-size: 0.78rem; }
-  .sch-caret { margin-left: auto; color: #6b7280; font-size: 0.8rem; transition: transform 0.15s; }
+  .sch-type-name { font-weight: 800; font-size: 1rem; }
+  .sch-type-count { margin-left: auto; background: #f3e6c9; color: #7a4a0a; font-weight: 700;
+    font-size: 0.78rem; padding: 5px 12px; border-radius: 999px; }
+  .sch-caret { color: #6b7280; font-size: 0.8rem; transition: transform 0.15s; }
   .sch-type.open .sch-caret { transform: rotate(90deg); }
   .sch-type-body { display: none; }
   .sch-type.open .sch-type-body { display: block; }
   .sch-ro { background: #f7f8fa; color: #6b7280; cursor: not-allowed; }
-  .sch-tbl { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-  .sch-tbl th { text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted, #6b7280); padding: 7px 10px; border-bottom: 1px solid var(--line, #e7e9ee); }
-  .sch-tbl td { padding: 8px 10px; border-bottom: 1px solid #f0f1f4; vertical-align: middle; }
-  .sch-tbl tr:last-child td { border-bottom: none; }
-  .sch-time { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 700; }
-  .sch-off { opacity: 0.5; }
+  .sch-row { display: flex; align-items: center; gap: 14px; padding: 12px 18px;
+    border-bottom: 1px solid #f0f1f4; }
+  .sch-row:last-child { border-bottom: none; }
+  .sch-row.sch-off { opacity: 0.55; }
+  .sch-row-main { flex: 1; min-width: 0; }
+  .sch-row-name { font-weight: 700; font-size: 0.92rem; }
+  .sch-row-meta { font-size: 0.78rem; color: var(--muted, #6b7280); margin-top: 2px; }
+  .sch-time { font-variant-numeric: tabular-nums; font-weight: 700; }
   .sch-pill { display: inline-block; font-size: 0.66rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
   .sch-pill-on  { background: #e9f7ef; color: #1f8a4c; }
   .sch-pill-off { background: #f1f0ee; color: #8a8f98; }
@@ -2209,7 +2257,6 @@ body.hcs-app *{box-sizing:border-box;}
   .sch-btn-danger:hover { background: #8f1b1b; }
   .sch-btn-sm { padding: 4px 9px; font-size: 0.76rem; }
   .sch-btn-ghost { border-color: transparent; color: #B22222; background: none; }
-  .sch-row-actions { text-align: right; white-space: nowrap; }
 
   .sch-overlay { position: fixed; inset: 0; background: rgba(20,20,30,0.5); display: flex; align-items: center;
     justify-content: center; z-index: 300; padding: 18px; }
@@ -2238,6 +2285,30 @@ body.hcs-app *{box-sizing:border-box;}
   .sch-card-foot { display: flex; justify-content: flex-end; gap: 9px; padding: 13px 18px; border-top: 1px solid var(--line,#e7e9ee);
     position: sticky; bottom: 0; background: #fff; }
 </style>
+
+<!-- Emergency Modal (drives Restore to CMS Schedule below) -->
+<div id="emergency-modal" class="modal-overlay hidden">
+  <div id="emergency-modal-card" class="modal-card danger">
+    <h3 id="emergency-modal-title"></h3>
+    <p id="emergency-modal-body"></p>
+    <div class="modal-actions">
+      <button id="emergency-confirm-btn" onclick="emergencyConfirm()">Confirm</button>
+      <button class="btn btn-gray" onclick="hideEmergencyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule Controls -->
+<div class="card">
+  <h2>Schedule Controls</h2>
+  <p style="color:var(--muted);font-size:0.88rem;margin-bottom:16px">The CMS controls the active schedule. Lockdown now lives in the dedicated <b>Lockdown</b> app; use Restore to resync today's doors to the CMS schedule.</p>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button class="btn btn-warning" id="btn-restore"
+      onclick="confirmAction('restoreNormal','Restore to CMS Schedule','This will rebuild today\'s schedule from the CMS.','Restore','warning',this)">
+      Restore to CMS Schedule
+    </button>
+  </div>
+</div>
 
 <div class="sch-wrap">
   <div class="sch-head">
@@ -2322,7 +2393,45 @@ body.hcs-app *{box-sizing:border-box;}
 </div>
 
 <script>
-  var _sch = { list: [], groups: [], editRow: null, pending: null, mode: 'edit' };
+  var _pendingEmergency = null;
+
+  function confirmAction(action, title, body, confirmLabel, severity, btn) {
+    _pendingEmergency = { action: action, btn: btn, category: null };
+    document.getElementById('emergency-modal-title').textContent = title;
+    document.getElementById('emergency-modal-body').textContent  = body;
+    var confirmBtn = document.getElementById('emergency-confirm-btn');
+    confirmBtn.textContent  = confirmLabel || 'Confirm';
+    confirmBtn.className    = 'btn btn-' + (severity || 'danger');
+    document.getElementById('emergency-modal-card').className = 'modal-card ' + (severity || 'danger');
+    document.getElementById('emergency-modal').classList.remove('hidden');
+  }
+
+  function emergencyConfirm() {
+    hideEmergencyModal();
+    if (!_pendingEmergency) return;
+    _executeEmergencyAction();
+  }
+
+  function _executeEmergencyAction() {
+    if (!_pendingEmergency) return;
+    var action = _pendingEmergency.action;
+    var btn    = _pendingEmergency.btn;
+    _pendingEmergency = null;
+    var loadText = 'Restoring…';
+    if (btn) btnLoad(btn, loadText);
+    post(action, {}, function() {
+      toast('Done');
+      invalidateTab('today');
+      loadSchedules();
+    }, btn ? function() { btnReset(btn); } : null);
+  }
+
+  function hideEmergencyModal() {
+    document.getElementById('emergency-modal').classList.add('hidden');
+    _pendingEmergency = null;
+  }
+
+  var _sch = { list: [], groups: [], doors: [], editRow: null, pending: null, mode: 'edit' };
 
   function schEsc(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -2339,6 +2448,7 @@ body.hcs-app *{box-sizing:border-box;}
     post('getSchedulesData', {}, function(d) {
       _sch.list   = d.schedules || [];
       _sch.groups = d.doorGroups || [];
+      _sch.doors  = d.doors || [];
       document.getElementById('sch-loading').style.display = 'none';
       document.getElementById('sch-admin-hint').innerHTML = CAN_ADMIN
         ? 'Tap a type to expand. <b>Edit</b> = permanent change; <b>Temp</b> = change until a date, then it auto-reverts. Both take a two-step confirm.'
@@ -2366,60 +2476,99 @@ body.hcs-app *{box-sizing:border-box;}
                             (ov.groups ? ' [' + schEsc(ov.groups) + ']' : '') : 'disabled') + '</div>'
           : '';
         var actions = CAN_ADMIN
-          ? '<td class="sch-row-actions">' +
-              '<button class="sch-btn sch-btn-sm" onclick="schOpenEdit(' + s.rowIndex + ')">Edit</button> ' +
+          ? '<div style="display:flex;gap:6px;flex-shrink:0">' +
+              '<button class="sch-btn sch-btn-sm" onclick="schOpenEdit(' + s.rowIndex + ')">Edit</button>' +
               '<button class="sch-btn sch-btn-sm" onclick="schOpenTemp(' + s.rowIndex + ')">Temp</button>' +
-              (ov ? ' <button class="sch-btn sch-btn-sm sch-btn-ghost" onclick="schCancelTemp(' + ov.soRow + ')">Cancel temp</button>' : '') +
-            '</td>'
+              (ov ? '<button class="sch-btn sch-btn-sm sch-btn-ghost" onclick="schCancelTemp(' + ov.soRow + ')">Cancel temp</button>' : '') +
+            '</div>'
           : '';
-        return '<tr class="' + (s.enabled ? '' : 'sch-off') + '">' +
-          '<td>' + schEsc(s.name || '') + badge + '</td>' +
-          '<td>' + schEsc(s.days || '') + '</td>' +
-          '<td class="sch-time">' + schTo12h(s.unlockTime) + ' &ndash; ' + schTo12h(s.lockTime) + '</td>' +
-          '<td>' + schEsc(s.groups || 'ALL') + '</td>' +
-          '<td>' + schEsc(s.category || 'School') + '</td>' +
-          '<td><span class="sch-pill ' + (s.enabled ? 'sch-pill-on' : 'sch-pill-off') + '">' + (s.enabled ? 'On' : 'Off') + '</span></td>' +
+        return '<div class="sch-row' + (s.enabled ? '' : ' sch-off') + '">' +
+          '<div class="sch-row-main">' +
+            '<div class="sch-row-name">' + schEsc(s.name || '') + '</div>' +
+            '<div class="sch-row-meta"><span class="sch-time">' + schTo12h(s.unlockTime) + ' &ndash; ' + schTo12h(s.lockTime) + '</span>' +
+              ' &middot; ' + schEsc(s.days || '') + ' &middot; ' + schEsc(s.groups || 'ALL') + ' &middot; ' + schEsc(s.category || 'School') + '</div>' +
+            badge +
+          '</div>' +
+          '<span class="sch-pill ' + (s.enabled ? 'sch-pill-on' : 'sch-pill-off') + '">' + (s.enabled ? 'On' : 'Off') + '</span>' +
           actions +
-        '</tr>';
+        '</div>';
       }).join('');
-      var adminTh = CAN_ADMIN ? '<th></th>' : '';
-      // Collapsed by default — click the type header to expand.
+      // Collapsed by default — click the type header to expand. count pill sits flush-right via margin-left:auto.
       return '<div class="sch-type">' +
         '<div class="sch-type-head" onclick="schToggleType(this)"><span class="sch-type-name">' + schEsc(t) + '</span>' +
           '<span class="sch-type-count">' + byType[t].length + (byType[t].length === 1 ? ' window' : ' windows') + '</span>' +
           '<span class="sch-caret">&#9654;</span></div>' +
-        '<div class="sch-type-body"><table class="sch-tbl"><thead><tr><th>Name</th><th>Days</th><th>Window</th><th>Target</th><th>Category</th><th>Status</th>' + adminTh + '</tr></thead>' +
-        '<tbody>' + rows + '</tbody></table></div></div>';
+        '<div class="sch-type-body">' + rows + '</div></div>';
     }).join('');
   }
   function schToggleType(headEl) { headEl.parentNode.classList.toggle('open'); }
 
-  // ── group picker ──
+  // ── group/door picker ──
+  // Nested group -> individual-door tree (mirrors Edit.html's Custom Events picker,
+  // onGroupCheck/populateGroupsDropdown) so a schedule/temp-override row can target a single door
+  // (e.g. "EL Ramp") instead of only a whole group (e.g. "EL"). resolveDoorTargets (Doors.js) already
+  // accepts a comma-separated mix of group + individual door names — this UI was the only thing
+  // restricting input to groups only. See docs/2026-07-12-override-fix-plan.md item 5.
   function schRenderGroups(selected) {
     var sel = String(selected || 'ALL').toUpperCase().split(',').map(function(x){ return x.trim(); });
     var isAll = sel.indexOf('ALL') >= 0;
     var host = document.getElementById('sch-f-groups');
-    var opts = ['ALL'].concat(_sch.groups.filter(function(g){ return g && g.toUpperCase() !== 'ALL'; }));
-    host.innerHTML = opts.map(function(g) {
-      var checked = (g === 'ALL') ? isAll : (!isAll && sel.indexOf(g.toUpperCase()) >= 0);
-      return '<label class="sch-gchk"><input type="checkbox" value="' + schEsc(g) + '" ' + (checked ? 'checked' : '') +
-        ' onchange="schGroupToggle(this)"> ' + schEsc(g) + '</label>';
-    }).join('');
+    var pureGroups = _sch.groups.filter(function(g){ return g && g.toUpperCase() !== 'ALL'; });
+    var doorsByGroup = {};
+    (_sch.doors || []).forEach(function(d) {
+      if (!doorsByGroup[d.group]) doorsByGroup[d.group] = [];
+      doorsByGroup[d.group].push(d.name);
+    });
+    var html = '<label class="sch-gchk"><input type="checkbox" value="ALL" ' + (isAll ? 'checked' : '') +
+      ' onchange="schGroupToggle(this)"> ALL GROUPS</label>';
+    pureGroups.forEach(function(g) {
+      var gUp = g.toUpperCase();
+      var gChecked = !isAll && sel.indexOf(gUp) >= 0;
+      html += '<label class="sch-gchk"><input type="checkbox" value="' + schEsc(g) + '" data-group="' + schEsc(g) +
+        '" class="sch-group-cb" ' + (gChecked ? 'checked' : '') + ' onchange="schGroupToggle(this)"> ' + schEsc(g) + ' (all)</label>';
+      (doorsByGroup[g] || []).forEach(function(dName) {
+        var dChecked = !isAll && !gChecked && sel.indexOf(dName.toUpperCase()) >= 0;
+        html += '<label class="sch-gchk" style="padding-left:20px"><input type="checkbox" value="' + schEsc(dName) +
+          '" data-door-group="' + schEsc(g) + '" class="sch-door-cb" ' + (dChecked ? 'checked' : '') +
+          ' onchange="schGroupToggle(this)"> ' + schEsc(dName) + '</label>';
+      });
+    });
+    host.innerHTML = html;
   }
   function schGroupToggle(cb) {
-    var boxes = document.querySelectorAll('#sch-f-groups input');
-    if (cb.value.toUpperCase() === 'ALL' && cb.checked) {
-      boxes.forEach(function(b){ if (b.value.toUpperCase() !== 'ALL') b.checked = false; });
-    } else if (cb.value.toUpperCase() !== 'ALL' && cb.checked) {
-      boxes.forEach(function(b){ if (b.value.toUpperCase() === 'ALL') b.checked = false; });
+    var host = document.getElementById('sch-f-groups');
+    var allCb = host.querySelector('input[value="ALL"]');
+    if (cb.value === 'ALL') {
+      if (!cb.checked) cb.checked = true;   // ALL can't be unchecked directly — pick a group/door instead
+      host.querySelectorAll('.sch-group-cb, .sch-door-cb').forEach(function(c){ c.checked = false; });
+      return;
     }
+    if (cb.classList.contains('sch-group-cb')) {
+      var grp = cb.getAttribute('data-group');
+      host.querySelectorAll('.sch-door-cb[data-door-group="' + grp + '"]').forEach(function(d){ d.checked = cb.checked; });
+    } else {
+      var doorGrp = cb.getAttribute('data-door-group');
+      var grpDoors = host.querySelectorAll('.sch-door-cb[data-door-group="' + doorGrp + '"]');
+      var grpCb    = host.querySelector('.sch-group-cb[data-group="' + doorGrp + '"]');
+      if (grpCb) grpCb.checked = Array.from(grpDoors).every(function(d){ return d.checked; });
+    }
+    if (allCb) allCb.checked = false;
+    var anyChecked = Array.from(host.querySelectorAll('.sch-group-cb, .sch-door-cb')).some(function(c){ return c.checked; });
+    if (!anyChecked && allCb) allCb.checked = true;
   }
   function schGatherGroups() {
-    var checked = [];
-    document.querySelectorAll('#sch-f-groups input:checked').forEach(function(b){ checked.push(b.value); });
-    if (!checked.length) return 'ALL';
-    if (checked.some(function(g){ return g.toUpperCase() === 'ALL'; })) return 'ALL';
-    return checked.join(',');
+    var host = document.getElementById('sch-f-groups');
+    var allCb = host.querySelector('input[value="ALL"]');
+    if (allCb && allCb.checked) return 'ALL';
+    var groupsChecked = [];
+    host.querySelectorAll('.sch-group-cb:checked').forEach(function(b){ groupsChecked.push(b.value.toUpperCase()); });
+    var out = [];
+    host.querySelectorAll('.sch-group-cb:checked').forEach(function(b){ out.push(b.value); });
+    host.querySelectorAll('.sch-door-cb:checked').forEach(function(b){
+      var dGroup = (b.getAttribute('data-door-group') || '').toUpperCase();
+      if (groupsChecked.indexOf(dGroup) < 0) out.push(b.value);   // door already covered by its checked group
+    });
+    return out.length ? out.join(',') : 'ALL';
   }
 
   // ── open edit (existing rows only — no add) ──

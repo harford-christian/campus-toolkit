@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Door Automation — Dashboard</title>
-<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <!-- Bootstrap 5.3 + Inter (CDN) so this page wears the shared HCS "Eagle Eye" look. -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -215,9 +214,6 @@
   }
   .card-body { padding: 20px; }
 
-  /* Chart */
-  #trend-chart { width: 100%; height: 260px; }
-
   /* Tables */
   .data-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
   .data-table th {
@@ -255,6 +251,7 @@
   .badge-failed  { background: var(--hcs-red-soft);  color: var(--hcs-red); }
   .badge-skipped { background: #eef2f7;              color: #516074; }
   .badge-pending { background: var(--hcs-warn-bg);   color: var(--hcs-warn); }
+  .badge-orange  { background: var(--hcs-warn-bg);   color: var(--hcs-warn); }
 
   /* Action type breakdown grid */
   .action-grid {
@@ -293,6 +290,10 @@
     color: var(--hcs-muted); margin-top: 8px;
   }
   .notes-cell { max-width: 320px; word-break: break-word; }
+  .bar-cell { width: 140px; }
+  .bar-track { background: var(--hcs-line); border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill  { height: 8px; border-radius: 4px; background: var(--hcs-ok); transition: width 0.3s; }
+  .bar-fill.red { background: var(--hcs-red); }
 
   /* Scheduling action buttons */
   .action-btns { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -334,8 +335,8 @@
 <div class="window-bar">
   <label for="window-select">Showing last</label>
   <select id="window-select">
-    <option value="7">7 days</option>
-    <option value="30" selected>30 days</option>
+    <option value="7" selected>7 days</option>
+    <option value="30">30 days</option>
     <option value="60">60 days</option>
     <option value="90">90 days</option>
   </select>
@@ -354,38 +355,36 @@
     <!-- KPI Cards -->
     <div class="kpi-grid" id="kpi-grid"></div>
 
-    <!-- Trend Chart -->
+    <!-- Action Type Breakdown -->
     <div class="card">
-      <div class="card-header">Door Actions — Daily Trend</div>
+      <div class="card-header">Action Type Breakdown</div>
       <div class="card-body">
-        <div id="trend-chart"></div>
+        <div class="action-grid" id="action-grid"></div>
       </div>
-    </div>
-
-    <!-- Action Type Breakdown + Sports side by side -->
-    <div class="two-col">
-      <div class="card">
-        <div class="card-header">Action Type Breakdown</div>
-        <div class="card-body">
-          <div class="action-grid" id="action-grid"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">Sports Sync Health</div>
-        <div class="card-body" id="sports-card"></div>
-      </div>
-    </div>
-
-    <!-- Recent Failures -->
-    <div class="card">
-      <div class="card-header">Recent Failures (last 20)</div>
-      <div class="card-body" id="failures-card"></div>
     </div>
 
     <!-- Emergency Operations -->
     <div class="card">
       <div class="card-header">Emergency Operations (all time)</div>
       <div class="card-body" id="emergency-card"></div>
+    </div>
+
+    <!-- Door Performance -->
+    <div class="card">
+      <div class="card-header">Door Performance</div>
+      <div class="card-body" id="door-performance-card"></div>
+    </div>
+
+    <!-- Peak Hours + Operation Sources -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">Peak Unlock Hours</div>
+        <div class="card-body" id="peak-hours-card"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">Operation Sources</div>
+        <div class="card-body" id="source-stats-card"></div>
+      </div>
     </div>
 
     <!-- Scheduling Actions -->
@@ -401,16 +400,21 @@
       </div>
     </div>
 
+    <!-- Recent Failures + Warnings -->
+    <div class="card">
+      <div class="card-header">Recent Failures &amp; Warnings (last 20 per type)</div>
+      <div class="card-body" id="failures-card"></div>
+    </div>
+
     <div class="generated-at" id="generated-at"></div>
   </div>
 </main>
 
 <script>
-google.charts.load('current', {packages: ['corechart']});
-google.charts.setOnLoadCallback(loadData);
-
 var CSRF = 'demo-csrf-0';
 var _data = null;
+
+document.addEventListener('DOMContentLoaded', loadData);
 
 function loadData() {
   var btn = document.getElementById('btn-refresh');
@@ -460,11 +464,12 @@ function showError(msg) {
 
 function render(d) {
   renderKPIs(d);
-  renderTrendChart(d.dailyTrends);
   renderActionGrid(d.byActionType);
-  renderSports(d.sportsSyncStats);
-  renderFailures(d.recentFailures);
+  renderFailures(d.failuresByAction, d.failureActionTypes, d.failureDoors);
   renderEmergency(d.emergencyOps);
+  renderDoorPerformance(d.doorStats);
+  renderPeakHours(d.peakHours);
+  renderSourceStats(d.sourceStats, d.manualOperators);
   document.getElementById('generated-at').textContent = 'Generated at ' + d.generatedAt;
   document.getElementById('generated-at-header').textContent = '— as of ' + d.generatedAt;
 }
@@ -480,7 +485,7 @@ function renderKPIs(d) {
     { label: 'Door Action Success Rate', value: rate,
       sub: d.doorOpsAttempted + ' attempted' + skippedNote + ' — of ops that ran',   color: rateColor },
     { label: 'Door Action Fail Rate',    value: fail,
-      sub: d.doorOpsFailed + ' failed of ' + d.doorOpsAttempted + ' attempted',       color: failColor },
+      sub: d.doorOpsFailed + ' failed' + (d.doorOpsPartial > 0 ? ', ' + d.doorOpsPartial + ' partial' : '') + ' of ' + d.doorOpsAttempted + ' attempted', color: failColor },
     { label: 'Scheduling Errors', value: d.schedulingErrors,
       sub: 'invalid schedule type or build failure',   color: d.schedulingErrors  === 0 ? 'green' : 'red'    },
     { label: 'Remediations',    value: d.remediationCount,   sub: 'auto-corrections in window', color: d.remediationCount   === 0 ? 'green' : 'orange' },
@@ -495,46 +500,6 @@ function renderKPIs(d) {
            '<div class="kpi-sub">'   + escHtml(c.sub) + '</div>' +
            '</div>';
   }).join('');
-}
-
-function fmtChartDate(d) {
-  if (!d || typeof d !== 'string') return '';
-  var p = d.split('-');
-  if (p.length < 3) return d;
-  var mo = parseInt(p[1], 10);
-  var dy = parseInt(p[2], 10);
-  if (isNaN(mo) || isNaN(dy)) return d;
-  var m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return (m[mo - 1] || '') + ' ' + dy;
-}
-
-function renderTrendChart(trends) {
-  if (!trends || trends.length === 0) {
-    document.getElementById('trend-chart').innerHTML =
-      '<p class="empty-state">No door action data in the selected window.</p>';
-    return;
-  }
-  var dataTable = new google.visualization.DataTable();
-  dataTable.addColumn('string', 'Date');
-  dataTable.addColumn('number', 'Success');
-  dataTable.addColumn('number', 'Failed');
-  trends.forEach(function(row) {
-    dataTable.addRow([fmtChartDate(row.date), row.success, row.failed]);
-  });
-  var options = {
-    chartArea: { left: 44, right: 20, top: 20, bottom: 40 },
-    colors: ['#2d6a2d', '#b91c1c'],
-    lineWidth: 2,
-    pointSize: 4,
-    legend: { position: 'top', textStyle: { color: '#9b9189', fontSize: 12 } },
-    hAxis: { textStyle: { color: '#9b9189', fontSize: 11 } },
-    vAxis: { textStyle: { color: '#9b9189', fontSize: 11 }, minValue: 0, format: '0',
-             gridlines: { color: '#d9d0c4' }, baselineColor: '#d9d0c4' },
-    backgroundColor: '#ffffff',
-    tooltip: { trigger: 'both', isHtml: false },
-  };
-  var chart = new google.visualization.LineChart(document.getElementById('trend-chart'));
-  chart.draw(dataTable, options);
 }
 
 function renderActionGrid(byType) {
@@ -562,36 +527,60 @@ function renderActionGrid(byType) {
   document.getElementById('action-grid').innerHTML = html || '<p class="empty-state">No data in window.</p>';
 }
 
-function renderSports(s) {
-  var html = '<table class="data-table">' +
-    '<tr><td>Games created</td><td><span class="badge badge-success">' + s.created + '</span></td></tr>' +
-    '<tr><td>Games canceled</td><td><span class="badge badge-skipped">' + s.canceled + '</span></td></tr>' +
-    '<tr><td>Sync errors</td><td>' +
-      (s.syncFailed > 0
-        ? '<span class="badge badge-failed">' + s.syncFailed + '</span>'
-        : '<span class="badge badge-success">0</span>') +
-    '</td></tr>' +
-    '</table>';
-  document.getElementById('sports-card').innerHTML = html;
-}
-
-function renderFailures(failures) {
-  if (!failures || failures.length === 0) {
-    document.getElementById('failures-card').innerHTML = '<p class="empty-state">No failures on record.</p>';
+function renderFailures(failuresByAction, actionTypes, failureDoors) {
+  var el = document.getElementById('failures-card');
+  if (!actionTypes || actionTypes.length === 0) {
+    el.innerHTML = '<p class="empty-state">No failures or warnings on record.</p>';
     return;
   }
-  var rows = failures.map(function(f) {
+  var selectedAction = el._filterAction || 'ALL';
+  var selectedDoor   = el._filterDoor   || 'ALL';
+  var byAction = (failuresByAction && failuresByAction[selectedAction]) || [];
+  var visible = selectedDoor === 'ALL' ? byAction : byAction.filter(function(f) {
+    return String(f.doors || '').split(',').some(function(d) { return d.trim() === selectedDoor; });
+  });
+
+  var selectStyle = 'font-size:0.85rem;padding:4px 8px;border:1px solid var(--hcs-line);border-radius:6px;background:var(--hcs-surface)';
+  var actionOpts = '<option value="ALL"' + (selectedAction === 'ALL' ? ' selected' : '') + '>All types (last 20)</option>' +
+    actionTypes.map(function(a) {
+      return '<option value="' + escHtml(a) + '"' + (a === selectedAction ? ' selected' : '') + '>' + escHtml(a) + '</option>';
+    }).join('');
+  var doorOpts = '<option value="ALL"' + (selectedDoor === 'ALL' ? ' selected' : '') + '>All doors</option>' +
+    (failureDoors || []).map(function(d) {
+      return '<option value="' + escHtml(d) + '"' + (d === selectedDoor ? ' selected' : '') + '>' + escHtml(d) + '</option>';
+    }).join('');
+  var filterHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+    '<select id="failure-filter-action" style="' + selectStyle + '">' + actionOpts + '</select>' +
+    '<select id="failure-filter-door"   style="' + selectStyle + '">' + doorOpts   + '</select>' +
+    '</div>';
+
+  var rows = visible.map(function(f) {
+    var resultBadge = f.result === 'WARNING'
+      ? '<span class="badge badge-pending">Warning</span>'
+      : '<span class="badge badge-failed">Failed</span>';
     return '<tr>' +
       '<td>' + escHtml(f.timestamp) + '</td>' +
       '<td>' + escHtml(f.action) + '</td>' +
+      '<td>' + resultBadge + '</td>' +
       '<td>' + escHtml(f.doors || '—') + '</td>' +
       '<td class="notes-cell">' + escHtml(f.notes || '—') + '</td>' +
       '</tr>';
   }).join('');
-  document.getElementById('failures-card').innerHTML =
-    '<table class="data-table">' +
-    '<thead><tr><th>Timestamp</th><th>Action</th><th>Doors</th><th>Notes</th></tr></thead>' +
-    '<tbody>' + rows + '</tbody></table>';
+
+  el.innerHTML = filterHtml +
+    (visible.length === 0 ? '<p class="empty-state">No failures or warnings match these filters.</p>' :
+      '<table class="data-table">' +
+      '<thead><tr><th>Timestamp</th><th>Action</th><th>Result</th><th>Doors</th><th>Notes</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table>');
+
+  document.getElementById('failure-filter-action').addEventListener('change', function() {
+    el._filterAction = this.value;
+    renderFailures(_data.failuresByAction, _data.failureActionTypes, _data.failureDoors);
+  });
+  document.getElementById('failure-filter-door').addEventListener('change', function() {
+    el._filterDoor = this.value;
+    renderFailures(_data.failuresByAction, _data.failureActionTypes, _data.failureDoors);
+  });
 }
 
 function renderEmergency(ops) {
@@ -602,6 +591,8 @@ function renderEmergency(ops) {
   var rows = ops.map(function(op) {
     var badge = op.result === 'SUCCESS'
       ? '<span class="badge badge-success">Success</span>'
+      : op.result === 'PARTIAL'
+      ? '<span class="badge badge-orange">Partial</span>'
       : '<span class="badge badge-failed">' + escHtml(op.result) + '</span>';
     return '<tr>' +
       '<td>' + escHtml(op.timestamp) + '</td>' +
@@ -614,6 +605,101 @@ function renderEmergency(ops) {
     '<table class="data-table">' +
     '<thead><tr><th>Timestamp</th><th>Operation</th><th>Result</th><th>Notes</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>';
+}
+
+function renderDoorPerformance(doorStats) {
+  var el = document.getElementById('door-performance-card');
+  if (!doorStats || doorStats.length === 0) {
+    el.innerHTML = '<p class="empty-state">No door operation data in the selected window.</p>';
+    return;
+  }
+  var rows = doorStats.map(function(d) {
+    var rate = (d.successRate !== null && d.successRate !== undefined) ? d.successRate : null;
+    var rateBadge = rate === null
+      ? '<span class="badge badge-skipped">—</span>'
+      : rate >= 95 ? '<span class="badge badge-success">' + rate + '%</span>'
+      : rate >= 80 ? '<span class="badge badge-pending">' + rate + '%</span>'
+      : '<span class="badge badge-failed">' + rate + '%</span>';
+    var issueBadge = d.checksFailed > 0
+      ? '<span class="badge badge-failed">' + d.checksFailed + '</span>'
+      : (d.checkTotal > 0 ? '<span class="badge badge-success">0</span>' : '<span class="badge badge-skipped">—</span>');
+    var remBadge = (d.remediations || 0) > 0
+      ? '<span class="badge badge-pending">' + d.remediations + '</span>'
+      : '<span class="badge badge-skipped">0</span>';
+    return '<tr>' +
+      '<td>' + escHtml(d.door) + '</td>' +
+      '<td style="text-align:right">' + d.unlocks + '</td>' +
+      '<td style="text-align:right">' + (d.checkTotal > 0 ? d.checksSuccess + ' / ' + d.checkTotal : '—') + '</td>' +
+      '<td>' + issueBadge + '</td>' +
+      '<td>' + remBadge + '</td>' +
+      '<td>' + rateBadge + '</td>' +
+      '</tr>';
+  }).join('');
+  el.innerHTML =
+    '<p style="font-size:0.75rem;color:var(--hcs-muted);margin-bottom:10px">Reliability based on post-op verification checks (60 s after each unlock)</p>' +
+    '<table class="data-table">' +
+    '<thead><tr><th>Door</th><th style="text-align:right">Unlocks</th><th style="text-align:right">Verified OK / Checks</th><th>Issues</th><th>Remediations</th><th>Reliability</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+function renderPeakHours(peakHours) {
+  var el = document.getElementById('peak-hours-card');
+  var active = (peakHours || []).filter(function(h) { return h.count > 0; });
+  if (active.length === 0) {
+    el.innerHTML = '<p class="empty-state">No unlock data in the selected window.</p>';
+    return;
+  }
+  var maxCount = Math.max.apply(null, active.map(function(h) { return h.count; }));
+  var rows = active.map(function(h) {
+    var pct = maxCount > 0 ? Math.round(h.count / maxCount * 100) : 0;
+    var label = h.hour === 0 ? '12 AM'
+      : h.hour < 12 ? h.hour + ' AM'
+      : h.hour === 12 ? '12 PM'
+      : (h.hour - 12) + ' PM';
+    return '<tr>' +
+      '<td style="width:52px;white-space:nowrap">' + escHtml(label) + '</td>' +
+      '<td class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div></td>' +
+      '<td style="width:36px;text-align:right">' + h.count + '</td>' +
+      '</tr>';
+  }).join('');
+  el.innerHTML =
+    '<table class="data-table">' +
+    '<thead><tr><th>Hour</th><th class="bar-cell">Volume</th><th style="text-align:right">Count</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+function renderSourceStats(s, ops) {
+  var el = document.getElementById('source-stats-card');
+  if (!s || s.total === 0) {
+    el.innerHTML = '<p class="empty-state">No operation data in the selected window.</p>';
+    return;
+  }
+  var maxCount = Math.max(s.scheduled, s.manual, s.emergency, s.relock);
+  function sourceRow(label, count, barClass) {
+    var pct = maxCount > 0 ? Math.round(count / maxCount * 100) : 0;
+    return '<tr>' +
+      '<td>' + escHtml(label) + '</td>' +
+      '<td class="bar-cell"><div class="bar-track"><div class="bar-fill' + (barClass ? ' ' + barClass : '') + '" style="width:' + pct + '%"></div></div></td>' +
+      '<td style="width:36px;text-align:right">' + count + '</td>' +
+      '</tr>';
+  }
+  var html =
+    '<table class="data-table">' +
+    '<thead><tr><th>Source</th><th class="bar-cell">Volume</th><th style="text-align:right">Count</th></tr></thead>' +
+    '<tbody>' +
+    sourceRow('Auto-scheduled (calendar)', s.scheduled) +
+    sourceRow('Quick Control (manual)', s.manual) +
+    sourceRow('Emergency ops', s.emergency, 'red') +
+    sourceRow('Relock on closure', s.relock) +
+    '</tbody></table>';
+  if (ops && ops.length > 0) {
+    html += '<div style="margin-top:16px;font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--hcs-muted);margin-bottom:6px">Manual Operators</div>';
+    var opRows = ops.map(function(o) {
+      return '<tr><td>' + escHtml(o.email) + '</td><td style="text-align:right">' + o.count + '</td></tr>';
+    }).join('');
+    html += '<table class="data-table"><thead><tr><th>User</th><th style="text-align:right">Ops</th></tr></thead><tbody>' + opRows + '</tbody></table>';
+  }
+  el.innerHTML = html;
 }
 
 function escHtml(s) {

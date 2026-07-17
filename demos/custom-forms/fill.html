@@ -117,6 +117,8 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
+  .identity-collapsed { display:none !important; }
   /* FAQ accordion (faq field type) */
   .faq-block { margin:4px 0 8px; }
   .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
@@ -295,123 +297,57 @@ function computeCalc(field, answers) {
   });
   return String(Math.round(sum * 100) / 100);
 }
+
+/**
+ * The grade AFTER the given one, for "registering for next year" defaults. Handles the HCS
+ * ladder K3→K4→K5→1→…→12; a graduating 12th-grader returns 'Graduated'. Tolerates FACTS
+ * formatting ('09'→'9', bare 'K'→'K5'). Unknown/blank grade → '' (leave the field for the user).
+ */
+function nextGrade(g) {
+  var norm = String(g == null ? '' : g).trim().toUpperCase().replace(/^0+(?=\d)/, '');
+  if (norm === 'K') norm = 'K5';
+  var ladder = ['K3', 'K4', 'K5', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  var i = ladder.indexOf(norm);
+  if (i === -1) return '';
+  return i === ladder.length - 1 ? 'Graduated' : ladder[i + 1];
+}
+
+// ---------- shared predicates (single source for server + client — no more copy-paste drift) ----------
+
+/** The one email-shape check used everywhere (client hints + server validation). */
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A field whose answer is an ARRAY (checkboxes, or a multi student/staff picker). */
+function isMultiField(field) {
+  return field.type === 'checkboxes' ||
+    ((field.type === 'studentPicker' || field.type === 'staffPicker') && field.multiple);
+}
+
+/** Static content types: no answer, no validation, no response column. */
+function isContentType(type) {
+  return type === 'sectionHeader' || type === 'description' || type === 'pageBreak' || type === 'faq';
+}
+
+/**
+ * Form-level settings persisted via setFormState, by coercion kind — the single list the server
+ * (Forms.setFormState) and the builder (stateFromSettings_) both iterate. Add a new simple setting
+ * HERE and it round-trips automatically; special-cased elsewhere: lifecycle (template guard),
+ * access + approval (use-as-is lock guard), locked (registry column), maxResponses (number),
+ * notifyEmails (domain filter).
+ */
+var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit'];
+var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage'];
 </script>
 
 <script>
   (function () {
-    var slots = ['Tue — 3:00–3:20 PM','Tue — 3:20–3:40 PM','Tue — 3:40–4:00 PM','Thu — 3:00–3:20 PM','Thu — 3:20–3:40 PM'];
-    var STAFF = ['Mrs. Karen Adams','Mr. David Boyer','Ms. Rachel Cho','Mr. Thomas Elder','Mrs. Lauren Frey'];
     var PREFILL = { parent: { first:'Jordan', last:'Sample', email:'parent@example.com' },
       students: [ { key:'s1', displayName:'Alex Sample', first:'Alex', last:'Sample', grade:'9' },
                   { key:'s2', displayName:'Bailey Sample', first:'Bailey', last:'Sample', grade:'11' } ] };
-    var FORMS = {
-      'demo-open': { access:'open', form:{ id:'demo-open', title:'Sample Interest Form',
-        description:'A quick demo (open — no login). Fabricated data for review only.',
-        confirmationMessage:'Thanks! (Demo — nothing was saved.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
-          { id:'sec1', type:'sectionHeader', label:'Your details' },
-          { id:'fn', type:'text', label:'First name', required:true },
-          { id:'ln', type:'text', label:'Last name', required:true },
-          { id:'em', type:'email', label:'Email', required:true },
-          { id:'grade', type:'dropdown', label:'Student grade', required:true, options:['K4','K5','1','2','3','4','5','6','7','8','9','10','11','12'] },
-          { id:'interest', type:'radio', label:'How interested are you?', required:true, options:['Very','Somewhat','Just browsing'] },
-          { id:'topics', type:'checkboxes', label:'Topics you care about', options:['Academics','Athletics','Arts','Spiritual life'] },
-          { id:'comments', type:'textarea', label:'Anything else?' } ]}] } },
-      'demo-parent': { access:'private', form:{ id:'demo-parent', title:'Field Trip Permission',
-        description:'Private demo — verify with any email + any 6-digit code to see auto-prefill (fabricated family).',
-        confirmationMessage:'Thank you — permission recorded. (Demo.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
-          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
-          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
-          { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
-          { id:'pe', type:'email', label:'Your email', required:true, prefillFrom:'parentEmail', help:'Verified — the email you signed in with.' },
-          { id:'secS', type:'sectionHeader', label:'Student(s)' },
-          { id:'stu', type:'studentPicker', label:'Which student(s)?', required:true, multiple:true, help:'Pick one or more of your children.' },
-          { id:'perm', type:'yesno', label:'I give permission to attend.', required:true },
-          { id:'notes', type:'textarea', label:'Notes (allergies, meds, etc.)' } ]}] } },
-      'demo-conference': { access:'private', form:{ id:'demo-conference', title:'HS Parent/Teacher Conference',
-        description:'Private demo — verify with any email + any 6-digit code. Fabricated family + teachers.',
-        confirmationMessage:'Thank you — your conference request was received. (Demo.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
-          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
-          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
-          { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
-          { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail', help:'Verified.' },
-          { id:'secS', type:'sectionHeader', label:'Student' },
-          { id:'stu', type:'studentPicker', label:'Student', required:true },
-          { id:'grade', type:'text', label:'Grade', prefillFrom:'studentGrade' },
-          { id:'secC', type:'sectionHeader', label:'Conference request' },
-          { id:'teachers', type:'staffPicker', label:'Which teacher(s) would you like to meet with?', required:true, multiple:true, options:STAFF },
-          { id:'t1', type:'dropdown', label:'First choice — meeting time', required:true, options:slots, capacityLeft:{ 'Tue — 3:00–3:20 PM':0, 'Tue — 3:20–3:40 PM':2, 'Tue — 3:40–4:00 PM':5 } },
-          { id:'t2', type:'dropdown', label:'Second choice — meeting time', options:slots },
-          { id:'t3', type:'dropdown', label:'Third choice — meeting time', options:slots },
-          { id:'info', type:'textarea', label:'Anything else we should know?' } ]}] } },
-      'demo-physical': { access:'private', form:{ id:'demo-physical', title:'Sports Physical + Signature',
-        description:'Private demo showing file upload + e-signature. Verify with any email + any 6-digit code.',
-        confirmationMessage:'Received! (Demo.)', locked:false, reviewMode:true, pages:[{ title:'Main', fields:[
-          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
-          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
-          { id:'pl', type:'text', label:'Last name', required:true, prefillFrom:'parentLast' },
-          { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail' },
-          { id:'stu', type:'studentPicker', label:'Student', required:true },
-          { id:'sports', type:'checkboxes', label:'Sport(s) this year', options:['Soccer','Volleyball','Cross Country','Basketball','Cheerleading','Baseball','Softball','Track & Field','Golf','Tennis','Esports'], help:'Multi-select (real form pre-checks last year’s sports).' },
-          { id:'up', type:'file', label:'Upload the physical (PDF or photo)', required:true, accept:'.pdf,image/*', help:'Max 10 MB.' },
-          { id:'sig', type:'signature', label:'Parent signature', required:true, help:'Sign in the box; type your name below.' } ]}] } },
-      'demo-trip': { access:'open', form:{ id:'demo-trip', title:'Field Trip Request (demo)',
-        description:'Shows CONDITIONAL LOGIC — the overnight section appears only if you answer Yes.',
-        confirmationMessage:'Submitted for approval! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
-          { id:'trip', type:'text', label:'Trip name / purpose', required:true },
-          { id:'dest', type:'text', label:'Destination', required:true },
-          { id:'overnight', type:'yesno', label:'Is this an overnight trip?', required:true },
-          { id:'lodging', type:'textarea', label:'Overnight lodging & chaperone plan', required:true, showIf:{ field:'overnight', op:'equals', value:'Yes' } },
-          { id:'transport', type:'dropdown', label:'Transportation', required:true, options:['School bus','School van','Charter bus','Parent drivers','Walking'] },
-          { id:'cost', type:'number', label:'Estimated cost per student', money:true, help:'Recorded as a dollar amount in the sheet.' } ]}] } },
-      'demo-course': { access:'private', form:{ id:'demo-course', title:'Course Selection Guide',
-        description:'Shows CONDITIONAL SECTIONS — choose a grade and only that grade’s courses appear. Verify with any email + any 6-digit code.',
-        confirmationMessage:'Course selections submitted! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
-          { id:'faq', type:'faq', label:'Frequently Asked Questions', items:[
-            { q:'How many study halls can I take?', a:'Up to one per semester for grades 9–11; seniors may take two.' },
-            { q:'What about dual enrollment?', a:'Juniors and seniors in good standing may dual-enroll at approved colleges; see the registrar.' },
-            { q:'How do I reach Calculus by senior year?', a:'Algebra I (9) → Geometry (10) → Algebra II (11) → Pre-Calculus, then Calculus (12).' } ] },
-          { id:'secS', type:'sectionHeader', label:'Student & family' },
-          { id:'stu', type:'studentPicker', label:'Student', required:true },
-          { id:'pe', type:'email', label:'Parent email', required:true, prefillFrom:'parentEmail' },
-          { id:'gradeReg', type:'dropdown', label:'Which grade are you registering FOR (next year)?', required:true, options:['9','10','11','12'], help:'Real form defaults this to your student’s next grade.' },
-          { id:'pb1', type:'pageBreak', label:'Course selection' },
-          { id:'h9', type:'sectionHeader', label:'9th Grade Courses', showIf:{field:'gradeReg',op:'equals',value:'9'} },
-          { id:'m9', type:'radio', label:'Math', required:true, options:['Algebra I','Geometry','Algebra II'], showIf:{field:'gradeReg',op:'equals',value:'9'} },
-          { id:'s9', type:'radio', label:'Science', required:true, options:['Physical Science','Biology'], showIf:{field:'gradeReg',op:'equals',value:'9'} },
-          { id:'h12', type:'sectionHeader', label:'12th Grade Courses', showIf:{field:'gradeReg',op:'equals',value:'12'} },
-          { id:'m12', type:'radio', label:'Math', required:true, options:['Pre-Calculus','Calculus','Statistics'], showIf:{field:'gradeReg',op:'equals',value:'12'} },
-          { id:'s12', type:'radio', label:'Science', required:true, options:['Physics','Anatomy & Physiology'], showIf:{field:'gradeReg',op:'equals',value:'12'} },
-          { id:'cc', type:'calculation', label:'Courses selected', calc:{op:'count',fields:['m9','s9','m12','s12']} },
-          { id:'pb2', type:'pageBreak', label:'Sign-off' },
-          { id:'ssig', type:'signature', label:'Student signature', required:true } ]}] } },
-      'demo-homeschool': { access:'private', form:{ id:'demo-homeschool', title:'Homeschool Opportunities Sign Up',
-        description:'Homeschool families sign up for HCS opportunities. Verify with any email + any 6-digit code.',
-        confirmationMessage:'Sign-up received! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
-          { id:'secF', type:'sectionHeader', label:'Family' },
-          { id:'pf', type:'text', label:'Parent first name', required:true, prefillFrom:'parentFirst' },
-          { id:'pe', type:'email', label:'Parent email', required:true, prefillFrom:'parentEmail' },
-          { id:'students', type:'studentPicker', label:'Which student(s) are you signing up?', required:true, multiple:true },
-          { id:'umbrella', type:'yesno', label:'Are you enrolled in the HCS Homeschool Umbrella?', required:true },
-          { id:'secSp', type:'sectionHeader', label:'Specials Classes' },
-          { id:'specials', type:'checkboxes', label:'Select any specials classes', options:['Art','Music','Physical Education','Science Lab','Spanish'] },
-          { id:'secT', type:'sectionHeader', label:'Standardized Testing' },
-          { id:'tests', type:'checkboxes', label:'Which test(s)?', options:['PSAT','SAT','Iowa / Terra Nova','MACS Academic Testing'] },
-          { id:'pic', type:'radio', label:'Spring Picture Day', options:['Yes — order a package','Yes — digital only','No thank you'] } ]}] } },
-      'demo-preapproved': { access:'private', form:{ id:'demo-preapproved', title:'Pre-Approved Trip Request',
-        description:'Request pre-approval for a student absence. Verify with any email + any 6-digit code.',
-        confirmationMessage:'Trip request submitted! (Demo.)', locked:false, reviewMode:false, pages:[{ title:'Main', fields:[
-          { id:'secP', type:'sectionHeader', label:'Parent / guardian' },
-          { id:'pf', type:'text', label:'First name', required:true, prefillFrom:'parentFirst' },
-          { id:'pe', type:'email', label:'Email', required:true, prefillFrom:'parentEmail' },
-          { id:'students', type:'studentPicker', label:'Which student(s) will be absent?', required:true, multiple:true },
-          { id:'sd', type:'date', label:'First day of absence', required:true },
-          { id:'ed', type:'date', label:'Last day of absence', required:true },
-          { id:'reason', type:'textarea', label:'Reason / destination for the trip', required:true },
-          { id:'sig', type:'signature', label:'Parent / guardian signature', required:true } ]}] } }
-    };
-    var ORDER = ['demo-open','demo-parent','demo-conference','demo-physical','demo-trip','demo-course','demo-homeschool','demo-preapproved'];
+    var FORMS = {"demo-sample-0001":{"access":"open","form":{"id":"demo-sample-0001","title":"Sample Interest Form","description":"A quick demo form to prove the runner end-to-end (M1).","confirmationMessage":"Thanks! Your response was recorded. We will be in touch. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":false,"pages":[{"title":"Main","fields":[{"id":"sec1","type":"sectionHeader","label":"Your details"},{"id":"firstName","type":"text","label":"First name","required":true},{"id":"lastName","type":"text","label":"Last name","required":true},{"id":"email","type":"email","label":"Email address","required":true,"help":"We'll send a confirmation here."},{"id":"phone","type":"phone","label":"Phone (optional)","required":false},{"id":"grade","type":"dropdown","label":"Student grade","required":true,"options":["K4","K5","1","2","3","4","5","6","7","8","9","10","11","12"]},{"id":"interest","type":"radio","label":"How interested are you?","required":true,"options":["Very","Somewhat","Just browsing"]},{"id":"topics","type":"checkboxes","label":"Topics you care about","required":false,"options":["Academics","Athletics","Arts","Spiritual life"]},{"id":"consent","type":"yesno","label":"May we contact you?","required":true},{"id":"comments","type":"textarea","label":"Anything else?","required":false}]}]}},"demo-parent-demo":{"access":"private","form":{"id":"demo-parent-demo","title":"Field Trip Permission (demo)","description":"Demonstrates FACTS prefill. Your details fill in automatically after you verify your email. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your permission has been recorded. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":false,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Your email","required":true,"prefillFrom":"parentEmail","help":"Verified — this is the email you signed in with."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Which student?","required":true,"help":"Only your students are listed."},{"id":"grade","type":"text","label":"Grade","required":false,"prefillFrom":"studentGrade"},{"id":"secT","type":"sectionHeader","label":"Permission"},{"id":"permission","type":"yesno","label":"I give permission for my student to attend.","required":true},{"id":"notes","type":"textarea","label":"Notes (allergies, medications, etc.)","required":false}]}]}},"demo-hs-conference":{"access":"private","form":{"id":"demo-hs-conference","title":"HS Parent/Teacher Conference","description":"Request a High School parent/teacher conference. Sign in with the email Harford Christian has on file and your information will fill in automatically. Choose the teacher(s) you’d like to meet with and your top three time preferences. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your conference request has been received. We’ll follow up to confirm times. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":false,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified — the email you signed in with."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true,"help":"Only your students are listed."},{"id":"grade","type":"text","label":"Grade","required":false,"prefillFrom":"studentGrade"},{"id":"secC","type":"sectionHeader","label":"Conference request"},{"id":"teachers","type":"staffPicker","label":"Which teacher(s) would you like to meet with?","required":true,"multiple":true,"staffLevel":"HS","help":"Select all that apply.","options":["Mrs. Karen Adams","Mr. David Boyer","Ms. Rachel Cho","Mr. Thomas Elder","Mrs. Lauren Frey"]},{"id":"time1","type":"dropdown","label":"First choice — meeting time","required":true,"options":["Tue — 3:00–3:20 PM","Tue — 3:20–3:40 PM","Tue — 3:40–4:00 PM","Tue — 4:00–4:20 PM","Thu — 3:00–3:20 PM","Thu — 3:20–3:40 PM","Thu — 3:40–4:00 PM","Thu — 4:00–4:20 PM"],"capacity":{"Tue — 3:00–3:20 PM":3,"Tue — 3:20–3:40 PM":3,"Tue — 3:40–4:00 PM":3,"Tue — 4:00–4:20 PM":3,"Thu — 3:00–3:20 PM":3,"Thu — 3:20–3:40 PM":3,"Thu — 3:40–4:00 PM":3,"Thu — 4:00–4:20 PM":3},"help":"Each slot holds 3 first-choice requests, then hides.","capacityLeft":{"Tue — 3:00–3:20 PM":0,"Tue — 3:20–3:40 PM":3,"Tue — 3:40–4:00 PM":3,"Tue — 4:00–4:20 PM":3,"Thu — 3:00–3:20 PM":3,"Thu — 3:20–3:40 PM":3,"Thu — 3:40–4:00 PM":3,"Thu — 4:00–4:20 PM":3}},{"id":"time2","type":"dropdown","label":"Second choice — meeting time","required":false,"options":["Tue — 3:00–3:20 PM","Tue — 3:20–3:40 PM","Tue — 3:40–4:00 PM","Tue — 4:00–4:20 PM","Thu — 3:00–3:20 PM","Thu — 3:20–3:40 PM","Thu — 3:40–4:00 PM","Thu — 4:00–4:20 PM"],"validation":{"notSameAs":"time1"}},{"id":"time3","type":"dropdown","label":"Third choice — meeting time","required":false,"options":["Tue — 3:00–3:20 PM","Tue — 3:20–3:40 PM","Tue — 3:40–4:00 PM","Tue — 4:00–4:20 PM","Thu — 3:00–3:20 PM","Thu — 3:20–3:40 PM","Thu — 3:40–4:00 PM","Thu — 4:00–4:20 PM"],"validation":{"notSameAs":["time1","time2"]}},{"id":"info","type":"textarea","label":"Anything else we should know?","required":false}]}]}},"demo-sports-physical":{"access":"private","form":{"id":"demo-sports-physical","title":"Sports Physical Submission","description":"Upload your student’s completed sports physical. Sign in with the email on file and your details fill in automatically. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your student’s physical has been received. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":true,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Grade","prefillFrom":"studentGrade"},{"id":"sports","type":"checkboxes","label":"Sport(s) this year","required":false,"priorYear":true,"help":"Last year’s sports are pre-checked once you pick your student — adjust as needed.","options":["Soccer","Volleyball","Cross Country","Basketball","Cheerleading","Baseball","Softball","Track & Field","Golf","Tennis","Esports"]},{"id":"sportOther","type":"text","label":"Other sport(s)","required":false},{"id":"secD","type":"sectionHeader","label":"Physical"},{"id":"physDate","type":"date","label":"Date of physical","required":true},{"id":"file","type":"file","label":"Upload the completed physical (PDF or photo)","required":true,"accept":".pdf,image/*","help":"Max 10 MB. PDF or a clear photo."}]}]}},"demo-ki-auth":{"access":"private","form":{"id":"demo-ki-auth","title":"Potassium Iodide (KI) Authorization","description":"Authorization for the school to administer potassium iodide (KI) to your student in the event of a radiological emergency, per state guidance. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your authorization has been recorded. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":true,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Grade","prefillFrom":"studentGrade"},{"id":"secA","type":"sectionHeader","label":"Authorization"},{"id":"authText","type":"description","label":"I authorize Harford Christian School to administer potassium iodide (KI) to my student in the event of a radiological emergency, according to instructions provided by state/local health authorities. I confirm I am the parent/legal guardian."},{"id":"choice","type":"yesno","label":"Do you authorize administration of KI to your student?","required":true},{"id":"allergies","type":"textarea","label":"Known allergies or medical notes","required":false},{"id":"sign","type":"signature","label":"Parent/guardian signature","required":true,"help":"Sign in the box; type your full name below."}]}]}},"demo-field-trip":{"access":"staff","form":{"id":"demo-field-trip","title":"Field Trip Request","description":"Staff request for a field trip. Overnight trips ask for extra detail, and every request routes to an approver.","confirmationMessage":"Thank you — your field trip request was submitted for approval. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":false,"pages":[{"title":"Main","fields":[{"id":"secT","type":"sectionHeader","label":"Trip details"},{"id":"tripName","type":"text","label":"Trip name / purpose","required":true},{"id":"destination","type":"text","label":"Destination","required":true},{"id":"date","type":"date","label":"Trip date","required":true},{"id":"grades","type":"checkboxes","label":"Grade level(s) attending","required":true,"options":["K4","K5","1","2","3","4","5","6","7","8","9","10","11","12"]},{"id":"count","type":"number","label":"Estimated number of students","required":true},{"id":"overnight","type":"yesno","label":"Is this an overnight trip?","required":true},{"id":"lodging","type":"textarea","label":"Overnight lodging & chaperone plan","required":true,"help":"Required for overnight trips.","showIf":{"field":"overnight","op":"equals","value":"Yes"}},{"id":"transport","type":"dropdown","label":"Transportation","required":true,"options":["School bus","School van","Charter bus","Parent drivers","Walking","Other"]},{"id":"cost","type":"number","label":"Estimated cost per student","required":false,"money":true,"help":"Per-student cost; recorded as a dollar amount."},{"id":"notes","type":"textarea","label":"Additional notes","required":false}]}]}},"demo-course-selection":{"access":"private","form":{"id":"demo-course-selection","title":"Course Selection Guide","description":"Select next year’s courses. Sign in with the email on file; your family info fills in automatically. Choose the grade you are registering FOR, then complete that grade’s selections. (Course lists are examples from last year — edit them in the builder each year.) (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your course selections have been submitted. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":true,"pages":[{"title":"Main","fields":[{"id":"infoH","type":"sectionHeader","label":"Information & Policies"},{"id":"gradReqH","type":"sectionHeader","label":"Graduation Requirements"},{"id":"gradReqTxt","type":"description","label":"(Edit each year with the current graduation requirements — total credits and required credits per subject: Bible, English, Math, Science, History, PE/Health, and electives.)"},{"id":"polH","type":"sectionHeader","label":"Course Selection Policies"},{"id":"polTxt","type":"description","label":"(Edit with current policies — prerequisites, sign-offs and waivers, study-hall limits, dual enrollment, senior daily early release, and courses taken out of sequence.)"},{"id":"faq","type":"faq","label":"Frequently Asked Questions","items":[{"q":"What if I am not returning to HCS next year?","a":"[EDIT: Contact the registrar’s office and note your plans below in \"Additional course requests.\" You do not need to complete course selection if you are not returning.]"},{"q":"How many study halls can I take?","a":"[EDIT: State the current study-hall limit per grade.]"},{"q":"What are prerequisites, sign-offs, and waivers?","a":"[EDIT: Explain that some courses require a prior course or a teacher sign-off, and how to request a waiver.]"},{"q":"What about daily early release for seniors?","a":"[EDIT: Describe senior early-release eligibility and how it affects the schedule.]"},{"q":"What about dual enrollment?","a":"[EDIT: Explain dual-enrollment options, which colleges, and how credits transfer.]"},{"q":"What if I have taken courses out of sequence?","a":"[EDIT: Explain who to talk to and how out-of-sequence credits are handled.]"},{"q":"How do I get into a math track to take Calculus by my senior year?","a":"[EDIT: Lay out the recommended math sequence to reach Calculus by grade 12.]"}]},{"id":"pbReg","type":"pageBreak","label":"Registration"},{"id":"secS","type":"sectionHeader","label":"Student & family"},{"id":"student","type":"studentPicker","label":"Student","required":true,"help":"Select your high-school student."},{"id":"sGrade","type":"text","label":"Current grade (on file)","prefillFrom":"studentGrade"},{"id":"pFirst","type":"text","label":"Parent first name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Parent last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Parent email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"pPhone","type":"phone","label":"Parent phone","required":false,"help":"Not on file — please enter."},{"id":"secR","type":"sectionHeader","label":"Registration"},{"id":"gradeReg","type":"dropdown","label":"Which grade are you registering FOR (next year)?","required":true,"options":["9","10","11","12"],"prefillFrom":"studentGradeNextYear","help":"Defaults to your student’s next grade — change it if needed. The course lists below change based on this."},{"id":"track","type":"radio","label":"College plans","required":true,"options":["Planning to attend college","Not planning to attend college"]},{"id":"hdr9","type":"sectionHeader","label":"9th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s0","type":"radio","label":"Bible","required":true,"options":["Bible 9"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s1","type":"radio","label":"English","required":true,"options":["English 9","Honors English 9"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s2","type":"radio","label":"History","required":true,"options":["World History","Honors World History"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s3","type":"radio","label":"Math","required":true,"options":["Algebra I","Geometry","Algebra II"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s4","type":"radio","label":"Science","required":true,"options":["Physical Science","Biology"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 9"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"hdr10","type":"sectionHeader","label":"10th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s0","type":"radio","label":"Bible","required":true,"options":["Bible 10"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s1","type":"radio","label":"English","required":true,"options":["English 10","Honors English 10"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s2","type":"radio","label":"History","required":true,"options":["US History","Honors US History"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s3","type":"radio","label":"Math","required":true,"options":["Geometry","Algebra II","Pre-Calculus"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s4","type":"radio","label":"Science","required":true,"options":["Biology","Chemistry"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 10"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"hdr11","type":"sectionHeader","label":"11th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s0","type":"radio","label":"Bible","required":true,"options":["Bible 11 (Apologetics)"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s1","type":"radio","label":"English","required":true,"options":["English 11","Honors English 11"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s2","type":"radio","label":"History","required":true,"options":["US Government","Economics"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s3","type":"radio","label":"Math","required":true,"options":["Algebra II","Pre-Calculus","Trigonometry"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s4","type":"radio","label":"Science","required":true,"options":["Chemistry","Physics","Anatomy & Physiology"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 11","Waiver"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"hdr12","type":"sectionHeader","label":"12th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s0","type":"radio","label":"Bible","required":true,"options":["Bible 12 (Doctrine)"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s1","type":"radio","label":"English","required":true,"options":["English 12","Honors English 12","Composition"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s2","type":"radio","label":"History","required":true,"options":["Government","Economics","Psychology"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s3","type":"radio","label":"Math","required":true,"options":["Pre-Calculus","Calculus","Statistics"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s4","type":"radio","label":"Science","required":true,"options":["Physics","Anatomy & Physiology"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 12","Waiver"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"requests","type":"textarea","label":"Additional course requests or notes","required":false},{"id":"courseCount","type":"calculation","label":"Courses selected (this grade)","calc":{"op":"count","fields":["g9s0","g9s1","g9s2","g9s3","g9s4","g9s5","g9elec","g10s0","g10s1","g10s2","g10s3","g10s4","g10s5","g10elec","g11s0","g11s1","g11s2","g11s3","g11s4","g11s5","g11elec","g12s0","g12s1","g12s2","g12s3","g12s4","g12s5","g12elec"]}},{"id":"pbSign","type":"pageBreak","label":"Sign-off"},{"id":"secV","type":"sectionHeader","label":"Sign-off"},{"id":"verifyText","type":"description","label":"By signing below, we confirm the course selections above are complete and accurate."},{"id":"verify","type":"yesno","label":"I have completed my course registration information.","required":true},{"id":"studentSig","type":"signature","label":"Student’s signature","required":true},{"id":"parentSig","type":"signature","label":"Parent’s / guardian’s signature","required":true}]}]}},"demo-homeschool-opp":{"access":"private","form":{"id":"demo-homeschool-opp","title":"HCS Homeschool Opportunities Sign Up","description":"Sign your homeschool student(s) up for HCS opportunities. Sign in with the email on file and your info fills in automatically. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your sign-up has been received. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":false,"pages":[{"title":"Main","fields":[{"id":"secF","type":"sectionHeader","label":"Family"},{"id":"pFirst","type":"text","label":"Parent first name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Parent last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Parent email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"pPhone","type":"phone","label":"Parent phone","required":false,"help":"Not on file — please enter."},{"id":"students","type":"studentPicker","label":"Which student(s) are you signing up?","required":true,"multiple":true},{"id":"umbrella","type":"yesno","label":"Are you enrolled in the HCS Homeschool Umbrella?","required":true},{"id":"pbOpp","type":"pageBreak","label":"Classes & testing"},{"id":"secSp","type":"sectionHeader","label":"Specials Classes"},{"id":"specials","type":"checkboxes","label":"Select any specials classes","required":false,"options":["Art","Music","Physical Education","Science Lab","Spanish"]},{"id":"secT","type":"sectionHeader","label":"Standardized Testing"},{"id":"tests","type":"checkboxes","label":"Which test(s) would you like your child to take?","required":false,"options":["PSAT","SAT","Iowa / Terra Nova","MACS Academic Testing"]},{"id":"secM","type":"sectionHeader","label":"MACS Opportunities"},{"id":"macs","type":"checkboxes","label":"MACS events","required":false,"options":["MACS Academic Testing","MACS Spelling Bee","MACS Competition Day"]},{"id":"pbEv","type":"pageBreak","label":"Events & notes"},{"id":"secE","type":"sectionHeader","label":"Events"},{"id":"mayday","type":"yesno","label":"Sign up for May Day?","required":false},{"id":"pictureday","type":"radio","label":"Spring Picture Day","required":false,"options":["Yes — order a package","Yes — digital only","No thank you"]},{"id":"notes","type":"textarea","label":"Anything else?","required":false}]}]}},"demo-preapproved-trip":{"access":"private","form":{"id":"demo-preapproved-trip","title":"Pre-Approved Trip Request","description":"Request pre-approval for a student absence due to a trip. Sign in with the email on file; your family info fills in automatically. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your pre-approved trip request has been submitted. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":false,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student(s)"},{"id":"students","type":"studentPicker","label":"Which student(s) will be absent?","required":true,"multiple":true},{"id":"homeroom","type":"staffPicker","label":"Homeroom teacher(s)","required":false,"multiple":true,"help":"Choose your student(s)’ homeroom teacher(s).","options":["Mrs. Karen Adams","Mr. David Boyer","Ms. Rachel Cho","Mr. Thomas Elder","Mrs. Lauren Frey"]},{"id":"secA","type":"sectionHeader","label":"Proposed absence"},{"id":"startDate","type":"date","label":"First day of absence","required":true},{"id":"endDate","type":"date","label":"Last day of absence","required":true,"validation":{"notBefore":"startDate"}},{"id":"reason","type":"textarea","label":"Reason / destination for the trip","required":true},{"id":"ackTxt","type":"description","label":"Pre-approved absences still require students to complete all missed work. Approval is subject to attendance policy and administrative review."},{"id":"sig","type":"signature","label":"Parent / guardian signature","required":true}]}]}},"demo-med-auth":{"access":"private","form":{"id":"demo-med-auth","title":"Medication Authorization","description":"Authorize the school to administer a medication to your student. Sign in with the email on file; your family info fills in automatically. You’ll upload the physician-signed order and sign below. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — the health office has received your medication authorization. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":true,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"pPhone","type":"phone","label":"Parent phone","required":false,"help":"Not on file — please enter."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Grade","prefillFrom":"studentGrade"},{"id":"pbMed","type":"pageBreak","label":"Medication"},{"id":"secM","type":"sectionHeader","label":"Medication"},{"id":"medName","type":"text","label":"Medication name","required":true},{"id":"dosage","type":"text","label":"Dosage / amount","required":true,"help":"e.g., 10 mg, 1 tablet, 5 mL"},{"id":"route","type":"dropdown","label":"How is it given?","required":true,"options":["By mouth (oral)","Inhaler","Topical / skin","Eye / ear drops","Injection","Other"]},{"id":"times","type":"checkboxes","label":"When should it be given at school?","required":true,"options":["Before school","Mid-morning","Lunch / midday","Afternoon","As needed (PRN)"]},{"id":"timeNotes","type":"text","label":"Specific time(s) or conditions","required":false,"help":"e.g., 12:00 PM with lunch; or \"for headache\"."},{"id":"startDate","type":"date","label":"Start date","required":true},{"id":"endDate","type":"date","label":"End date (optional)","required":false,"validation":{"notBefore":"startDate"}},{"id":"reason","type":"text","label":"Reason / diagnosis","required":false},{"id":"allergies","type":"textarea","label":"Known allergies or medical notes","required":false},{"id":"instructions","type":"textarea","label":"Special instructions / side effects to watch for","required":false},{"id":"pbPhys","type":"pageBreak","label":"Physician & authorization"},{"id":"secD","type":"sectionHeader","label":"Physician order"},{"id":"physName","type":"text","label":"Prescribing physician","required":false},{"id":"physPhone","type":"phone","label":"Physician phone","required":false},{"id":"order","type":"file","label":"Upload the physician-signed order","required":true,"accept":".pdf,image/*","help":"PDF or a clear photo of the signed physician order. Max 10 MB."},{"id":"secA","type":"sectionHeader","label":"Authorization"},{"id":"authText","type":"description","label":"By signing below, I request and authorize the school nurse or a designated staff member to administer the medication above to my student as directed by the prescribing physician. I confirm I am the parent/legal guardian."},{"id":"sign","type":"signature","label":"Parent / guardian signature","required":true,"help":"Your signature is your authorization. Sign in the box, or type your full name below."}]}]}},"demo-supply-lists":{"access":"private","form":{"id":"demo-supply-lists","title":"Supply & Project Lists","description":"View your student’s supply and project list. Sign in with the email on file; your family info fills in automatically. Choose the grade band to see its list. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — you’re all set. You can reopen this anytime to review the list. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":true,"pages":[{"title":"Main","fields":[{"id":"secS","type":"sectionHeader","label":"Student & family"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Current grade (on file)","prefillFrom":"studentGrade"},{"id":"pEmail","type":"email","label":"Parent email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"band","type":"dropdown","label":"Which list do you need?","required":true,"options":["K4 – K5","Grades 1–2","Grades 3–4","Grades 5–6","Middle School (7–8)","High School (9–12)"]},{"id":"list_K4-K5","type":"description","label":"[EDIT: paste the K4 – K5 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"K4 – K5"}},{"id":"list_1-2","type":"description","label":"[EDIT: paste the Grades 1–2 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Grades 1–2"}},{"id":"list_3-4","type":"description","label":"[EDIT: paste the Grades 3–4 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Grades 3–4"}},{"id":"list_5-6","type":"description","label":"[EDIT: paste the Grades 5–6 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Grades 5–6"}},{"id":"list_7-8","type":"description","label":"[EDIT: paste the Middle School (7–8) supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Middle School (7–8)"}},{"id":"list_9-12","type":"description","label":"[EDIT: paste the High School (9–12) supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"High School (9–12)"}},{"id":"ack","type":"yesno","label":"I have reviewed my student’s supply list.","required":true},{"id":"notes","type":"textarea","label":"Questions or notes (optional)","required":false}]}]}},"demo-athome-learning":{"access":"private","form":{"id":"demo-athome-learning","title":"At-Home Learning Request","description":"Request a period of at-home learning for your student. Sign in with the email on file; your family info fills in automatically. Requests route to an administrator for approval. (Demo: verify with ANY email + any 6-digit code.)","confirmationMessage":"Thank you — your request was submitted for administrator approval. You’ll get an email with the decision. (Demo — nothing was saved.)","locked":false,"reviewMode":false,"multiStudent":true,"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student(s)"},{"id":"students","type":"studentPicker","label":"Which student(s)?","required":true,"multiple":true},{"id":"secR","type":"sectionHeader","label":"Request"},{"id":"reason","type":"dropdown","label":"Reason for at-home learning","required":true,"options":["Illness / medical","Family circumstance","Extended travel","Temporary transition","Other"]},{"id":"startDate","type":"date","label":"Start date","required":true},{"id":"returnDate","type":"date","label":"Expected return date","required":false,"validation":{"notBefore":"startDate"}},{"id":"plan","type":"textarea","label":"Learning plan / details","required":true,"help":"How the student will keep up with coursework."},{"id":"coordination","type":"textarea","label":"How will work be submitted and communication handled?","required":false},{"id":"secA","type":"sectionHeader","label":"Acknowledgment"},{"id":"ackTxt","type":"description","label":"At-home learning is subject to administrative approval and school policy. Students remain responsible for all coursework and assessments."},{"id":"sign","type":"signature","label":"Parent / guardian signature","required":true,"help":"Sign in the box; type your full name below."}]}]}}};
+    var ORDER = ["demo-sample-0001","demo-parent-demo","demo-hs-conference","demo-sports-physical","demo-ki-auth","demo-field-trip","demo-course-selection","demo-homeschool-opp","demo-preapproved-trip","demo-med-auth","demo-supply-lists","demo-athome-learning"];
     function qs(k){ return new URLSearchParams(location.search).get(k); }
-    window.FORM_ID = qs('form') && FORMS[qs('form')] ? qs('form') : 'demo-open';
+    window.FORM_ID = qs('form') && FORMS[qs('form')] ? qs('form') : ORDER[0];
     window.PREVIEW = true;
     try { localStorage.removeItem('hcsFormsToken'); } catch(e){}
     var API = {
@@ -420,7 +356,8 @@ function computeCalc(field, answers) {
         return {ok:true, form:s.form, verifiedVia: token?'otp':'open', prefill: token?PREFILL:null }; },
       authRequestOtp: function(){ return {ok:true, msg:'(Demo) enter any 6-digit code.'}; },
       authVerifyOtp: function(email, code){ return /^\d{6}$/.test(String(code||'')) ? {ok:true,token:'demo',email:email} : {ok:false,msg:'Enter any 6-digit code (demo).'}; },
-      submitForm: function(formId){ return {ok:true, submissionId:'DEMO-'+Math.floor(Math.random()*100000), message:FORMS[formId].form.confirmationMessage}; }
+      submitForm: function(formId){ return {ok:true, submissionId:'DEMO-'+Math.floor(Math.random()*100000), message:FORMS[formId].form.confirmationMessage}; },
+      getPriorAnswersForStudent: function(){ return {ok:true, answers:{ sports:['Soccer','Track & Field'] }}; }
     };
     function runnerObj(){ var s=null,f=null; var o={ withSuccessHandler:function(fn){s=fn;return o;}, withFailureHandler:function(fn){f=fn;return o;} };
       Object.keys(API).forEach(function(m){ o[m]=function(){ var a=arguments; setTimeout(function(){ try{ s&&s(API[m].apply(null,a)); }catch(e){ f&&f(e); } },140); }; }); return o; }
@@ -456,6 +393,9 @@ function computeCalc(field, answers) {
   var PAGES = [];       // [{ title, fields:[...] }] split at pageBreak markers
   var CUR = 0;          // current page index
   var LOCKED = false;
+  var FORM = null;      // the current form object (for "save & add another child")
+  var LAST_ANSWERS = null; // answers of the just-submitted response (to carry over between children)
+  var REVIEW_SHOWN = false; // show the review-mode "two emails" notice only once per session
 
   loadForm();
 
@@ -546,7 +486,7 @@ function computeCalc(field, answers) {
 
   function sendCode() {
     var email = (document.getElementById('otpEmail').value || '').trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return otpError('Enter a valid email address.');
+    if (!EMAIL_RE.test(email)) return otpError('Enter a valid email address.');
     otpEmail = email;
     var btn = document.getElementById('otpSend'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
     google.script.run.withSuccessHandler(function () { renderCodeEntry(); })
@@ -605,6 +545,7 @@ function computeCalc(field, answers) {
 
   // ---------- render form ----------
   function renderForm(form) {
+    FORM = form;
     FIELDS = []; VISALL = [];
     var body = '<div class="card flush-top card-pad stack">';
     if (IS_PREVIEW) body += '<div class="notice info">' + FormsUI.icon('eye') + ' <strong>Preview</strong> — this is exactly what submitters see (with sample data). Nothing is saved.</div>';
@@ -612,8 +553,11 @@ function computeCalc(field, answers) {
     // honeypot (bots fill it; humans never see it) — server drops any submission with this set
     body += '<input type="text" id="hpField" name="hp_addr" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute!important;left:-9999px;top:auto;width:1px;height:1px;opacity:0">';
     if (VIA === 'otp' && PREFILL && PREFILL.parent) {
-      body += '<div class="notice info" style="display:flex;justify-content:space-between;align-items:center;gap:8px">' +
-        '<span>Signed in as <strong>' + FormsUI.esc(PREFILL.parent.email) + '</strong></span>' +
+      var pName = ((PREFILL.parent.first || '') + ' ' + (PREFILL.parent.last || '')).trim();
+      body += '<div class="notice info" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span>Submitting as <strong>' + FormsUI.esc(pName || PREFILL.parent.email) + '</strong>' +
+        (pName ? ' <span style="color:#666">(' + FormsUI.esc(PREFILL.parent.email) + ')</span>' : '') +
+        ' <a href="#" id="showIdentity" style="display:none;margin-left:6px">Update my info</a></span>' +
         '<button id="signOut" class="btn ghost sm" type="button">Not you?</button></div>';
     } else if (TOKEN && !IS_EDIT) {
       // A parent session is still stored on this device (e.g. a shared/library computer) even though
@@ -646,6 +590,12 @@ function computeCalc(field, answers) {
       pg.fields.forEach(function (f) { pdiv.appendChild(renderField(f)); });
       host.appendChild(pdiv);
     });
+    if (!LOCKED && !IS_PREVIEW && FIELDS.some(function (f) { return f.required; })) {
+      host.parentNode.insertBefore(
+        FormsUI.el('p', { 'class': 'help', 'style': 'margin:0 0 2px' },
+          '<span class="req" aria-hidden="true">*</span> Required — your progress saves automatically on this device.'),
+        host);
+    }
 
     if (!IS_EDIT) applyPrefill();
     initSignatures();
@@ -666,7 +616,8 @@ function computeCalc(field, answers) {
     var so = document.getElementById('signOut'); if (so) so.addEventListener('click', signOut);
     CUR = 0; showPage(0);
 
-    if (form.reviewMode) {
+    if (form.reviewMode && !REVIEW_SHOWN) {
+      REVIEW_SHOWN = true;
       var demo = (typeof window !== 'undefined' && window.PREVIEW) ? ' <em>(This is a demo — no email is actually sent.)</em>' : '';
       FormsUI.modal('Before you begin',
         'The email address you enter will receive <strong>two emails</strong> after you submit: a <strong>confirmation</strong> (to you as the requester) and a copy of the <strong>notification the form’s owner receives</strong>.' + demo,
@@ -688,7 +639,8 @@ function computeCalc(field, answers) {
     if (LOCKED) { nav.innerHTML = ''; document.querySelectorAll('.formpage').forEach(function (p) { p.style.display = ''; }); return; }
     var multi = PAGES.length > 1;
     var prog = multi ? '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + PAGES.length + '" aria-valuenow="' + (CUR + 1) + '" aria-label="Step ' + (CUR + 1) + ' of ' + PAGES.length + '"><div class="progress-bar" style="width:' + Math.round((CUR + 1) / PAGES.length * 100) + '%"></div></div>' +
-      '<p class="help center">Step ' + (CUR + 1) + ' of ' + PAGES.length + (PAGES[CUR].title ? ' — ' + FormsUI.esc(PAGES[CUR].title) : '') + '</p>' : '';
+      '<p class="help center">Step ' + (CUR + 1) + ' of ' + PAGES.length + (PAGES[CUR].title ? ' — ' + FormsUI.esc(PAGES[CUR].title) : '') + '</p>'
+      : (FIELDS.length > 8 ? '<p class="help center" id="ansCount" aria-live="polite"></p>' : '');
     var btns = '<div style="display:flex;gap:10px;margin-top:14px">';
     if (multi && CUR > 0) btns += '<button class="btn ghost" id="prevBtn" type="button">← Back</button>';
     var lastPage = CUR >= PAGES.length - 1;
@@ -702,6 +654,19 @@ function computeCalc(field, answers) {
     var nx = document.getElementById('nextBtn'); if (nx) nx.onclick = onNext;
     var sb = document.getElementById('submitBtn'); if (sb) sb.onclick = onSubmit;
     var wb = document.getElementById('withdrawBtn'); if (wb) wb.onclick = onWithdraw;
+    updateAnswerCount();
+  }
+  // "X of N required questions answered" — orientation on long single-page forms.
+  function updateAnswerCount() {
+    var el = document.getElementById('ansCount'); if (!el) return;
+    var ans = currentAnswers();
+    var req = FIELDS.filter(function (f) { return f.required && f.type !== 'calculation' && evalShowIf(f.showIf, ans); });
+    if (!req.length) { el.textContent = ''; return; }
+    var done = req.filter(function (f) {
+      if (f.type === 'file' || f.type === 'signature') return (ATTACH[f.id] && ATTACH[f.id].length) || !fieldEmpty(f, ans[f.id]);
+      return !fieldEmpty(f, ans[f.id]);
+    }).length;
+    el.textContent = done + ' of ' + req.length + ' required questions answered';
   }
   function onNext() {
     if (uploadsPending('nextBtn')) return;
@@ -721,12 +686,12 @@ function computeCalc(field, answers) {
   function validatePage(pi) {
     var ans = currentAnswers(), ok = true, firstBad = null;
     PAGES[pi].fields.forEach(function (f) {
-      if (f.type === 'sectionHeader' || f.type === 'description' || f.type === 'calculation') return;
+      if (isContentType(f.type) || f.type === 'calculation') return;
       if (!evalShowIf(f.showIf, ans)) { setErr(f, ''); return; }
       var msg = '';
       if (f.type === 'file') { if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please attach a file.'; }
       else if (f.type === 'signature') { captureSignature(f); if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !readValue(f) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please sign in the box, or type your full name.'; }
-      else { var v = readValue(f); if (f.required && fieldEmpty(f, v)) msg = 'This field is required.'; else if (!fieldEmpty(f, v) && f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = 'Enter a valid email address.'; }
+      else { var v = readValue(f); if (f.required && fieldEmpty(f, v)) msg = 'This field is required.'; else if (!fieldEmpty(f, v) && f.type === 'email' && !EMAIL_RE.test(v)) msg = 'Enter a valid email address.'; }
       setErr(f, msg); if (msg) { ok = false; if (!firstBad) firstBad = f; }
     });
     return { ok: ok, firstBad: firstBad };
@@ -738,7 +703,7 @@ function computeCalc(field, answers) {
     w.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var c = w.querySelector('input:not([type=hidden]),select,textarea,canvas'); if (c) { try { c.focus({ preventScroll: true }); } catch (e) { try { c.focus(); } catch (x) {} } }
   }
-  function onFieldChange() { applyVisibility(); recomputeCalc(); saveDraft(); }
+  function onFieldChange() { applyVisibility(); recomputeCalc(); saveDraft(); updateAnswerCount(); }
 
   // ---------- calculation fields ----------
   // evalShowIf + computeCalc come from SharedLogic.html (generated from Logic.js) — one source, server-identical.
@@ -948,7 +913,7 @@ function computeCalc(field, answers) {
       (opts.length !== 1 ? '<option value="">' + FormsUI.esc(ph) + '</option>' : '') +
       opts.map(function (o) { return '<option value="' + FormsUI.esc(o.v) + '">' + FormsUI.esc(o.label) + '</option>'; }).join('') + '</select>';
   }
-  function isMultiField(f) { return f.type === 'checkboxes' || ((f.type === 'studentPicker' || f.type === 'staffPicker') && f.multiple); }
+  // isMultiField comes from SharedLogic.html (generated from Logic.js) — one shared predicate.
   // capacity remaining for an option (from server); full options are disabled + labeled
   function capNote(f, o) {
     if (!f.capacityLeft || f.capacityLeft[o] == null) return { full: false, suffix: '' };
@@ -1001,6 +966,7 @@ function computeCalc(field, answers) {
           break;
       }
     });
+    collapseIdentityBlock();
     refreshStudentDerived();
 
     if (picker) {
@@ -1013,9 +979,51 @@ function computeCalc(field, answers) {
     }
   }
 
+  // Verified parents shouldn't stare at inputs they never touch: hide successfully-prefilled
+  // parent identity fields (the banner already says who's submitting) and any section header
+  // left with nothing visible under it. "Update my info" reveals them for corrections.
+  function collapseIdentityBlock() {
+    if (VIA !== 'otp') return;
+    var IDENTITY = { parentFirst: 1, parentLast: 1, parentEmail: 1 };
+    var collapsed = 0;
+    FIELDS.forEach(function (f) {
+      if (!IDENTITY[f.prefillFrom]) return;
+      if (!readValue(f)) return; // never hide a still-empty required field
+      var w = document.querySelector('[data-fid="' + f.id + '"]');
+      if (w) { w.classList.add('identity-collapsed'); collapsed++; }
+    });
+    if (!collapsed) return;
+    // hide section headers whose entire section is now collapsed
+    var hdr = null, hasVisible = false;
+    var closeSection = function () {
+      if (hdr && !hasVisible) { var hw = document.querySelector('[data-fid="' + hdr.id + '"]'); if (hw) hw.classList.add('identity-collapsed'); }
+    };
+    VISALL.forEach(function (f) {
+      if (f.type === 'sectionHeader') { closeSection(); hdr = f; hasVisible = false; return; }
+      var w = document.querySelector('[data-fid="' + f.id + '"]');
+      if (w && !w.classList.contains('identity-collapsed')) hasVisible = true;
+    });
+    closeSection();
+    var link = document.getElementById('showIdentity');
+    if (link) {
+      link.style.display = '';
+      link.onclick = function (e) {
+        e.preventDefault();
+        document.querySelectorAll('.identity-collapsed').forEach(function (x) { x.classList.remove('identity-collapsed'); });
+        link.style.display = 'none';
+      };
+    }
+  }
+
   function refreshStudentDerived() {
     var s = selectedStudent();
     FIELDS.forEach(function (f) {
+      if (f.prefillFrom === 'studentGradeNextYear') {
+        // seed the next grade up (current+1) but leave EDITABLE so a parent can override
+        var ng = s && typeof nextGrade === 'function' ? nextGrade(s.grade) : '';
+        if (ng) setVal(f.id, ng);
+        return;
+      }
       if (f.prefillFrom !== 'studentGrade' && f.prefillFrom !== 'studentName') return;
       var v = s ? (f.prefillFrom === 'studentGrade' ? s.grade : s.displayName) : '';
       setVal(f.id, v);
@@ -1023,6 +1031,23 @@ function computeCalc(field, answers) {
       // with 0 or >1 students selected can still complete a required field (no dead-end).
       if (v) lockField(f.id, true); else lockField(f.id, false);
     });
+    maybePriorYear();
+  }
+  // Pre-fill "remembered" fields (priorYear) from this student's most recent prior submission to
+  // this same form. Server-guarded to the OTP parent's own students; applied as editable defaults.
+  function maybePriorYear() {
+    if (VIA !== 'otp' || IS_PREVIEW || IS_EDIT) return;
+    if (!FIELDS.some(function (f) { return f.priorYear; })) return;
+    var s = selectedStudent(); if (!s) return;
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res || !res.ok || !res.answers) return;
+      FIELDS.forEach(function (f) {
+        if (!f.priorYear || res.answers[f.id] == null) return;
+        var cur = readValue(f);
+        if (fieldEmpty(f, cur)) writeValue(f, res.answers[f.id]); // don't clobber edits
+      });
+      applyVisibility();
+    }).getPriorAnswersForStudent(FORM_ID, TOKEN, s.displayName);
   }
   function lockField(id, on) {
     var el = document.getElementById('f_' + id);
@@ -1066,7 +1091,7 @@ function computeCalc(field, answers) {
       } else {
         var v = readValue(f); answers[f.id] = v;
         if (f.required && fieldEmpty(f, v)) msg = 'This field is required.';
-        else if (!fieldEmpty(f, v) && f.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = 'Enter a valid email address.';
+        else if (!fieldEmpty(f, v) && f.type === 'email' && !EMAIL_RE.test(v)) msg = 'Enter a valid email address.';
       }
       setErr(f, msg);
       if (msg) { ok = false; if (!firstBad) firstBad = f; }
@@ -1078,6 +1103,7 @@ function computeCalc(field, answers) {
       return;
     }
     formErr.style.display = 'none';
+    LAST_ANSWERS = answers; // remembered so "add another child" can carry the parent/common fields over
     if (IS_PREVIEW) { onSubmitDone({ ok: true, message: 'This is a preview — your response was NOT saved.', submissionId: 'PREVIEW' }); return; }
     var btn = document.getElementById('submitBtn'); btn.disabled = true;
     var label = IS_EDIT ? 'Save changes' : 'Submit';
@@ -1119,6 +1145,8 @@ function computeCalc(field, answers) {
       return;
     }
     if (!IS_EDIT) clearDraft();
+    var canAddChild = !IS_PREVIEW && !IS_EDIT && FORM && FORM.multiStudent && VIA === 'otp' &&
+      FIELDS.some(function (f) { return f.type === 'studentPicker'; });
     var nextStep = res.status === 'Pending Approval'
       ? '<div class="notice info" style="text-align:left">Your submission will be reviewed. You’ll get an email with the decision.</div>' : '';
     shell('<div class="card flush-top card-pad center stack">' +
@@ -1127,8 +1155,25 @@ function computeCalc(field, answers) {
       '<p class="form-desc">' + FormsUI.esc(res.message) + '</p>' +
       nextStep +
       '<p class="help">Reference: ' + FormsUI.esc(res.submissionId) + '</p>' +
-      (IS_PREVIEW || IS_EDIT ? '' : '<button class="btn ghost" type="button" onclick="location.reload()">Submit another response</button>') +
+      (canAddChild ? '<button class="btn block" id="addChildBtn" type="button">' + FormsUI.icon('plus') + ' Save &amp; add another child</button>' : '') +
+      (IS_PREVIEW || IS_EDIT ? '' : '<button class="btn ghost" type="button" onclick="location.reload()">' + (canAddChild ? 'I’m done' : 'Submit another response') + '</button>') +
       '</div>');
+    var acb = document.getElementById('addChildBtn'); if (acb) acb.onclick = addAnotherChild;
+  }
+
+  // Re-open the form for the parent's NEXT child: keep parent + common answers, reset the student
+  // (and student-derived + file/signature fields). Produces a separate response row per child.
+  function addAnotherChild() {
+    var keep = LAST_ANSWERS || {};
+    renderForm(FORM); // fresh render — applyPrefill re-fills parent fields and resets the picker
+    FIELDS.forEach(function (f) {
+      if (f.type === 'studentPicker' || f.type === 'file' || f.type === 'signature') return;
+      if (f.prefillFrom === 'studentGrade' || f.prefillFrom === 'studentName' || f.prefillFrom === 'studentGradeNextYear') return;
+      if (keep[f.id] != null) writeValue(f, keep[f.id]);
+    });
+    recomputeCalc(); applyVisibility();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+    FormsUI.toast('Your info was kept — now choose your next child');
   }
 })();
 </script>

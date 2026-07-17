@@ -117,6 +117,8 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
+  .identity-collapsed { display:none !important; }
   /* FAQ accordion (faq field type) */
   .faq-block { margin:4px 0 8px; }
   .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
@@ -178,10 +180,45 @@
   .btn.ghost.danger { color:var(--hcs-red); border-color:var(--hcs-red); background:none; }
   .btn.ghost.danger:hover { background:#fbeaea; }
   .editor { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
-  @media (max-width:820px){ .editor { grid-template-columns:1fr; } }
-  .palette { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  .editor.withprev { grid-template-columns:1fr 360px 300px; }
+  /* Below full-desktop width the pane becomes a fixed right-side drawer — always visible,
+     never buried below a long field list. */
+  @media (max-width:1180px){
+    .editor.withprev { grid-template-columns:1fr 300px; }
+    .editor.withprev #livePrevWrap { position:fixed; top:0; right:0; bottom:0; width:min(420px,92vw); z-index:70;
+      background:var(--card); box-shadow:-12px 0 30px rgba(0,0,0,.22); overflow:auto; }
+    .editor.withprev #livePrevWrap .prevpane { border:0; border-radius:0; max-height:none; }
+    .editor.withprev #livePrevWrap .prevpane-hd { border-radius:0; }
+  }
+  @media (max-width:820px){ .editor, .editor.withprev { grid-template-columns:1fr; } }
+  .palette { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; align-items:center; }
   .palette button { font-size:.8rem; padding:6px 10px; border:1px solid var(--line-strong); border-radius:999px; background:var(--card); cursor:pointer; }
   .palette button:hover { border-color:var(--hcs-red); color:var(--hcs-red); }
+  .palgroup { flex-basis:100%; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:6px 0 -2px; }
+  .palgroup:first-child { margin-top:0; }
+  .startchoices { display:grid; gap:10px; margin-top:6px; }
+  .startchoices button { display:block; text-align:left; background:var(--card); border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:14px 16px; cursor:pointer; font:inherit; }
+  .startchoices button:hover { border-color:var(--hcs-red); }
+  .startchoices button strong { display:block; margin-bottom:3px; }
+  .startchoices button span { color:var(--muted); font-size:.85rem; line-height:1.4; }
+  .prevpane { position:sticky; top:12px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); max-height:calc(100vh - 40px); overflow:auto; }
+  .prevpane-hd { background:var(--hcs-red); color:#fff; font-weight:700; font-size:.8rem; padding:8px 14px; border-radius:var(--radius) var(--radius) 0 0; position:sticky; top:0; }
+  #livePrev { padding:14px; }
+  #livePrev .field { margin-bottom:12px; }
+  #livePrev .fieldlabel { display:block; font-weight:600; font-size:.88rem; margin-bottom:4px; }
+  .pv-title { font-weight:800; font-size:1.05rem; margin-bottom:4px; }
+  .pv-desc { color:var(--muted); font-size:.85rem; margin:0 0 10px; }
+  .pv-break { text-align:center; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--hcs-red); border-top:2px dashed var(--line-strong); padding-top:8px; margin:14px 0 10px; }
+  .pv-cond { font-size:.7rem; color:#8a6d00; background:#fdf6df; border-radius:6px; padding:2px 8px; display:inline-block; margin-bottom:4px; }
+  .pv-sig { border:1px dashed var(--line-strong); border-radius:8px; padding:18px; text-align:center; color:var(--muted); font-size:.85rem; }
+  .caprow { display:flex; align-items:center; gap:8px; margin:4px 0; }
+  .caprow span { flex:1; font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .caprow input { max-width:90px; }
+  .sgroup { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin:10px 0; background:var(--card); }
+  .sgroup > summary { cursor:pointer; font-weight:700; font-size:.85rem; color:var(--text); }
+  .sgroup > summary:hover { color:var(--hcs-red); }
+  .rtable tr[data-ri] { cursor:pointer; }
+  .rtable tr[data-ri]:hover td { background:#f7f3ea; }
   .fieldcard { border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; background:var(--panel); }
   .fieldcard { cursor:default; }
   .fieldcard .fchead { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
@@ -319,29 +356,10 @@
     function pg(fields){ return [{ title:'Main', fields:fields }]; }
     function base(access){ return { access:access||'open', lifecycle:'published', locked:false, reviewMode:false, confirmationMessage:'Thank you — your response was recorded.', notifyEmails:[ME.email] }; }
 
-    add('f-interest', {title:'Sample Interest Form', access:'open', submissions:42}, { title:'Sample Interest Form', description:'Tell us about your interest in HCS.', settings:base('open'), pages:pg([
-      {id:'fn',type:'text',label:'First name',required:true},{id:'ln',type:'text',label:'Last name',required:true},
-      {id:'em',type:'email',label:'Email',required:true},{id:'g',type:'dropdown',label:'Grade of interest',options:['K4','K5','1','2','3','4','5','6','7','8','9','10','11','12']}]) });
-    add('f-trip', {title:'Field Trip Request', access:'staff', submissions:8, category:'Staff'}, { title:'Field Trip Request', description:'Staff trip request — approval routing + conditional overnight section.', settings:Object.assign(base('staff'),{approval:{enabled:true,approvers:['principal@harfordchristian.org'],mode:'any'}}), pages:pg([
-      {id:'trip',type:'text',label:'Trip name / purpose',required:true},{id:'dest',type:'text',label:'Destination',required:true},
-      {id:'overnight',type:'yesno',label:'Is this an overnight trip?',required:true},
-      {id:'lodging',type:'textarea',label:'Overnight lodging & chaperone plan',required:true,showIf:{field:'overnight',op:'equals',value:'Yes'}},
-      {id:'cost',type:'number',label:'Estimated cost per student ($)'}]) });
-    add('f-conf', {title:'HS Parent/Teacher Conference', access:'private', submissions:63, category:'High School'}, { title:'HS Parent/Teacher Conference', description:'Request a conference.', settings:base('private'), pages:pg([
-      {id:'pf',type:'text',label:'First name',required:true,prefillFrom:'parentFirst'},{id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},
-      {id:'stu',type:'studentPicker',label:'Student',required:true},{id:'teach',type:'staffPicker',label:'Teacher(s) to meet',required:true,multiple:true,staffLevel:'HS'},
-      {id:'t1',type:'dropdown',label:'First choice time',required:true,options:['Tue 3:00','Tue 3:20','Thu 3:00']}]) });
-    add('f-phys', {title:'Sports Physical Submission', access:'private', submissions:27, category:'Athletics'}, { title:'Sports Physical Submission', description:'Upload the completed physical.', settings:base('private'), pages:pg([
-      {id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},{id:'stu',type:'studentPicker',label:'Student',required:true},
-      {id:'up',type:'file',label:'Upload physical (PDF/photo)',required:true,accept:'.pdf,image/*'},{id:'sig',type:'signature',label:'Parent signature',required:true}]) });
     add('f-draft', {title:'Volunteer Signup (draft)', access:'open', lifecycle:'draft', submissions:0}, { title:'Volunteer Signup', description:'', settings:base('open'), pages:pg([
       {id:'n',type:'text',label:'Name',required:true},{id:'e',type:'email',label:'Email',required:true}]) });
-    add('f-homeschool', {title:'HCS Homeschool Opportunities Sign Up', access:'private', submissions:31, category:'Homeschool'}, { title:'HCS Homeschool Opportunities Sign Up', description:'A-la-carte homeschool sign-ups (specials, testing, MACS, events).', settings:base('private'), pages:pg([
-      {id:'pe',type:'email',label:'Parent email',required:true,prefillFrom:'parentEmail'},{id:'students',type:'studentPicker',label:'Which student(s)?',required:true,multiple:true},
-      {id:'umbrella',type:'yesno',label:'HCS Homeschool Umbrella?',required:true},{id:'tests',type:'checkboxes',label:'Standardized testing',options:['PSAT','SAT','MACS Academic Testing']}]) });
-    add('f-trip2', {title:'Pre-Approved Trip Request', access:'private', submissions:12, category:'Attendance'}, { title:'Pre-Approved Trip Request', description:'Pre-approval for a student absence.', settings:base('private'), pages:pg([
-      {id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},{id:'students',type:'studentPicker',label:'Which student(s) will be absent?',required:true,multiple:true},
-      {id:'sd',type:'date',label:'First day of absence',required:true},{id:'ed',type:'date',label:'Last day of absence',required:true},{id:'sig',type:'signature',label:'Parent signature',required:true}]) });
+    var SEEDED = [{"id":"f-sample-0001","meta":{"title":"Sample Interest Form","access":"open","category":"","submissions":7},"schema":{"title":"Sample Interest Form","description":"A quick demo form to prove the runner end-to-end (M1).","settings":{"access":"open","lifecycle":"published","locked":false,"confirmationMessage":"Thanks! Your response was recorded. We will be in touch.","notifyEmails":["forms@harfordchristian.org"]},"pages":[{"title":"Main","fields":[{"id":"sec1","type":"sectionHeader","label":"Your details"},{"id":"firstName","type":"text","label":"First name","required":true},{"id":"lastName","type":"text","label":"Last name","required":true},{"id":"email","type":"email","label":"Email address","required":true,"help":"We'll send a confirmation here."},{"id":"phone","type":"phone","label":"Phone (optional)","required":false},{"id":"grade","type":"dropdown","label":"Student grade","required":true,"options":["K4","K5","1","2","3","4","5","6","7","8","9","10","11","12"]},{"id":"interest","type":"radio","label":"How interested are you?","required":true,"options":["Very","Somewhat","Just browsing"]},{"id":"topics","type":"checkboxes","label":"Topics you care about","required":false,"options":["Academics","Athletics","Arts","Spiritual life"]},{"id":"consent","type":"yesno","label":"May we contact you?","required":true},{"id":"comments","type":"textarea","label":"Anything else?","required":false}]}]}},{"id":"f-parent-demo","meta":{"title":"Field Trip Permission (demo)","access":"private","category":"","submissions":18},"schema":{"title":"Field Trip Permission (demo)","description":"Demonstrates FACTS prefill. Your details fill in automatically after you verify your email.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your permission has been recorded.","notifyEmails":["forms@harfordchristian.org"]},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Your email","required":true,"prefillFrom":"parentEmail","help":"Verified — this is the email you signed in with."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Which student?","required":true,"help":"Only your students are listed."},{"id":"grade","type":"text","label":"Grade","required":false,"prefillFrom":"studentGrade"},{"id":"secT","type":"sectionHeader","label":"Permission"},{"id":"permission","type":"yesno","label":"I give permission for my student to attend.","required":true},{"id":"notes","type":"textarea","label":"Notes (allergies, medications, etc.)","required":false}]}]}},{"id":"f-hs-conference","meta":{"title":"HS Parent/Teacher Conference","access":"private","category":"High School","submissions":29},"schema":{"title":"HS Parent/Teacher Conference","description":"Request a High School parent/teacher conference. Sign in with the email Harford Christian has on file and your information will fill in automatically. Choose the teacher(s) you’d like to meet with and your top three time preferences.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your conference request has been received. We’ll follow up to confirm times.","notifyEmails":["forms@harfordchristian.org"]},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified — the email you signed in with."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true,"help":"Only your students are listed."},{"id":"grade","type":"text","label":"Grade","required":false,"prefillFrom":"studentGrade"},{"id":"secC","type":"sectionHeader","label":"Conference request"},{"id":"teachers","type":"staffPicker","label":"Which teacher(s) would you like to meet with?","required":true,"multiple":true,"staffLevel":"HS","help":"Select all that apply."},{"id":"time1","type":"dropdown","label":"First choice — meeting time","required":true,"options":["Tue — 3:00–3:20 PM","Tue — 3:20–3:40 PM","Tue — 3:40–4:00 PM","Tue — 4:00–4:20 PM","Thu — 3:00–3:20 PM","Thu — 3:20–3:40 PM","Thu — 3:40–4:00 PM","Thu — 4:00–4:20 PM"],"capacity":{"Tue — 3:00–3:20 PM":3,"Tue — 3:20–3:40 PM":3,"Tue — 3:40–4:00 PM":3,"Tue — 4:00–4:20 PM":3,"Thu — 3:00–3:20 PM":3,"Thu — 3:20–3:40 PM":3,"Thu — 3:40–4:00 PM":3,"Thu — 4:00–4:20 PM":3},"help":"Each slot holds 3 first-choice requests, then hides."},{"id":"time2","type":"dropdown","label":"Second choice — meeting time","required":false,"options":["Tue — 3:00–3:20 PM","Tue — 3:20–3:40 PM","Tue — 3:40–4:00 PM","Tue — 4:00–4:20 PM","Thu — 3:00–3:20 PM","Thu — 3:20–3:40 PM","Thu — 3:40–4:00 PM","Thu — 4:00–4:20 PM"],"validation":{"notSameAs":"time1"}},{"id":"time3","type":"dropdown","label":"Third choice — meeting time","required":false,"options":["Tue — 3:00–3:20 PM","Tue — 3:20–3:40 PM","Tue — 3:40–4:00 PM","Tue — 4:00–4:20 PM","Thu — 3:00–3:20 PM","Thu — 3:20–3:40 PM","Thu — 3:40–4:00 PM","Thu — 4:00–4:20 PM"],"validation":{"notSameAs":["time1","time2"]}},{"id":"info","type":"textarea","label":"Anything else we should know?","required":false}]}]}},{"id":"f-sports-physical","meta":{"title":"Sports Physical Submission","access":"private","category":"Athletics","submissions":40},"schema":{"title":"Sports Physical Submission","description":"Upload your student’s completed sports physical. Sign in with the email on file and your details fill in automatically.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your student’s physical has been received.","notifyEmails":["forms@harfordchristian.org"],"multiStudent":true},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Grade","prefillFrom":"studentGrade"},{"id":"sports","type":"checkboxes","label":"Sport(s) this year","required":false,"priorYear":true,"help":"Last year’s sports are pre-checked once you pick your student — adjust as needed.","options":["Soccer","Volleyball","Cross Country","Basketball","Cheerleading","Baseball","Softball","Track & Field","Golf","Tennis","Esports"]},{"id":"sportOther","type":"text","label":"Other sport(s)","required":false},{"id":"secD","type":"sectionHeader","label":"Physical"},{"id":"physDate","type":"date","label":"Date of physical","required":true},{"id":"file","type":"file","label":"Upload the completed physical (PDF or photo)","required":true,"accept":".pdf,image/*","help":"Max 10 MB. PDF or a clear photo."}]}]}},{"id":"f-ki-auth","meta":{"title":"Potassium Iodide (KI) Authorization","access":"private","category":"Health","submissions":51},"schema":{"title":"Potassium Iodide (KI) Authorization","description":"Authorization for the school to administer potassium iodide (KI) to your student in the event of a radiological emergency, per state guidance.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your authorization has been recorded.","notifyEmails":["forms@harfordchristian.org"],"multiStudent":true},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Grade","prefillFrom":"studentGrade"},{"id":"secA","type":"sectionHeader","label":"Authorization"},{"id":"authText","type":"description","label":"I authorize Harford Christian School to administer potassium iodide (KI) to my student in the event of a radiological emergency, according to instructions provided by state/local health authorities. I confirm I am the parent/legal guardian."},{"id":"choice","type":"yesno","label":"Do you authorize administration of KI to your student?","required":true},{"id":"allergies","type":"textarea","label":"Known allergies or medical notes","required":false},{"id":"sign","type":"signature","label":"Parent/guardian signature","required":true,"help":"Sign in the box; type your full name below."}]}]}},{"id":"f-field-trip","meta":{"title":"Field Trip Request","access":"staff","category":"Staff","submissions":2},"schema":{"title":"Field Trip Request","description":"Staff request for a field trip. Overnight trips ask for extra detail, and every request routes to an approver.","settings":{"access":"staff","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your field trip request was submitted for approval.","notifyEmails":["forms@harfordchristian.org"],"approval":{"enabled":true,"approvers":["forms@harfordchristian.org"],"mode":"any"}},"pages":[{"title":"Main","fields":[{"id":"secT","type":"sectionHeader","label":"Trip details"},{"id":"tripName","type":"text","label":"Trip name / purpose","required":true},{"id":"destination","type":"text","label":"Destination","required":true},{"id":"date","type":"date","label":"Trip date","required":true},{"id":"grades","type":"checkboxes","label":"Grade level(s) attending","required":true,"options":["K4","K5","1","2","3","4","5","6","7","8","9","10","11","12"]},{"id":"count","type":"number","label":"Estimated number of students","required":true},{"id":"overnight","type":"yesno","label":"Is this an overnight trip?","required":true},{"id":"lodging","type":"textarea","label":"Overnight lodging & chaperone plan","required":true,"help":"Required for overnight trips.","showIf":{"field":"overnight","op":"equals","value":"Yes"}},{"id":"transport","type":"dropdown","label":"Transportation","required":true,"options":["School bus","School van","Charter bus","Parent drivers","Walking","Other"]},{"id":"cost","type":"number","label":"Estimated cost per student","required":false,"money":true,"help":"Per-student cost; recorded as a dollar amount."},{"id":"notes","type":"textarea","label":"Additional notes","required":false}]}]}},{"id":"f-course-selection","meta":{"title":"Course Selection Guide","access":"private","category":"Academics","submissions":13},"schema":{"title":"Course Selection Guide","description":"Select next year’s courses. Sign in with the email on file; your family info fills in automatically. Choose the grade you are registering FOR, then complete that grade’s selections. (Course lists are examples from last year — edit them in the builder each year.)","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your course selections have been submitted.","notifyEmails":["forms@harfordchristian.org"],"multiStudent":true},"pages":[{"title":"Main","fields":[{"id":"infoH","type":"sectionHeader","label":"Information & Policies"},{"id":"gradReqH","type":"sectionHeader","label":"Graduation Requirements"},{"id":"gradReqTxt","type":"description","label":"(Edit each year with the current graduation requirements — total credits and required credits per subject: Bible, English, Math, Science, History, PE/Health, and electives.)"},{"id":"polH","type":"sectionHeader","label":"Course Selection Policies"},{"id":"polTxt","type":"description","label":"(Edit with current policies — prerequisites, sign-offs and waivers, study-hall limits, dual enrollment, senior daily early release, and courses taken out of sequence.)"},{"id":"faq","type":"faq","label":"Frequently Asked Questions","items":[{"q":"What if I am not returning to HCS next year?","a":"[EDIT: Contact the registrar’s office and note your plans below in \"Additional course requests.\" You do not need to complete course selection if you are not returning.]"},{"q":"How many study halls can I take?","a":"[EDIT: State the current study-hall limit per grade.]"},{"q":"What are prerequisites, sign-offs, and waivers?","a":"[EDIT: Explain that some courses require a prior course or a teacher sign-off, and how to request a waiver.]"},{"q":"What about daily early release for seniors?","a":"[EDIT: Describe senior early-release eligibility and how it affects the schedule.]"},{"q":"What about dual enrollment?","a":"[EDIT: Explain dual-enrollment options, which colleges, and how credits transfer.]"},{"q":"What if I have taken courses out of sequence?","a":"[EDIT: Explain who to talk to and how out-of-sequence credits are handled.]"},{"q":"How do I get into a math track to take Calculus by my senior year?","a":"[EDIT: Lay out the recommended math sequence to reach Calculus by grade 12.]"}]},{"id":"pbReg","type":"pageBreak","label":"Registration"},{"id":"secS","type":"sectionHeader","label":"Student & family"},{"id":"student","type":"studentPicker","label":"Student","required":true,"help":"Select your high-school student."},{"id":"sGrade","type":"text","label":"Current grade (on file)","prefillFrom":"studentGrade"},{"id":"pFirst","type":"text","label":"Parent first name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Parent last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Parent email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"pPhone","type":"phone","label":"Parent phone","required":false,"help":"Not on file — please enter."},{"id":"secR","type":"sectionHeader","label":"Registration"},{"id":"gradeReg","type":"dropdown","label":"Which grade are you registering FOR (next year)?","required":true,"options":["9","10","11","12"],"prefillFrom":"studentGradeNextYear","help":"Defaults to your student’s next grade — change it if needed. The course lists below change based on this."},{"id":"track","type":"radio","label":"College plans","required":true,"options":["Planning to attend college","Not planning to attend college"]},{"id":"hdr9","type":"sectionHeader","label":"9th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s0","type":"radio","label":"Bible","required":true,"options":["Bible 9"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s1","type":"radio","label":"English","required":true,"options":["English 9","Honors English 9"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s2","type":"radio","label":"History","required":true,"options":["World History","Honors World History"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s3","type":"radio","label":"Math","required":true,"options":["Algebra I","Geometry","Algebra II"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s4","type":"radio","label":"Science","required":true,"options":["Physical Science","Biology"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 9"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"g9elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"9"}},{"id":"hdr10","type":"sectionHeader","label":"10th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s0","type":"radio","label":"Bible","required":true,"options":["Bible 10"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s1","type":"radio","label":"English","required":true,"options":["English 10","Honors English 10"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s2","type":"radio","label":"History","required":true,"options":["US History","Honors US History"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s3","type":"radio","label":"Math","required":true,"options":["Geometry","Algebra II","Pre-Calculus"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s4","type":"radio","label":"Science","required":true,"options":["Biology","Chemistry"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 10"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"g10elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"10"}},{"id":"hdr11","type":"sectionHeader","label":"11th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s0","type":"radio","label":"Bible","required":true,"options":["Bible 11 (Apologetics)"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s1","type":"radio","label":"English","required":true,"options":["English 11","Honors English 11"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s2","type":"radio","label":"History","required":true,"options":["US Government","Economics"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s3","type":"radio","label":"Math","required":true,"options":["Algebra II","Pre-Calculus","Trigonometry"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s4","type":"radio","label":"Science","required":true,"options":["Chemistry","Physics","Anatomy & Physiology"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 11","Waiver"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"g11elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"11"}},{"id":"hdr12","type":"sectionHeader","label":"12th Grade Course Registration","showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s0","type":"radio","label":"Bible","required":true,"options":["Bible 12 (Doctrine)"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s1","type":"radio","label":"English","required":true,"options":["English 12","Honors English 12","Composition"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s2","type":"radio","label":"History","required":true,"options":["Government","Economics","Psychology"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s3","type":"radio","label":"Math","required":true,"options":["Pre-Calculus","Calculus","Statistics"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s4","type":"radio","label":"Science","required":true,"options":["Physics","Anatomy & Physiology"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12s5","type":"radio","label":"Physical Education/Health","required":true,"options":["PE/Health 12","Waiver"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"g12elec","type":"checkboxes","label":"Electives (choose any)","required":false,"options":["Art","Band","Chorus","Yearbook","Accounting","Study Hall"],"showIf":{"field":"gradeReg","op":"equals","value":"12"}},{"id":"requests","type":"textarea","label":"Additional course requests or notes","required":false},{"id":"courseCount","type":"calculation","label":"Courses selected (this grade)","calc":{"op":"count","fields":["g9s0","g9s1","g9s2","g9s3","g9s4","g9s5","g9elec","g10s0","g10s1","g10s2","g10s3","g10s4","g10s5","g10elec","g11s0","g11s1","g11s2","g11s3","g11s4","g11s5","g11elec","g12s0","g12s1","g12s2","g12s3","g12s4","g12s5","g12elec"]}},{"id":"pbSign","type":"pageBreak","label":"Sign-off"},{"id":"secV","type":"sectionHeader","label":"Sign-off"},{"id":"verifyText","type":"description","label":"By signing below, we confirm the course selections above are complete and accurate."},{"id":"verify","type":"yesno","label":"I have completed my course registration information.","required":true},{"id":"studentSig","type":"signature","label":"Student’s signature","required":true},{"id":"parentSig","type":"signature","label":"Parent’s / guardian’s signature","required":true}]}]}},{"id":"f-homeschool-opp","meta":{"title":"HCS Homeschool Opportunities Sign Up","access":"private","category":"Homeschool","submissions":24},"schema":{"title":"HCS Homeschool Opportunities Sign Up","description":"Sign your homeschool student(s) up for HCS opportunities. Sign in with the email on file and your info fills in automatically.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your sign-up has been received.","notifyEmails":["forms@harfordchristian.org"]},"pages":[{"title":"Main","fields":[{"id":"secF","type":"sectionHeader","label":"Family"},{"id":"pFirst","type":"text","label":"Parent first name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Parent last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Parent email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"pPhone","type":"phone","label":"Parent phone","required":false,"help":"Not on file — please enter."},{"id":"students","type":"studentPicker","label":"Which student(s) are you signing up?","required":true,"multiple":true},{"id":"umbrella","type":"yesno","label":"Are you enrolled in the HCS Homeschool Umbrella?","required":true},{"id":"pbOpp","type":"pageBreak","label":"Classes & testing"},{"id":"secSp","type":"sectionHeader","label":"Specials Classes"},{"id":"specials","type":"checkboxes","label":"Select any specials classes","required":false,"options":["Art","Music","Physical Education","Science Lab","Spanish"]},{"id":"secT","type":"sectionHeader","label":"Standardized Testing"},{"id":"tests","type":"checkboxes","label":"Which test(s) would you like your child to take?","required":false,"options":["PSAT","SAT","Iowa / Terra Nova","MACS Academic Testing"]},{"id":"secM","type":"sectionHeader","label":"MACS Opportunities"},{"id":"macs","type":"checkboxes","label":"MACS events","required":false,"options":["MACS Academic Testing","MACS Spelling Bee","MACS Competition Day"]},{"id":"pbEv","type":"pageBreak","label":"Events & notes"},{"id":"secE","type":"sectionHeader","label":"Events"},{"id":"mayday","type":"yesno","label":"Sign up for May Day?","required":false},{"id":"pictureday","type":"radio","label":"Spring Picture Day","required":false,"options":["Yes — order a package","Yes — digital only","No thank you"]},{"id":"notes","type":"textarea","label":"Anything else?","required":false}]}]}},{"id":"f-preapproved-trip","meta":{"title":"Pre-Approved Trip Request","access":"private","category":"Attendance","submissions":35},"schema":{"title":"Pre-Approved Trip Request","description":"Request pre-approval for a student absence due to a trip. Sign in with the email on file; your family info fills in automatically.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your pre-approved trip request has been submitted.","notifyEmails":["forms@harfordchristian.org"]},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student(s)"},{"id":"students","type":"studentPicker","label":"Which student(s) will be absent?","required":true,"multiple":true},{"id":"homeroom","type":"staffPicker","label":"Homeroom teacher(s)","required":false,"multiple":true,"help":"Choose your student(s)’ homeroom teacher(s)."},{"id":"secA","type":"sectionHeader","label":"Proposed absence"},{"id":"startDate","type":"date","label":"First day of absence","required":true},{"id":"endDate","type":"date","label":"Last day of absence","required":true,"validation":{"notBefore":"startDate"}},{"id":"reason","type":"textarea","label":"Reason / destination for the trip","required":true},{"id":"ackTxt","type":"description","label":"Pre-approved absences still require students to complete all missed work. Approval is subject to attendance policy and administrative review."},{"id":"sig","type":"signature","label":"Parent / guardian signature","required":true}]}]}},{"id":"f-med-auth","meta":{"title":"Medication Authorization","access":"private","category":"Health","submissions":46},"schema":{"title":"Medication Authorization","description":"Authorize the school to administer a medication to your student. Sign in with the email on file; your family info fills in automatically. You’ll upload the physician-signed order and sign below.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — the health office has received your medication authorization.","notifyEmails":["forms@harfordchristian.org"],"multiStudent":true,"pdfCopy":true},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"pPhone","type":"phone","label":"Parent phone","required":false,"help":"Not on file — please enter."},{"id":"secS","type":"sectionHeader","label":"Student"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Grade","prefillFrom":"studentGrade"},{"id":"pbMed","type":"pageBreak","label":"Medication"},{"id":"secM","type":"sectionHeader","label":"Medication"},{"id":"medName","type":"text","label":"Medication name","required":true},{"id":"dosage","type":"text","label":"Dosage / amount","required":true,"help":"e.g., 10 mg, 1 tablet, 5 mL"},{"id":"route","type":"dropdown","label":"How is it given?","required":true,"options":["By mouth (oral)","Inhaler","Topical / skin","Eye / ear drops","Injection","Other"]},{"id":"times","type":"checkboxes","label":"When should it be given at school?","required":true,"options":["Before school","Mid-morning","Lunch / midday","Afternoon","As needed (PRN)"]},{"id":"timeNotes","type":"text","label":"Specific time(s) or conditions","required":false,"help":"e.g., 12:00 PM with lunch; or \"for headache\"."},{"id":"startDate","type":"date","label":"Start date","required":true},{"id":"endDate","type":"date","label":"End date (optional)","required":false,"validation":{"notBefore":"startDate"}},{"id":"reason","type":"text","label":"Reason / diagnosis","required":false},{"id":"allergies","type":"textarea","label":"Known allergies or medical notes","required":false},{"id":"instructions","type":"textarea","label":"Special instructions / side effects to watch for","required":false},{"id":"pbPhys","type":"pageBreak","label":"Physician & authorization"},{"id":"secD","type":"sectionHeader","label":"Physician order"},{"id":"physName","type":"text","label":"Prescribing physician","required":false},{"id":"physPhone","type":"phone","label":"Physician phone","required":false},{"id":"order","type":"file","label":"Upload the physician-signed order","required":true,"accept":".pdf,image/*","help":"PDF or a clear photo of the signed physician order. Max 10 MB."},{"id":"secA","type":"sectionHeader","label":"Authorization"},{"id":"authText","type":"description","label":"By signing below, I request and authorize the school nurse or a designated staff member to administer the medication above to my student as directed by the prescribing physician. I confirm I am the parent/legal guardian."},{"id":"sign","type":"signature","label":"Parent / guardian signature","required":true,"help":"Your signature is your authorization. Sign in the box, or type your full name below."}]}]}},{"id":"f-supply-lists","meta":{"title":"Supply & Project Lists","access":"private","category":"General","submissions":57},"schema":{"title":"Supply & Project Lists","description":"View your student’s supply and project list. Sign in with the email on file; your family info fills in automatically. Choose the grade band to see its list.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — you’re all set. You can reopen this anytime to review the list.","notifyEmails":["forms@harfordchristian.org"],"multiStudent":true},"pages":[{"title":"Main","fields":[{"id":"secS","type":"sectionHeader","label":"Student & family"},{"id":"student","type":"studentPicker","label":"Student","required":true},{"id":"grade","type":"text","label":"Current grade (on file)","prefillFrom":"studentGrade"},{"id":"pEmail","type":"email","label":"Parent email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"band","type":"dropdown","label":"Which list do you need?","required":true,"options":["K4 – K5","Grades 1–2","Grades 3–4","Grades 5–6","Middle School (7–8)","High School (9–12)"]},{"id":"list_K4-K5","type":"description","label":"[EDIT: paste the K4 – K5 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"K4 – K5"}},{"id":"list_1-2","type":"description","label":"[EDIT: paste the Grades 1–2 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Grades 1–2"}},{"id":"list_3-4","type":"description","label":"[EDIT: paste the Grades 3–4 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Grades 3–4"}},{"id":"list_5-6","type":"description","label":"[EDIT: paste the Grades 5–6 supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Grades 5–6"}},{"id":"list_7-8","type":"description","label":"[EDIT: paste the Middle School (7–8) supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"Middle School (7–8)"}},{"id":"list_9-12","type":"description","label":"[EDIT: paste the High School (9–12) supply & project list here, or link the PDF. Edit each year.]","showIf":{"field":"band","op":"equals","value":"High School (9–12)"}},{"id":"ack","type":"yesno","label":"I have reviewed my student’s supply list.","required":true},{"id":"notes","type":"textarea","label":"Questions or notes (optional)","required":false}]}]}},{"id":"f-athome-learning","meta":{"title":"At-Home Learning Request","access":"private","category":"Homeschool","submissions":8},"schema":{"title":"At-Home Learning Request","description":"Request a period of at-home learning for your student. Sign in with the email on file; your family info fills in automatically. Requests route to an administrator for approval.","settings":{"access":"private","lifecycle":"published","locked":false,"confirmationMessage":"Thank you — your request was submitted for administrator approval. You’ll get an email with the decision.","notifyEmails":["forms@harfordchristian.org"],"multiStudent":true,"pdfCopy":true,"approval":{"enabled":true,"approvers":["forms@harfordchristian.org"],"mode":"any"}},"pages":[{"title":"Main","fields":[{"id":"secP","type":"sectionHeader","label":"Parent / guardian"},{"id":"pFirst","type":"text","label":"First name","required":true,"prefillFrom":"parentFirst"},{"id":"pLast","type":"text","label":"Last name","required":true,"prefillFrom":"parentLast"},{"id":"pEmail","type":"email","label":"Email","required":true,"prefillFrom":"parentEmail","help":"Verified."},{"id":"secS","type":"sectionHeader","label":"Student(s)"},{"id":"students","type":"studentPicker","label":"Which student(s)?","required":true,"multiple":true},{"id":"secR","type":"sectionHeader","label":"Request"},{"id":"reason","type":"dropdown","label":"Reason for at-home learning","required":true,"options":["Illness / medical","Family circumstance","Extended travel","Temporary transition","Other"]},{"id":"startDate","type":"date","label":"Start date","required":true},{"id":"returnDate","type":"date","label":"Expected return date","required":false,"validation":{"notBefore":"startDate"}},{"id":"plan","type":"textarea","label":"Learning plan / details","required":true,"help":"How the student will keep up with coursework."},{"id":"coordination","type":"textarea","label":"How will work be submitted and communication handled?","required":false},{"id":"secA","type":"sectionHeader","label":"Acknowledgment"},{"id":"ackTxt","type":"description","label":"At-home learning is subject to administrative approval and school policy. Students remain responsible for all coursework and assessments."},{"id":"sign","type":"signature","label":"Parent / guardian signature","required":true,"help":"Sign in the box; type your full name below."}]}]}}]; // generated from the real Seeds.js schemas
+    SEEDED.forEach(function (x) { add(x.id, x.meta, x.schema); });
     add('t-permission', {title:'Permission Slip', isTemplate:true, templateScope:'shared', layoutLock:'starter', lifecycle:'template', category:'General'}, { title:'Permission Slip', description:'Reusable permission slip.', settings:base('private'), pages:pg([
       {id:'pf',type:'text',label:'First name',required:true,prefillFrom:'parentFirst'},{id:'stu',type:'studentPicker',label:'Student',required:true},{id:'ok',type:'yesno',label:'I give permission.',required:true}]) });
     add('t-medical', {title:'Medical Authorization (locked)', isTemplate:true, templateScope:'shared', layoutLock:'useAsIs', lifecycle:'template', category:'Health'}, { title:'Medical Authorization', description:'Standardized medical authorization — used as-is.', settings:base('private'), pages:pg([
@@ -369,7 +387,7 @@
       listAdmins: function(){ return ADMINS.slice(); },
       addAdmin: function(email, name){ if(!ADMINS.some(function(a){return a.email.toLowerCase()===String(email).toLowerCase();})) ADMINS.push({email:String(email).toLowerCase(),name:name||''}); return {ok:true, admins:ADMINS.slice()}; },
       removeAdmin: function(email){ ADMINS = ADMINS.filter(function(a){return a.email.toLowerCase()!==String(email).toLowerCase();}); return {ok:true, admins:ADMINS.slice()}; },
-      getShareUrl: function(id){ return {ok:true, url: location.href.replace(/admin\.html.*$/, 'fill.html?form=demo-open'), access: STORE[id].meta.access}; },
+      getShareUrl: function(id){ return {ok:true, url: location.href.replace(/admin\.html.*$/, 'fill.html?form=demo-sample-0001'), access: STORE[id].meta.access}; },
       getResponses: function(id){ var m=STORE[id].meta; return {ok:true, headers:['SubmissionID','Timestamp','Email','First name','Last name','Status'], rows:rows(Math.min(6,m.submissions)), count:m.submissions, sheetUrl:''}; },
       getApprovalQueue: function(){ return {ok:true, items:[
         {formId:'f-trip', formTitle:'Field Trip Request', submissionId:'SUB-2001', respondentEmail:'teacher@harfordchristian.org', timestamp:'2/3/26 8:10 AM', summary:'Trip name: Zoo Trip · Destination: Baltimore · Is this an overnight trip?: No'},
@@ -402,8 +420,36 @@
     ['file', 'File upload'], ['signature', 'Signature'],
     ['pageBreak', 'Page break'], ['calculation', 'Calculation']
   ];
+  // Palette grouping + plain-language tooltips (school staff, not developers).
+  var TYPE_GROUPS = [
+    ['Layout', ['sectionHeader', 'description', 'faq', 'pageBreak']],
+    ['Questions', ['text', 'textarea', 'email', 'phone', 'number', 'date', 'time', 'dropdown', 'radio', 'checkboxes', 'yesno', 'rating']],
+    ['School', ['studentPicker', 'staffPicker']],
+    ['Advanced', ['file', 'signature', 'calculation']]
+  ];
+  var TYPE_TIPS = {
+    sectionHeader: 'A bold heading that groups the questions below it.',
+    description: 'A block of text or policy content — not a question.',
+    faq: 'Expandable question-and-answer pairs (tap to reveal each answer).',
+    pageBreak: 'Splits the form into steps with Next/Back buttons.',
+    text: 'One-line answer.', textarea: 'Multi-line answer.',
+    email: 'Email address (checked for a valid format).', phone: 'Phone number.',
+    number: 'Numbers only; can be formatted as money in the response sheet.',
+    date: 'Date picker.', time: 'Time picker.',
+    dropdown: 'Pick ONE from a list (compact).', radio: 'Pick ONE — all choices visible.',
+    checkboxes: 'Pick ANY number of choices.', yesno: 'A simple Yes / No.',
+    rating: 'A 1-to-N scale.',
+    studentPicker: 'On parent forms: lists ONLY that parent’s own students (from FACTS).',
+    staffPicker: 'Lists HCS staff from the Staff directory (optionally one division).',
+    file: 'Upload a document or photo.', signature: 'Draw or type a signature.',
+    calculation: 'Auto-computed sum or count of other answers (not a question).'
+  };
   var OPTION_TYPES = { dropdown: 1, radio: 1, checkboxes: 1 };
   var DIRTY = false, SAVING = false, AUTOSAVE_T = null, DRAG_FROM = null;
+  var COLLAPSED = {};           // fieldId -> true when its editor card is collapsed
+  var UNDO_STACK = [];          // JSON snapshots of EDITING.schema (structural ops)
+  var LIVEPREV = false;         // live preview pane on/off
+  try { LIVEPREV = localStorage.getItem('hcsBuilderLivePrev') === '1'; } catch (e) {}
   window.addEventListener('beforeunload', function (e) { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
   var esc = FormsUI.esc;
 
@@ -754,28 +800,54 @@
   function renderEditor() {
     var locked = EDITING.structureLocked;
     var back = '<button class="btn ghost sm" id="back">← All forms</button>';
-    var palette = locked ? '' : '<div class="palette">' + FIELD_TYPES.map(function (t) {
-      return '<button data-type="' + t[0] + '">+ ' + esc(t[1]) + '</button>'; }).join('') + '</div>';
+    var palette = locked ? '' : '<div class="palette">' + TYPE_GROUPS.map(function (g) {
+      var labelFor = {}; FIELD_TYPES.forEach(function (t) { labelFor[t[0]] = t[1]; });
+      return '<span class="palgroup">' + esc(g[0]) + '</span>' + g[1].map(function (ty) {
+        return '<button data-type="' + ty + '" title="' + esc(TYPE_TIPS[ty] || '') + '">+ ' + esc(labelFor[ty] || ty) + '</button>';
+      }).join('');
+    }).join('') + '</div>';
     var lockBanner = locked ? '<div class="banner">This form’s layout is locked (use as-is). You can change most settings, but its fields, access, and approval routing are locked to the HCS template. An admin can change them.</div>' : '';
 
-    DIRTY = false; clearTimeout(AUTOSAVE_T);
+    DIRTY = false; clearTimeout(AUTOSAVE_T); UNDO_STACK = []; COLLAPSED = {};
+    // long forms open with cards collapsed so the creator can orient first
+    if (fields().length > 12) fields().forEach(function (f) { COLLAPSED[f.id] = true; });
     chrome(
-      '<div style="display:flex;align-items:center;gap:10px;margin:16px 0">' + back +
+      '<div style="display:flex;align-items:center;gap:10px;margin:16px 0;flex-wrap:wrap">' + back +
         '<h1 class="form-title" style="margin:0;font-size:1.2rem">Editing: ' + esc(EDITING.meta.title) + '</h1>' +
-        '<span id="saveState" class="help" style="margin-left:auto;display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('check', { size: 14 }) + ' Saved</span></div>' +
-      '<div class="editor" id="editorRoot"><div>' + lockBanner +
+        '<span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px">' +
+          (locked ? '' : '<button class="btn ghost sm" id="btnUndo" title="Undo the last add/delete/move (Ctrl+Z)" disabled>Undo</button>') +
+          '<button class="btn ghost sm" id="btnLivePrev" aria-pressed="' + (LIVEPREV ? 'true' : 'false') + '" title="Show a live preview of the form beside the editor (updates as you type)">' + FormsUI.icon('eye', { size: 14 }) + ' Live preview</button>' +
+          '<span id="saveState" class="help" style="display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('check', { size: 14 }) + ' Saved</span></span></div>' +
+      '<div class="editor' + (LIVEPREV ? ' withprev' : '') + '" id="editorRoot"><div>' + lockBanner +
         '<div class="field"><label for="fTitle">Form title</label><input class="control" id="fTitle" value="' + esc(EDITING.schema.title || '') + '"' + (locked ? ' readonly' : '') + '></div>' +
         '<div class="field" style="margin-top:10px"><label for="fDesc">Description</label><textarea class="control" id="fDesc"' + (locked ? ' readonly' : '') + '>' + esc(EDITING.schema.description || '') + '</textarea></div>' +
         '<div class="divider"></div>' + palette +
+        '<div id="canvasBar" style="display:none;justify-content:flex-end;margin-bottom:6px"><button class="btn ghost sm" id="btnToggleAll" type="button"></button></div>' +
         '<div id="canvas"></div>' +
-      '</div>' + sidePanel() + '</div>');
+      '</div><div id="livePrevWrap"' + (LIVEPREV ? '' : ' style="display:none"') + '><div class="prevpane"><div class="prevpane-hd" style="display:flex;justify-content:space-between;align-items:center">Live preview<button id="livePrevClose" type="button" aria-label="Close live preview" style="background:none;border:0;color:#fff;font-size:1.1rem;cursor:pointer;line-height:1">✕</button></div><div id="livePrev"></div></div></div>' + sidePanel() + '</div>');
 
     document.getElementById('back').onclick = function () {
       // save pending edits before leaving so nothing is lost
       var go = function () { DIRTY = false; renderDashboard(); };
       if (DIRTY && !EDITING.structureLocked) doSave(true).then(go); else go();
     };
+    var lp = document.getElementById('btnLivePrev');
+    lp.onclick = function () {
+      LIVEPREV = !LIVEPREV;
+      try { localStorage.setItem('hcsBuilderLivePrev', LIVEPREV ? '1' : '0'); } catch (e) {}
+      lp.setAttribute('aria-pressed', LIVEPREV ? 'true' : 'false');
+      document.getElementById('editorRoot').classList.toggle('withprev', LIVEPREV);
+      var wrap = document.getElementById('livePrevWrap');
+      wrap.style.display = LIVEPREV ? '' : 'none';
+      if (LIVEPREV) {
+        renderLivePreview();
+        try { wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+      }
+    };
+    var lpc = document.getElementById('livePrevClose'); if (lpc) lpc.onclick = function () { lp.click(); };
     if (!locked) {
+      var bu = document.getElementById('btnUndo'); if (bu) bu.onclick = doUndo;
+      document.addEventListener('keydown', undoKeyHandler_);
       document.querySelectorAll('.palette button').forEach(function (b) { b.onclick = function () { addField(b.getAttribute('data-type')); }; });
       document.getElementById('fTitle').oninput = function () { EDITING.schema.title = this.value; };
       document.getElementById('fDesc').oninput = function () { EDITING.schema.description = this.value; };
@@ -786,26 +858,118 @@
     }
     wireSide();
     renderCanvas();
+    if (LIVEPREV) renderLivePreview();
+  }
+
+  // ---------- undo (structural ops only: add/delete/duplicate/move/drag/parent-block) ----------
+  function snapshotUndo() {
+    UNDO_STACK.push(JSON.stringify(EDITING.schema));
+    if (UNDO_STACK.length > 20) UNDO_STACK.shift();
+    var bu = document.getElementById('btnUndo'); if (bu) bu.disabled = false;
+  }
+  function doUndo() {
+    if (!UNDO_STACK.length || !EDITING || EDITING.structureLocked) return;
+    if (!document.getElementById('canvas')) return; // not on the editor screen
+    EDITING.schema = normalizeSchema(JSON.parse(UNDO_STACK.pop()));
+    renderCanvas(); markDirty();
+    var bu = document.getElementById('btnUndo'); if (bu) bu.disabled = !UNDO_STACK.length;
+    FormsUI.toast('Undone');
+  }
+  function undoKeyHandler_(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return;
+    var t = e.target && e.target.tagName;
+    if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return; // native text undo wins
+    if (EDITING) { e.preventDefault(); doUndo(); }
   }
 
   function renderCanvas() {
     var host = document.getElementById('canvas');
     var locked = EDITING.structureLocked;
     var fs = fields();
-    if (!fs.length) { host.innerHTML = '<p class="help">No fields yet. Add one from the palette above' + (EDITING.structureLocked ? '' : '') + '.</p>'; return; }
+    var bar = document.getElementById('canvasBar');
+    if (bar) bar.style.display = (!locked && fs.length > 3) ? 'flex' : 'none';
+    if (!fs.length) {
+      // Empty canvas: offer the common starting points instead of a blank stare.
+      host.innerHTML = locked ? '<p class="help">No fields yet.</p>' :
+        '<div class="startchoices">' +
+          '<button type="button" id="startParent"><strong>👪 Parent form</strong><span>Adds the parent identity block + student picker and sets access to Private (parents verify by email). Most HCS forms start here.</span></button>' +
+          '<button type="button" id="startContact"><strong>✏️ Basic info block</strong><span>Adds First name, Last name, and Email fields — for open/staff forms.</span></button>' +
+          '<button type="button" id="startBlank"><strong>📄 Start blank</strong><span>Add fields one at a time from the palette above.</span></button>' +
+        '</div>';
+      var sp = document.getElementById('startParent'); if (sp) sp.onclick = function () { addParentBlock(true); };
+      var sc = document.getElementById('startContact');
+      if (sc) sc.onclick = function () {
+        snapshotUndo();
+        fields().push(
+          { id: uid(), type: 'text', label: 'First name', required: true },
+          { id: uid(), type: 'text', label: 'Last name', required: true },
+          { id: uid(), type: 'email', label: 'Email', required: true });
+        renderCanvas(); markDirty();
+      };
+      var sb2 = document.getElementById('startBlank'); if (sb2) sb2.onclick = function () { FormsUI.toast('Pick a field type from the palette above'); };
+      refreshLivePreview();
+      return;
+    }
     host.innerHTML = fs.map(function (f, i) { return fieldCard(f, i, locked); }).join('');
+    // restore per-card collapse state
+    fs.forEach(function (f) {
+      if (COLLAPSED[f.id]) { var c = host.querySelector('.fieldcard[data-fid="' + f.id + '"]'); if (c) c.classList.add('collapsed'); }
+    });
+    var tAll = document.getElementById('btnToggleAll');
+    if (tAll) {
+      var allCollapsed = fs.every(function (f) { return COLLAPSED[f.id]; });
+      tAll.textContent = allCollapsed ? 'Expand all' : 'Collapse all';
+      tAll.onclick = function () {
+        var target = !fs.every(function (f) { return COLLAPSED[f.id]; });
+        fs.forEach(function (f) { COLLAPSED[f.id] = target; });
+        renderCanvas();
+      };
+    }
+    refreshLivePreview();
     if (locked) return;
     fs.forEach(function (f, i) {
       bindInput('lbl_' + f.id, function (v) { f.label = v; var lp = document.querySelector('.fieldcard[data-fid="' + f.id + '"] .fclabel'); if (lp) lp.textContent = v; });
       var faqEl = document.getElementById('faq_' + f.id); if (faqEl) faqEl.oninput = function () { f.items = parseFaq(this.value); };
       bindInput('help_' + f.id, function (v) { f.help = v; });
       var reqEl = document.getElementById('req_' + f.id); if (reqEl) reqEl.onchange = function () { f.required = this.checked; };
-      var optEl = document.getElementById('opt_' + f.id); if (optEl) optEl.oninput = function () { f.options = this.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); };
+      var optEl = document.getElementById('opt_' + f.id);
+      if (optEl) optEl.oninput = function () {
+        var oldOpts = f.options || [];
+        var newOpts = this.value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+        // Rename propagation: capacity limits and conditional rules are keyed by the option's
+        // LABEL, so renaming an option would silently orphan them. When the option count is
+        // unchanged, treat position i as a rename and carry the keys along.
+        if (oldOpts.length === newOpts.length) {
+          oldOpts.forEach(function (o, i) {
+            var n = newOpts[i];
+            if (!o || !n || o === n) return;
+            if (f.capacity && f.capacity[o] != null) { f.capacity[n] = f.capacity[o]; delete f.capacity[o]; }
+            fields().forEach(function (g) {
+              if (g.showIf && g.showIf.field === f.id && g.showIf.value === o) {
+                g.showIf.value = n;
+                var cv = document.getElementById('cval_' + g.id); if (cv) cv.value = n;
+              }
+            });
+          });
+          var capBox = document.getElementById('cap_' + f.id);
+        }
+        f.options = newOpts;
+        // keep the per-option capacity inputs in sync with the (renamed/added/removed) options
+        var cb = document.getElementById('capbox_' + f.id); if (cb) cb.innerHTML = capRows(f);
+      };
       var pfEl = document.getElementById('pf_' + f.id); if (pfEl) pfEl.onchange = function () { f.prefillFrom = this.value; };
       var multEl = document.getElementById('mult_' + f.id); if (multEl) multEl.onchange = function () { f.multiple = this.checked; };
       var lvlEl = document.getElementById('lvl_' + f.id); if (lvlEl) lvlEl.onchange = function () { f.staffLevel = this.value; };
       var accEl = document.getElementById('acc_' + f.id); if (accEl) accEl.oninput = function () { f.accept = this.value; };
-      var capEl = document.getElementById('cap_' + f.id); if (capEl) capEl.oninput = function () { f.capacity = parseCap(this.value); };
+      var capbox = document.getElementById('capbox_' + f.id);
+      if (capbox) capbox.addEventListener('input', function () {
+        var cap = {};
+        capbox.querySelectorAll('input[data-capopt]').forEach(function (inp) {
+          var val = inp.value.trim();
+          if (val !== '' && isFinite(Number(val)) && Number(val) >= 0) cap[inp.getAttribute('data-capopt')] = Number(val);
+        });
+        f.capacity = Object.keys(cap).length ? cap : undefined;
+      });
       var cif = document.getElementById('cif_' + f.id), cop = document.getElementById('cop_' + f.id), cval = document.getElementById('cval_' + f.id);
       var updCond = function () { if (!cif || !cif.value) { delete f.showIf; } else { f.showIf = { field: cif.value, op: cop.value, value: cval.value }; } };
       if (cif) cif.onchange = updCond; if (cop) cop.onchange = updCond; if (cval) cval.oninput = updCond;
@@ -814,13 +978,19 @@
       if (calcop) calcop.onchange = updCalc; if (calcsrc) calcsrc.addEventListener('change', updCalc);
       var rmaxEl = document.getElementById('rmax_' + f.id); if (rmaxEl) rmaxEl.oninput = function () { f.max = Number(this.value) || 5; };
       var moneyEl = document.getElementById('money_' + f.id); if (moneyEl) moneyEl.onchange = function () { f.money = this.checked; };
+      var priorEl = document.getElementById('prior_' + f.id); if (priorEl) priorEl.onchange = function () { f.priorYear = this.checked; };
       [['vmin_', 'min', 1], ['vmax_', 'max', 1], ['vminl_', 'minLen', 1], ['vmaxl_', 'maxLen', 1], ['vpat_', 'pattern', 0], ['vpmsg_', 'patternMsg', 0], ['vmind_', 'minDate', 0], ['vmaxd_', 'maxDate', 0], ['vnb_', 'notBefore', 0]].forEach(function (spec) {
         var el = document.getElementById(spec[0] + f.id); if (!el) return;
         var h = function () { if (!f.validation) f.validation = {}; f.validation[spec[1]] = spec[2] ? (this.value === '' ? null : Number(this.value)) : this.value; };
         if (el.tagName === 'SELECT') el.onchange = h; else el.oninput = h;
       });
       var colEl = document.getElementById('col_' + f.id);
-      if (colEl) colEl.onclick = function () { var c = document.querySelector('.fieldcard[data-fid="' + f.id + '"]'); if (c) c.classList.toggle('collapsed'); };
+      if (colEl) colEl.onclick = function () {
+        var c = document.querySelector('.fieldcard[data-fid="' + f.id + '"]');
+        if (c) { c.classList.toggle('collapsed'); COLLAPSED[f.id] = c.classList.contains('collapsed'); }
+        var tb = document.getElementById('btnToggleAll');
+        if (tb) tb.textContent = fields().every(function (x) { return COLLAPSED[x.id]; }) ? 'Expand all' : 'Collapse all';
+      };
       document.getElementById('up_' + f.id).onclick = function () { move(i, -1); markDirty(); };
       document.getElementById('dn_' + f.id).onclick = function () { move(i, 1); markDirty(); };
       document.getElementById('dup_' + f.id).onclick = function () { duplicateFieldAt(i); };
@@ -839,18 +1009,20 @@
         e.preventDefault(); card.style.borderColor = '';
         var to = Number(card.getAttribute('data-idx'));
         if (DRAG_FROM == null || DRAG_FROM === to) return;
+        snapshotUndo();
         var fs2 = fields(); var moved = fs2.splice(DRAG_FROM, 1)[0]; fs2.splice(to, 0, moved);
         DRAG_FROM = null; renderCanvas(); markDirty();
       });
     });
   }
   function duplicateFieldAt(i) {
+    snapshotUndo();
     var fs = fields(); var c = JSON.parse(JSON.stringify(fs[i])); c.id = uid();
     fs.splice(i + 1, 0, c); renderCanvas(); markDirty();
   }
   function deleteFieldAt(i) {
-    FormsUI.confirm('Delete this field?', 'This removes the field from the form.', 'Delete').then(function (ok) {
-      if (!ok) return; fields().splice(i, 1); renderCanvas(); markDirty();
+    FormsUI.confirm('Delete this field?', 'This removes the field from the form. (Undo is available afterward.)', 'Delete').then(function (ok) {
+      if (!ok) return; snapshotUndo(); fields().splice(i, 1); renderCanvas(); markDirty();
     });
   }
 
@@ -892,9 +1064,8 @@
         body += '<label class="switchrow" style="margin-top:8px"><span>Allow ' + (f.type === 'file' ? 'multiple files' : 'choosing multiple') + '</span><span class="toggle"><input type="checkbox" id="mult_' + f.id + '"' + (f.multiple ? ' checked' : '') + '><span class="sl"></span></span></label>';
       }
       if (OPTION_TYPES[f.type]) {
-        body += '<details class="adv"><summary>Limit sign-ups per option (capacity)</summary>' +
-          '<label class="lbl">One per line: <code>Option = number</code></label>' +
-          '<textarea class="control" id="cap_' + f.id + '" placeholder="Tue 3:00 = 5">' + esc(capToText(f.capacity)) + '</textarea>' +
+        body += '<details class="adv"' + (f.capacity && Object.keys(f.capacity).length ? ' open' : '') + '><summary>Limit sign-ups per option (capacity)</summary>' +
+          '<div id="capbox_' + f.id + '">' + capRows(f) + '</div>' +
           '<p class="help">Blank = unlimited. A full option is hidden from submitters and rejected on submit.</p></details>';
       }
       if (f.type === 'staffPicker') {
@@ -922,6 +1093,9 @@
       if (f.type === 'number') {
         body += '<label class="switchrow" style="margin-top:8px"><span>Format as money ($) in the response sheet</span><span class="toggle"><input type="checkbox" id="money_' + f.id + '"' + (f.money ? ' checked' : '') + '><span class="sl"></span></span></label>';
       }
+      if (['file', 'signature', 'calculation', 'studentPicker'].indexOf(f.type) === -1) {
+        body += '<label class="switchrow" style="margin-top:8px"><span>Remember from last time' + info('On parent (Private) forms with a student picker: pre-fills this field from the same student’s most recent prior submission to this form — e.g. last year’s sports. The parent can still change it.') + '</span><span class="toggle"><input type="checkbox" id="prior_' + f.id + '"' + (f.priorYear ? ' checked' : '') + '><span class="sl"></span></span></label>';
+      }
       body += valBlock(f);
       body += '<details class="adv"><summary>Conditional logic</summary>' +
         '<label class="lbl">Show this field only if…</label>' +
@@ -942,11 +1116,13 @@
       '<button class="iconbtn" id="del_' + f.id + '" title="Delete field" aria-label="Delete field">' + FormsUI.icon('trash') + '</button></div></div>' +
       '<div class="fcbody">' + body + '</div></div>';
   }
+  // Field types that can never be a condition source (no user-entered value to compare).
+  var NON_CONDITION_TYPES = { sectionHeader: 1, description: 1, faq: 1, pageBreak: 1, calculation: 1, file: 1, signature: 1 };
   function condFieldOpts(cur) {
     var sel = (cur.showIf && cur.showIf.field) || '';
     var opts = '<option value="">— always show —</option>';
     fields().forEach(function (f) {
-      if (f.id === cur.id || f.type === 'sectionHeader' || f.type === 'description') return;
+      if (f.id === cur.id || NON_CONDITION_TYPES[f.type]) return;
       opts += '<option value="' + f.id + '"' + (sel === f.id ? ' selected' : '') + '>' + esc(f.label || f.id) + '</option>';
     });
     return opts;
@@ -975,15 +1151,14 @@
     } else { return ''; }
     return '<details class="adv"><summary>Validation</summary>' + inner + '</details>';
   }
-  function capToText(cap) { cap = cap || {}; return Object.keys(cap).map(function (k) { return k + ' = ' + cap[k]; }).join('\n'); }
-  function parseCap(text) {
-    var m = {};
-    String(text).split('\n').forEach(function (line) {
-      var i = line.lastIndexOf('='); if (i < 0) return;
-      var k = line.slice(0, i).trim(); var n = parseInt(line.slice(i + 1).trim(), 10);
-      if (k && isFinite(n) && n >= 0) m[k] = n;
-    });
-    return m;
+  /** Per-option capacity rows (a number input beside each option; blank = unlimited). */
+  function capRows(f) {
+    var opts = f.options || [];
+    if (!opts.length) return '<p class="help">Add options above first.</p>';
+    return opts.map(function (o) {
+      var v = (f.capacity && f.capacity[o] != null) ? f.capacity[o] : '';
+      return '<div class="caprow"><span>' + esc(o) + '</span><input type="number" min="0" class="control" data-capopt="' + esc(o) + '" value="' + esc(v) + '" placeholder="∞" aria-label="Capacity for ' + esc(o) + '"></div>';
+    }).join('');
   }
   function sourceFieldChecks(cur) {
     var sel = (cur.calc && cur.calc.fields) || [];
@@ -997,13 +1172,15 @@
   }
   function prefillOpts(sel) {
     return [['', '— none —'], ['parentFirst', 'Parent first name'], ['parentLast', 'Parent last name'],
-      ['parentEmail', 'Parent email (locked)'], ['studentGrade', 'Student grade'], ['studentName', 'Student name']]
+      ['parentEmail', 'Parent email (locked)'], ['studentGrade', 'Student grade'],
+      ['studentGradeNextYear', 'Next year’s grade (editable)'], ['studentName', 'Student name']]
       .map(function (o) { return '<option value="' + o[0] + '"' + (sel === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
   }
   function bindInput(id, cb) { var el = document.getElementById(id); if (el) el.oninput = function () { cb(this.value); }; }
-  function move(i, d) { var fs = fields(); var j = i + d; if (j < 0 || j >= fs.length) return; var t = fs[i]; fs[i] = fs[j]; fs[j] = t; renderCanvas(); }
+  function move(i, d) { var fs = fields(); var j = i + d; if (j < 0 || j >= fs.length) return; snapshotUndo(); var t = fs[i]; fs[i] = fs[j]; fs[j] = t; renderCanvas(); }
 
   function addField(type) {
+    snapshotUndo();
     var f = { id: uid(), type: type, label: '', required: false };
     if (OPTION_TYPES[type]) f.options = ['Option 1'];
     if (type === 'sectionHeader') f.label = 'Section title';
@@ -1014,21 +1191,27 @@
     setTimeout(function () { var el = document.getElementById('lbl_' + f.id); if (el) el.focus(); }, 30);
   }
 
-  function addParentBlock() {
-    if (!confirm('Add the parent identity block?\n\nThis inserts First/Last name, a locked verified Email, and a student picker, and sets the form to Private (parents verify by email).')) return;
-    var blk = [
-      { id: uid(), type: 'sectionHeader', label: 'Parent / guardian' },
-      { id: uid(), type: 'text', label: 'First name', required: true, prefillFrom: 'parentFirst' },
-      { id: uid(), type: 'text', label: 'Last name', required: true, prefillFrom: 'parentLast' },
-      { id: uid(), type: 'email', label: 'Your email', required: true, prefillFrom: 'parentEmail', help: 'Verified — the email you sign in with.' },
-      { id: uid(), type: 'sectionHeader', label: 'Student' },
-      { id: uid(), type: 'studentPicker', label: 'Which student?', required: true, help: 'Only your students are listed.' },
-      { id: uid(), type: 'text', label: 'Grade', required: false, prefillFrom: 'studentGrade' }
-    ];
-    EDITING.schema.pages[0].fields = blk.concat(fields());
-    EDITING.schema.settings.access = 'private';
-    renderCanvas(); syncSideAccess();
-    FormsUI.toast('Parent block added · access set to Private');
+  function addParentBlock(skipConfirm) {
+    var go = function () {
+      snapshotUndo();
+      var blk = [
+        { id: uid(), type: 'sectionHeader', label: 'Parent / guardian' },
+        { id: uid(), type: 'text', label: 'First name', required: true, prefillFrom: 'parentFirst' },
+        { id: uid(), type: 'text', label: 'Last name', required: true, prefillFrom: 'parentLast' },
+        { id: uid(), type: 'email', label: 'Your email', required: true, prefillFrom: 'parentEmail', help: 'Verified — the email you sign in with.' },
+        { id: uid(), type: 'sectionHeader', label: 'Student' },
+        { id: uid(), type: 'studentPicker', label: 'Which student?', required: true, help: 'Only your students are listed.' },
+        { id: uid(), type: 'text', label: 'Grade', required: false, prefillFrom: 'studentGrade' }
+      ];
+      EDITING.schema.pages[0].fields = blk.concat(fields());
+      EDITING.schema.settings.access = 'private';
+      renderCanvas(); syncSideAccess(); markDirty();
+      FormsUI.toast('Parent block added · access set to Private');
+    };
+    if (skipConfirm === true) return go();
+    FormsUI.confirm('Add the parent identity block?',
+      'Inserts First/Last name, a locked verified Email, and a student picker, and sets the form to <strong>Private</strong> (parents verify by email).',
+      'Add it').then(function (ok) { if (ok) go(); });
   }
 
   // ---------- side settings panel ----------
@@ -1041,21 +1224,26 @@
       '<label class="lbl">Status</label><select class="control" id="sLife">' +
         opt('draft', 'Draft', s.lifecycle) + opt('published', 'Published', s.lifecycle) + opt('closed', 'Closed', s.lifecycle) + '</select>' +
       '<div class="switchrow"><span>Not accepting responses' + info('Temporarily closes the form to new submissions without unpublishing it — submitters see a friendly “not accepting responses” message.') + '</span><span class="toggle"><input type="checkbox" id="sLock"' + (s.locked ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '<div class="switchrow"><span>Review mode — send both emails to the submitter' + info('The email the submitter enters gets BOTH the confirmation (as the requester) and a copy of the owner notification (as the reviewer). Useful when one person builds and submits the form.') + '</span><span class="toggle"><input type="checkbox" id="sReview"' + (s.reviewMode ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '<div class="switchrow"><span>Limit to one response per person' + info('Blocks a second submission from the same email address (verified email for parent/staff forms, or the entered email on open forms).') + '</span><span class="toggle"><input type="checkbox" id="sOnce"' + (s.onePerEmail ? ' checked' : '') + '><span class="sl"></span></span></div>' +
       '<label class="lbl">Notify on submit (emails, comma-sep)</label><input class="control" id="sNotify" value="' + esc((s.notifyEmails || []).join(', ')) + '"><div id="sNotifyWarn" class="help" style="color:var(--hcs-red);display:none">Only @harfordchristian.org addresses are allowed — others are dropped when you save.</div>' +
       '<label class="lbl">Confirmation message</label><textarea class="control" id="sConfirm">' + esc(s.confirmationMessage || '') + '</textarea>' +
-      '<div class="divider"></div><h4>Response record</h4>' +
-      '<div class="switchrow"><span>Attach a PDF copy to the confirmation email' + info('The submitter’s receipt email includes a branded PDF of their answers. Great for signed permission slips, physicals, and KI forms. A copy is also saved in the form’s Uploads folder.') + '</span><span class="toggle"><input type="checkbox" id="sPdf"' + (s.pdfCopy ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '<div class="switchrow"><span>Let people edit or withdraw their response' + info('Adds a secure “Edit or withdraw” link to the receipt email. They can change answers or cancel while the response is still Submitted or Pending Approval — no login needed.') + '</span><span class="toggle"><input type="checkbox" id="sEdit"' + (s.allowEdit ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '<div class="divider"></div><h4>Scheduling &amp; limits</h4>' +
-      '<label class="lbl">Opens (optional)</label><input class="control" id="sOpen" type="datetime-local" value="' + esc(s.openDate || '') + '">' +
-      '<label class="lbl">Closes (optional)</label><input class="control" id="sClose" type="datetime-local" value="' + esc(s.closeDate || '') + '">' +
-      '<label class="lbl">Max total responses (0 = unlimited)</label><input class="control" id="sMax" type="number" min="0" value="' + esc(s.maxResponses || 0) + '">' +
-      '<div class="divider"></div><h4>Approvals</h4>' +
-      '<div class="switchrow"><span>Require approval before it’s final' + info('Submissions land as “Pending Approval” and route to the approvers below. They approve/reject from the Approvals tab; the submitter is emailed the decision.') + '</span><span class="toggle"><input type="checkbox" id="aEn"' + (ap.enabled ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '<label class="lbl">Approvers (emails or group names, comma-sep)</label><input class="control" id="aWho" value="' + esc((ap.approvers || []).join(', ')) + '">' +
-      '<label class="lbl">Require</label><select class="control" id="aMode">' + opt('any', 'Any one approver', ap.mode || 'any') + opt('all', 'All approvers', ap.mode || 'any') + '</select>' +
+      // rarely-touched settings live behind grouped disclosures (open when something inside is set)
+      '<details class="sgroup"' + ((s.reviewMode || s.onePerEmail || s.multiStudent || s.pdfCopy || s.allowEdit) ? ' open' : '') + '><summary>Response options</summary>' +
+        '<div class="switchrow"><span>Review mode' + info('The email the submitter enters gets BOTH the confirmation (as the requester) and a copy of the owner notification (as the reviewer). Useful when one person builds and submits the form.') + '</span><span class="toggle"><input type="checkbox" id="sReview"' + (s.reviewMode ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+        '<div class="switchrow"><span>One response per person' + info('Blocks a second submission from the same email address (verified email for parent/staff forms, or the entered email on open forms).') + '</span><span class="toggle"><input type="checkbox" id="sOnce"' + (s.onePerEmail ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+        '<div class="switchrow"><span>Save &amp; add another child' + info('After submitting, a parent can keep their entered info and quickly submit again for another of their children (one response per child). Best for per-student forms with a student picker.') + '</span><span class="toggle"><input type="checkbox" id="sMulti"' + (s.multiStudent ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+        '<div class="switchrow"><span>PDF copy with receipt' + info('The submitter’s receipt email includes a branded PDF of their answers. Great for signed permission slips, physicals, and KI forms. A copy is also saved in the form’s Uploads folder.') + '</span><span class="toggle"><input type="checkbox" id="sPdf"' + (s.pdfCopy ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+        '<div class="switchrow"><span>Allow edit &amp; withdraw' + info('Adds a secure “Edit or withdraw” link to the receipt email. They can change answers or cancel while the response is still Submitted or Pending Approval — no login needed.') + '</span><span class="toggle"><input type="checkbox" id="sEdit"' + (s.allowEdit ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+      '</details>' +
+      '<details class="sgroup"' + ((s.openDate || s.closeDate || Number(s.maxResponses)) ? ' open' : '') + '><summary>Scheduling &amp; limits</summary>' +
+        '<label class="lbl">Opens (optional)</label><input class="control" id="sOpen" type="datetime-local" value="' + esc(s.openDate || '') + '">' +
+        '<label class="lbl">Closes (optional)</label><input class="control" id="sClose" type="datetime-local" value="' + esc(s.closeDate || '') + '">' +
+        '<label class="lbl">Max total responses (0 = unlimited)</label><input class="control" id="sMax" type="number" min="0" value="' + esc(s.maxResponses || 0) + '">' +
+      '</details>' +
+      '<details class="sgroup"' + (ap.enabled ? ' open' : '') + '><summary>Approvals</summary>' +
+        '<div class="switchrow"><span>Require approval' + info('Submissions land as “Pending Approval” and route to the approvers below. They approve/reject from the Approvals tab; the submitter is emailed the decision.') + '</span><span class="toggle"><input type="checkbox" id="aEn"' + (ap.enabled ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+        '<label class="lbl">Approvers (emails or group names, comma-sep)</label><input class="control" id="aWho" value="' + esc((ap.approvers || []).join(', ')) + '">' +
+        '<label class="lbl">Require</label><select class="control" id="aMode">' + opt('any', 'Any one approver', ap.mode || 'any') + opt('all', 'All approvers', ap.mode || 'any') + '</select>' +
+      '</details>' +
       '<div class="divider"></div>' +
       (EDITING.structureLocked ? '' : '<button class="btn gold block" id="btnParent" style="margin-bottom:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px">' + FormsUI.icon('plus') + ' This form is for Parents</button>') +
       '<button class="btn block" id="btnSave">Save</button>' +
@@ -1088,6 +1276,7 @@
     document.getElementById('sLock').onchange = function () { s.locked = this.checked; };
     document.getElementById('sReview').onchange = function () { s.reviewMode = this.checked; };
     document.getElementById('sOnce').onchange = function () { s.onePerEmail = this.checked; };
+    document.getElementById('sMulti').onchange = function () { s.multiStudent = this.checked; };
     document.getElementById('sPdf').onchange = function () { s.pdfCopy = this.checked; };
     document.getElementById('sEdit').onchange = function () { s.allowEdit = this.checked; };
     document.getElementById('sOpen').onchange = function () { s.openDate = this.value; };
@@ -1119,9 +1308,78 @@
   }
 
   function stateFromSettings_(s) {
-    return { lifecycle: s.lifecycle, access: s.access, locked: s.locked, reviewMode: !!s.reviewMode, onePerEmail: !!s.onePerEmail, pdfCopy: !!s.pdfCopy, allowEdit: !!s.allowEdit, openDate: s.openDate || '', closeDate: s.closeDate || '', maxResponses: Number(s.maxResponses) || 0, approval: s.approval || { enabled: false, approvers: [], mode: 'any' }, notifyEmails: s.notifyEmails, confirmationMessage: s.confirmationMessage };
+    // simple keys come from the shared spec (SharedLogic/Logic.js) — same list the server persists
+    var st = { lifecycle: s.lifecycle, access: s.access, locked: s.locked,
+      maxResponses: Number(s.maxResponses) || 0,
+      approval: s.approval || { enabled: false, approvers: [], mode: 'any' },
+      notifyEmails: s.notifyEmails };
+    SETTINGS_BOOLS.forEach(function (k) { st[k] = !!s[k]; });
+    SETTINGS_STRINGS.forEach(function (k) { st[k] = s[k] || ''; });
+    return st;
   }
-  function markDirty() { DIRTY = true; setDirtyDot(true); scheduleAutosave(); }
+  var PREV_T = null;
+  function markDirty() {
+    DIRTY = true; setDirtyDot(true); scheduleAutosave();
+    if (LIVEPREV) { clearTimeout(PREV_T); PREV_T = setTimeout(renderLivePreview, 250); }
+  }
+  function refreshLivePreview() { if (LIVEPREV) renderLivePreview(); }
+
+  // ---------- live preview (read-only mirror of what a submitter sees, re-rendered as you edit) ----------
+  function renderLivePreview() {
+    var host = document.getElementById('livePrev'); if (!host || !EDITING) return;
+    try {
+      var s = EDITING.schema;
+      var h = '<div class="pv-title">' + esc(s.title || 'Untitled form') + '</div>' +
+        (s.description ? '<p class="pv-desc">' + esc(s.description) + '</p>' : '');
+      var step = 1;
+      (s.pages[0].fields || []).forEach(function (f) { h += pvField_(f, s, function () { step++; return step; }); });
+      host.innerHTML = h || '<p class="help">Nothing to preview yet.</p>';
+    } catch (e) {
+      // never fail silently — show the problem where the preview would be
+      host.innerHTML = '<p class="notice err">Preview couldn’t render: ' + esc(String(e && e.message || e)) + '</p>';
+    }
+  }
+  function pvField_(f, s, nextStep) {
+    if (f.type === 'pageBreak') return '<div class="pv-break">Step ' + nextStep() + (f.label ? ' — ' + esc(f.label) : '') + '</div>';
+    if (f.type === 'sectionHeader') return '<div class="section-head">' + esc(f.label) + '</div>';
+    if (f.type === 'description') return '<p class="desc-block">' + esc(f.label) + '</p>';
+    if (f.type === 'faq') {
+      return '<div class="faq-block">' + (f.label ? '<div class="section-head">' + esc(f.label) + '</div>' : '') +
+        (f.items || []).map(function (it) { return '<details class="faq-item"><summary>' + esc(it.q || '') + '</summary><div class="faq-a">' + esc(it.a || '') + '</div></details>'; }).join('') + '</div>';
+    }
+    var ctrl = '';
+    switch (f.type) {
+      case 'textarea': ctrl = '<textarea class="control" disabled placeholder="' + esc(f.placeholder || '') + '"></textarea>'; break;
+      case 'dropdown': ctrl = '<select class="control" disabled><option>— Choose —</option></select>'; break;
+      case 'studentPicker': ctrl = f.multiple
+        ? '<div class="choices"><label class="choice"><input type="checkbox" disabled><span>(the parent’s own students)</span></label></div>'
+        : '<select class="control" disabled><option>— Choose student —</option></select>'; break;
+      case 'staffPicker': ctrl = '<select class="control" disabled><option>— Choose ' + (f.staffLevel ? f.staffLevel + ' ' : '') + 'staff —</option></select>'; break;
+      case 'radio': case 'yesno': {
+        var opts = f.type === 'yesno' ? ['Yes', 'No'] : (f.options || []);
+        ctrl = '<div class="choices">' + opts.map(function (o) { return '<label class="choice"><input type="radio" disabled><span>' + esc(o) + (f.capacity && f.capacity[o] != null ? ' <em style="color:#999">(max ' + f.capacity[o] + ')</em>' : '') + '</span></label>'; }).join('') + '</div>'; break;
+      }
+      case 'checkboxes':
+        ctrl = '<div class="choices">' + (f.options || []).map(function (o) { return '<label class="choice"><input type="checkbox" disabled><span>' + esc(o) + (f.capacity && f.capacity[o] != null ? ' <em style="color:#999">(max ' + f.capacity[o] + ')</em>' : '') + '</span></label>'; }).join('') + '</div>'; break;
+      case 'rating': { var n = f.max || 5, st = ''; for (var i = 0; i < n; i++) st += '☆'; ctrl = '<div style="font-size:1.3rem;color:var(--hcs-gold)">' + st + '</div>'; break; }
+      case 'file': ctrl = '<input type="file" class="control" disabled>'; break;
+      case 'signature': ctrl = '<div class="pv-sig">✍ signature box</div>'; break;
+      case 'calculation': ctrl = '<div class="calc-value">0</div>'; break;
+      default: {
+        var t = { email: 'email', phone: 'tel', number: 'number', date: 'date', time: 'time' }[f.type] || 'text';
+        ctrl = '<input class="control" type="' + t + '" disabled placeholder="' + esc(f.placeholder || '') + '">';
+      }
+    }
+    var cond = '';
+    if (f.showIf && f.showIf.field) {
+      var src = (fields().filter(function (g) { return g.id === f.showIf.field; })[0] || {});
+      var opTxt = { equals: 'is', notEquals: 'is not', contains: 'includes', notEmpty: 'is answered', empty: 'is blank' }[f.showIf.op] || f.showIf.op;
+      cond = '<div class="pv-cond">Shown when “' + esc(src.label || f.showIf.field) + '” ' + opTxt + (f.showIf.value ? ' “' + esc(f.showIf.value) + '”' : '') + '</div>';
+    }
+    return '<div class="field">' + cond +
+      '<label class="fieldlabel">' + esc(f.label || '(no label)') + (f.required ? '<span class="req">*</span>' : '') + '</label>' +
+      ctrl + (f.help ? '<div class="help">' + esc(f.help) + '</div>' : '') + '</div>';
+  }
   function setDirtyDot(on) { var d = document.getElementById('saveState'); if (d) d.innerHTML = on ? '● Unsaved…' : FormsUI.icon('check', { size: 14 }) + ' Saved'; }
   function scheduleAutosave() { if (EDITING && EDITING.structureLocked) return; clearTimeout(AUTOSAVE_T); AUTOSAVE_T = setTimeout(function () { doSave(true); }, 1500); }
   /** Save schema + settings. silent=true for autosave (no toast, no button spinner). Returns a promise. */
@@ -1154,6 +1412,17 @@
   function saveAll() { return doSave(false); }
 
   // ---------- responses ----------
+  /** Render a response cell: Drive/file URLs become clickable links, everything else escapes. */
+  function respCellHtml(c) {
+    var s = String(c == null ? '' : c);
+    if (!/https?:\/\//.test(s)) return esc(s);
+    var n = 0;
+    return s.split(/\s*\|\s*|\s+/).filter(Boolean).map(function (tok) {
+      if (/^https?:\/\//.test(tok)) { n++; return '<a href="' + esc(tok) + '" target="_blank" rel="noopener">file ' + n + ' ↗</a>'; }
+      return esc(tok);
+    }).join(' ');
+  }
+
   function openResponses(formId) {
     chrome('<p class="help" style="padding:24px">Loading responses…</p>');
     call('getResponses', [formId, 100]).then(function (r) {
@@ -1162,13 +1431,48 @@
         '<h1 class="form-title" style="margin:0;font-size:1.2rem">Responses (' + r.count + ')</h1>' +
         '<button class="btn ghost sm" id="exportCsv" style="margin-left:auto">Export CSV</button>' +
         (r.sheetUrl ? '<a class="btn ghost sm" style="text-decoration:none" target="_blank" href="' + esc(r.sheetUrl) + '">Open Sheet ↗</a>' : '') + '</div>';
-      var table = !r.rows.length ? '<p class="help">No responses yet.</p>' :
-        '<div style="overflow:auto"><table class="rtable"><thead><tr>' +
-          r.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-          r.rows.map(function (row) { return '<tr>' + row.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') +
-          '</tbody></table></div>';
-      chrome(head + table);
+      var statusIdx = r.headers.indexOf('Status');
+      var statuses = [];
+      if (statusIdx > -1) r.rows.forEach(function (row) { var v = String(row[statusIdx] || ''); if (v && statuses.indexOf(v) === -1) statuses.push(v); });
+      var toolbar = !r.rows.length ? '' :
+        '<div class="toolbar"><input id="rSearch" type="search" placeholder="Search responses (name, student, email…)" aria-label="Search responses">' +
+        (statuses.length > 1 ? '<select id="rStatus" aria-label="Filter by status"><option value="">All statuses</option>' + statuses.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>' : '') + '</div>';
+      chrome(head + toolbar + '<div id="rwrap"></div>');
       document.getElementById('back').onclick = renderDashboard;
+
+      var draw = function () {
+        var qEl = document.getElementById('rSearch'), sEl = document.getElementById('rStatus');
+        var q = qEl ? qEl.value.toLowerCase() : '', st = sEl ? sEl.value : '';
+        var list = r.rows.map(function (row, i) { return { row: row, i: i }; }).filter(function (x) {
+          if (st && statusIdx > -1 && String(x.row[statusIdx]) !== st) return false;
+          if (q && !x.row.some(function (c) { return String(c).toLowerCase().indexOf(q) > -1; })) return false;
+          return true;
+        });
+        document.getElementById('rwrap').innerHTML = !r.rows.length ? '<p class="help">No responses yet.</p>' :
+          !list.length ? '<p class="help">No responses match.</p>' :
+          '<p class="help" style="margin:0 0 6px">Click a row to see the full response.</p>' +
+          '<div style="overflow:auto"><table class="rtable"><thead><tr>' +
+            r.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+            list.map(function (x) { return '<tr data-ri="' + x.i + '" tabindex="0">' + x.row.map(function (c) { return '<td>' + respCellHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('') +
+            '</tbody></table></div>';
+        document.querySelectorAll('.rtable tr[data-ri]').forEach(function (tr) {
+          var open = function (e) {
+            if (e.target && e.target.tagName === 'A') return; // let file links click through
+            var row = r.rows[Number(tr.getAttribute('data-ri'))];
+            var body = '<table style="border-collapse:collapse;font-size:.88rem">' + r.headers.map(function (h, ci) {
+              var v = row[ci];
+              if (v === '' || v == null) return '';
+              return '<tr><td style="padding:5px 12px 5px 0;color:#666;vertical-align:top;white-space:nowrap">' + esc(h) + '</td><td style="padding:5px 0">' + respCellHtml(v) + '</td></tr>';
+            }).join('') + '</table>';
+            modalWith('Response detail', body, null, null);
+          };
+          tr.onclick = open;
+          tr.onkeydown = function (e) { if (e.key === 'Enter') open(e); };
+        });
+      };
+      var qEl2 = document.getElementById('rSearch'); if (qEl2) qEl2.oninput = draw;
+      var sEl2 = document.getElementById('rStatus'); if (sEl2) sEl2.onchange = draw;
+      draw();
       var ex = document.getElementById('exportCsv');
       if (ex) ex.onclick = function () {
         call('exportResponsesCsv', [formId]).then(function (res) {
