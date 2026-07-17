@@ -1,11 +1,16 @@
 /* data.js — fabricated data for the Talon Hub · Staff demo. All athletes,
-   guardians, opponents, coach emails, calendar IDs, and metrics are invented.
-   Guardian emails use @example.com; the HCS / @harfordchristian.org brand is
-   kept for staff/coach identity only. No real spreadsheet, calendar, portal,
-   or file IDs appear here. Event dates are stored as day offsets (inDays) and
-   resolved to yyyy-MM-dd in mock.js relative to "today" so they stay upcoming.
-   Athlete missingForms are DERIVED from compliance in mock.js — the compliance
-   flags below are the single source of truth. */
+   guardians, opponents, coach emails, and metrics are invented. Guardian emails
+   use @example.com; the HCS / @harfordchristian.org brand is kept for staff/coach
+   identity only. No real spreadsheet, calendar, portal, or file IDs appear here.
+   Event dates are stored as day offsets (inDays) and resolved to yyyy-MM-dd in
+   mock.js relative to "today" so they stay upcoming. Athlete missingForms are
+   DERIVED from compliance in mock.js — the compliance flags are the source of truth.
+
+   The real Staff app funnels every server call through one dispatcher
+   api(fn,args) -> google.script.run.api(fn,args); mock.js reproduces that
+   dispatcher and switches on fn. Shapes mirror the live server endpoints
+   (getStaffBundle / getTeamRoster / getEventBoard / getPlayerProfile / practices /
+   drills / announcements / tryouts / lost&found / stats / lineup / groups / staff). */
 (function () {
   'use strict';
 
@@ -24,20 +29,39 @@
   }
 
   window.STAFF_DATA = {
-    role: 'Admin',
+    // ---- identity / bundle scalars ----
+    role: 'Coach',                       // Coach experience (home/schedule/roster/practices/gameday…)
+    owner: false,
+    email: 'demo.coach@harfordchristian.org',
+    isGuardian: false,
     season: 'F26',
     neverLoggedIn: 3,
+    // Program-wide module toggles (union across the coach's teams).
+    features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
+    // Coach defaults (CoachPrefs.resolve shape).
+    prefs: {
+      WarmupMin: 10, CooldownMin: 5, WaterBreakMin: 3, WaterBreakEveryMin: 0, DefaultLengthMin: 90,
+      PerDrillMin: 0, AutoAdvance: true, ToneOn: true, DefaultTeamID: 'BSOC-V-F26', ScrimHalfMin: 25,
+      ScrimHalfCount: 2, ScrimSquadSize: 7, GameDayChecklist: 'Uniforms\nWater / coolers\nFirst-aid kit\nGame balls\nLineup card\nRoster / scorebook',
+      LandingTab: '', TabOrderJson: '', HiddenTabsJson: '', Density: 'comfortable'
+    },
 
     teams: [
       {
-        TeamID: 'BSOC-V-F26', Sport: 'BSOC', Level: 'V', Gender: 'Boys', Season: 'F26',
+        TeamID: 'BSOC-V-F26', Sport: 'BSOC', Level: 'V', Gender: 'Boys', Season: 'F26', CalendarId: '',
         CoachEmails: 'aturner@harfordchristian.org, jbekele@harfordchristian.org',
-        Active: true, label: 'Boys Varsity Soccer', CalendarId: 'talon-bsoc-demo'
+        Active: true, label: 'Boys Varsity Soccer', Phase: 'InSeason', GradeMin: 9, GradeMax: 12,
+        mine: true, phase: 'InSeason', phaseLabel: 'In season', future: false,
+        features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
+        overrides: {}, wizardComplete: true, sportName: 'Soccer'
       },
       {
-        TeamID: 'GSOC-V-F26', Sport: 'GSOC', Level: 'V', Gender: 'Girls', Season: 'F26',
+        TeamID: 'GSOC-V-F26', Sport: 'GSOC', Level: 'V', Gender: 'Girls', Season: 'F26', CalendarId: '',
         CoachEmails: 'mdelgado@harfordchristian.org, sroberts@harfordchristian.org',
-        Active: true, label: 'Girls Varsity Soccer', CalendarId: 'talon-gsoc-demo'
+        Active: true, label: 'Girls Varsity Soccer', Phase: 'InSeason', GradeMin: 9, GradeMax: 12,
+        mine: true, phase: 'InSeason', phaseLabel: 'In season', future: false,
+        features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
+        overrides: {}, wizardComplete: true, sportName: 'Soccer'
       }
     ],
 
@@ -45,6 +69,17 @@
     multiSport: [
       { athleteId: 'B04', name: 'Owen Sinclair', teams: ['Boys Varsity Soccer', 'Boys Varsity Cross Country'] }
     ],
+
+    // Staff roster (AD console / staff mgr). Coach view doesn't surface this, but
+    // listStaff stays shape-correct for the demo.
+    staff: [
+      { email: 'aturner@harfordchristian.org', role: 'Coach', teams: [{ teamId: 'BSOC-V-F26', label: 'Boys Varsity Soccer', season: 'F26' }] },
+      { email: 'mdelgado@harfordchristian.org', role: 'Coach', teams: [{ teamId: 'GSOC-V-F26', label: 'Girls Varsity Soccer', season: 'F26' }] },
+      { email: 'athletics@harfordchristian.org', role: 'AD', teams: [] }
+    ],
+
+    // Registration form links (Ops → getFormLinks).
+    formLinks: { physical: '', concussion: '', handbook: '' },
 
     rosters: {
       'BSOC-V-F26': [
@@ -85,7 +120,7 @@
       ]
     },
 
-    // School directory pool for the "Add a player" search (some already rostered, some not).
+    // School directory pool for the "Add a player" / tryout search (some rostered, some not).
     directory: [
       { directoryKey: 'dir-201', first: 'Mason', last: 'Delgado', grade: 10, gradYear: 2028, guardianCount: 2 },
       { directoryKey: 'dir-202', first: 'Ella', last: 'Whitfield', grade: 11, gradYear: 2027, guardianCount: 2 },
@@ -102,7 +137,7 @@
     ],
 
     // Events (day offsets → resolved in mock.js). missing[] are outbound exceptions;
-    // returnPlan holds the return-leg special cases; seedChecked pre-checks a few riders.
+    // returnPlan holds return-leg special cases; seedChecked pre-checks a few riders.
     events: [
       {
         EventID: 'EV-BSOC-1', TeamID: 'BSOC-V-F26', Sport: 'BSOC', Gender: 'Boys', Season: 'F26', Level: 'V',
@@ -177,6 +212,87 @@
         Status: 'Scheduled', StaffNotes: '', exceptionCount: 0,
         missing: [], returnPlan: { guardian: [], self: [], other: [] }, seedChecked: { out: [], ret: [] }
       }
-    ]
+    ],
+
+    // Program / team announcements (bundle.announcements + listAnnouncements).
+    announcements: [
+      {
+        AnnouncementID: 'ANN-001', Audience: 'Program', TeamID: '', Title: 'Fall pictures Thursday',
+        Body: 'Team photos in the gym before practice — wear home uniforms.', Severity: 'info',
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Athletics Office', PostedByEmail: 'athletics@harfordchristian.org', Status: 'Active'
+      },
+      {
+        AnnouncementID: 'ANN-002', Audience: 'Team', TeamID: 'BSOC-V-F26', Title: 'Bus leaves 30 min early Friday',
+        Body: 'Bayside Prep is farther than usual — depart 2:45 sharp from the gym lot.', Severity: 'urgent',
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Coach Turner', PostedByEmail: 'aturner@harfordchristian.org', Status: 'Active'
+      }
+    ],
+
+    // Drill pool (listDrills). Sport BSOC (soccer). Equipment powers the plan roll-up.
+    drills: [
+      { DrillID: 'DRL-001', Name: 'Dynamic warm-up circuit', Category: 'Warm-up', Sport: 'BSOC', Tags: 'warmup,mobility', Description: 'Progressive movement prep — skips, lunges, openers.', Equipment: 'Cones', DurationMinDefault: 10 },
+      { DrillID: 'DRL-002', Name: 'Rondo 4v2', Category: 'Possession', Sport: 'BSOC', Tags: 'possession,pressure', Description: 'Keep-away in a tight grid; two defenders press.', Equipment: 'Cones, Balls, Pinnies', DurationMinDefault: 15 },
+      { DrillID: 'DRL-003', Name: 'Passing patterns', Category: 'Technical', Sport: 'BSOC', Tags: 'passing,movement', Description: 'Combination play through a fixed pattern, both sides.', Equipment: 'Cones, Balls', DurationMinDefault: 15 },
+      { DrillID: 'DRL-004', Name: 'Shooting from crosses', Category: 'Finishing', Sport: 'BSOC', Tags: 'finishing,crossing', Description: 'Wide delivery to near/far post finishing.', Equipment: 'Balls, Goals, Cones', DurationMinDefault: 20 },
+      { DrillID: 'DRL-005', Name: 'Defensive shape 6v6', Category: 'Tactical', Sport: 'BSOC', Tags: 'defending,shape', Description: 'Compact block, pressing triggers, transition.', Equipment: 'Pinnies, Balls, Cones', DurationMinDefault: 20 },
+      { DrillID: 'DRL-006', Name: 'Small-sided scrimmage', Category: 'Game', Sport: 'BSOC', Tags: 'scrimmage,conditioning', Description: 'Free play to finish; rotate squads every 4 min.', Equipment: 'Balls, Pinnies, Goals', DurationMinDefault: 20 }
+    ],
+
+    // Saved reusable practices (listSessions / getSession).
+    sessions: [
+      {
+        sessionId: 'PS-001', title: 'Possession & pressing', scope: 'Team', teamId: 'BSOC-V-F26', sport: 'BSOC',
+        focus: 'Keep the ball under pressure', objectives: 'Sharp first touch; press as a unit within 5s of loss.',
+        tags: 'possession,pressing', estMinutes: 90,
+        blocks: [
+          { blockId: 'BLK-1', seq: 0, title: 'Warm-up', durationMin: 10, notes: '', drillId: 'DRL-001', drillName: 'Dynamic warm-up circuit' },
+          { blockId: 'BLK-2', seq: 1, title: 'Rondos', durationMin: 15, notes: 'Two-touch limit.', drillId: 'DRL-002', drillName: 'Rondo 4v2' },
+          { blockId: 'BLK-3', seq: 2, title: 'Defensive shape', durationMin: 25, notes: '', drillId: 'DRL-005', drillName: 'Defensive shape 6v6' },
+          { blockId: 'BLK-4', seq: 3, title: 'Scrimmage', durationMin: 20, notes: '', drillId: 'DRL-006', drillName: 'Small-sided scrimmage' }
+        ]
+      },
+      {
+        sessionId: 'PS-002', title: 'Finishing day', scope: 'Team', teamId: 'BSOC-V-F26', sport: 'BSOC',
+        focus: 'Convert chances', objectives: 'First-time finishes; movement in the box.',
+        tags: 'finishing', estMinutes: 75,
+        blocks: [
+          { blockId: 'BLK-1', seq: 0, title: 'Warm-up', durationMin: 10, notes: '', drillId: 'DRL-001', drillName: 'Dynamic warm-up circuit' },
+          { blockId: 'BLK-2', seq: 1, title: 'Passing patterns', durationMin: 15, notes: '', drillId: 'DRL-003', drillName: 'Passing patterns' },
+          { blockId: 'BLK-3', seq: 2, title: 'Crosses & finishing', durationMin: 25, notes: 'Both flanks.', drillId: 'DRL-004', drillName: 'Shooting from crosses' }
+        ]
+      }
+    ],
+
+    // Recently run practices (listPracticeRuns). ranOn resolved in mock.js (inDays).
+    practiceRuns: [
+      { runId: 'RUN-001', title: 'Possession & pressing', teamId: 'BSOC-V-F26', inDays: -2, durationMin: 90 },
+      { runId: 'RUN-002', title: 'Finishing day', teamId: 'BSOC-V-F26', inDays: -5, durationMin: 75 }
+    ],
+
+    // Lost & Found (lostFoundList). PostedAt resolved in mock.js (inDays).
+    lostFound: [
+      { ItemID: 'LF-001', Description: 'Blue Nike cleats, size 9', FoundWhere: 'HCS Turf Field', FoundWhen: 'After Tue practice', PhotoThumb: '', Status: 'Open', Claimed: false, PostedBy: 'aturner@harfordchristian.org', inDays: -1, Season: 'F26' },
+      { ItemID: 'LF-002', Description: 'Black water bottle, name faded', FoundWhere: 'Gym lot', FoundWhen: 'Friday bus', PhotoThumb: '', Status: 'Open', Claimed: false, PostedBy: 'aturner@harfordchristian.org', inDays: -3, Season: 'F26' }
+    ],
+
+    // Tryouts (listTryouts / getTryout). Standings stay empty until evaluations exist.
+    tryouts: [
+      {
+        TryoutID: 'TRY-F26-01', Name: 'Boys Varsity Soccer 2026', Sport: 'BSOC', Season: 'F26', TeamID: 'BSOC-V-F26',
+        Status: 'Open', EvalCode: 'SOC26X', CreatedBy: 'athletics@harfordchristian.org', CreatedAt: '',
+        events: [
+          { TryoutID: 'TRY-F26-01', EventKey: 'sprint', Name: '40-yard sprint', InputType: 'time', ConfigJson: '', MaxPoints: 10, Weight: 1, EventOrder: 0, AllEvaluators: false, Active: true },
+          { TryoutID: 'TRY-F26-01', EventKey: 'juggling', Name: 'Juggling count', InputType: 'number', ConfigJson: '', MaxPoints: 10, Weight: 1, EventOrder: 1, AllEvaluators: false, Active: true },
+          { TryoutID: 'TRY-F26-01', EventKey: 'scrimmage', Name: 'Scrimmage read', InputType: 'rating', ConfigJson: '', MaxPoints: 10, Weight: 2, EventOrder: 2, AllEvaluators: true, Active: true }
+        ],
+        candidates: [
+          { TryoutID: 'TRY-F26-01', CandidateID: 'CAND-001', FirstName: 'Lucas', LastName: 'Nguyen', Grade: 12, DirectoryKey: 'dir-205', Number: '21', Decision: '', AddedAt: '' },
+          { TryoutID: 'TRY-F26-01', CandidateID: 'CAND-002', FirstName: 'Henry', LastName: 'Alvarez', Grade: 11, DirectoryKey: 'dir-207', Number: '22', Decision: '', AddedAt: '' }
+        ]
+      }
+    ],
+
+    // Positions catalog fallback for lineup (Sports blueprint also supplies these).
+    soccerPositions: ['GK', 'DEF', 'MID', 'FWD']
   };
 })();

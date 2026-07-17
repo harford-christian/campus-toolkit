@@ -99,9 +99,9 @@
       </div>
 
       <div class="card">
-        <h2>Idle photo carousel (Drive folder)</h2>
-        <label>Drive folder link or ID</label>
-        <input id="folder" placeholder="Same as Lobby, or a gym-specific folder">
+        <h2>Idle photos — general athletics (Drive folder)</h2>
+        <label>Drive folder link or ID (shown when no game is on)</label>
+        <input id="folder" placeholder="General athletics photos folder">
         <div class="row" style="margin-top:8px">
           <div><label>Seconds per photo</label><input id="interval" type="number" value="8" min="2"></div>
           <div style="flex:0 0 auto"><label>&nbsp;</label><button onclick="applyCarousel()">Set carousel</button></div>
@@ -110,15 +110,13 @@
       </div>
 
       <div class="card">
-        <h2>Ticker messages</h2>
-        <textarea id="ticker" rows="3" placeholder="One message per line (blank = leave current)"></textarea>
-        <div style="margin-top:8px"><button onclick="applyTicker()">Update ticker</button></div>
-      </div>
-
-      <div class="card">
-        <h2>Idle info cards</h2>
-        <textarea id="info" rows="3" placeholder="One card per line — rotates in the idle rail (records, spirit week, reminders…)"></textarea>
-        <div style="margin-top:8px"><button onclick="applyInfo()">Update info cards</button></div>
+        <h2>Promotional slides</h2>
+        <div id="adList"></div>
+        <div class="row" style="margin-top:8px">
+          <div style="flex:0 0 auto"><button class="ghost" onclick="addAdRow()">+ Add slide</button></div>
+          <div style="flex:0 0 auto"><button onclick="saveAds()">Save slides</button></div>
+        </div>
+        <div class="hint">Appears in the rotation while today is within the show-from/until window. Theme styles the slide (e.g. red-out). Headline is the big text; subhead is the ribbon.</div>
       </div>
 
       <div class="card">
@@ -197,14 +195,33 @@
     google.script.run.withSuccessHandler(function (r) { alert('Carousel set: ' + r.count + ' images'); })
       .withFailureHandler(onFail).setGymCarousel(document.getElementById('folder').value, document.getElementById('interval').value);
   }
-  function applyTicker() {
-    var lines = document.getElementById('ticker').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setTicker(lines);
+  // ---- promotional slides (repeater) ----
+  var THEMES = ['generic','redout','pinkout','whiteout','gold','rivalry','senior-night'];
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(m){return({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[m];}); }
+  function adRowHtml(a){ a=a||{};
+    var opts = THEMES.map(function(v){ return '<option'+(a.theme===v?' selected':'')+'>'+v+'</option>'; }).join('');
+    return '<div class="card adrow" style="background:#fafafa;margin:8px 0">'
+      +'<div class="row"><div><label>Headline</label><input class="ad-headline" value="'+esc(a.headline)+'"></div>'
+      +'<div><label>Subhead (ribbon)</label><input class="ad-subhead" value="'+esc(a.subhead)+'"></div></div>'
+      +'<div class="row"><div><label>Date text</label><input class="ad-dateText" value="'+esc(a.dateText)+'"></div>'
+      +'<div><label>Opponent</label><input class="ad-opponent" value="'+esc(a.opponent)+'"></div>'
+      +'<div><label>Theme</label><select class="ad-theme">'+opts+'</select></div></div>'
+      +'<div class="row"><div><label>Show from</label><input type="date" class="ad-startShow" value="'+esc(a.startShow)+'"></div>'
+      +'<div><label>Show until</label><input type="date" class="ad-endShow" value="'+esc(a.endShow)+'"></div>'
+      +'<div style="flex:0 0 auto"><label>Enabled</label><input type="checkbox" class="ad-enabled" '+(a.enabled!==false?'checked':'')+' style="width:auto"></div>'
+      +'<div style="flex:0 0 auto"><label>&nbsp;</label><button class="ghost" onclick="this.closest(\'.adrow\').remove()">Remove</button></div></div>'
+      +'</div>';
   }
-  function applyInfo() {
-    var lines = document.getElementById('info').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
-    google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setInfoCards(lines);
-  }
+  function addAdRow(a){ var w=document.createElement('div'); w.innerHTML=adRowHtml(a); document.getElementById('adList').appendChild(w.firstChild); }
+  function renderAds(ads){ var list=document.getElementById('adList'); list.innerHTML=''; (ads||[]).forEach(function(a){ addAdRow(a); }); }
+  function collectAds(){ var out=[]; document.querySelectorAll('#adList .adrow').forEach(function(r){
+    out.push({ headline:r.querySelector('.ad-headline').value, subhead:r.querySelector('.ad-subhead').value,
+      dateText:r.querySelector('.ad-dateText').value, opponent:r.querySelector('.ad-opponent').value,
+      theme:r.querySelector('.ad-theme').value, startShow:r.querySelector('.ad-startShow').value,
+      endShow:r.querySelector('.ad-endShow').value, enabled:r.querySelector('.ad-enabled').checked }); });
+    return out; }
+  function saveAds(){ google.script.run.withSuccessHandler(function(c){ renderStatus(c); alert('Saved '+(((c.content&&c.content.ads)||[]).length)+' promo slide(s).'); })
+    .withFailureHandler(onFail).setMessageAds(collectAds()); }
   function emergency(on) {
     google.script.run.withSuccessHandler(renderStatus).withFailureHandler(onFail).setEmergency(on, document.getElementById('emsg').value);
   }
@@ -224,8 +241,7 @@
       'Detector: <span class="pill ' + (d.active ? 'on' : 'off') + '">' + (d.active ? ('LIVE — ' + d.sport) : 'inactive') + '</span> ' +
       '<span style="color:#999">(' + (d.note || '') + (d.checkedAt ? ', checked ' + new Date(d.checkedAt).toLocaleString() : '') + ')</span>';
     // Pre-fill editors with current values
-    document.getElementById('ticker').value = (c.tickerMessages || []).join('\n');
-    document.getElementById('info').value = ((c.content && c.content.infoCards) || []).join('\n');
+    renderAds((c.content && c.content.ads) || []);
     document.getElementById('status').textContent = JSON.stringify(c, null, 2);
   }
   function loadSports() {

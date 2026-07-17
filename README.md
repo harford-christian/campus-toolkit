@@ -17,6 +17,7 @@ Christian School. Each demo is the **real app UI** running standalone in the bro
 | Custom Forms | `demos/custom-forms/` | `index.html` chooser → `admin.html` (staff builder + responses + admin) and `fill.html` (form runner). Reuses the project's own mock-backed preview build — no login, fabricated forms/submissions |
 | Gym Display TV | `demos/gym-tv/` | `index.html` switcher: Control Dashboard + display (`display.html?mode=game\|idle\|emergency`). Auto-detects home games; game mode mirrors the live concession menu |
 | Lunch Inventory | `demos/lunch-inventory/` | `index.html` switcher: Home / Count Kiosk / Shipment / Admin. Per-batch expiry tracking, reorder lists, pizza sell-through, usage charts |
+| Account Provisioning | `demos/facts-provisioning/` | Bespoke console (the source tool is headless): FACTS SIS → Google Workspace account creation → Microsoft 365 licensing, with dry-run → create → sync, a pending-account queue, OU moves, and review flags. Fabricated data |
 
 **Online vs. offline:** the site works from `file://`, but a few tools pull CDN assets (Bootstrap, Chart.js, Inter font) and the library covers from the network — those render fully only with an internet connection. Everything degrades gracefully offline.
 

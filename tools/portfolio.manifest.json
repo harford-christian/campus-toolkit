@@ -34,8 +34,8 @@
       "title": "Athletics Logistics (Talon Hub)",
       "demoFolder": "demos/talon-hub",
       "launch": "demos/talon-hub/index.html",
-      "sourceProject": ["talon-hub/apps/staff"],
-      "builtFrom": ["talon-hub/apps/staff/pages/Staff.html", "talon-hub/apps/staff/pages/StaffApp.html", "talon-hub/apps/staff/pages/StaffStyles.html", "talon-hub/apps/staff/pages/Theme.html"],
+      "sourceProject": ["athletics/talon-hub/apps/staff"],
+      "builtFrom": ["athletics/talon-hub/apps/staff/pages/Staff.html", "athletics/talon-hub/apps/staff/pages/StaffApp.html", "athletics/talon-hub/apps/staff/pages/StaffStyles.html", "athletics/talon-hub/apps/staff/pages/Theme.html", "athletics/talon-hub/apps/staff/pages/ClientLogic.html"],
       "buildMethod": "build-demo.mjs + hand data/mock"
     },
     "purchasing": {
@@ -107,6 +107,14 @@
       "sourceProject": ["lunch-inventory-management"],
       "builtFrom": ["lunch-inventory-management/Lunch_Home.html", "lunch-inventory-management/Lunch_Kiosk.html", "lunch-inventory-management/Lunch_Shipment.html", "lunch-inventory-management/Lunch_Admin.html"],
       "buildMethod": "build-demo.mjs (4 pages) + hand wrapper/data/mock"
+    },
+    "facts-provisioning": {
+      "title": "Account Provisioning (FACTS → Google → M365)",
+      "demoFolder": "demos/facts-provisioning",
+      "launch": "demos/facts-provisioning/index.html",
+      "sourceProject": ["FACTS/facts-to-gac-sync"],
+      "builtFrom": [],
+      "buildMethod": "bespoke console — source tool is headless (no web UI to port)"
     }
   },
   "coveredProjects": [
@@ -117,10 +125,10 @@
     "campus-control/lockdown",
     "campus-control/bell-schedule",
     "campus-control/monitoring",
-    "talon-hub/apps/staff",
-    "talon-hub/apps/parent",
-    "talon-hub/apps/student",
-    "talon-hub/apps/tryout",
+    "athletics/talon-hub/apps/staff",
+    "athletics/talon-hub/apps/parent",
+    "athletics/talon-hub/apps/student",
+    "athletics/talon-hub/apps/tryout",
     "hcs-purchasing-system",
     "leave-sub-automation/public-interface",
     "leave-sub-automation/admin-interface",

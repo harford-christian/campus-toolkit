@@ -1,3 +1,4 @@
 # Machine-written scan output (regenerated every run — avoid commit churn).
 tools/portfolio-status.json
 *.bak
+.tmp/

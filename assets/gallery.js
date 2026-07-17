@@ -114,6 +114,17 @@
         '<p>Lunch inventory lived on paper and manual spreadsheet counts — no expiry tracking per delivery batch, no automatic reorder flagging when stock ran low, and no view of how fast items sold or how much hot pizza got thrown away. Staff eyeballed the shelf and guessed reorder amounts.</p>' +
         '<h4>How it helps now</h4>' +
         '<p>A shared, phone-friendly system on top of the same Google Sheet. Staff do shelf counts on a touch <b>kiosk</b>, log incoming <b>shipments</b> with per-box expiry dates, and the <b>admin dashboard</b> surfaces FIFO expiry warnings, at-a-glance low-stock reorder lists, hot-pizza sell-through, shipment history, and usage-trend charts — right-sizing orders and cutting waste.</p>'
+    },
+
+    'facts-provisioning': {
+      icon: '🔑', title: 'Account Provisioning (FACTS → Google → Microsoft 365)', launch: 'demos/facts-provisioning/index.html',
+      summary: 'Automated student/staff account provisioning: new enrollments flow from the FACTS SIS into auto-created Google Workspace accounts (email, org-unit, password), which then drive Microsoft 365 license assignment. Headless in production; shown here as a console.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Every new enrollment meant IT hand-creating that student\'s Google Workspace account from a FACTS export — inventing a username, picking an org-unit, setting a password — then repeating for withdrawals and the annual graduation shuffle. It was slow, error-prone, and inconsistent org-units broke downstream Microsoft 365 license assignment.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>A nightly automation reads the FACTS SIS export and manages the whole account lifecycle — <b>create → update → move OU → suspend/graduate</b> — with strict email/OU conventions and unique per-student passwords, guarded by a dry-run and a staged rollout so no existing account is ever disrupted. The correct org-units then drive <b>Microsoft 365 licensing automatically</b> (Students → A1, Staff → A3).</p>' +
+        '<p>The real tool runs headless (nightly, reporting to Sheets + email). This console is a representative view of what one run surfaces — the pending-account queue, OU moves, review flags, and the Google→M365 sync.</p>'
     }
   };
 

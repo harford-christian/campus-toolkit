@@ -33,20 +33,21 @@
       "getMonitorSnapshotForClient",
       "processPost"
     ],
-    "hash": "e4e67000e5daaeec"
+    "hash": "23cc3447d39d9f2f"
   },
   "athletics": {
     "files": [
-      "talon-hub/apps/staff/pages/Staff.html",
-      "talon-hub/apps/staff/pages/StaffApp.html",
-      "talon-hub/apps/staff/pages/StaffStyles.html",
-      "talon-hub/apps/staff/pages/Theme.html"
+      "athletics/talon-hub/apps/staff/pages/ClientLogic.html",
+      "athletics/talon-hub/apps/staff/pages/Staff.html",
+      "athletics/talon-hub/apps/staff/pages/StaffApp.html",
+      "athletics/talon-hub/apps/staff/pages/StaffStyles.html",
+      "athletics/talon-hub/apps/staff/pages/Theme.html"
     ],
     "missing": [],
     "gsr": [
       "api"
     ],
-    "hash": "621226da4b439182"
+    "hash": "0836675139be5411"
   },
   "purchasing": {
     "files": [
@@ -170,7 +171,7 @@
       "authVerifyOtp",
       "withdrawSubmission"
     ],
-    "hash": "739247a65e0a1eed"
+    "hash": "f7d6e96306822157"
   },
   "gym-tv": {
     "files": [
@@ -186,11 +187,10 @@
       "setEmergency",
       "setGameOverride",
       "setGymCarousel",
-      "setInfoCards",
-      "setTicker",
+      "setMessageAds",
       "whoAmI"
     ],
-    "hash": "c346e82870193fd2"
+    "hash": "f4da87fa64574622"
   },
   "lunch-inventory": {
     "files": [
@@ -210,5 +210,11 @@
       "saveItemEdits"
     ],
     "hash": "96f540404393630b"
+  },
+  "facts-provisioning": {
+    "files": [],
+    "missing": [],
+    "gsr": [],
+    "hash": "e3b0c44298fc1c14"
   }
 }

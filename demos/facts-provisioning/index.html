@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FACTS → Google → Microsoft 365 — Showcase demo</title>
+
+<!-- Demo chrome (injects "← Gallery" link + sample-data tag) -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "FACTS → Google → Microsoft 365" };</script>
+<script src="../../assets/demo-banner.js" defer></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --maroon:#B40005; --maroon-hi:#d51720; --maroon-deep:#8a0004;
+    --gold:#C79A3D; --gold-soft:#e6cf9a;
+    --ink:#1c1b1f; --muted:#6b6a72; --line:#e7e5e2;
+    --bg:#f4f2ef; --card:#ffffff;
+    --ok:#187a4a; --ok-bg:#e5f4ec;
+    --warn:#9a6b00; --warn-bg:#fbf1d8;
+    --err:#b3261e; --err-bg:#fce8e6;
+    --pend:#5a5a63; --pend-bg:#ecebe9;
+    --blue:#1a56c4; --blue-bg:#e6eefb;
+    --radius:14px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; }
+  body{
+    font-family:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color:var(--ink); background:var(--bg);
+    -webkit-font-smoothing:antialiased; line-height:1.4;
+    padding-bottom:70px;
+  }
+  h1,h2,h3{ margin:0; font-weight:800; letter-spacing:-.01em; }
+  .wrap{ max-width:1180px; margin:0 auto; padding:22px 20px 40px; }
+
+  /* ---- Top masthead ---- */
+  .masthead{
+    background:linear-gradient(120deg,var(--maroon-deep) 0%, var(--maroon) 55%, var(--maroon-hi) 100%);
+    color:#fff; border-radius:var(--radius);
+    padding:20px 24px; box-shadow:0 10px 30px rgba(140,0,4,.28);
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  }
+  .masthead .crest{
+    width:46px;height:46px;border-radius:12px;flex:none;
+    background:var(--gold); color:#3a2b00; font-weight:900; font-size:1.25rem;
+    display:grid; place-items:center; box-shadow:inset 0 0 0 2px rgba(255,255,255,.25);
+  }
+  .masthead h1{ font-size:1.4rem; }
+  .masthead .sub{ font-size:.85rem; opacity:.9; font-weight:500; margin-top:2px; }
+  .masthead .spacer{ flex:1; }
+  .runmode{
+    display:inline-flex; align-items:center; gap:8px;
+    background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.32);
+    border-radius:999px; padding:7px 14px; font-weight:800; font-size:.82rem;
+    letter-spacing:.03em;
+  }
+  .runmode .dot{ width:9px;height:9px;border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px rgba(199,154,61,.3); }
+
+  .honest{
+    margin:12px 2px 0; font-size:.8rem; color:var(--muted);
+    display:flex; align-items:center; gap:8px;
+  }
+  .honest svg{ flex:none; }
+
+  /* ---- Pipeline ---- */
+  .pipeline{
+    margin-top:18px; background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); padding:22px 20px;
+    display:flex; align-items:stretch; gap:8px; flex-wrap:nowrap;
+    box-shadow:0 2px 10px rgba(0,0,0,.04);
+  }
+  .stage{
+    flex:1; text-align:center; padding:6px 10px;
+    display:flex; flex-direction:column; align-items:center; gap:8px;
+  }
+  .stage .badge{
+    width:56px;height:56px;border-radius:16px; display:grid; place-items:center;
+    font-size:1.6rem; box-shadow:0 4px 12px rgba(0,0,0,.1);
+  }
+  .stage .b-facts{ background:#0b2b52; color:#fff; }
+  .stage .b-google{ background:#fff; color:#4285F4; border:1px solid var(--line); }
+  .stage .b-ms{ background:#fff; color:#0a7; border:1px solid var(--line); }
+  .stage .name{ font-weight:800; font-size:.98rem; }
+  .stage .role{ font-size:.75rem; color:var(--muted); margin-top:-4px; }
+  .stage .pill{
+    font-size:.74rem; font-weight:700; padding:4px 11px; border-radius:999px;
+    background:var(--gold-soft); color:#5a4200; border:1px solid rgba(199,154,61,.5);
+  }
+  .arrow{
+    align-self:center; flex:none; display:flex; flex-direction:column; align-items:center;
+    color:var(--maroon); font-weight:800; min-width:74px;
+  }
+  .arrow .lbl{ font-size:.62rem; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:2px; text-align:center; }
+  .arrow .line{ font-size:1.5rem; line-height:1; }
+
+  /* ---- Run controls ---- */
+  .runbar{
+    margin-top:16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px 18px; box-shadow:0 2px 10px rgba(0,0,0,.04);
+  }
+  .dryrun{
+    display:inline-flex; align-items:center; gap:9px;
+    background:repeating-linear-gradient(45deg,#3a2b00,#3a2b00 8px,#4a3700 8px,#4a3700 16px);
+    color:var(--gold-soft); font-weight:900; letter-spacing:.06em;
+    padding:11px 18px; border-radius:12px; font-size:.9rem;
+    border:2px solid var(--gold);
+  }
+  .runbar .desc{ font-size:.82rem; color:var(--muted); max-width:340px; }
+  .runbar .spacer{ flex:1; }
+  .btn{
+    border:0; cursor:pointer; font:inherit; font-weight:800; font-size:.92rem;
+    padding:12px 20px; border-radius:11px; display:inline-flex; align-items:center; gap:9px;
+    transition:transform .1s ease, box-shadow .12s ease, opacity .12s;
+  }
+  .btn:active{ transform:translateY(1px); }
+  .btn-primary{ background:var(--maroon); color:#fff; box-shadow:0 4px 14px rgba(180,0,5,.32); }
+  .btn-primary:hover{ background:var(--maroon-hi); }
+  .btn-ms{ background:#0a6d4a; color:#fff; box-shadow:0 4px 14px rgba(10,109,74,.3); }
+  .btn-ms:hover{ background:#0a815a; }
+  .btn:disabled{ opacity:.42; cursor:not-allowed; box-shadow:none; }
+  .btn .spin{ width:15px;height:15px;border-radius:50%; border:2.5px solid rgba(255,255,255,.4); border-top-color:#fff; animation:sp .7s linear infinite; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+
+  /* ---- Stat tiles ---- */
+  .tiles{ margin-top:16px; display:grid; grid-template-columns:repeat(8,1fr); gap:10px; }
+  .tile{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:13px 12px; text-align:left; box-shadow:0 2px 8px rgba(0,0,0,.03);
+  }
+  .tile .n{ font-size:1.7rem; font-weight:900; letter-spacing:-.02em; line-height:1; }
+  .tile .k{ font-size:.68rem; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin-top:6px; }
+  .tile.accent .n{ color:var(--maroon); }
+  .tile.gold{ border-color:rgba(199,154,61,.5); background:#fdf9f0; }
+  .tile.gold .n{ color:#8a6a12; }
+  .tile.ok .n{ color:var(--ok); }
+  .tile.err .n{ color:var(--err); }
+  .tile .n.tick{ animation:pop .4s ease; }
+  @keyframes pop{ 0%{ transform:scale(1);} 40%{ transform:scale(1.28); } 100%{ transform:scale(1);} }
+
+  /* ---- Cards / sections ---- */
+  .grid{ margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:0 2px 10px rgba(0,0,0,.04); overflow:hidden;
+  }
+  .card.full{ grid-column:1 / -1; }
+  .card-head{
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .card-head h2{ font-size:1.02rem; }
+  .card-head .count{ font-size:.72rem; font-weight:800; color:var(--muted); background:var(--bg); padding:3px 9px; border-radius:999px; }
+  .card-head .spacer{ flex:1; }
+  .card-head .note{ font-size:.76rem; color:var(--muted); font-weight:500; }
+  .card-body{ padding:6px 0 0; }
+
+  table{ width:100%; border-collapse:collapse; font-size:.83rem; }
+  th{ text-align:left; font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:800; padding:8px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td{ padding:9px 12px; border-bottom:1px solid #f2f0ed; vertical-align:middle; }
+  tr:last-child td{ border-bottom:0; }
+  tr:hover td{ background:#faf9f7; }
+  .mono{ font-family:"SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-size:.8rem; }
+  .sub{ font-size:.72rem; color:var(--muted); }
+  .nm{ font-weight:700; }
+
+  .chip{ display:inline-flex; align-items:center; gap:5px; font-size:.72rem; font-weight:800; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .chip .cd{ width:6px;height:6px;border-radius:50%; }
+  .c-pending{ background:var(--pend-bg); color:var(--pend); } .c-pending .cd{ background:var(--pend); }
+  .c-created{ background:var(--ok-bg); color:var(--ok); } .c-created .cd{ background:var(--ok); }
+  .c-error{ background:var(--err-bg); color:var(--err); } .c-error .cd{ background:var(--err); }
+  .c-skipped{ background:var(--blue-bg); color:var(--blue); } .c-skipped .cd{ background:var(--blue); }
+  .c-licensed{ background:var(--ok-bg); color:var(--ok); } .c-licensed .cd{ background:var(--ok); }
+  .c-synced{ background:var(--ok-bg); color:var(--ok); } .c-synced .cd{ background:var(--ok); }
+  .c-dash{ color:var(--muted); font-weight:600; font-size:.85rem; }
+  .c-license{ background:#efe9fb; color:#5b3ba8; } .c-license .cd{ background:#5b3ba8; }
+
+  .pw{ display:inline-flex; align-items:center; gap:7px; }
+  .pw .val{ font-family:"SFMono-Regular", ui-monospace, Menlo, Consolas, monospace; font-size:.8rem; letter-spacing:.04em; }
+  .reveal{ border:1px solid var(--line); background:#fff; border-radius:7px; padding:2px 7px; cursor:pointer; font-size:.66rem; font-weight:800; color:var(--muted); }
+  .reveal:hover{ border-color:var(--gold); color:#8a6a12; }
+
+  .tag{ font-size:.66rem; font-weight:800; padding:2px 8px; border-radius:6px; letter-spacing:.03em; }
+  .t-move{ background:#e6eefb; color:var(--blue); }
+  .t-suspend{ background:#fce8e6; color:var(--err); }
+  .t-createou{ background:#e5f4ec; color:var(--ok); }
+
+  .flag{ padding:12px 18px; border-bottom:1px solid #f2f0ed; display:flex; gap:11px; align-items:flex-start; }
+  .flag:last-child{ border-bottom:0; }
+  .flag .fi{ width:26px;height:26px;border-radius:8px; flex:none; display:grid; place-items:center; font-size:.85rem; }
+  .fi-drift{ background:#fbf1d8; } .fi-absent{ background:#ecebe9; } .fi-orphan{ background:#fce8e6; }
+  .flag .ft{ font-weight:700; font-size:.84rem; }
+  .flag .fd{ font-size:.76rem; color:var(--muted); margin-top:2px; }
+
+  .maprow{ display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid #f2f0ed; }
+  .maprow:last-child{ border-bottom:0; }
+  .maprow .ou{ font-family:ui-monospace, monospace; font-size:.78rem; font-weight:700; }
+  .maprow .to{ color:var(--maroon); font-weight:900; }
+  .maprow .lic{ font-weight:800; }
+  .maprow .spacer{ flex:1; }
+
+  .ms-explain{
+    margin:2px 18px 16px; padding:12px 14px; border-radius:10px;
+    background:#f0f7f3; border:1px solid #cfe6da; font-size:.8rem; color:#25543f;
+    display:flex; gap:9px; align-items:flex-start;
+  }
+  .ms-explain b{ color:#0a6d4a; }
+
+  .foot{ margin-top:22px; font-size:.75rem; color:var(--muted); text-align:center; line-height:1.6; }
+
+  @media (max-width:1000px){
+    .tiles{ grid-template-columns:repeat(4,1fr); }
+    .grid{ grid-template-columns:1fr; }
+  }
+  @media (max-width:720px){
+    .pipeline{ flex-wrap:wrap; }
+    .arrow{ transform:rotate(90deg); min-width:0; margin:2px 0; }
+    .stage{ flex:1 1 100%; }
+    .tiles{ grid-template-columns:repeat(2,1fr); }
+    .masthead{ padding:16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== Masthead ===== -->
+  <div class="masthead">
+    <div class="crest">HCS</div>
+    <div>
+      <h1>Identity Provisioning Console</h1>
+      <div class="sub">FACTS SIS → Google Workspace → Microsoft 365 · nightly account &amp; license automation</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="runmode"><span class="dot"></span> DRY RUN</div>
+  </div>
+
+  <div class="honest">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+    <span>Representative console — the live tool runs headless (nightly, no UI); it reports to a Google Sheet + email digest. This page recreates what a run <em>looks</em> like on realistic sample data.</span>
+  </div>
+
+  <!-- ===== Pipeline ===== -->
+  <div class="pipeline">
+    <div class="stage">
+      <div class="badge b-facts">🎓</div>
+      <div class="name">FACTS SIS</div>
+      <div class="role">source of truth · enrollment</div>
+      <div class="pill" id="pl-facts">Export 3.2h old</div>
+    </div>
+    <div class="arrow">
+      <div class="lbl">create account</div>
+      <div class="line">→</div>
+    </div>
+    <div class="stage">
+      <div class="badge b-google">🟦</div>
+      <div class="name">Google Workspace</div>
+      <div class="role">email · org-unit · password</div>
+      <div class="pill" id="pl-google">18 to create</div>
+    </div>
+    <div class="arrow">
+      <div class="lbl">drives license</div>
+      <div class="line">→</div>
+    </div>
+    <div class="stage">
+      <div class="badge b-ms">🟩</div>
+      <div class="name">Microsoft 365</div>
+      <div class="role">license by org-unit</div>
+      <div class="pill" id="pl-ms">16 to license</div>
+    </div>
+  </div>
+
+  <!-- ===== Run controls ===== -->
+  <div class="runbar">
+    <div class="dryrun">⚠ DRY RUN — no writes yet</div>
+    <div class="desc">Preview the proposed actions, then execute. Google accounts are created first; Microsoft 365 licensing keys off the resulting org-unit.</div>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" id="btnRun">▶ Run provisioning</button>
+    <button class="btn btn-ms" id="btnSync" disabled>☁ Sync to Microsoft 365</button>
+  </div>
+
+  <!-- ===== Stat tiles ===== -->
+  <div class="tiles">
+    <div class="tile"><div class="n" id="s-enrolled">561</div><div class="k">Enrolled</div></div>
+    <div class="tile"><div class="n" id="s-matched">549</div><div class="k">Matched</div></div>
+    <div class="tile accent"><div class="n" id="s-new">12</div><div class="k">New</div></div>
+    <div class="tile gold"><div class="n" id="s-oumis">6</div><div class="k">OU mismatch</div></div>
+    <div class="tile"><div class="n" id="s-proposed">21</div><div class="k">Proposed</div></div>
+    <div class="tile ok"><div class="n" id="s-created">0</div><div class="k">Created</div></div>
+    <div class="tile ok"><div class="n" id="s-licensed">0</div><div class="k">Licensed</div></div>
+    <div class="tile err"><div class="n" id="s-errors">0</div><div class="k">Errors</div></div>
+  </div>
+
+  <!-- ===== Hero table ===== -->
+  <div class="card full" style="margin-top:18px;">
+    <div class="card-head">
+      <h2>Pending new accounts</h2>
+      <span class="count" id="pnaCount">12 rows</span>
+      <span class="spacer"></span>
+      <span class="note">username = first-initial + lastname · password = word-word-## · OU = grad-year</span>
+    </div>
+    <div class="card-body" style="overflow-x:auto;">
+      <table id="pnaTable">
+        <thead>
+          <tr>
+            <th>FACTS ID</th><th>Student</th><th>Grade</th>
+            <th>Generated email</th><th>Target org-unit</th>
+            <th>Initial password</th><th>Google</th><th>M365 license</th>
+          </tr>
+        </thead>
+        <tbody id="pnaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== Two-column: proposals + flags ===== -->
+  <div class="grid">
+    <div class="card">
+      <div class="card-head">
+        <h2>Other proposals</h2>
+        <span class="count" id="propCount">9 actions</span>
+        <span class="spacer"></span>
+        <span class="note">applied on a live run</span>
+      </div>
+      <div class="card-body" style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Action</th><th>Account</th><th>Detail / reason</th></tr></thead>
+          <tbody id="propBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Review flags</h2>
+        <span class="count">3 items</span>
+        <span class="spacer"></span>
+        <span class="note">non-actionable · human review</span>
+      </div>
+      <div class="card-body" id="flagBody"></div>
+    </div>
+  </div>
+
+  <!-- ===== Microsoft 365 panel ===== -->
+  <div class="card full" style="margin-top:16px;">
+    <div class="card-head">
+      <h2>Microsoft 365 licensing</h2>
+      <span class="count" id="msCount">— synced</span>
+      <span class="spacer"></span>
+      <span class="note">license assigned by Google org-unit</span>
+    </div>
+    <div class="ms-explain">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="flex:none;color:#0a6d4a;margin-top:1px;"><path d="M4 12l5 5L20 6"/></svg>
+      <span>Licensing is <b>fully automatic</b>: once a Google account lands in an org-unit, M365 sync maps that OU to a license SKU — <b>/Students → Microsoft&nbsp;A1</b>, <b>/Staff → Microsoft&nbsp;A3</b> — and assigns it. No one picks licenses by hand; the Google OU is the single control.</span>
+    </div>
+    <div class="card-body">
+      <div id="msMap"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    HCS Identity Provisioning · sample data, invented names — no real student, staff, key, or ID appears on this page.<br>
+    Live automation runs nightly via a time-driven trigger and writes an audit row per action to a Google Sheet.
+  </div>
+
+</div>
+
+<script src="./data.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------- render helpers ----------
+  var gChipLabel = { pending:"pending", created:"created", error:"error", "skipped-existing":"skipped-existing" };
+  var gChipClass = { pending:"c-pending", created:"c-created", error:"c-error", "skipped-existing":"c-skipped" };
+
+  function gChip(s){
+    return '<span class="chip '+gChipClass[s]+'"><span class="cd"></span>'+gChipLabel[s]+'</span>';
+  }
+  function mChip(m){
+    if(m.state === "none")     return '<span class="c-dash">—</span>';
+    if(m.state === "licensed") return '<span class="chip c-licensed"><span class="cd"></span>'+m.sku+'</span>';
+    if(m.state === "pending")  return '<span class="chip c-license"><span class="cd"></span>'+m.sku+' · pending</span>';
+    if(m.state === "error")    return '<span class="chip c-error"><span class="cd"></span>error</span>';
+    return '<span class="c-dash">—</span>';
+  }
+
+  var $ = function(id){ return document.getElementById(id); };
+  var rows = window.PROVISIONING_DATA.pending;
+
+  // ---------- render hero table ----------
+  function renderPending(){
+    var html = "";
+    rows.forEach(function(r,i){
+      var pw = r.gStatus === "skipped-existing"
+        ? '<span class="c-dash">— (exists)</span>'
+        : '<span class="pw"><span class="val" data-pw="'+i+'">••••••</span>'
+          + '<button class="reveal" data-reveal="'+i+'">reveal</button></span>';
+      html += '<tr>'
+        + '<td class="mono">'+r.factsId+'</td>'
+        + '<td><span class="nm">'+r.name+'</span>'+(r.tagNote?'<div class="sub">'+r.tagNote+'</div>':'')+'</td>'
+        + '<td>'+r.grade+'</td>'
+        + '<td class="mono">'+r.email+'</td>'
+        + '<td class="mono sub">'+r.ou+'</td>'
+        + '<td>'+pw+'</td>'
+        + '<td data-gcell="'+i+'">'+gChip(r.gStatus)+(r.gNote?'<div class="sub">'+r.gNote+'</div>':'')+'</td>'
+        + '<td data-mcell="'+i+'">'+mChip(r.m365)+'</td>'
+        + '</tr>';
+    });
+    $("pnaBody").innerHTML = html;
+    $("pnaCount").textContent = rows.length + " rows";
+
+    // reveal handlers
+    document.querySelectorAll(".reveal").forEach(function(b){
+      b.addEventListener("click", function(){
+        var i = +b.getAttribute("data-reveal");
+        var span = document.querySelector('[data-pw="'+i+'"]');
+        if(b.textContent === "reveal"){ span.textContent = rows[i].password; b.textContent = "hide"; }
+        else { span.textContent = "••••••"; b.textContent = "reveal"; }
+      });
+    });
+  }
+
+  // ---------- proposals & flags ----------
+  function renderProposals(){
+    var tagCls = { MOVE_OU:"t-move", SUSPEND:"t-suspend", CREATE_OU:"t-createou" };
+    var html = "";
+    window.PROVISIONING_DATA.proposals.forEach(function(p){
+      html += '<tr>'
+        + '<td><span class="tag '+tagCls[p.action]+'">'+p.action+'</span></td>'
+        + '<td>'+(p.account?'<span class="mono">'+p.account+'</span>':'<span class="c-dash">—</span>')+'</td>'
+        + '<td class="sub">'+p.detail+'</td>'
+        + '</tr>';
+    });
+    $("propBody").innerHTML = html;
+    $("propCount").textContent = window.PROVISIONING_DATA.proposals.length + " actions";
+  }
+  function renderFlags(){
+    var icon = { drift:["fi-drift","≠"], absent:["fi-absent","∅"], orphan:["fi-orphan","👤"] };
+    var html = "";
+    window.PROVISIONING_DATA.flags.forEach(function(f){
+      var ic = icon[f.type];
+      html += '<div class="flag"><div class="fi '+ic[0]+'">'+ic[1]+'</div>'
+        + '<div><div class="ft">'+f.title+'</div><div class="fd">'+f.detail+'</div></div></div>';
+    });
+    $("flagBody").innerHTML = html;
+  }
+
+  // ---------- M365 mapping panel ----------
+  function renderMsMap(){
+    var html = "";
+    window.PROVISIONING_DATA.msMap.forEach(function(m){
+      var st = m.state === "synced"
+          ? '<span class="chip c-synced"><span class="cd"></span>synced</span>'
+        : m.state === "pending"
+          ? '<span class="chip c-license"><span class="cd"></span>pending</span>'
+          : '<span class="chip c-error"><span class="cd"></span>error</span>';
+      html += '<div class="maprow" data-msou="'+m.ou+'">'
+        + '<span class="ou">'+m.ou+'</span>'
+        + '<span class="to">→</span>'
+        + '<span class="lic">'+m.license+'</span>'
+        + '<span class="spacer"></span>'
+        + '<span>'+m.accounts+' accounts</span>'
+        + '<span data-msstate="'+m.ou+'">'+st+'</span>'
+        + '</div>';
+    });
+    $("msMap").innerHTML = html;
+  }
+
+  // ---------- live stats ----------
+  function tick(id, val){
+    var el = $(id);
+    el.textContent = val;
+    el.classList.remove("tick"); void el.offsetWidth; el.classList.add("tick");
+  }
+  function recomputeStats(){
+    var created = rows.filter(function(r){ return r.gStatus === "created"; }).length;
+    var licensed = rows.filter(function(r){ return r.m365.state === "licensed"; }).length;
+    var errors = rows.filter(function(r){ return r.gStatus === "error" || r.m365.state === "error"; }).length;
+    tick("s-created", created);
+    tick("s-licensed", licensed);
+    tick("s-errors", errors);
+  }
+
+  // ---------- flow ----------
+  var btnRun = $("btnRun"), btnSync = $("btnSync");
+
+  btnRun.addEventListener("click", function(){
+    if(btnRun.disabled) return;
+    btnRun.disabled = true;
+    btnRun.innerHTML = '<span class="spin"></span> Creating accounts…';
+    setTimeout(function(){
+      rows.forEach(function(r,i){
+        if(r.gStatus === "pending"){
+          r.gStatus = "created";
+          r.m365 = { state:"pending", sku:"A1 Students" };
+          var gc = document.querySelector('[data-gcell="'+i+'"]');
+          gc.innerHTML = gChip("created") + (r.gNote?'<div class="sub">'+r.gNote+'</div>':'');
+          document.querySelector('[data-mcell="'+i+'"]').innerHTML = mChip(r.m365);
+        }
+      });
+      recomputeStats();
+      $("pl-google").textContent = "18 created";
+      btnRun.innerHTML = '✓ Accounts created';
+      btnSync.disabled = false;
+      btnSync.classList.add("btn-ms");
+    }, 1050);
+  });
+
+  btnSync.addEventListener("click", function(){
+    if(btnSync.disabled) return;
+    btnSync.disabled = true;
+    btnSync.innerHTML = '<span class="spin"></span> Syncing to Microsoft 365…';
+    setTimeout(function(){
+      rows.forEach(function(r,i){
+        if(r.m365.state === "pending"){
+          // one deliberate M365 error, keyed by the data flag
+          r.m365 = r.m365Fail
+            ? { state:"error", sku:"A1 Students" }
+            : { state:"licensed", sku:"A1 Students" };
+          document.querySelector('[data-mcell="'+i+'"]').innerHTML = mChip(r.m365);
+        }
+      });
+      recomputeStats();
+      // flip the M365 mapping panel to synced
+      window.PROVISIONING_DATA.msMap.forEach(function(m){
+        if(m.state === "pending"){
+          m.state = "synced";
+          document.querySelector('[data-msstate="'+m.ou+'"]').innerHTML =
+            '<span class="chip c-synced"><span class="cd"></span>synced</span>';
+        }
+      });
+      $("pl-ms").textContent = "15 licensed · 1 error";
+      $("msCount").textContent = "synced";
+      btnSync.innerHTML = '✓ Synced to Microsoft 365';
+    }, 1050);
+  });
+
+  // ---------- init ----------
+  renderPending();
+  renderProposals();
+  renderFlags();
+  renderMsMap();
+  recomputeStats();
+})();
+</script>
+</body>
+</html>

@@ -38,5 +38,12 @@ window.GYMTV_DATA = {
     { label: 'V Girls Volleyball', summary: 'Eagles @ Cedar Valley Academy', inDays: 3, time: '17:30', home: false },
     { label: 'MS Boys Basketball', summary: 'Eagles vs Grace Prep', inDays: 5, time: '16:00', home: true },
     { label: 'V Girls Basketball', summary: 'Eagles vs St. Andrew’s', inDays: 6, time: '19:00', home: true }
+  ],
+  // Message/promo ad slides (mirrors GymControl.setMessageAds / content.ads shape). These rotate
+  // as full-screen "promoAd" slides on the display. startShow/endShow blank = always active.
+  messageAds: [
+    { id: 'ad_redout', headline: 'RED OUT', subhead: 'Wear red — pack the gym!', dateText: 'Fri Dec 13', opponent: 'Northgate Christian', theme: 'redout', startShow: '', endShow: '', enabled: true },
+    { id: 'ad_senior', headline: 'SENIOR NIGHT', subhead: 'Honoring our varsity seniors', dateText: 'Feb 6', opponent: '', theme: 'senior-night', startShow: '', endShow: '', enabled: true },
+    { id: 'ad_boosters', headline: 'GO EAGLES', subhead: 'Concessions open — cash & card', dateText: '', opponent: '', theme: 'gold', startShow: '', endShow: '', enabled: true }
   ]
 };
