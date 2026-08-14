@@ -216,5 +216,22 @@
     "missing": [],
     "gsr": [],
     "hash": "e3b0c44298fc1c14"
+  },
+  "staff-onboarding": {
+    "files": [
+      "FACTS/facts-to-gac-staff-email-config/Index.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "adminAddRoleApi",
+      "adminCompleteSetupApi",
+      "adminMarkOnboardedApi",
+      "adminRosterApi",
+      "adminSaveRolesApi",
+      "adminSaveUiApi",
+      "adminStateApi",
+      "contentApi"
+    ],
+    "hash": "b30fe2f4d282a7ca"
   }
 }

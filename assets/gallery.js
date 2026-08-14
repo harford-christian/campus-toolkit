@@ -125,6 +125,17 @@
         '<h4>How it helps now</h4>' +
         '<p>A nightly automation reads the FACTS SIS export and manages the whole account lifecycle — <b>create → update → move OU → suspend/graduate</b> — with strict email/OU conventions and unique per-student passwords, guarded by a dry-run and a staged rollout so no existing account is ever disrupted. The correct org-units then drive <b>Microsoft 365 licensing automatically</b> (Students → A1, Staff → A3).</p>' +
         '<p>The real tool runs headless (nightly, reporting to Sheets + email). This console is a representative view of what one run surfaces — the pending-account queue, OU moves, review flags, and the Google→M365 sync.</p>'
+    },
+
+    'staff-onboarding': {
+      icon: '🎓', title: 'Staff Onboarding', launch: 'demos/staff-onboarding/index.html',
+      summary: 'New staff automatically get an onboarding email linking to a role-picker page — each role sees its own setup instructions, maintained by a non-technical owner in Google Docs. Includes a first-run admin wizard (⚙ Settings in the demo).',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Every new hire got a hand-written instruction email — a different one per role. Fulltime staff and teachers needed SIS-access steps, coaches needed the athletics hub, bus drivers needed neither, and everyone needed the current Staff Handbook. One person composed each of these from memory, for every single hire, and the content lived nowhere but her sent folder.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>The moment a new staff Google account is created (by the provisioning automation or by hand), a scanner emails the new inbox a single link. The hire picks their role — <b>Fulltime Staff, Fulltime Teacher, Sub/Part-time Teacher, Coach, or Support Staff</b> — and sees exactly the steps for them, plus a for-everyone section. The content is plain Google Docs the owner edits herself; changes are live on the next page load. An in-app <b>⚙ Settings</b> panel (try it in the demo) lets her rename/reorder/add roles, rewrite the page text, and one-click mark all existing staff as already onboarded so they\'re never emailed.</p>' +
+        '<p>Idempotent by design: each account is stamped when emailed, the scanner is gated by a start date and a circuit breaker, and the sender never touches anyone created before rollout.</p>'
     }
   };
 

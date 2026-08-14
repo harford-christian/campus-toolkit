@@ -115,6 +115,14 @@
       "sourceProject": ["FACTS/facts-to-gac-sync"],
       "builtFrom": [],
       "buildMethod": "bespoke console — source tool is headless (no web UI to port)"
+    },
+    "staff-onboarding": {
+      "title": "Staff Onboarding",
+      "demoFolder": "demos/staff-onboarding",
+      "launch": "demos/staff-onboarding/index.html",
+      "sourceProject": ["FACTS/facts-to-gac-staff-email-config"],
+      "builtFrom": ["FACTS/facts-to-gac-staff-email-config/Index.html"],
+      "buildMethod": "build-demo.mjs + hand data/mock (name scrubs in replace list)"
     }
   },
   "coveredProjects": [
@@ -137,7 +145,8 @@
     "lobby-tv-project",
     "custom-forms",
     "athletics/gym-tv-project",
-    "lunch-inventory-management"
+    "lunch-inventory-management",
+    "FACTS/facts-to-gac-staff-email-config"
   ],
   "excludeDirs": [
     "apps-script-showcase",

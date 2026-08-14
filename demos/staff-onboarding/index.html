@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    /* HCS shared look — tokens + crest lifted from the talon-hub design system
+       (athletics/talon-hub/ui/Theme.html): maroon + white with an antique-gold accent. */
+    :root {
+      color-scheme: only light; /* Docs export renders white — keep the page light too */
+      --maroon: #6b1f2a; --maroon-deep: #4a141c; --gold: #c8a24a;
+      --bg: #f4f1ec; --card: #FFFFFF; --text: #17181B; --muted: #6B7280; --line: #E6E8EC;
+      --shadow: 0 1px 2px rgba(20,20,30,.06), 0 8px 24px rgba(20,20,30,.06);
+      --ok: #0B7A48; --warn: #B45309; --err: #B42318;
+      --logo: url("data:image/png;base64,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"); /* HCS Eagles crest (shared data URI from talon-hub Theme.html) */
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); line-height: 1.5;
+           font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           -webkit-font-smoothing: antialiased; }
+    /* ── hero header: maroon gradient, crest chip, gold keyline ── */
+    header { background: linear-gradient(160deg, var(--maroon) 0%, var(--maroon-deep) 100%);
+             color: #fff; padding: 1.6em 1em 1.5em; text-align: center; position: relative;
+             border-bottom: 3px solid var(--gold); }
+    .crest { width: 84px; height: 54px; margin: 0 auto .7em; background: #fff var(--logo) center/contain no-repeat;
+             border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    header h1 { margin: 0; font-size: 1.45em; font-weight: 800; letter-spacing: -.01em; }
+    header p { margin: .4em 0 0; font-size: .8em; color: rgba(255,255,255,.82); font-weight: 600; }
+    #adminBtn { position: absolute; top: .8em; right: .8em; background: rgba(255,255,255,.16);
+                color: #fff; border: 0; border-radius: 999px; padding: .35em .9em;
+                font-size: .78em; font-weight: 700; cursor: pointer; }
+    #adminBtn:hover { background: rgba(255,255,255,.3); }
+    #adminBtn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    main { max-width: 52em; margin: 0 auto; padding: 1em .85em 2em; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+            box-shadow: var(--shadow); padding: 1.2em 1.4em; margin: 1em 0; }
+    .card h2 { margin: 0 0 .6em; font-size: 1.02em; font-weight: 800; color: var(--maroon); }
+    .sectlabel { font-size: .66em; text-transform: uppercase; letter-spacing: .14em;
+                 color: var(--muted); font-weight: 800; margin-bottom: .35em; }
+    .roles { display: flex; flex-wrap: wrap; gap: .6em; margin-top: .8em; }
+    .roles button { flex: 1 1 14em; padding: .85em 1em; font-size: .95em; cursor: pointer;
+                    border: 1px solid var(--line); border-radius: 12px; background: var(--card);
+                    color: var(--text); font-weight: 700; box-shadow: var(--shadow);
+                    transition: transform .12s, border-color .12s, background .15s, color .15s; }
+    .roles button:hover { border-color: var(--maroon); color: var(--maroon); transform: translateY(-1px); }
+    .roles button.active { background: var(--maroon); border-color: var(--maroon); color: #fff; }
+    .roles button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    iframe.doc { width: 100%; border: none; min-height: 4em; display: block; }
+    .muted { color: var(--muted); font-size: .9em; }
+    .error { background: color-mix(in srgb, var(--err) 8%, var(--card));
+             border: 1px solid color-mix(in srgb, var(--err) 45%, var(--line));
+             border-radius: 12px; padding: .8em 1em; color: var(--err); }
+    .spinner { text-align: center; padding: 1.2em; color: var(--muted); }
+    footer { text-align: center; color: var(--muted); opacity: .75; font-size: .72em;
+             padding: 0 0 1.5em; font-weight: 600; }
+    /* ── admin ── */
+    #adminWrap { display: none; }
+    body.admin-open #adminWrap { display: block; }
+    body.admin-open #viewerWrap { display: none; }
+    .wizard { background: color-mix(in srgb, var(--gold) 14%, var(--card));
+              border: 1px solid color-mix(in srgb, var(--gold) 50%, var(--line));
+              border-radius: 16px; padding: 1em 1.2em; margin: 1em 0; }
+    .wizard b { color: var(--maroon); }
+    .wizard ol { margin: .5em 0 .7em 1.2em; padding: 0; }
+    .adm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5em; margin-top: .6em; }
+    .btn { padding: .55em 1em; font-size: .9em; cursor: pointer; border-radius: 10px;
+           border: 0; background: var(--maroon); color: #fff; font-weight: 700; }
+    .btn:hover { filter: brightness(1.12); }
+    .btn:active { background: var(--maroon-deep); }
+    .btn.secondary { background: transparent; color: var(--maroon);
+                     border: 1px solid color-mix(in srgb, var(--maroon) 40%, var(--line)); }
+    .btn.small { padding: .25em .6em; font-size: .8em; font-weight: 600; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    a.btn { text-decoration: none; display: inline-block; }
+    label.f { display: block; margin: .6em 0 .15em; font-size: .8em; color: var(--muted); font-weight: 700; }
+    input.f, textarea.f { width: 100%; padding: .55em .65em; font-size: .95em; border: 1px solid var(--line);
+                          border-radius: 10px; font-family: inherit; background: var(--card); color: var(--text); }
+    input.f:focus-visible, textarea.f:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+    textarea.f { min-height: 4em; resize: vertical; }
+    .rolerow { display: flex; align-items: center; gap: .4em; margin: .35em 0; }
+    .rolerow input { flex: 1; }
+    table.roster { width: 100%; border-collapse: collapse; font-size: .85em; margin-top: .6em; }
+    table.roster th, table.roster td { text-align: left; padding: .4em .5em; border-bottom: 1px solid var(--line); }
+    table.roster th { color: var(--maroon); font-size: .82em; text-transform: uppercase; letter-spacing: .06em; }
+    .ok { color: var(--ok); font-weight: 700; }
+    .todo { color: var(--warn); font-weight: 700; }
+    .notice { background: color-mix(in srgb, var(--gold) 12%, var(--card));
+              border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line));
+              border-radius: 12px; padding: .7em 1em; margin: .6em 0; font-size: .88em; }
+    .saved { color: var(--ok); font-size: .85em; font-weight: 700; }
+    @media (max-width: 480px) { .card { padding: 1em; } header h1 { font-size: 1.25em; } }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Staff Onboarding" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <header>
+    <div class="crest" role="img" aria-label="HCS Eagles crest"></div>
+    <h1 id="hdrTitle"></h1>
+    <p>Onboarding information &middot; signed in as newhire.demo@harfordchristian.org</p>
+    <button id="adminBtn"></button>
+  </header>
+  <main>
+    <!-- ═══ viewer (what every staff member sees) ═══ -->
+    <div id="viewerWrap">
+      <div class="card">
+        <div class="sectlabel">Step 1</div>
+        <h2 id="roleQuestion"></h2>
+        <p class="muted" id="introText"></p>
+        <div class="roles" id="roles"></div>
+      </div>
+
+      <div class="card" id="roleCard" style="display:none">
+        <div class="sectlabel">Step 2</div>
+        <h2 id="roleTitle"></h2>
+        <div id="roleContent"></div>
+      </div>
+
+      <div class="card">
+        <h2 id="everyoneHeading"></h2>
+        <div id="everyoneContent"><div class="spinner">Loading&hellip;</div></div>
+      </div>
+    </div>
+
+    <!-- ═══ admin panel (content owner + IT only; server re-checks every call) ═══ -->
+    <div id="adminWrap">
+      <div class="wizard" id="wizardBanner" style="display:none">
+        <b>First-time setup</b> — four quick steps, in any order:
+        <ol>
+          <li><b>Content</b>: open each Doc below and replace the placeholder with your real
+              instructions (edits show up on the page immediately, now and forever).</li>
+          <li><b>Roles &amp; wording</b>: rename, reorder, add or remove the role buttons and
+              tweak the page text until it reads the way you want.</li>
+          <li><b>Current staff</b>: click "Mark ALL current staff as onboarded" so nobody who
+              already works here gets the new-hire email.</li>
+          <li>Click <b>Finish setup</b>. (IT then switches the automatic email on.)</li>
+        </ol>
+        <button class="btn" id="finishBtn">Finish setup</button>
+      </div>
+
+      <div class="card">
+        <h2>Page wording</h2>
+        <label class="f">Page title</label><input class="f" id="uiTitle">
+        <label class="f">Role question (heading above the buttons)</label><input class="f" id="uiRoleQuestion">
+        <label class="f">Intro line (under the role question)</label><textarea class="f" id="uiIntro"></textarea>
+        <label class="f">Heading of the for-everyone section</label><input class="f" id="uiEveryoneHeading">
+        <div class="adm-actions">
+          <button class="btn" id="saveUiBtn">Save wording</button><span class="saved" id="uiSaved"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Roles &amp; content Docs</h2>
+        <p class="muted">Each role button shows its own Doc. Rename or reorder freely — the Doc
+          link stays attached. Removing a role hides the button; its Doc is kept in the Drive
+          folder (nothing is ever deleted). "Everyone" content:
+          <a id="everyoneDocLink" target="_blank" rel="noopener">open Doc</a></p>
+        <div id="roleRows"></div>
+        <div class="adm-actions">
+          <button class="btn secondary" id="addRoleBtn">+ Add role</button>
+          <button class="btn" id="saveRolesBtn">Save roles</button><span class="saved" id="rolesSaved"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Onboarding status — current staff</h2>
+        <div class="notice" id="schemaNotice" style="display:none">
+          The onboarding stamp isn't available yet (IT step pending — IT will run
+          <code>RUN_createSchema</code> in facts-to-gac-sync). Marking will work after that.
+        </div>
+        <p class="muted">New staff get the onboarding email automatically. Everyone listed here
+          <i>without</i> a checkmark would count as "new" — mark existing employees so they're
+          never emailed.</p>
+        <div class="adm-actions">
+          <button class="btn secondary" id="loadRosterBtn">Refresh list</button>
+          <button class="btn" id="markAllBtn">Mark ALL current staff as onboarded</button>
+          <span class="saved" id="markResult"></span>
+        </div>
+        <div id="rosterBox"><p class="muted">Loading staff list&hellip;</p></div>
+      </div>
+    </div>
+  </main>
+  <footer>Harford Christian School &middot; Home of the Eagles</footer>
+
+  <script>
+    // Server-generated (no user input) — raw print is safe.
+    var ROLES = window.DEMO_DATA.roles;
+    var UI = window.DEMO_DATA.ui;
+    var IS_ADMIN = true;
+    var SETUP_COMPLETE = true;
+    var current = null;
+    var adminState = null;
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function $(id) { return document.getElementById(id); }
+
+    /* ═══ viewer ═══ */
+
+    function renderViewerChrome() {
+      document.title = 'HCS Onboarding';
+      $('hdrTitle').textContent = UI.title;
+      $('roleQuestion').textContent = UI.roleQuestion;
+      $('introText').textContent = UI.intro;
+      $('everyoneHeading').textContent = UI.everyoneHeading;
+      var rolesDiv = $('roles');
+      rolesDiv.innerHTML = '';
+      ROLES.forEach(function (r) {
+        var b = document.createElement('button');
+        b.textContent = r.label;
+        b.className = (current === r.key) ? 'active' : '';
+        b.onclick = function () {
+          current = r.key;
+          Array.prototype.forEach.call(rolesDiv.children, function (x) {
+            x.classList.toggle('active', x === b);
+          });
+          loadContent(r.key);
+        };
+        rolesDiv.appendChild(b);
+      });
+    }
+
+    // A per-doc iframe isolates each exported Doc's stylesheet from the page and from the other
+    // Doc. srcdoc iframes are same-origin, so we can auto-size them to their content.
+    function docFrame(container, html) {
+      container.innerHTML = '';
+      if (!html) {
+        container.innerHTML = '<p class="muted">No content here yet.</p>';
+        return;
+      }
+      var f = document.createElement('iframe');
+      f.className = 'doc';
+      f.onload = function () {
+        try {
+          var d = f.contentDocument;
+          d.body.style.margin = '0';
+          var fit = function () { f.style.height = (d.documentElement.scrollHeight + 10) + 'px'; };
+          fit();
+          setTimeout(fit, 300); // once more after webfonts/images settle
+        } catch (e) { f.style.height = '30em'; }
+      };
+      f.srcdoc = html;
+      container.appendChild(f);
+    }
+
+    function showError(container, msg) {
+      container.innerHTML = '<div class="error">' + esc(msg) +
+        ' &mdash; please reply to the onboarding email or contact HCS IT.</div>';
+    }
+
+    function loadContent(roleKey) {
+      var roleContent = $('roleContent');
+      if (roleKey) {
+        $('roleCard').style.display = '';
+        $('roleTitle').textContent = 'Your setup steps';
+        roleContent.innerHTML = '<div class="spinner">Loading&hellip;</div>';
+      }
+      google.script.run
+        .withSuccessHandler(function (res) {
+          docFrame($('everyoneContent'), res.everyoneHtml);
+          if (roleKey) {
+            $('roleTitle').textContent = 'Setup steps — ' + res.roleLabel;
+            docFrame(roleContent, res.roleHtml);
+          }
+        })
+        .withFailureHandler(function (err) {
+          showError(roleKey ? roleContent : $('everyoneContent'),
+            'Could not load this content (' + err.message + ')');
+        })
+        .contentApi(roleKey);
+    }
+
+    /* ═══ admin ═══ */
+
+    function adminFail(err) { alert('Admin action failed: ' + err.message); }
+
+    function setAdminOpen(open) {
+      document.body.classList.toggle('admin-open', open);
+      $('adminBtn').textContent = open ? '← Back to the page' : '⚙ Settings';
+      if (open && !adminState) refreshAdminState(true);
+    }
+
+    function refreshAdminState(withRoster) {
+      google.script.run.withSuccessHandler(function (st) {
+        adminState = st;
+        renderAdmin();
+        if (withRoster) loadRoster();
+      }).withFailureHandler(adminFail).adminStateApi();
+    }
+
+    function renderAdmin() {
+      var st = adminState;
+      $('wizardBanner').style.display = st.setupComplete ? 'none' : '';
+      $('uiTitle').value = st.ui.title;
+      $('uiRoleQuestion').value = st.ui.roleQuestion;
+      $('uiIntro').value = st.ui.intro;
+      $('uiEveryoneHeading').value = st.ui.everyoneHeading;
+      $('everyoneDocLink').href = st.everyoneDocUrl || '#';
+      $('schemaNotice').style.display = st.schemaReady ? 'none' : '';
+      $('markAllBtn').disabled = !st.schemaReady;
+
+      var rows = $('roleRows');
+      rows.innerHTML = '';
+      st.roles.forEach(function (r, i) {
+        var div = document.createElement('div');
+        div.className = 'rolerow';
+        div.innerHTML =
+          '<button class="btn secondary small" title="Move up">&#8593;</button>' +
+          '<button class="btn secondary small" title="Move down">&#8595;</button>' +
+          '<input class="f" value="' + esc(r.label) + '">' +
+          (r.docUrl ? '<a class="btn secondary small" target="_blank" rel="noopener" href="' +
+            esc(r.docUrl) + '">Open Doc</a>' : '') +
+          '<button class="btn secondary small" title="Remove role">&#10005;</button>';
+        var btns = div.querySelectorAll('button');
+        btns[0].onclick = function () { moveRole(i, -1); };
+        btns[1].onclick = function () { moveRole(i, +1); };
+        btns[btns.length - 1].onclick = function () {
+          if (confirm('Remove the "' + r.label + '" button? (Its Doc stays in the Drive folder.)')) {
+            adminState.roles.splice(i, 1);
+            renderAdmin();
+          }
+        };
+        div.querySelector('input').oninput = function (e) { adminState.roles[i].label = e.target.value; };
+        rows.appendChild(div);
+      });
+    }
+
+    function moveRole(i, d) {
+      var r = adminState.roles;
+      var j = i + d;
+      if (j < 0 || j >= r.length) return;
+      var t = r[i]; r[i] = r[j]; r[j] = t;
+      renderAdmin();
+    }
+
+    function applyState(st) {
+      adminState = st;
+      ROLES = st.roles.map(function (r) { return { key: r.key, label: r.label }; });
+      UI = st.ui;
+      if (current && !ROLES.some(function (r) { return r.key === current; })) current = null;
+      renderAdmin();
+      renderViewerChrome();
+    }
+
+    function flash(id) {
+      $(id).textContent = 'Saved ✓';
+      setTimeout(function () { $(id).textContent = ''; }, 2500);
+    }
+
+    function loadRoster() {
+      $('rosterBox').innerHTML = '<p class="muted">Loading staff list&hellip;</p>';
+      google.script.run.withSuccessHandler(function (roster) {
+        var done = roster.filter(function (r) { return r.onboarded; }).length;
+        var html = '<p class="muted">' + roster.length + ' active staff accounts &middot; ' +
+          '<span class="ok">' + done + ' marked onboarded</span> &middot; ' +
+          '<span class="todo">' + (roster.length - done) + ' not marked</span></p>' +
+          '<table class="roster"><tr><th>Account</th><th>Name</th><th>Created</th><th>Onboarded</th><th></th></tr>';
+        roster.forEach(function (r) {
+          html += '<tr><td>' + esc(r.email) + '</td><td>' + esc(r.name) + '</td><td>' +
+            esc(r.created) + '</td><td>' +
+            (r.onboarded ? '<span class="ok">✓ ' + esc(r.onboarded) + '</span>'
+                         : '<span class="todo">—</span>') +
+            '</td><td>' + (r.onboarded ? '' :
+              '<button class="btn secondary small" data-email="' + esc(r.email) + '">Mark</button>') +
+            '</td></tr>';
+        });
+        html += '</table>';
+        $('rosterBox').innerHTML = html;
+        Array.prototype.forEach.call($('rosterBox').querySelectorAll('button[data-email]'), function (b) {
+          b.onclick = function () { markOnboarded([b.getAttribute('data-email')]); };
+        });
+      }).withFailureHandler(function (err) {
+        $('rosterBox').innerHTML = '<div class="error">Could not load the staff list (' +
+          esc(err.message) + ')</div>';
+      }).adminRosterApi();
+    }
+
+    function markOnboarded(emails) {
+      $('markResult').textContent = 'Working…';
+      $('markAllBtn').disabled = true;
+      google.script.run.withSuccessHandler(function (res) {
+        var msg = res.written + ' marked';
+        if (res.pending.length) msg += ' (' + res.pending.length + ' still syncing — refresh in a minute)';
+        if (res.failed.length) msg += ' · ' + res.failed.length + ' FAILED';
+        $('markResult').textContent = msg;
+        $('markAllBtn').disabled = !adminState.schemaReady;
+        if (res.failed.length) alert('Some accounts failed:\n' + res.failed.join('\n'));
+        loadRoster();
+      }).withFailureHandler(function (err) {
+        $('markResult').textContent = '';
+        $('markAllBtn').disabled = !adminState.schemaReady;
+        adminFail(err);
+      }).adminMarkOnboardedApi(emails);
+    }
+
+    if (IS_ADMIN) {
+      $('adminBtn').onclick = function () { setAdminOpen(!document.body.classList.contains('admin-open')); };
+      $('saveUiBtn').onclick = function () {
+        google.script.run.withSuccessHandler(function (st) { applyState(st); flash('uiSaved'); })
+          .withFailureHandler(adminFail).adminSaveUiApi({
+            title: $('uiTitle').value, roleQuestion: $('uiRoleQuestion').value,
+            intro: $('uiIntro').value, everyoneHeading: $('uiEveryoneHeading').value
+          });
+      };
+      $('saveRolesBtn').onclick = function () {
+        google.script.run.withSuccessHandler(function (st) { applyState(st); flash('rolesSaved'); })
+          .withFailureHandler(adminFail)
+          .adminSaveRolesApi(adminState.roles.map(function (r) { return { key: r.key, label: r.label }; }));
+      };
+      $('addRoleBtn').onclick = function () {
+        var label = prompt('Name of the new role (this is the button text):');
+        if (!label || !label.trim()) return;
+        google.script.run.withSuccessHandler(function (st) { applyState(st); flash('rolesSaved'); })
+          .withFailureHandler(adminFail).adminAddRoleApi(label.trim());
+      };
+      $('markAllBtn').onclick = function () {
+        if (confirm('Mark EVERY current staff account as already onboarded?\n\nDo this once, before ' +
+          'the automatic email is switched on, so existing employees never get the new-hire email.')) {
+          markOnboarded(null);
+        }
+      };
+      $('loadRosterBtn').onclick = loadRoster;
+      $('finishBtn').onclick = function () {
+        google.script.run.withSuccessHandler(function (st) {
+          applyState(st);
+          alert('Setup complete! Tell IT — they flip the automatic email on from here.');
+        }).withFailureHandler(adminFail).adminCompleteSetupApi();
+      };
+      // First visit for an admin while setup is incomplete → open straight into the wizard.
+      if (!SETUP_COMPLETE) setAdminOpen(true); else setAdminOpen(false);
+    }
+
+    renderViewerChrome();
+    loadContent(null); // everyone-content loads immediately; role content on pick
+  </script>
+</body>
+</html>
