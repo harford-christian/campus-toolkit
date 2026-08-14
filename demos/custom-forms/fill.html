@@ -24,6 +24,10 @@
   .page.wide { max-width:1080px; }
   .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
     padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
+  /* full-bleed variant — Portal's site shell (matches Builder's always-full-width .topbar);
+     the default (unrounded-top removed) is still used by boxed contexts like the runner's
+     access-denied page, which keep the rounded-top-of-a-card look. */
+  .brandbar.flush { border-radius:0; }
   .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
   .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
   .brandbar .spacer { margin-left:auto; }
@@ -103,8 +107,8 @@
   .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; }
-  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; overflow-y:auto; }
+  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; max-height:calc(100vh - 32px); overflow-y:auto; margin:auto; }
   .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
   .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
   .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; }
@@ -117,6 +121,27 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* ---- shared shell nav (cross-app link in the topbar/brandbar) ---- */
+  .shell-topbar-link { margin-left:auto; color:#fff; text-decoration:none; font-weight:700;
+    font-size:.85rem; background:rgba(255,255,255,.14); border-radius:999px; padding:7px 14px;
+    transition:background .12s; }
+  .shell-topbar-link:hover { background:rgba(255,255,255,.24); }
+
+  /* ---- tile grid (Portal's full-site home view — same visual language as Builder's
+     .chipgrid/.chip, generically named so Portal doesn't need Builder's CSS) ---- */
+  .tilegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; padding:16px;
+    text-decoration:none; color:inherit; font:inherit; cursor:pointer; text-align:left;
+    transition:border-color .12s, transform .12s; }
+  .tile:hover { border-color:var(--hcs-gold); transform:translateY(-1px); }
+  .tile:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .tile:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+  .tile-icon { flex:0 0 auto; width:40px; height:40px; border-radius:10px; background:var(--hcs-gold-soft);
+    color:var(--hcs-red); display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+  .tile-name { flex:1 1 auto; min-width:0; font-weight:700; color:var(--text); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .tile-chev { flex:0 0 auto; color:var(--muted); font-size:1.1rem; }
   /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
   .identity-collapsed { display:none !important; }
   /* FAQ accordion (faq field type) */
@@ -133,6 +158,9 @@
   .hcsi-lg { width:44px; height:44px; }
   .infoicon { color:var(--muted); cursor:help; }
   .infoicon:hover { color:var(--hcs-red); }
+  .infotip { position:fixed; max-width:260px; background:var(--card); border:1px solid var(--line-strong);
+    border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.18); padding:9px 12px; font-size:.8rem;
+    line-height:1.4; color:var(--text); z-index:200; }
 </style>
 <style>
   #pvbar { position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
@@ -489,8 +517,10 @@ var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage'];
     if (!EMAIL_RE.test(email)) return otpError('Enter a valid email address.');
     otpEmail = email;
     var btn = document.getElementById('otpSend'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
-    google.script.run.withSuccessHandler(function () { renderCodeEntry(); })
-      .withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Send code'; otpError(String(e && e.message || e)); })
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.ok === false) { btn.disabled = false; btn.textContent = 'Send code'; otpError(res.msg); return; }
+      renderCodeEntry();
+    }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Send code'; otpError(String(e && e.message || e)); })
       .authRequestOtp(email);
   }
 
@@ -511,8 +541,9 @@ var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage'];
     resend.addEventListener('click', function () {
       resend.disabled = true; var n = 20;
       resend.textContent = 'Resend in ' + n + 's';
-      google.script.run.authRequestOtp(otpEmail);
-      FormsUI.toast('New code sent (if the email is on file)');
+      google.script.run.withSuccessHandler(function (res) {
+        FormsUI.toast(res && res.ok === false ? res.msg : 'New code sent (if the email is on file)');
+      }).authRequestOtp(otpEmail);
       var t = setInterval(function () { n--; resend.textContent = n > 0 ? 'Resend in ' + n + 's' : 'Resend code'; if (n <= 0) { clearInterval(t); resend.disabled = false; } }, 1000);
     });
     var codeEl = document.getElementById('otpCode');

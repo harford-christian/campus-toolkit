@@ -24,6 +24,10 @@
   .page.wide { max-width:1080px; }
   .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
     padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
+  /* full-bleed variant — Portal's site shell (matches Builder's always-full-width .topbar);
+     the default (unrounded-top removed) is still used by boxed contexts like the runner's
+     access-denied page, which keep the rounded-top-of-a-card look. */
+  .brandbar.flush { border-radius:0; }
   .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
   .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
   .brandbar .spacer { margin-left:auto; }
@@ -103,8 +107,8 @@
   .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; }
-  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; overflow-y:auto; }
+  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; max-height:calc(100vh - 32px); overflow-y:auto; margin:auto; }
   .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
   .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
   .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; }
@@ -117,6 +121,27 @@
   .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
   .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
   @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* ---- shared shell nav (cross-app link in the topbar/brandbar) ---- */
+  .shell-topbar-link { margin-left:auto; color:#fff; text-decoration:none; font-weight:700;
+    font-size:.85rem; background:rgba(255,255,255,.14); border-radius:999px; padding:7px 14px;
+    transition:background .12s; }
+  .shell-topbar-link:hover { background:rgba(255,255,255,.24); }
+
+  /* ---- tile grid (Portal's full-site home view — same visual language as Builder's
+     .chipgrid/.chip, generically named so Portal doesn't need Builder's CSS) ---- */
+  .tilegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; padding:16px;
+    text-decoration:none; color:inherit; font:inherit; cursor:pointer; text-align:left;
+    transition:border-color .12s, transform .12s; }
+  .tile:hover { border-color:var(--hcs-gold); transform:translateY(-1px); }
+  .tile:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .tile:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+  .tile-icon { flex:0 0 auto; width:40px; height:40px; border-radius:10px; background:var(--hcs-gold-soft);
+    color:var(--hcs-red); display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+  .tile-name { flex:1 1 auto; min-width:0; font-weight:700; color:var(--text); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .tile-chev { flex:0 0 auto; color:var(--muted); font-size:1.1rem; }
   /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
   .identity-collapsed { display:none !important; }
   /* FAQ accordion (faq field type) */
@@ -133,6 +158,9 @@
   .hcsi-lg { width:44px; height:44px; }
   .infoicon { color:var(--muted); cursor:help; }
   .infoicon:hover { color:var(--hcs-red); }
+  .infotip { position:fixed; max-width:260px; background:var(--card); border:1px solid var(--line-strong);
+    border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.18); padding:9px 12px; font-size:.8rem;
+    line-height:1.4; color:var(--text); z-index:200; }
 </style>
 <style>
   #pvbar { position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
@@ -154,7 +182,7 @@
 <style>
   .bwrap { max-width:1080px; margin:0 auto; padding:0 16px 64px; }
   .topbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff; padding:12px 18px; }
-  .topbar .logo { height:32px; background:#fff; border-radius:6px; padding:3px 5px; }
+  .topbar .logo { height:34px; background:#fff; border-radius:6px; padding:3px 5px; }
   .topbar .name { font-weight:800; }
   .topbar .who { margin-left:auto; font-size:.8rem; opacity:.92; display:flex; align-items:center; gap:8px; min-width:0; }
   .topbar .who span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -165,6 +193,8 @@
   .tab.on { color:var(--hcs-red); border-bottom-color:var(--hcs-red); }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
   .fcard { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; display:flex; flex-direction:column; gap:10px; }
+  /* Marks whichever template card's preview is currently showing in the library's prevpane. */
+  .fcard.active { border-color:var(--hcs-red); box-shadow:0 0 0 1px var(--hcs-red), var(--shadow); }
   .fcard h3 { margin:0; font-size:1.02rem; }
   .fcard .meta { font-size:.78rem; color:var(--muted); }
   .fcard .pills { display:flex; gap:6px; flex-wrap:wrap; }
@@ -179,18 +209,27 @@
   .moremenu .menu button.danger:hover { background:#fbeaea; }
   .btn.ghost.danger { color:var(--hcs-red); border-color:var(--hcs-red); background:none; }
   .btn.ghost.danger:hover { background:#fbeaea; }
-  .editor { display:grid; grid-template-columns:1fr 300px; gap:18px; align-items:start; }
-  .editor.withprev { grid-template-columns:1fr 360px 300px; }
-  /* Below full-desktop width the pane becomes a fixed right-side drawer — always visible,
-     never buried below a long field list. */
-  @media (max-width:1180px){
-    .editor.withprev { grid-template-columns:1fr 300px; }
-    .editor.withprev #livePrevWrap { position:fixed; top:0; right:0; bottom:0; width:min(420px,92vw); z-index:70;
-      background:var(--card); box-shadow:-12px 0 30px rgba(0,0,0,.22); overflow:auto; }
-    .editor.withprev #livePrevWrap .prevpane { border:0; border-radius:0; max-height:none; }
-    .editor.withprev #livePrevWrap .prevpane-hd { border-radius:0; }
-  }
-  @media (max-width:820px){ .editor, .editor.withprev { grid-template-columns:1fr; } }
+  /* Canvas + a fixed-width right pane — used by the template library's preview. */
+  .split2col { display:grid; grid-template-columns:1fr 360px; gap:18px; align-items:start; }
+  @media (max-width:820px){ .split2col { grid-template-columns:1fr; } }
+
+  /* Editor: three tabs (Build / Settings / Preview) instead of a permanent side column —
+     each gets the full content width. Build shows the canvas (fieldCard()'s .fcpreview is
+     each field's real look); Settings is a spacious card grid; Preview renders the whole
+     form via renderSchemaPreviewInto_ / pvField_ (same renderer the library preview uses). */
+  .pvpage { max-width:720px; margin:0 auto; }
+  .settingsgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; max-width:1100px; }
+  .setcard { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px; }
+  .setcard h4 { margin:0 0 12px; color:var(--hcs-red); font-size:.92rem; }
+  /* Access & status + Actions merged into one full-width, visually raised card — the
+     setting most likely to matter (who can see it, is it even published) plus the actions
+     people reach for right after checking it, given top billing over the other cards. */
+  .setcard-spotlight { grid-column:1 / -1; border:1px solid var(--hcs-red); box-shadow:0 6px 22px rgba(139,30,30,.14); }
+  .setcard-spotlight .spotlight-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; align-items:start; }
+  @media (max-width:640px){ .setcard-spotlight .spotlight-grid { grid-template-columns:1fr; } }
+  .setcard-spotlight h4 { font-size:1.05rem; }
+  .setcard label.lbl { display:block; font-size:.8rem; font-weight:600; margin:12px 0 4px; }
+  .setcard label.lbl:first-of-type { margin-top:0; }
   .palette { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; align-items:center; }
   .palette button { font-size:.8rem; padding:6px 10px; border:1px solid var(--line-strong); border-radius:999px; background:var(--card); cursor:pointer; }
   .palette button:hover { border-color:var(--hcs-red); color:var(--hcs-red); }
@@ -201,11 +240,44 @@
   .startchoices button:hover { border-color:var(--hcs-red); }
   .startchoices button strong { display:block; margin-bottom:3px; }
   .startchoices button span { color:var(--muted); font-size:.85rem; line-height:1.4; }
-  .prevpane { position:sticky; top:12px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); max-height:calc(100vh - 40px); overflow:auto; }
-  .prevpane-hd { background:var(--hcs-red); color:#fff; font-weight:700; font-size:.8rem; padding:8px 14px; border-radius:var(--radius) var(--radius) 0 0; position:sticky; top:0; }
-  #livePrev { padding:14px; }
-  #livePrev .field { margin-bottom:12px; }
-  #livePrev .fieldlabel { display:block; font-weight:600; font-size:.88rem; margin-bottom:4px; }
+  /* "+" insert points between fields — click one, pick a type from an icon tile grid
+     (scan by shape), new field lands right there. */
+  .fieldgap { position:relative; height:20px; display:flex; align-items:center; justify-content:center; }
+  .fieldgap::before { content:''; position:absolute; left:0; right:0; top:50%; border-top:1px dashed var(--line-strong); }
+  .fieldgap .moremenu { position:relative; z-index:2; }
+  .gapadd { width:22px; height:22px; border-radius:50%; border:1px solid var(--line-strong); background:var(--card);
+    color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0; transition:opacity .12s, border-color .12s, color .12s; }
+  .fieldgap:hover .gapadd, .gapadd:focus-visible { opacity:1; }
+  .gapadd:hover { border-color:var(--hcs-red); color:var(--hcs-red); }
+  /* Always-visible "+ Add field" variant — the one permanent add point (see fieldGapHtml). */
+  .fieldgap-big { height:auto; margin:14px 0 6px; }
+  .fieldgap-big::before { content:none; }
+  .fieldgap-big .gapadd-big { opacity:1; width:auto; height:auto; border-radius:8px; padding:9px 16px;
+    display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:.85rem; font-weight:700;
+    color:var(--hcs-red); border-color:var(--hcs-red); }
+  .fieldgap-big .gapadd-big:hover { background:var(--panel); }
+  .fieldgap-big .gapmenu { left:0; transform:none; }
+  .fieldgap .gapmenu { left:50%; right:auto; transform:translateX(-50%); top:calc(100% + 4px);
+    max-height:min(420px,60vh); overflow:auto; width:min(300px,88vw); padding:10px; }
+  .tg-group { margin-bottom:12px; }
+  .tg-group:last-child { margin-bottom:0; }
+  .tg-group h4 { font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 8px; padding:0 2px; }
+  .tg-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  /* Specificity bump (button.tg-tile inside .gapmenu.tilemenu) beats the generic
+     .moremenu .menu button row styling this menu otherwise inherits. */
+  .gapmenu.tilemenu button.tg-tile { display:flex; flex-direction:column; align-items:center; gap:6px;
+    width:auto; text-align:center; padding:10px 4px; border:1px solid transparent; border-radius:8px; background:none; }
+  .gapmenu.tilemenu button.tg-tile:hover { background:var(--panel); border-color:var(--line-strong); }
+  .tg-tile .ic { font-size:1.2rem; width:34px; height:34px; border-radius:9px; background:var(--hcs-gold-soft);
+    display:flex; align-items:center; justify-content:center; }
+  .tg-tile .lb { font-size:.7rem; font-weight:600; line-height:1.2; }
+  .prevpane { position:sticky; top:12px; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); max-height:calc(100vh - 40px); overflow:auto; padding:14px; }
+  .prevpane-hd { background:var(--hcs-red); color:#fff; font-weight:700; font-size:.8rem; padding:8px 14px; border-radius:var(--radius) var(--radius) 0 0; position:sticky; top:0; margin:-14px -14px 14px; }
+  /* Outlined "sheet" around the rendered preview — reads as an actual form (like Runner's
+     own .card look), not loose text floating in the pane. Shared by the template library's
+     preview pane and each field's own collapsed WYSIWYG view in the editor (.fcpreview) —
+     both call renderSchemaPreviewInto_ / pvField_. */
+  .pv-sheet { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; }
   .pv-title { font-weight:800; font-size:1.05rem; margin-bottom:4px; }
   .pv-desc { color:var(--muted); font-size:.85rem; margin:0 0 10px; }
   .pv-break { text-align:center; font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--hcs-red); border-top:2px dashed var(--line-strong); padding-top:8px; margin:14px 0 10px; }
@@ -214,31 +286,41 @@
   .caprow { display:flex; align-items:center; gap:8px; margin:4px 0; }
   .caprow span { flex:1; font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .caprow input { max-width:90px; }
-  .sgroup { border:1px solid var(--line); border-radius:8px; padding:8px 12px; margin:10px 0; background:var(--card); }
-  .sgroup > summary { cursor:pointer; font-weight:700; font-size:.85rem; color:var(--text); }
-  .sgroup > summary:hover { color:var(--hcs-red); }
   .rtable tr[data-ri] { cursor:pointer; }
   .rtable tr[data-ri]:hover td { background:#f7f3ea; }
-  .fieldcard { border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; background:var(--panel); }
-  .fieldcard { cursor:default; }
-  .fieldcard .fchead { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-  .draghandle { cursor:grab; color:var(--muted); font-size:1.05rem; user-select:none; }
+  /* Collapsed (default): .fcpreview shows the field exactly as a submitter would see it —
+     the canvas itself is the preview, no docked pane elsewhere. Expanded (click the
+     preview, or the pencil in .fctools): .fceditor shows the full settings body this
+     editor has always had (unchanged logic — only the surrounding chrome moved). */
+  .fieldcard { position:relative; border:1px solid var(--line); border-radius:var(--radius-sm); padding:12px; margin-bottom:10px; background:var(--panel); }
+  .fieldcard.collapsed { background:var(--card); padding:0; }
+  .fieldcard .fctools { position:absolute; top:8px; right:8px; display:flex; align-items:center; gap:2px;
+    background:var(--card); border:1px solid var(--line-strong); border-radius:8px; padding:2px; box-shadow:var(--shadow); z-index:2; }
+  .fieldcard.collapsed .fctools { opacity:0; transition:opacity .12s; }
+  .fieldcard.collapsed:hover .fctools { opacity:1; }
+  .draghandle { cursor:grab; color:var(--muted); font-size:1.05rem; user-select:none; padding:0 3px; }
+  .fieldcard .fcpreview { display:none; cursor:pointer; border-radius:8px; padding:14px; }
+  .fieldcard.collapsed .fcpreview { display:block; }
+  .fieldcard.collapsed:hover .fcpreview { background:var(--panel); }
+  /* pvField_ renders real (disabled) form controls for a true WYSIWYG look — disabled
+     inputs/selects/etc. natively swallow clicks instead of bubbling them up, so clicking
+     directly on e.g. the text-input box did nothing. Routing pointer events through to the
+     .fcpreview container itself (which has the click-to-expand handler) fixes that. */
+  .fieldcard.collapsed .fcpreview * { pointer-events:none; }
+  .fieldcard .fceditor { display:block; }
+  .fieldcard.collapsed .fceditor { display:none; }
+  .fieldcard .fchead { display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; }
+  .fieldcard .fchead .fcdone { margin-left:auto; }
   .toolbar { display:flex; gap:8px; flex-wrap:wrap; margin:12px 0; }
   .toolbar input, .toolbar select { padding:8px 10px; border:1px solid var(--line-strong); border-radius:var(--radius-sm); font:inherit; }
   .toolbar input { flex:1; min-width:180px; }
   .fieldcard .ftype { font-size:.66rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:800; background:#eef1f5; padding:2px 7px; border-radius:6px; }
-  .fieldcard .fcacts { margin-left:auto; display:flex; gap:4px; }
-  .fieldcard .fclabel { font-weight:600; font-size:.9rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:38%; }
+  .fieldcard .fclabel { font-weight:600; font-size:.9rem; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fieldcard.collapsed .fcbody { display:none; }
-  .col-chevron { transition:transform .15s ease; }
-  .fieldcard.collapsed .col-chevron { transform:rotate(-90deg); }
   .iconbtn { display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--line-strong); background:var(--card); border-radius:7px; width:30px; height:30px; cursor:pointer; font-size:.9rem; line-height:1; color:var(--muted); }
   .iconbtn:hover { border-color:var(--hcs-red); color:var(--hcs-red); }
   .frow { display:flex; gap:8px; flex-wrap:wrap; }
   .frow > * { flex:1; min-width:120px; }
-  .side { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; position:sticky; top:12px; }
-  .side h4 { margin:0 0 10px; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
-  .side label.lbl { display:block; font-size:.8rem; font-weight:600; margin:12px 0 4px; }
   .switchrow { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:10px 0; font-size:.9rem; }
   .toggle { position:relative; width:42px; height:24px; flex:none; }
   .toggle input { opacity:0; width:0; height:0; }
@@ -252,6 +334,29 @@
   .adv { margin-top:8px; }
   .adv summary { font-size:.78rem; color:var(--muted); cursor:pointer; }
   .banner { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; border-radius:var(--radius-sm); padding:10px 12px; font-size:.85rem; margin-bottom:14px; }
+  .chipgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr)); gap:16px; margin-bottom:22px; }
+  .chip-wrap { position:relative; }
+  .chip { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); display:flex; flex-direction:column; position:relative; }
+  .chip-band { position:relative; padding:12px 14px; background:var(--tint,var(--panel)); display:flex; align-items:center; gap:10px; overflow:hidden; border:0; margin:0; width:100%; cursor:pointer; font:inherit; text-align:left; border-radius:var(--radius) var(--radius) 0 0; }
+  .chip-tile { position:relative; flex:none; width:28px; height:28px; border-radius:8px; background:var(--card); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; font-size:.74rem; font-weight:800; letter-spacing:.01em; color:var(--tile-fg,var(--hcs-red)); overflow:hidden; }
+  .chip-tile img { width:100%; height:100%; object-fit:cover; }
+  .chip-name { position:relative; font-weight:700; font-size:.94rem; color:inherit; text-decoration:none; background:none; border:0; padding:0; text-align:left; cursor:pointer; font-family:inherit; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip-name:hover { color:var(--hcs-red); }
+  .chip-body { padding:12px 14px; display:flex; flex-direction:column; gap:8px; flex:1; }
+  .chip-owner { font-size:.76rem; color:var(--muted); }
+  .chip-desc { font-size:.8rem; color:var(--muted); }
+  .chip-stat { font-size:.78rem; color:var(--muted); font-variant-numeric:tabular-nums; background:none; border:0; padding:0; cursor:pointer; font-family:inherit; text-align:left; }
+  .chip-stat:hover { color:var(--hcs-red); }
+  .chip-stat b { color:var(--text); font-weight:700; }
+  .chip-pills { display:flex; gap:5px; flex-wrap:wrap; }
+  .chip-foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:auto; padding-top:4px; }
+  .upload-preview { display:flex; align-items:center; gap:10px; margin:6px 0 2px; }
+  .upload-preview img { width:40px; height:40px; border-radius:8px; object-fit:cover; border:1px solid var(--line); }
+  .upload-preview .help { margin:0; }
+  .chip-notes { font-size:.78rem; font-style:italic; color:var(--muted); border-left:2px solid var(--line-strong); padding-left:8px; white-space:pre-wrap; }
+  .pill.acc-open { background:#e0f5f2; color:#1f7a6c; }
+  .mbody-section { font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.07em; color:var(--hcs-red); border-bottom:1px solid var(--line); padding-bottom:5px; margin:16px 0 4px; }
+  .mbody-section:first-child { margin-top:0; }
 </style>
 <link rel="stylesheet" href="../../assets/demo-banner.css">
 <script>window.DEMO_META = { name: "Custom Forms" };</script>
@@ -365,6 +470,17 @@
     add('t-medical', {title:'Medical Authorization (locked)', isTemplate:true, templateScope:'shared', layoutLock:'useAsIs', lifecycle:'template', category:'Health'}, { title:'Medical Authorization', description:'Standardized medical authorization — used as-is.', settings:base('private'), pages:pg([
       {id:'pe',type:'email',label:'Email',required:true,prefillFrom:'parentEmail'},{id:'stu',type:'studentPicker',label:'Student',required:true},{id:'sig',type:'signature',label:'Signature',required:true}]) });
     add('t-mine', {title:'My Survey Starter', isTemplate:true, templateScope:'personal', layoutLock:'starter', lifecycle:'template'}, { title:'My Survey Starter', description:'', settings:base('open'), pages:pg([{id:'q',type:'textarea',label:'Your feedback'}]) });
+    add('t-pending-demo', {title:'Lunch Order Form (pending review)', isTemplate:true, templateScope:'pending', layoutLock:'starter', lifecycle:'template', category:'General'}, { title:'Lunch Order Form', description:'', settings:base('open'), pages:pg([{id:'w',type:'radio',label:'This week\'s choice',options:['Pizza','Salad','Sandwich']}]) });
+    // PascalCase in (matches the real adminAddApp/adminUpdateApp payload shape from
+    // Builder.html), camelCase out (matches the real appRowToObj_ read shape).
+    function appFromInput_(appId, data){ return { appId:appId, name:data.Name||'', description:data.Description||'', url:data.Url||'',
+      iconEmoji:data.IconEmoji||'', ownerEmail:data.OwnerEmail||'', active:data.Active!==false, slug:data.Slug||'',
+      supportsHandoff:data.SupportsHandoff===true, visibleToParent:data.VisibleToParent===true, visibleToStaff:data.VisibleToStaff===true,
+      visibleToStudent:data.VisibleToStudent===true, logoUrl:data.LogoUrl||'', notes:data.Notes||'' }; }
+    function appToInput_(a){ return { Name:a.name, Description:a.description, Url:a.url, IconEmoji:a.iconEmoji, OwnerEmail:a.ownerEmail,
+      Active:a.active, Slug:a.slug, SupportsHandoff:a.supportsHandoff, VisibleToParent:a.visibleToParent, VisibleToStaff:a.visibleToStaff,
+      VisibleToStudent:a.visibleToStudent, LogoUrl:a.logoUrl, Notes:a.notes }; }
+    var APPS = [{ appId:'a-ptc', name:'PTC Scheduling', description:'Parent-teacher conference sign-ups', url:'https://example.com/ptc', ownerEmail:ME.email, active:true, visibleToParent:true, visibleToStaff:true, visibleToStudent:false, iconEmoji:'📅', notes:'' }];
 
     function metas(pred){ return Object.keys(STORE).map(function(k){ return JSON.parse(JSON.stringify(STORE[k].meta)); }).filter(pred); }
     function rows(n){ var o=[],names=['Jordan','Alex','Sam','Riley','Casey']; for(var i=0;i<n;i++) o.push(['SUB-'+(1000+i),'2/'+(i+1)+'/26 9:15 AM','parent'+i+'@example.com',names[i%5],'Sample','Submitted']); return o; }
@@ -384,24 +500,47 @@
       saveAsTemplate: function(id, opts){ var n=nid('t-new-'); var sc=JSON.parse(JSON.stringify(STORE[id].schema)); sc.id=n; add(n,{title:sc.title,isTemplate:true,templateScope:opts.scope,layoutLock:opts.layoutLock,lifecycle:'template'},sc); return {ok:true,templateId:n,scope:opts.scope,layoutLock:opts.layoutLock}; },
       deleteForm: function(id){ delete STORE[id]; return {ok:true}; },
       setTemplateScope: function(id, scope){ STORE[id].meta.templateScope = (scope==='shared'?'shared':'personal'); return {ok:true, scope:STORE[id].meta.templateScope}; },
+      requestPublishTemplate: function(id){ STORE[id].meta.templateScope='pending'; return {ok:true}; },
+      getTemplateRequests: function(){ return Object.keys(STORE).filter(function(k){ return STORE[k].meta.isTemplate && STORE[k].meta.templateScope==='pending'; })
+        .map(function(k){ var m=STORE[k].meta; return { formId:k, title:m.title, owner:m.owner, category:m.category||'' }; }); },
+      decideTemplateRequest: function(id, approve){ STORE[id].meta.templateScope = approve?'shared':'personal'; return {ok:true, scope:STORE[id].meta.templateScope}; },
+      adminListApps: function(){ return APPS.slice(); },
+      adminAddApp: function(data){ APPS.push(appFromInput_('a-'+(idc++), data)); return {ok:true}; },
+      adminUpdateApp: function(appId, data){ var i=APPS.findIndex(function(x){return x.appId===appId;}); if(i>-1) APPS[i]=appFromInput_(appId, Object.assign({}, appToInput_(APPS[i]), data)); return {ok:true}; },
+      adminDeleteApp: function(appId){ APPS = APPS.filter(function(x){return x.appId!==appId;}); return {ok:true}; },
       listAdmins: function(){ return ADMINS.slice(); },
       addAdmin: function(email, name){ if(!ADMINS.some(function(a){return a.email.toLowerCase()===String(email).toLowerCase();})) ADMINS.push({email:String(email).toLowerCase(),name:name||''}); return {ok:true, admins:ADMINS.slice()}; },
       removeAdmin: function(email){ ADMINS = ADMINS.filter(function(a){return a.email.toLowerCase()!==String(email).toLowerCase();}); return {ok:true, admins:ADMINS.slice()}; },
       getShareUrl: function(id){ return {ok:true, url: location.href.replace(/admin\.html.*$/, 'fill.html?form=demo-sample-0001'), access: STORE[id].meta.access}; },
       getResponses: function(id){ var m=STORE[id].meta; return {ok:true, headers:['SubmissionID','Timestamp','Email','First name','Last name','Status'], rows:rows(Math.min(6,m.submissions)), count:m.submissions, sheetUrl:''}; },
-      getApprovalQueue: function(){ return {ok:true, items:[
-        {formId:'f-trip', formTitle:'Field Trip Request', submissionId:'SUB-2001', respondentEmail:'teacher@harfordchristian.org', timestamp:'2/3/26 8:10 AM', summary:'Trip name: Zoo Trip · Destination: Baltimore · Is this an overnight trip?: No'},
-        {formId:'f-trip', formTitle:'Field Trip Request', submissionId:'SUB-2002', respondentEmail:'coach@harfordchristian.org', timestamp:'2/4/26 1:20 PM', summary:'Trip name: State Tournament · Is this an overnight trip?: Yes · Overnight lodging & chaperone plan: Hampton Inn; 4 chaperones'} ]}; },
-      decideApproval: function(formId, subId, decision){ return {ok:true, status:decision}; }
+      decideApproval: function(formId, subId, decision){ return {ok:true, status:decision}; },
+      adminCheckAppStatus: function(appId){ var a=APPS.find(function(x){return x.appId===appId;}); if(a){a.lastStatus='up';a.lastCheckedAt=new Date().toISOString();a.lastStatusMsg='200';} return a; },
+      adminCheckAllAppsStatus: function(){ APPS.forEach(function(a){a.lastStatus='up';a.lastCheckedAt=new Date().toISOString();a.lastStatusMsg='200';}); return APPS.slice(); }
     };
     function runnerObj(){ var s=null,f=null; var o={ withSuccessHandler:function(fn){s=fn;return o;}, withFailureHandler:function(fn){f=fn;return o;} };
       Object.keys(API).forEach(function(mm){ o[mm]=function(){ var a=arguments; setTimeout(function(){ try{ s&&s(API[mm].apply(null,a)); }catch(e){ f&&f(e); } },120); }; }); return o; }
     window.google = { script: { get run(){ return runnerObj(); } } };
+    // This preview should open straight into the editor for one pre-filled sample form —
+    // not the dashboard. Builder.html's own boot() always renders the dashboard first
+    // (that's real product code, left untouched), so instead of forking it: hide #app
+    // until the editor's own root element shows up, then click the sample form's real
+    // "edit" control (same click a person would make) — the dashboard never has time to
+    // become visible. A capped retry avoids an infinite blank page if the id ever changes.
+    var TARGET_FORM_ID = "f-sample-0001";
     window.addEventListener('DOMContentLoaded', function(){
       var bar=document.getElementById('pvbar');
-      bar.innerHTML='<span class="pvtag">PREVIEW · admin/backend · demo</span>'+
+      bar.innerHTML='<span class="pvtag">PREVIEW · builder editor · demo</span>'+
         '<a class="sp" href="index.html">← All views</a>'+
         '<a href="mailto:joshmay@harfordchristian.org" target="_blank" style="margin-left:14px">Leave a comment ↗</a>';
+      var appEl = document.getElementById('app');
+      appEl.style.visibility = 'hidden';
+      var tries = 0;
+      (function tryOpen(){
+        var el = document.querySelector('[data-act="edit"][data-id="'+TARGET_FORM_ID+'"]');
+        if (el) { el.click(); appEl.style.visibility = ''; return; }
+        if (++tries > 60) { appEl.style.visibility = ''; return; } // ~4.8s cap — reveal dashboard rather than stay blank
+        setTimeout(tryOpen, 80);
+      })();
     });
   })();
 </script>
@@ -410,6 +549,7 @@
   var app = document.getElementById('app');
   var ME = null;                // { email, isAdmin, name }
   var EDITING = null;           // { meta, schema, structureLocked }
+  var CURRENT_FORM_ITEMS = [];  // last-rendered My forms/All forms list, for card-editor lookups
   var TAB = 'mine';
   var FIELD_TYPES = [
     ['sectionHeader', 'Section'], ['description', 'Text block'], ['faq', 'FAQ (Q&A)'], ['text', 'Short text'],
@@ -444,12 +584,20 @@
     file: 'Upload a document or photo.', signature: 'Draw or type a signature.',
     calculation: 'Auto-computed sum or count of other answers (not a question).'
   };
+  // Icon tile grid for the "+" insert menu (fieldGapHtml) — scan-by-shape instead of a
+  // read-every-row list.
+  var TYPE_ICONS = {
+    sectionHeader: '🏷️', description: '📝', faq: '❓', pageBreak: '⏭️',
+    text: '🔤', textarea: '📄', email: '✉️', phone: '📞', number: '#️⃣',
+    date: '📅', time: '🕐', dropdown: '📋', radio: '⚪', checkboxes: '☑️',
+    yesno: '👍', rating: '⭐', studentPicker: '🎓', staffPicker: '🧑‍🏫',
+    file: '📎', signature: '✍️', calculation: '🧮'
+  };
   var OPTION_TYPES = { dropdown: 1, radio: 1, checkboxes: 1 };
   var DIRTY = false, SAVING = false, AUTOSAVE_T = null, DRAG_FROM = null;
   var COLLAPSED = {};           // fieldId -> true when its editor card is collapsed
   var UNDO_STACK = [];          // JSON snapshots of EDITING.schema (structural ops)
-  var LIVEPREV = false;         // live preview pane on/off
-  try { LIVEPREV = localStorage.getItem('hcsBuilderLivePrev') === '1'; } catch (e) {}
+  var LOADING_HTML_ = '<p class="help" style="padding:24px;display:flex;align-items:center;gap:8px"><span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span> ';
   window.addEventListener('beforeunload', function (e) { if (DIRTY) { e.preventDefault(); e.returnValue = ''; } });
   var esc = FormsUI.esc;
 
@@ -463,17 +611,20 @@
 
   // ---------- shell ----------
   function chrome(inner) {
+    var portalLink = (ME && ME.portalUrl)
+      ? '<a class="shell-topbar-link" href="' + esc(ME.portalUrl) + '" target="_top">Portal</a>'
+      : '';
     app.innerHTML =
       '<div class="topbar">' +
         '<img class="logo" src="' + HCS_LOGO + '" alt="HCS">' +
-        '<span class="name">HCS Forms</span>' +
+        '<span class="name">HCS Forms</span>' + portalLink +
         '<span class="who">' + (ME ? esc(ME.email) + (ME.isAdmin ? ' <span class="adminchip">admin</span>' : '') : '') + '</span>' +
       '</div><div class="goldrule"></div><div class="bwrap">' + inner + '</div>';
   }
 
   boot();
   function boot() {
-    chrome('<p class="help" style="padding:24px">Loading…</p>');
+    chrome(LOADING_HTML_ + 'Loading…</p>');
     call('whoAmI').then(function (me) {
       ME = me;
       var v = new URLSearchParams(location.search).get('view');
@@ -484,9 +635,12 @@
 
   // ---------- dashboard ----------
   function renderDashboard() {
+    if (TAB === 'apps' && !ME.isAdmin) TAB = 'mine';
+    if (TAB === 'approvals' && !ME.isAdmin) TAB = 'mine'; // deciding template requests is admin-only
     var tabs = '<div class="tabs">' +
       tabBtn('mine', 'My forms') + tabBtn('library', 'Template library') +
-      (ME.isAdmin ? tabBtn('all', 'All forms') : '') + tabBtn('approvals', 'Approvals') + '</div>';
+      (ME.isAdmin ? tabBtn('all', 'All forms') : '') + (ME.isAdmin ? tabBtn('approvals', 'Template requests') : '') +
+      (ME.isAdmin ? tabBtn('apps', 'App Manager') : '') + '</div>';
     var header = '<div style="display:flex;align-items:center;gap:10px;margin-top:18px">' +
       '<h1 class="form-title" style="margin:0">Forms</h1>' +
       '<div style="margin-left:auto;display:flex;gap:8px">' +
@@ -498,49 +652,68 @@
     document.getElementById('newBlank').onclick = newBlank;
     document.getElementById('newTpl').onclick = function () { TAB = 'library'; renderDashboard(); };
     var ma = document.getElementById('mngAdmins'); if (ma) ma.onclick = manageAdmins;
-    ['mine', 'library', 'all', 'approvals'].forEach(function (t) { var b = document.getElementById('tab_' + t); if (b) b.onclick = function () { TAB = t; renderDashboard(); }; });
+    ['mine', 'library', 'all', 'approvals', 'apps'].forEach(function (t) { var b = document.getElementById('tab_' + t); if (b) b.onclick = function () { TAB = t; renderDashboard(); }; });
     loadList();
   }
   function tabBtn(id, label) { return '<button class="tab ' + (TAB === id ? 'on' : '') + '" id="tab_' + id + '">' + esc(label) + '</button>'; }
 
+  var LOAD_GEN = 0;
   function loadList() {
+    var myGen = ++LOAD_GEN;
+    function stale() { return myGen !== LOAD_GEN; }
     var host = function () { return document.getElementById('list'); };
+    host().innerHTML = '<p class="help" style="display:flex;align-items:center;gap:8px"><span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span> Loading…</p>';
     if (TAB === 'approvals') {
-      call('getApprovalQueue').then(function (res) { renderApprovalQueue(res.items || []); }).catch(err);
+      // "Approvals" is now solely about admitting a form to the shared template library —
+      // per-submission approval routing (Settings' old Approvals card) is gone.
+      if (!ME.isAdmin) { renderTemplateRequests(null); return; }
+      call('getTemplateRequests').then(function (items) { if (!stale()) renderTemplateRequests(items || []); }).catch(err);
     } else if (TAB === 'library') {
-      call('listLibrary').then(function (items) { renderLibrary(items); }).catch(err);
+      call('listLibrary').then(function (items) { if (!stale()) renderLibrary(items); }).catch(err);
+    } else if (TAB === 'apps') {
+      call('adminListApps').then(function (items) { if (!stale()) renderAppsManager(items); }).catch(err);
     } else {
-      call(TAB === 'all' ? 'listAllForms' : 'listMyForms').then(function (items) { renderForms(items); }).catch(err);
+      call(TAB === 'all' ? 'listAllForms' : 'listMyForms').then(function (items) { if (!stale()) renderForms(items); }).catch(err);
     }
-    function err(e) { host().innerHTML = '<div class="notice err">' + esc(String(e && e.message || e)) + '</div>'; }
+    function err(e) { if (!stale()) host().innerHTML = '<div class="notice err">' + esc(String(e && e.message || e)) + '</div>'; }
   }
 
-  function renderApprovalQueue(items) {
+  // Admin-only queue of personal templates whose owner asked to publish them to the shared
+  // library (see doRequestPublish / Forms.js's requestPublishTemplate). `items === null`
+  // means the caller isn't an admin — they can request publishing from the Template
+  // library tab, but only an admin decides it, so this tab just points them there.
+  function renderTemplateRequests(items) {
     var host = document.getElementById('list');
-    if (!items.length) { host.innerHTML = '<p class="help">Nothing is awaiting your approval right now. 🎉</p>'; return; }
-    host.innerHTML = '<div class="grid">' + items.map(function (it) {
-      return '<div class="fcard"><h3>' + esc(it.formTitle) + '</h3>' +
-        '<div class="meta">from ' + esc(it.respondentEmail || '—') + ' · ' + esc(it.timestamp) + '</div>' +
-        '<div class="help">' + esc(it.summary || '') + '</div>' +
-        '<div class="acts"><button class="btn sm" data-ap="Approved" data-f="' + esc(it.formId) + '" data-s="' + esc(it.submissionId) + '">Approve</button>' +
-        '<button class="btn ghost sm" data-ap="Rejected" data-f="' + esc(it.formId) + '" data-s="' + esc(it.submissionId) + '">Reject</button></div></div>';
-    }).join('') + '</div>';
-    document.querySelectorAll('[data-ap]').forEach(function (b) {
-      b.onclick = function () { decide(b.getAttribute('data-ap'), b.getAttribute('data-f'), b.getAttribute('data-s')); };
-    });
-  }
-  function decide(decision, formId, subId) {
-    FormsUI.prompt(decision, { body: '<p class="help">Add a note for the requester (optional).</p>', placeholder: 'Note (optional)', okLabel: decision, multiline: true }).then(function (comment) {
-      if (comment === null) return;
-      call('decideApproval', [formId, subId, decision, comment]).then(function (res) {
-        FormsUI.toast(res.ok ? ('Marked ' + res.status) : (res.message || 'Error'));
-        loadList();
-      }).catch(alertErr);
+    if (items === null) {
+      host.innerHTML = '<p class="help">Only admins review template requests. To publish one of your own templates to the shared library, open <strong>Template library</strong>, find it under “My forms,” and use “Request to publish.”</p>';
+      return;
+    }
+    if (!items.length) { host.innerHTML = '<p class="help">No templates are waiting to join the shared library right now.</p>'; return; }
+    host.innerHTML =
+      '<p class="help" style="margin:0 0 12px">Personal templates a staff member asked to add to the shared library — approve to make it available to all staff, or reject to keep it personal.</p>' +
+      '<div class="chipgrid">' + items.map(function (t) {
+        return '<div class="fcard"><h3>' + esc(t.title || '(untitled)') + '</h3>' +
+          '<div class="meta">by ' + esc(t.owner) + (t.category ? ' · ' + esc(t.category) : '') + '</div>' +
+          '<div class="acts">' +
+            '<button class="btn sm" data-tplreq="approve" data-id="' + esc(t.formId) + '">Approve</button>' +
+            '<button class="btn ghost sm" data-tplreq="reject" data-id="' + esc(t.formId) + '">Reject</button>' +
+          '</div></div>';
+      }).join('') + '</div>';
+    document.querySelectorAll('[data-tplreq]').forEach(function (b) {
+      b.onclick = function () {
+        var id = b.getAttribute('data-id'), approve = b.getAttribute('data-tplreq') === 'approve';
+        b.disabled = true; b.innerHTML = '<span class="spinner" style="width:12px;height:12px"></span> ' + (approve ? 'Approving…' : 'Rejecting…');
+        call('decideTemplateRequest', [id, approve]).then(function () {
+          FormsUI.toast(approve ? 'Published to shared library' : 'Request rejected');
+          loadList();
+        }).catch(function (e) { b.disabled = false; alertErr(e); });
+      };
     });
   }
 
   function renderForms(items) {
     var host = document.getElementById('list');
+    CURRENT_FORM_ITEMS = items;
     if (!items.length) { host.innerHTML = '<p class="help">No forms yet. Click “New form” to start.</p>'; return; }
     host.innerHTML =
       '<div class="toolbar"><input id="fSearch" type="search" placeholder="Search forms…" aria-label="Search forms">' +
@@ -556,7 +729,7 @@
       });
       if (sort === 'title') list.sort(function (a, b) { return String(a.title).localeCompare(String(b.title)); });
       else if (sort === 'responses') list.sort(function (a, b) { return (b.submissions || 0) - (a.submissions || 0); });
-      document.getElementById('grid').innerHTML = list.length ? '<div class="grid">' + list.map(formCardHtml).join('') + '</div>' : '<p class="help">No forms match.</p>';
+      document.getElementById('grid').innerHTML = list.length ? '<div class="chipgrid">' + list.map(formCardHtml).join('') + '</div>' : '<p class="help">No forms match.</p>';
       wireCardButtons();
     };
     document.getElementById('fSearch').oninput = draw;
@@ -564,24 +737,54 @@
     document.getElementById('fSort').onchange = draw;
     draw();
   }
+  function initials(text) {
+    var words = String(text || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return '?';
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+  }
+  var LIFECYCLE_TINT = {
+    draft: { tint: 'var(--hcs-gold-soft)', fg: '#7a5b00' },
+    published: { tint: 'var(--ok-bg)', fg: 'var(--ok)' },
+    closed: { tint: 'var(--err-bg)', fg: 'var(--err)' }
+  };
+  function bandStyle(t) { return 'style="--tint:' + t.tint + '"'; }
+  function tileStyle(t) { return 'style="--tile-fg:' + t.fg + '"'; }
+  function formBadgeHtml(m) {
+    if (m.iconUrl) return '<img src="' + esc(m.iconUrl) + '" alt="">';
+    return esc(initials(m.title));
+  }
   function formCardHtml(m) {
     var id = m.id;
     var canDel = ME.isAdmin || String(m.owner || '').toLowerCase() === ME.email.toLowerCase();
     var menu =
       menuItem('Duplicate', 'dup', id, 'dup') +
       menuItem('Save as template', 'tpl', id, 'dup') +
+      menuItem('Share (QR code)', 'share', id, 'clip') +
+      menuItem('Edit card', 'editcard', id, 'edit') +
       (canDel ? menuItem('Delete', 'del', id, 'trash', 'danger') : '');
-    return '<div class="fcard"><h3>' + esc(m.title || '(untitled)') + '</h3>' +
-        '<div class="pills">' + statePills(m) + '</div>' +
-        '<div class="meta">' + m.submissions + ' response' + (m.submissions === 1 ? '' : 's') +
-          (TAB === 'all' ? ' · ' + esc(m.owner) : '') + '</div>' +
-        '<div class="acts">' +
-          btn('Edit', 'edit', id) + btn('Preview', 'preview', id, 'ghost') + btn('Responses', 'resp', id) + btn('Share', 'share', id, 'ghost') +
-          '<div class="moremenu">' +
-            '<button class="btn ghost sm" data-act="more" data-id="' + id + '" aria-haspopup="true" aria-expanded="false" title="More actions">' + FormsUI.icon('more') + ' More</button>' +
-            '<div class="menu" id="menu_' + id + '" hidden>' + menu + '</div>' +
-          '</div>' +
-        '</div></div>';
+    var t = LIFECYCLE_TINT[m.lifecycle] || LIFECYCLE_TINT.draft;
+    var band = '<button class="chip-band" ' + bandStyle(t) + ' data-act="edit" data-id="' + id + '">' +
+        '<span class="chip-tile" ' + tileStyle(t) + '>' + formBadgeHtml(m) + '</span>' +
+        '<span class="chip-name">' + esc(m.title || '(untitled)') + '</span>' +
+      '</button>';
+    return '<div class="chip-wrap"><div class="chip">' + band +
+        '<div class="chip-body">' +
+        (TAB === 'all' ? '<div class="chip-owner">' + esc(m.owner) + '</div>' : '') +
+        (m.notes ? '<div class="chip-notes">' + esc(m.notes) + '</div>' : '') +
+        '<div class="chip-pills">' + statePills(m) + '</div>' +
+        '<button class="chip-stat" data-act="resp" data-id="' + id + '"><b>' + m.submissions + '</b> response' + (m.submissions === 1 ? '' : 's') + '</button>' +
+        '<div class="chip-foot">' +
+          btn('Edit', 'edit', id) + btn('Preview', 'preview', id, 'ghost') +
+          '<span style="margin-left:auto;display:flex;gap:8px">' +
+            '<button class="iconbtn" data-act="copylink" data-id="' + id + '" title="Copy link">' + FormsUI.icon('clip', { size: 14 }) + '</button>' +
+            '<div class="moremenu">' +
+              '<button class="btn ghost sm" data-act="more" data-id="' + id + '" aria-haspopup="true" aria-expanded="false" title="More actions">' + FormsUI.icon('more') + '</button>' +
+              '<div class="menu" id="menu_' + id + '" hidden>' + menu + '</div>' +
+            '</div>' +
+          '</span>' +
+        '</div>' +
+      '</div></div></div>';
   }
   function menuItem(label, act, id, iconName, cls) {
     return '<button class="' + (cls || '') + '" data-act="' + act + '" data-id="' + id + '">' + FormsUI.icon(iconName, { size: 15 }) + esc(label) + '</button>';
@@ -590,36 +793,70 @@
   function renderLibrary(items) {
     var host = document.getElementById('list');
     if (!items.length) { host.innerHTML = '<p class="help">No templates yet.</p>'; return; }
-    host.innerHTML = '<div class="grid">' + items.map(function (m) {
+    var cards = items.map(function (m) {
       var lock = m.layoutLock === 'useAsIs' ? '<span class="pill locked">use as-is</span>' : '<span class="pill draft">starter</span>';
-      var scope = m.templateScope === 'shared' ? '<span class="pill staff">shared</span>' : '<span class="pill private">personal</span>';
+      var scope = m.templateScope === 'shared' ? '<span class="pill staff">shared</span>'
+        : m.templateScope === 'pending' ? '<span class="pill pending">pending review</span>'
+        : '<span class="pill private">personal</span>';
       var canEdit = ME.isAdmin || m.owner.toLowerCase() === ME.email.toLowerCase();
-      // Admin curation: publish/unpublish from the school-wide shared library.
+      var isOwner = m.owner.toLowerCase() === ME.email.toLowerCase();
+      // Admin curation: publish/unpublish from the school-wide shared library. Non-admin
+      // owners of a personal template can ask for it to be reviewed instead.
       var curate = ME.isAdmin
         ? (m.templateScope === 'shared'
             ? btn('Unpublish', 'unpub', m.id, 'ghost')
-            : btn('Make shared', 'pub', m.id, 'ghost'))
-        : '';
-      return '<div class="fcard"><h3>' + esc(m.title || '(untitled)') + '</h3>' +
+            : m.templateScope !== 'pending' ? btn('Make shared', 'pub', m.id, 'ghost') : '')
+        : (isOwner && m.templateScope === 'personal' ? btn('Request to publish', 'request', m.id, 'ghost') : '');
+      return '<div class="fcard" data-libcard="' + m.id + '"><h3>' + esc(m.title || '(untitled)') + '</h3>' +
         '<div class="pills">' + scope + lock + (m.category ? '<span class="pill draft">' + esc(m.category) + '</span>' : '') + '</div>' +
         '<div class="meta">by ' + esc(m.owner) + '</div>' +
-        '<div class="acts">' + btn('Use this template', 'use', m.id) + btn('Preview', 'preview', m.id, 'ghost') +
+        '<div class="acts">' + btn('Use this template', 'use', m.id) + btn('Show preview', 'showpreview', m.id, 'ghost') +
           (canEdit ? btn('Edit', 'edit', m.id, 'ghost') : '') + curate +
           (canEdit
             ? '<button class="btn ghost danger sm" data-act="del" data-id="' + m.id + '" title="Delete template" style="display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('trash', { size: 15 }) + ' Delete</button>' : '') +
         '</div></div>';
-    }).join('') + '</div>';
+    }).join('');
+    host.innerHTML = '<div class="split2col">' +
+      '<div class="grid">' + cards + '</div>' +
+      '<div class="prevpane"><div class="prevpane-hd">Preview</div><div id="libPrev"><p class="help">Click a template to preview it here.</p></div></div>' +
+      '</div>';
     wireCardButtons();
+    // Clicking the card itself (anywhere outside its action buttons) auto-loads the preview —
+    // "Show preview" stays as an explicit/keyboard-reachable fallback.
+    host.querySelectorAll('.fcard[data-libcard]').forEach(function (card) {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', function (e) {
+        if (e.target.closest('.acts')) return;
+        doShowLibraryPreview(card.getAttribute('data-libcard'));
+      });
+    });
   }
 
   function statePills(m) {
-    var p = '<span class="pill ' + m.lifecycle + '">' + m.lifecycle + '</span>' +
-            '<span class="pill ' + m.access + '">' + accessLabel(m.access) + '</span>';
+    var accCls = m.access === 'open' ? 'acc-open' : m.access; // 'open' gets its own color — not the lifecycle green
+    var p = '<span class="pill ' + accCls + '">' + accessLabel(m.access) + '</span>';
     if (m.locked) p += '<span class="pill locked">not accepting</span>';
     return p;
   }
   function accessLabel(a) { return a === 'staff' ? 'staff-only' : a; }
   function btn(label, act, id, cls) { return '<button class="btn ' + (cls || '') + ' sm" data-act="' + act + '" data-id="' + id + '">' + esc(label) + '</button>'; }
+
+  // Busy-state helper for the confirm-then-call() actions below — the confirm dialog
+  // itself closes immediately (it's just a yes/no), but the server call after it had no
+  // visible feedback until now. btnEl may be undefined if a caller has no button handy
+  // (e.g. a legacy call site not yet updated to pass one) — no-op rather than throw.
+  function setBusy_(btnEl, label) {
+    if (!btnEl) return null;
+    var orig = btnEl.innerHTML;
+    btnEl.disabled = true;
+    btnEl.innerHTML = '<span class="spinner" style="width:12px;height:12px"></span> ' + esc(label);
+    return orig;
+  }
+  function clearBusy_(btnEl, orig) {
+    if (!btnEl) return;
+    btnEl.disabled = false;
+    if (orig != null) btnEl.innerHTML = orig;
+  }
 
   function closeMenus() {
     document.querySelectorAll('.moremenu .menu').forEach(function (mn) { mn.setAttribute('hidden', 'hidden'); });
@@ -644,17 +881,24 @@
         if (act === 'preview') return doPreview(id);
         if (act === 'resp') return openResponses(id);
         if (act === 'share') return doShare(id);
-        if (act === 'dup') return doDuplicate(id);
+        if (act === 'copylink') return doCopyLink(id);
+        if (act === 'editcard') return openFormCardEditor(id);
+        if (act === 'dup') return doDuplicate(id, b);
         if (act === 'use') return doUse(id);
         if (act === 'tpl') return doSaveAsTemplate(id);
-        if (act === 'pub') return doSetTemplateScope(id, 'shared');
-        if (act === 'unpub') return doSetTemplateScope(id, 'personal');
-        if (act === 'del') return doDelete(id);
+        if (act === 'pub') return doSetTemplateScope(id, 'shared', b);
+        if (act === 'unpub') return doSetTemplateScope(id, 'personal', b);
+        if (act === 'showpreview') return doShowLibraryPreview(id);
+        if (act === 'request') return doRequestPublish(id, b);
+        if (act === 'del') return doDelete(id, null, b);
       };
     });
   }
 
   // generic bespoke modal that reads its inputs on OK (before closing)
+  // If onOk returns a promise, the modal stays open with the OK button showing a spinner
+  // until it resolves — closing early hid whether the save actually succeeded. Non-promise
+  // (or no) return keeps the old immediate-close behavior.
   function modalWith(title, bodyHtml, okLabel, onOk) {
     var ov = document.createElement('div'); ov.className = 'modal-overlay';
     ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + esc(title) + '</h3><div class="mbody">' + bodyHtml + '</div>' +
@@ -662,7 +906,21 @@
       (okLabel ? '<button class="btn block" data-x="1" type="button">' + esc(okLabel) + '</button>' : '') + '</div></div>';
     function close() { ov.remove(); }
     ov.querySelector('[data-x="0"]').onclick = close;
-    var ok = ov.querySelector('[data-x="1"]'); if (ok) ok.onclick = function () { if (onOk) onOk(ov); close(); };
+    var ok = ov.querySelector('[data-x="1"]');
+    if (ok) ok.onclick = function () {
+      if (!onOk) { close(); return; }
+      var result = onOk(ov);
+      if (!result || typeof result.then !== 'function') { close(); return; }
+      var label = ok.textContent;
+      ok.disabled = true; ok.innerHTML = '<span class="spinner"></span> ' + esc(label);
+      result.then(close).catch(function (e) {
+        ok.disabled = false; ok.textContent = label;
+        var mbody = ov.querySelector('.mbody');
+        var errEl = mbody.querySelector('.modal-err');
+        if (!errEl) { errEl = document.createElement('div'); errEl.className = 'notice err modal-err'; errEl.style.marginTop = '10px'; mbody.appendChild(errEl); }
+        errEl.textContent = String(e && e.message || e);
+      });
+    };
     ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
     document.body.appendChild(ov); (ok || ov.querySelector('[data-x="0"]')).focus();
     return ov;
@@ -671,30 +929,43 @@
   function newBlank() {
     FormsUI.prompt('New form', { placeholder: 'Form name', value: 'Untitled form', okLabel: 'Create' }).then(function (title) {
       if (title === null) return;
-      call('createForm', [title || 'Untitled form']).then(function (r) { openEditor(r.formId); }).catch(alertErr);
+      // The prompt modal itself closes immediately (yes/no-style, not save-aware) — without
+      // this, there was a silent gap between clicking Create and openEditor's own loading
+      // state where nothing on screen indicated anything was happening.
+      chrome(LOADING_HTML_ + 'Creating your form…</p>');
+      call('createForm', [title || 'Untitled form']).then(function (r) { openEditor(r.formId); })
+        .catch(function (e) { renderDashboard(); alertErr(e); });
     });
   }
-  function doUse(id) { call('createFromTemplate', [id]).then(function (r) { FormsUI.toast('Copied — review Access & Approval in Settings before publishing'); openEditor(r.formId); }).catch(alertErr); }
-  function doSetTemplateScope(id, scope) {
+  function doUse(id) {
+    chrome(LOADING_HTML_ + 'Copying template…</p>');
+    call('createFromTemplate', [id]).then(function (r) { FormsUI.toast('Copied — review Access & Approval in Settings before publishing'); openEditor(r.formId); })
+      .catch(function (e) { renderDashboard(); alertErr(e); });
+  }
+  function doSetTemplateScope(id, scope, btnEl) {
     var msg = scope === 'shared' ? 'Publish to the shared library (all staff can browse it)?' : 'Unpublish — make this personal so only its owner and admins see it?';
     FormsUI.confirm(scope === 'shared' ? 'Make shared?' : 'Unpublish template?', msg, scope === 'shared' ? 'Make shared' : 'Unpublish').then(function (ok) {
       if (!ok) return;
-      call('setTemplateScope', [id, scope]).then(function () { FormsUI.toast(scope === 'shared' ? 'Published to shared library' : 'Made personal'); loadList(); }).catch(alertErr);
+      var orig = setBusy_(btnEl, scope === 'shared' ? 'Publishing…' : 'Unpublishing…');
+      call('setTemplateScope', [id, scope]).then(function () { FormsUI.toast(scope === 'shared' ? 'Published to shared library' : 'Made personal'); loadList(); })
+        .catch(function (e) { clearBusy_(btnEl, orig); alertErr(e); });
     });
   }
-  function doDuplicate(id) {
+  function doDuplicate(id, btnEl) {
     FormsUI.confirm('Duplicate this form?', 'This creates an editable copy as a new Draft in “My forms.”', 'Duplicate').then(function (ok) {
       if (!ok) return;
-      call('duplicateForm', [id, {}]).then(function (r) { openEditor(r.formId); }).catch(alertErr);
+      var orig = setBusy_(btnEl, 'Duplicating…');
+      call('duplicateForm', [id, {}]).then(function (r) { openEditor(r.formId); }).catch(function (e) { clearBusy_(btnEl, orig); alertErr(e); });
     });
   }
-  function doDelete(id, after) {
+  function doDelete(id, after, btnEl) {
     FormsUI.confirm('Delete this form?', 'The form and any responses move to Drive trash (recoverable for ~30 days) and disappear from your dashboard. This can’t be undone from here.', 'Delete').then(function (ok) {
       if (!ok) return;
+      var orig = setBusy_(btnEl, 'Deleting…');
       call('deleteForm', [id]).then(function (res) {
         if (res && res.ok) { DIRTY = false; FormsUI.toast('Form deleted'); (after || loadList)(); }
-        else alert((res && res.message) || 'Could not delete.');
-      }).catch(alertErr);
+        else { clearBusy_(btnEl, orig); alert((res && res.message) || 'Could not delete.'); }
+      }).catch(function (e) { clearBusy_(btnEl, orig); alertErr(e); });
     });
   }
   function doPreview(id) {
@@ -702,6 +973,23 @@
     var base = (ME && ME.execUrl) || '';
     if (!base) return alert('Preview URL not available yet.');
     window.open(base + '?form=' + encodeURIComponent(id) + '&preview=1', '_blank');
+  }
+  function doShowLibraryPreview(id) {
+    var host = document.getElementById('libPrev');
+    if (!host) return;
+    document.querySelectorAll('.fcard[data-libcard]').forEach(function (c) { c.classList.toggle('active', c.getAttribute('data-libcard') === id); });
+    host.innerHTML = '<span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span>';
+    call('getTemplatePreview', [id]).then(function (res) {
+      renderSchemaPreviewInto_(host, normalizeSchema(res.schema));
+    }).catch(function (e) { host.innerHTML = '<p class="notice err">' + esc(String(e && e.message || e)) + '</p>'; });
+  }
+  function doRequestPublish(id, btnEl) {
+    FormsUI.confirm('Request to publish?', 'An admin will review this template before it appears in the shared library for all staff.', 'Send request').then(function (ok) {
+      if (!ok) return;
+      var orig = setBusy_(btnEl, 'Sending…');
+      call('requestPublishTemplate', [id]).then(function () { FormsUI.toast('Request sent — an admin will review it'); loadList(); })
+        .catch(function (e) { clearBusy_(btnEl, orig); alertErr(e); });
+    });
   }
   function doShare(id) {
     call('getShareUrl', [id]).then(function (r) {
@@ -720,6 +1008,44 @@
       };
     }).catch(alertErr);
   }
+  function doCopyLink(id) {
+    call('getShareUrl', [id]).then(function (r) {
+      if (!r.url) return alert('Set the public/builder URL in the Config tab first (this form’s access: ' + accessLabel(r.access) + ').');
+      try { navigator.clipboard.writeText(r.url); FormsUI.toast('Link copied'); }
+      catch (e) { FormsUI.toast('Could not copy — copy manually: ' + r.url); }
+    }).catch(alertErr);
+  }
+  function openFormCardEditor(id) {
+    var m = CURRENT_FORM_ITEMS.filter(function (x) { return x.id === id; })[0];
+    var current = m || { iconUrl: '', notes: '' };
+    var body =
+      '<label class="lbl">Card icon (optional)</label>' +
+      '<div class="upload-preview" id="_fcIconPreview">' + (current.iconUrl ? '<img src="' + esc(current.iconUrl) + '" alt="">' : '') + '<p class="help">Shown on the form\'s card instead of its initial letter.</p></div>' +
+      '<input class="control" id="_fcIconFile" type="file" accept="image/*">' +
+      '<label class="lbl">Notes (optional, staff/admin only)</label>' +
+      '<textarea class="control" id="_fcNotes" rows="2">' + esc(current.notes || '') + '</textarea>';
+    var pendingIconUrl = current.iconUrl || '';
+    var modalEl = modalWith('Edit card', body, 'Save', function () {
+      return call('setFormMeta', [id, { IconUrl: pendingIconUrl, Notes: modalEl.querySelector('#_fcNotes').value }])
+        .then(function () { FormsUI.toast('Card updated'); loadList(); });
+    });
+    var fileInput = modalEl.querySelector('#_fcIconFile');
+    fileInput.onchange = function () {
+      var file = fileInput.files[0];
+      if (!file) return;
+      var preview = modalEl.querySelector('#_fcIconPreview');
+      preview.innerHTML = '<span class="spinner"></span><p class="help">Uploading…</p>';
+      var reader = new FileReader();
+      reader.onload = function () {
+        var b64 = String(reader.result).split(',')[1];
+        call('uploadFormIcon', [file.name, file.type, b64]).then(function (r) {
+          pendingIconUrl = r.url;
+          preview.innerHTML = '<img src="' + esc(r.url) + '" alt=""><p class="help">Uploaded.</p>';
+        }).catch(function (e) { preview.innerHTML = '<p class="help">Upload failed.</p>'; alertErr(e); });
+      };
+      reader.readAsDataURL(file);
+    };
+  }
   function doSaveAsTemplate(id) {
     var body = '<label class="lbl">Library</label><select class="control" id="_tscope">' +
         '<option value="shared">Shared — all staff can browse &amp; use it</option>' +
@@ -731,8 +1057,8 @@
     modalWith('Save as template', body, 'Save', function (ov) {
       var scope = (ov.querySelector('#_tscope') || {}).value || 'personal';
       var lock = (ov.querySelector('#_tlock') || {}).value || 'starter';
-      call('saveAsTemplate', [id, { scope: scope, layoutLock: lock }])
-        .then(function () { FormsUI.toast('Saved to ' + scope + ' library'); }).catch(alertErr);
+      return call('saveAsTemplate', [id, { scope: scope, layoutLock: lock }])
+        .then(function () { FormsUI.toast('Saved to ' + scope + ' library'); });
     });
   }
 
@@ -782,11 +1108,188 @@
     }).catch(alertErr);
   }
 
+  // ---------- App Manager (admin-only) ----------
+  function appBadgeHtml(a, size) {
+    if (a.logoUrl) return '<img src="' + esc(a.logoUrl) + '" alt="">';
+    if (a.iconEmoji) return esc(a.iconEmoji);
+    return '🔗';
+  }
+  function appStatusPillHtml(a) {
+    var tint = { up: { bg: '#e6f4ea', fg: '#1a7f37' }, down: { bg: '#fbe9e7', fg: '#c62828' }, unknown: { bg: '#eee', fg: '#666' } }[a.lastStatus] || { bg: '#eee', fg: '#666' };
+    var label = { up: 'Up', down: 'Down', unknown: 'Not checked' }[a.lastStatus] || 'Not checked';
+    var title = (a.lastCheckedAt ? 'Checked ' + a.lastCheckedAt : 'Never checked') + (a.lastStatusMsg ? ' (' + a.lastStatusMsg + ')' : '');
+    return '<span class="pill" style="background:' + tint.bg + ';color:' + tint.fg + '" title="' + esc(title) + '">' + label + '</span>';
+  }
+  function appChipHtml(a, admin) {
+    var pills = '';
+    if (a.visibleToParent) pills += '<span class="pill private">Parent</span>';
+    if (a.visibleToStaff) pills += '<span class="pill staff">Staff</span>';
+    if (a.visibleToStudent) pills += '<span class="pill staff">Student</span>';
+    var t = a.active ? LIFECYCLE_TINT.published : LIFECYCLE_TINT.draft;
+    var band = '<a class="chip-band" ' + bandStyle(t) + ' href="' + esc(a.url) + '" target="_blank" rel="noopener">' +
+        '<span class="chip-tile" ' + tileStyle(t) + '>' + appBadgeHtml(a) + '</span>' +
+        '<span class="chip-name">' + esc(a.name) + '</span>' +
+      '</a>';
+    var menu = admin
+      ? '<div class="moremenu"><button class="btn ghost sm" data-appact="more" aria-haspopup="true" aria-expanded="false" title="More actions">' + FormsUI.icon('more') + '</button>' +
+          '<div class="menu" data-appmenu hidden>' +
+            '<button data-appact="edit">' + FormsUI.icon('edit', { size: 15 }) + 'Edit</button>' +
+            '<button class="danger" data-appact="del">' + FormsUI.icon('trash', { size: 15 }) + 'Delete</button>' +
+          '</div></div>'
+      : '';
+    var portalBtn = admin
+      ? (a.active
+          ? '<button class="btn ghost sm" data-appact="offline">Remove from Portal</button>'
+          : '<button class="btn sm" data-appact="live">Add to Portal</button>')
+      : '';
+    var copyBtn = '<button class="iconbtn" data-appact="copylink" title="Copy link">' + FormsUI.icon('clip', { size: 14 }) + '</button>';
+    var foot = '<div class="chip-foot">' + (admin ? portalBtn : '') + '<span style="margin-left:auto;display:flex;gap:8px">' + copyBtn + menu + '</span></div>';
+    return '<div class="chip-wrap" data-appid="' + esc(a.appId) + '" data-appurl="' + esc(a.url) + '"><div class="chip">' + band +
+      '<div class="chip-body">' +
+        (admin ? '<div class="chip-owner">' + esc(a.ownerEmail || '—') + '</div>' : '') +
+        (admin ? '<div class="chip-status" style="display:flex;align-items:center;gap:6px;margin-top:4px">' + appStatusPillHtml(a) + '<button class="btn ghost sm" data-appact="check">Check status</button></div>' : '') +
+        (a.description ? '<div class="chip-desc">' + esc(a.description) + '</div>' : '') +
+        (admin && a.notes ? '<div class="chip-notes">' + esc(a.notes) + '</div>' : '') +
+        '<div class="chip-pills">' + pills + '</div>' +
+        foot +
+      '</div></div></div>';
+  }
+  function renderAppsManager(items) {
+    var host = document.getElementById('list');
+    var inPortal = items.filter(function (a) { return a.active; });
+    var elsewhere = items.filter(function (a) { return !a.active; });
+    var section = function (label, hint, list) {
+      return '<div class="section-head">' + esc(label) + ' (' + list.length + ')</div>' +
+        '<p class="help" style="margin:-4px 0 10px">' + hint + '</p>' +
+        (list.length ? '<div class="chipgrid">' + list.map(function (a) { return appChipHtml(a, true); }).join('') + '</div>' : '<p class="help">None.</p>');
+    };
+    host.innerHTML =
+      '<div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn" id="appAdd">+ Add app</button>' +
+        (items.length ? '<button class="btn ghost" id="appCheckAll">Check all</button>' : '') + '</div>' +
+      (items.length
+        ? section('In Forms Portal', 'Shown to the roles below in the Forms Portal.', inPortal) +
+          section('Distributed another way', 'Live and working, just not listed in the Forms Portal — shared directly (link, QR code, etc.).', elsewhere)
+        : '<p class="help">No apps registered yet. Click “+ Add app” to add one (e.g. PTC Scheduling).</p>');
+    document.getElementById('appAdd').onclick = function () { openAppEditor(null); };
+    var appCheckAllBtn = document.getElementById('appCheckAll');
+    if (appCheckAllBtn) appCheckAllBtn.onclick = function () {
+      appCheckAllBtn.disabled = true; appCheckAllBtn.textContent = 'Checking…';
+      call('adminCheckAllAppsStatus').then(function (items) { FormsUI.toast('Checked all apps'); renderAppsManager(items); })
+        .catch(function (e) { appCheckAllBtn.disabled = false; appCheckAllBtn.textContent = 'Check all'; alertErr(e); });
+    };
+    if (!window.__hcsAppMenuClose) {
+      window.__hcsAppMenuClose = true;
+      document.addEventListener('click', function (e) { if (!e.target.closest('.moremenu')) closeAppMenus(); });
+    }
+    host.querySelectorAll('[data-appact]').forEach(function (b) {
+      var chip = b.closest('[data-appid]'), appId = chip.getAttribute('data-appid'), act = b.getAttribute('data-appact');
+      b.onclick = function () {
+        if (act === 'copylink') {
+          var url = chip.getAttribute('data-appurl');
+          try { navigator.clipboard.writeText(url); FormsUI.toast('Link copied'); }
+          catch (e) { FormsUI.toast('Could not copy — copy manually: ' + url); }
+          return;
+        }
+        if (act === 'live' || act === 'offline') {
+          b.disabled = true;
+          call('adminUpdateApp', [appId, { Active: act === 'live' }]).then(function () { loadList(); }).catch(function (e) { b.disabled = false; alertErr(e); });
+          return;
+        }
+        if (act === 'check') {
+          b.disabled = true; b.textContent = 'Checking…';
+          call('adminCheckAppStatus', [appId]).then(function () { loadList(); }).catch(function (e) { b.disabled = false; b.textContent = 'Check status'; alertErr(e); });
+          return;
+        }
+        if (act === 'more') {
+          var menuEl = chip.querySelector('[data-appmenu]'), wasHidden = menuEl.hasAttribute('hidden');
+          closeAppMenus();
+          if (wasHidden) { menuEl.removeAttribute('hidden'); b.setAttribute('aria-expanded', 'true'); }
+          return;
+        }
+        closeAppMenus();
+        if (act === 'edit') return openAppEditor(items.filter(function (a) { return a.appId === appId; })[0]);
+        if (act === 'del') return doDeleteApp(appId);
+      };
+    });
+  }
+  function closeAppMenus() {
+    document.querySelectorAll('[data-appmenu]').forEach(function (m) { m.setAttribute('hidden', 'hidden'); });
+    document.querySelectorAll('[data-appact="more"]').forEach(function (b) { b.setAttribute('aria-expanded', 'false'); });
+  }
+  function doDeleteApp(appId) {
+    FormsUI.confirm('Delete this app?', 'It will be removed from App Manager. This can’t be undone from here.', 'Delete').then(function (ok) {
+      if (!ok) return;
+      call('adminDeleteApp', [appId]).then(function () { FormsUI.toast('App removed'); loadList(); }).catch(alertErr);
+    });
+  }
+  function openAppEditor(existing) {
+    var a = existing || { name: '', description: '', url: '', iconEmoji: '', ownerEmail: '', active: true, supportsHandoff: false, slug: '', visibleToParent: false, visibleToStaff: false, visibleToStudent: false, logoUrl: '', notes: '' };
+    var section = function (label) { return '<div class="mbody-section">' + esc(label) + '</div>'; };
+    var body =
+      section('Basics') +
+      '<label class="lbl">Name</label><input class="control" id="_appName" value="' + esc(a.name) + '">' +
+      '<label class="lbl">Description</label><input class="control" id="_appDesc" value="' + esc(a.description) + '">' +
+      '<label class="lbl">URL</label><input class="control" id="_appUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec" value="' + esc(a.url) + '">' +
+      '<label class="lbl">Owner email (optional)</label><input class="control" id="_appOwner" type="email" value="' + esc(a.ownerEmail) + '">' +
+
+      section('Appearance') +
+      '<label class="lbl">Icon (emoji, optional)</label><input class="control" id="_appIcon" value="' + esc(a.iconEmoji) + '" style="max-width:80px">' +
+      '<label class="lbl">Logo image (optional)</label>' +
+      '<div class="upload-preview" id="_appLogoPreview">' + (a.logoUrl ? '<img src="' + esc(a.logoUrl) + '" alt="">' : '') + '<p class="help">Shown instead of the emoji above, if uploaded.</p></div>' +
+      '<input class="control" id="_appLogoFile" type="file" accept="image/*">' +
+
+      section('Notes') +
+      '<label class="lbl">Notes (optional, staff/admin only)</label><textarea class="control" id="_appNotes" rows="2" placeholder="e.g. Distributed via QR code at pickup line, not linked from the Portal.">' + esc(a.notes || '') + '</textarea>' +
+
+      section('Forms Portal') +
+      '<label class="switchrow"><span>Show in Forms Portal</span><span class="toggle"><input type="checkbox" id="_appActive"' + (a.active ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+      '<p class="help">Off means it\'s still live, just not listed in the Portal — for apps distributed another way (direct link, QR code, etc.).</p>' +
+      '<label class="lbl">Visible to</label>' +
+      '<label class="switchrow"><span>Parents</span><span class="toggle"><input type="checkbox" id="_appVisParent"' + (a.visibleToParent ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+      '<label class="switchrow"><span>Staff</span><span class="toggle"><input type="checkbox" id="_appVisStaff"' + (a.visibleToStaff ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+      '<label class="switchrow"><span>Students</span><span class="toggle"><input type="checkbox" id="_appVisStudent"' + (a.visibleToStudent ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+
+      section('Single sign-on (advanced)') +
+      '<label class="switchrow"><span>Supports SSO handoff</span><span class="toggle"><input type="checkbox" id="_appHandoff"' + (a.supportsHandoff ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+      '<label class="lbl">Slug (required if handoff is on)</label><input class="control" id="_appSlug" placeholder="e.g. ptc" value="' + esc(a.slug || '') + '">';
+    var pendingLogoUrl = a.logoUrl || '';
+    var modalEl = modalWith(existing ? 'Edit app' : 'Add app', body, existing ? 'Save' : 'Add', function (ov) {
+      var data = {
+        Name: ov.querySelector('#_appName').value, Description: ov.querySelector('#_appDesc').value,
+        Url: ov.querySelector('#_appUrl').value, IconEmoji: ov.querySelector('#_appIcon').value,
+        LogoUrl: pendingLogoUrl, Notes: ov.querySelector('#_appNotes').value,
+        OwnerEmail: ov.querySelector('#_appOwner').value, Active: ov.querySelector('#_appActive').checked,
+        SupportsHandoff: ov.querySelector('#_appHandoff').checked, Slug: ov.querySelector('#_appSlug').value,
+        VisibleToParent: ov.querySelector('#_appVisParent').checked, VisibleToStaff: ov.querySelector('#_appVisStaff').checked,
+        VisibleToStudent: ov.querySelector('#_appVisStudent').checked
+      };
+      var save = existing ? call('adminUpdateApp', [existing.appId, data]) : call('adminAddApp', [data]);
+      return save.then(function () { FormsUI.toast(existing ? 'App updated' : 'App added'); loadList(); });
+    });
+    var fileInput = modalEl.querySelector('#_appLogoFile');
+    fileInput.onchange = function () {
+      var file = fileInput.files[0];
+      if (!file) return;
+      var preview = modalEl.querySelector('#_appLogoPreview');
+      preview.innerHTML = '<span class="spinner"></span><p class="help">Uploading…</p>';
+      var reader = new FileReader();
+      reader.onload = function () {
+        var b64 = String(reader.result).split(',')[1];
+        call('adminUploadAppLogo', [file.name, file.type, b64]).then(function (r) {
+          pendingLogoUrl = r.url;
+          preview.innerHTML = '<img src="' + esc(r.url) + '" alt=""><p class="help">Uploaded.</p>';
+        }).catch(function (e) { preview.innerHTML = '<p class="help">Upload failed.</p>'; alertErr(e); });
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
   // ---------- editor ----------
   function openEditor(formId) {
-    chrome('<p class="help" style="padding:24px">Loading editor…</p>');
+    chrome(LOADING_HTML_ + 'Loading editor…</p>');
     call('loadFormForEdit', [formId]).then(function (res) {
       EDITING = { meta: res.meta, schema: normalizeSchema(res.schema), structureLocked: res.structureLocked, isAdmin: res.isAdmin };
+      EDITOR_TAB = 'build';
       renderEditor();
     }).catch(function (e) { chrome('<div class="card card-pad"><p class="notice err">' + esc(String(e && e.message || e)) + '</p></div>'); });
   }
@@ -797,68 +1300,137 @@
   }
   function fields() { return EDITING.schema.pages[0].fields; }
 
+  var EDITOR_TAB = 'build'; // 'build' | 'settings' | 'preview' — reset in openEditor()
+
   function renderEditor() {
     var locked = EDITING.structureLocked;
-    var back = '<button class="btn ghost sm" id="back">← All forms</button>';
-    var palette = locked ? '' : '<div class="palette">' + TYPE_GROUPS.map(function (g) {
-      var labelFor = {}; FIELD_TYPES.forEach(function (t) { labelFor[t[0]] = t[1]; });
-      return '<span class="palgroup">' + esc(g[0]) + '</span>' + g[1].map(function (ty) {
-        return '<button data-type="' + ty + '" title="' + esc(TYPE_TIPS[ty] || '') + '">+ ' + esc(labelFor[ty] || ty) + '</button>';
-      }).join('');
-    }).join('') + '</div>';
-    var lockBanner = locked ? '<div class="banner">This form’s layout is locked (use as-is). You can change most settings, but its fields, access, and approval routing are locked to the HCS template. An admin can change them.</div>' : '';
-
     DIRTY = false; clearTimeout(AUTOSAVE_T); UNDO_STACK = []; COLLAPSED = {};
-    // long forms open with cards collapsed so the creator can orient first
-    if (fields().length > 12) fields().forEach(function (f) { COLLAPSED[f.id] = true; });
+    // every field starts collapsed to its WYSIWYG look on the Build tab
+    fields().forEach(function (f) { COLLAPSED[f.id] = true; });
     chrome(
-      '<div style="display:flex;align-items:center;gap:10px;margin:16px 0;flex-wrap:wrap">' + back +
+      '<div style="display:flex;align-items:center;gap:10px;margin:16px 0;flex-wrap:wrap">' +
+        '<button class="btn ghost sm" id="back">← All forms</button>' +
         '<h1 class="form-title" style="margin:0;font-size:1.2rem">Editing: ' + esc(EDITING.meta.title) + '</h1>' +
         '<span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px">' +
           (locked ? '' : '<button class="btn ghost sm" id="btnUndo" title="Undo the last add/delete/move (Ctrl+Z)" disabled>Undo</button>') +
-          '<button class="btn ghost sm" id="btnLivePrev" aria-pressed="' + (LIVEPREV ? 'true' : 'false') + '" title="Show a live preview of the form beside the editor (updates as you type)">' + FormsUI.icon('eye', { size: 14 }) + ' Live preview</button>' +
-          '<span id="saveState" class="help" style="display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('check', { size: 14 }) + ' Saved</span></span></div>' +
-      '<div class="editor' + (LIVEPREV ? ' withprev' : '') + '" id="editorRoot"><div>' + lockBanner +
-        '<div class="field"><label for="fTitle">Form title</label><input class="control" id="fTitle" value="' + esc(EDITING.schema.title || '') + '"' + (locked ? ' readonly' : '') + '></div>' +
-        '<div class="field" style="margin-top:10px"><label for="fDesc">Description</label><textarea class="control" id="fDesc"' + (locked ? ' readonly' : '') + '>' + esc(EDITING.schema.description || '') + '</textarea></div>' +
-        '<div class="divider"></div>' + palette +
-        '<div id="canvasBar" style="display:none;justify-content:flex-end;margin-bottom:6px"><button class="btn ghost sm" id="btnToggleAll" type="button"></button></div>' +
-        '<div id="canvas"></div>' +
-      '</div><div id="livePrevWrap"' + (LIVEPREV ? '' : ' style="display:none"') + '><div class="prevpane"><div class="prevpane-hd" style="display:flex;justify-content:space-between;align-items:center">Live preview<button id="livePrevClose" type="button" aria-label="Close live preview" style="background:none;border:0;color:#fff;font-size:1.1rem;cursor:pointer;line-height:1">✕</button></div><div id="livePrev"></div></div></div>' + sidePanel() + '</div>');
+          '<span id="saveState" class="help" style="display:inline-flex;align-items:center;gap:5px">' + FormsUI.icon('check', { size: 14 }) + ' Saved</span>' +
+          '<button class="btn sm" id="btnSave">Save</button></span></div>' +
+      '<div class="tabs">' + editorTabBtn('build', 'Build') + editorTabBtn('settings', 'Settings') + editorTabBtn('preview', 'Preview') + '</div>' +
+      '<div id="editorPane"></div>');
 
     document.getElementById('back').onclick = function () {
       // save pending edits before leaving so nothing is lost
       var go = function () { DIRTY = false; renderDashboard(); };
       if (DIRTY && !EDITING.structureLocked) doSave(true).then(go); else go();
     };
-    var lp = document.getElementById('btnLivePrev');
-    lp.onclick = function () {
-      LIVEPREV = !LIVEPREV;
-      try { localStorage.setItem('hcsBuilderLivePrev', LIVEPREV ? '1' : '0'); } catch (e) {}
-      lp.setAttribute('aria-pressed', LIVEPREV ? 'true' : 'false');
-      document.getElementById('editorRoot').classList.toggle('withprev', LIVEPREV);
-      var wrap = document.getElementById('livePrevWrap');
-      wrap.style.display = LIVEPREV ? '' : 'none';
-      if (LIVEPREV) {
-        renderLivePreview();
-        try { wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
-      }
-    };
-    var lpc = document.getElementById('livePrevClose'); if (lpc) lpc.onclick = function () { lp.click(); };
     if (!locked) {
       var bu = document.getElementById('btnUndo'); if (bu) bu.onclick = doUndo;
       document.addEventListener('keydown', undoKeyHandler_);
-      document.querySelectorAll('.palette button').forEach(function (b) { b.onclick = function () { addField(b.getAttribute('data-type')); }; });
+    }
+    document.getElementById('btnSave').onclick = saveAll;
+    ['build', 'settings', 'preview'].forEach(function (t) {
+      var b = document.getElementById('etab_' + t); if (b) b.onclick = function () { EDITOR_TAB = t; renderEditorPane(); };
+    });
+    // #editorPane itself persists across tab switches (renderEditorPane only rewrites its
+    // innerHTML) — one delegated listener here, not one per tab-render, or switching tabs
+    // repeatedly would stack a fresh duplicate on every visit to a given tab.
+    if (!locked) {
+      var pane = document.getElementById('editorPane');
+      pane.addEventListener('input', markDirty);
+      pane.addEventListener('change', markDirty);
+    }
+    renderEditorPane();
+  }
+  function editorTabBtn(id, label) { return '<button class="tab ' + (EDITOR_TAB === id ? 'on' : '') + '" id="etab_' + id + '">' + esc(label) + '</button>'; }
+
+  function renderEditorPane() {
+    document.querySelectorAll('.tabs .tab').forEach(function (b) { b.classList.toggle('on', b.id === 'etab_' + EDITOR_TAB); });
+    var host = document.getElementById('editorPane');
+    var locked = EDITING.structureLocked;
+    if (EDITOR_TAB === 'settings') {
+      host.innerHTML = settingsTabHtml();
+      wireSettingsControls();
+      return;
+    }
+    if (EDITOR_TAB === 'preview') {
+      host.innerHTML = '<div class="pvpage"><div id="pvPage"></div></div>';
+      renderSchemaPreviewInto_(document.getElementById('pvPage'), EDITING.schema);
+      return;
+    }
+    // ---- Build ----
+    var lockBanner = locked ? '<div class="banner">This form’s layout is locked (use as-is). You can change most settings, but its fields, access, and approval routing are locked to the HCS template. An admin can change them.</div>' : '';
+    host.innerHTML = '<div id="editorRoot">' + lockBanner +
+      '<div id="startBlock"></div>' +
+      '<div class="field"><label for="fTitle">Form title</label><input class="control" id="fTitle" value="' + esc(EDITING.schema.title || '') + '"' + (locked ? ' readonly' : '') + '></div>' +
+      '<div class="field" style="margin-top:10px"><label for="fDesc">Description</label><textarea class="control" id="fDesc"' + (locked ? ' readonly' : '') + '>' + esc(EDITING.schema.description || '') + '</textarea></div>' +
+      (locked ? '' : '<button class="btn gold sm" id="btnParent" style="margin-top:14px;display:inline-flex;align-items:center;gap:6px">' + FormsUI.icon('plus') + ' This form is for Parents</button>') +
+      '<div class="divider"></div>' +
+      '<div id="canvasBar" style="display:none;justify-content:flex-end;margin-bottom:6px"><button class="btn ghost sm" id="btnToggleAll" type="button"></button></div>' +
+      '<div id="canvas"></div>' +
+    '</div>';
+    if (!locked) {
       document.getElementById('fTitle').oninput = function () { EDITING.schema.title = this.value; };
       document.getElementById('fDesc').oninput = function () { EDITING.schema.description = this.value; };
-      // one delegated listener → any field/setting edit marks dirty + schedules autosave
-      var root = document.getElementById('editorRoot');
-      root.addEventListener('input', markDirty);
-      root.addEventListener('change', markDirty);
+      document.getElementById('btnParent').onclick = addParentBlock;
     }
-    wireSide();
+    wireFieldGaps();
     renderCanvas();
-    if (LIVEPREV) renderLivePreview();
+  }
+
+  // ---------- "+" insert points between fields (see renderCanvas) — click one, pick a type
+  // from the readable dropdown menu, and the new field lands exactly there, not just at
+  // the end. Reuses the app's existing .moremenu/.menu dropdown look (full-width readable
+  // rows), not small pill buttons.
+  function fieldGapHtml(idx, big) {
+    var labelFor = {}; FIELD_TYPES.forEach(function (t) { labelFor[t[0]] = t[1]; });
+    var menu = TYPE_GROUPS.map(function (g) {
+      return '<div class="tg-group"><h4>' + esc(g[0]) + '</h4><div class="tg-grid">' + g[1].map(function (ty) {
+        return '<button class="tg-tile" data-type="' + ty + '" title="' + esc(TYPE_TIPS[ty] || '') + '">' +
+          '<span class="ic">' + (TYPE_ICONS[ty] || '❔') + '</span><span class="lb">' + esc(labelFor[ty] || ty) + '</span></button>';
+      }).join('') + '</div></div>';
+    }).join('');
+    // Every inter-field gap doubles as an add point, but they're hover-only dashed lines —
+    // easy to miss as "the" place to add a field. The LAST gap (after the final field, or
+    // the only gap on an empty canvas) renders as an always-visible "+ Add field" button
+    // instead, so there's one obvious, permanent place to add a field beyond the between-
+    // fields hover targets.
+    var addBtnHtml = big
+      ? '<button class="gapadd gapadd-big" title="Add field" aria-label="Add field">' + FormsUI.icon('plus', { size: 14 }) + ' Add field</button>'
+      : '<button class="gapadd" title="Add field here" aria-label="Add field here">' + FormsUI.icon('plus', { size: 13 }) + '</button>';
+    return '<div class="fieldgap' + (big ? ' fieldgap-big' : '') + '" data-gapidx="' + idx + '"><div class="moremenu">' +
+      addBtnHtml +
+      '<div class="menu gapmenu tilemenu" hidden>' + menu + '</div>' +
+    '</div></div>';
+  }
+  function closeGapMenus() {
+    document.querySelectorAll('.fieldgap .menu').forEach(function (m) { m.setAttribute('hidden', 'hidden'); });
+  }
+  // One delegated listener on #canvas (persists across renderCanvas() re-renders, since
+  // that only rewrites innerHTML — attaching this in renderCanvas() itself would stack a
+  // fresh duplicate on every add/delete/reorder; called once from renderEditorPane()
+  // instead, right after #canvas is created fresh for this form.
+  function wireFieldGaps() {
+    var host = document.getElementById('canvas');
+    if (!host) return;
+    host.addEventListener('click', function (e) {
+      var addBtn = e.target.closest('.gapadd');
+      if (addBtn) {
+        var menu = addBtn.parentElement.querySelector('.menu');
+        var wasHidden = menu.hasAttribute('hidden');
+        closeGapMenus();
+        if (wasHidden) menu.removeAttribute('hidden');
+        return;
+      }
+      var typeBtn = e.target.closest('.gapmenu button[data-type]');
+      if (typeBtn) {
+        var gap = typeBtn.closest('.fieldgap');
+        addField(typeBtn.getAttribute('data-type'), Number(gap.getAttribute('data-gapidx')));
+      }
+    });
+    if (!window.__hcsGapMenuClose) {
+      window.__hcsGapMenuClose = true;
+      document.addEventListener('click', function (e) { if (!e.target.closest('.fieldgap')) closeGapMenus(); });
+    }
   }
 
   // ---------- undo (structural ops only: add/delete/duplicate/move/drag/parent-block) ----------
@@ -882,35 +1454,56 @@
     if (EDITING) { e.preventDefault(); doUndo(); }
   }
 
+  // Empty-canvas "which kind of form is this" choice — deliberately rendered ABOVE the
+  // title/description fields (in #startBlock, see renderEditorPane) so it's the first thing
+  // seen and clearly something to pick before filling in details, not a footnote below an
+  // empty field list. Re-rendered from renderCanvas() so it appears/disappears in lockstep
+  // with the field list (e.g. picking a start option, or deleting the last field).
+  function renderStartBlock() {
+    var host = document.getElementById('startBlock');
+    if (!host) return;
+    if (EDITING.structureLocked || fields().length) { host.innerHTML = ''; return; }
+    host.innerHTML =
+      '<p class="help" style="margin:0 0 8px;font-weight:700">Pick how to start this form:</p>' +
+      '<div class="startchoices">' +
+        '<button type="button" id="startParent"><strong>👪 Parent form</strong><span>Adds the parent identity block + student picker and sets access to Private (parents verify by email). Most HCS forms start here.</span></button>' +
+        '<button type="button" id="startContact"><strong>✏️ Basic info block</strong><span>Adds First name, Last name, and Email fields — for open/staff forms.</span></button>' +
+        '<button type="button" id="startBlank"><strong>📄 Start blank</strong><span>Add one field at a time.</span></button>' +
+      '</div><div class="divider"></div>';
+    var sp = document.getElementById('startParent'); if (sp) sp.onclick = function () { addParentBlock(true); };
+    var sc = document.getElementById('startContact');
+    if (sc) sc.onclick = function () {
+      snapshotUndo();
+      fields().push(
+        { id: uid(), type: 'text', label: 'First name', required: true },
+        { id: uid(), type: 'text', label: 'Last name', required: true },
+        { id: uid(), type: 'email', label: 'Email', required: true });
+      renderCanvas(); markDirty();
+    };
+    var sb2 = document.getElementById('startBlank');
+    if (sb2) sb2.onclick = function () {
+      var gapBtn = document.querySelector('#canvas .fieldgap .gapadd'); if (gapBtn) gapBtn.click();
+    };
+  }
+
   function renderCanvas() {
+    renderStartBlock();
     var host = document.getElementById('canvas');
     var locked = EDITING.structureLocked;
     var fs = fields();
     var bar = document.getElementById('canvasBar');
     if (bar) bar.style.display = (!locked && fs.length > 3) ? 'flex' : 'none';
     if (!fs.length) {
-      // Empty canvas: offer the common starting points instead of a blank stare.
-      host.innerHTML = locked ? '<p class="help">No fields yet.</p>' :
-        '<div class="startchoices">' +
-          '<button type="button" id="startParent"><strong>👪 Parent form</strong><span>Adds the parent identity block + student picker and sets access to Private (parents verify by email). Most HCS forms start here.</span></button>' +
-          '<button type="button" id="startContact"><strong>✏️ Basic info block</strong><span>Adds First name, Last name, and Email fields — for open/staff forms.</span></button>' +
-          '<button type="button" id="startBlank"><strong>📄 Start blank</strong><span>Add fields one at a time from the palette above.</span></button>' +
-        '</div>';
-      var sp = document.getElementById('startParent'); if (sp) sp.onclick = function () { addParentBlock(true); };
-      var sc = document.getElementById('startContact');
-      if (sc) sc.onclick = function () {
-        snapshotUndo();
-        fields().push(
-          { id: uid(), type: 'text', label: 'First name', required: true },
-          { id: uid(), type: 'text', label: 'Last name', required: true },
-          { id: uid(), type: 'email', label: 'Email', required: true });
-        renderCanvas(); markDirty();
-      };
-      var sb2 = document.getElementById('startBlank'); if (sb2) sb2.onclick = function () { FormsUI.toast('Pick a field type from the palette above'); };
-      refreshLivePreview();
+      // Empty canvas: the start-choice buttons live above the title now (#startBlock) —
+      // this is just the one add point, styled as the permanent "+ Add field" button.
+      host.innerHTML = locked ? '<p class="help">No fields yet.</p>' : fieldGapHtml(0, true);
       return;
     }
-    host.innerHTML = fs.map(function (f, i) { return fieldCard(f, i, locked); }).join('');
+    // A "+" insert point before every field, and one more (always-visible) after the last —
+    // pick a type at any of them and the new field lands exactly there, not always at the end.
+    var rows = locked ? [] : [fieldGapHtml(0)];
+    fs.forEach(function (f, i) { rows.push(fieldCard(f, i, locked)); if (!locked) rows.push(fieldGapHtml(i + 1, i === fs.length - 1)); });
+    host.innerHTML = rows.join('');
     // restore per-card collapse state
     fs.forEach(function (f) {
       if (COLLAPSED[f.id]) { var c = host.querySelector('.fieldcard[data-fid="' + f.id + '"]'); if (c) c.classList.add('collapsed'); }
@@ -925,7 +1518,6 @@
         renderCanvas();
       };
     }
-    refreshLivePreview();
     if (locked) return;
     fs.forEach(function (f, i) {
       bindInput('lbl_' + f.id, function (v) { f.label = v; var lp = document.querySelector('.fieldcard[data-fid="' + f.id + '"] .fclabel'); if (lp) lp.textContent = v; });
@@ -984,13 +1576,36 @@
         var h = function () { if (!f.validation) f.validation = {}; f.validation[spec[1]] = spec[2] ? (this.value === '' ? null : Number(this.value)) : this.value; };
         if (el.tagName === 'SELECT') el.onchange = h; else el.oninput = h;
       });
-      var colEl = document.getElementById('col_' + f.id);
-      if (colEl) colEl.onclick = function () {
+      var notsameBox = document.getElementById('notsame_' + f.id);
+      if (notsameBox) notsameBox.addEventListener('change', function () {
+        var picked = Array.prototype.slice.call(notsameBox.querySelectorAll('input[data-notsame]:checked')).map(function (i) { return i.value; });
+        if (!f.validation) f.validation = {};
+        if (picked.length) f.validation.notSameAs = picked.length === 1 ? picked[0] : picked; else delete f.validation.notSameAs;
+      });
+      var toggleCollapse = function () {
+        // No stopPropagation: this click still bubbles to the click-outside-collapses
+        // listener, which correctly leaves THIS card alone (the click target is inside
+        // it) while collapsing any OTHER card left open — expanding one closes others.
         var c = document.querySelector('.fieldcard[data-fid="' + f.id + '"]');
-        if (c) { c.classList.toggle('collapsed'); COLLAPSED[f.id] = c.classList.contains('collapsed'); }
+        if (!c) return;
+        if (c.classList.contains('collapsed')) {
+          c.classList.remove('collapsed'); COLLAPSED[f.id] = false;
+          // Clicking the box should let you start typing right away, not just reveal the
+          // settings body under a second click.
+          setTimeout(function () { var el = document.getElementById('lbl_' + f.id); if (el) { el.focus(); if (el.select) el.select(); } }, 0);
+        }
+        else collapseField_(c);
         var tb = document.getElementById('btnToggleAll');
         if (tb) tb.textContent = fields().every(function (x) { return COLLAPSED[x.id]; }) ? 'Expand all' : 'Collapse all';
       };
+      var colEl = document.getElementById('col_' + f.id); if (colEl) colEl.onclick = toggleCollapse;
+      var doneEl = document.getElementById('done_' + f.id); if (doneEl) doneEl.onclick = toggleCollapse;
+      var pvEl = document.getElementById('fcpv_' + f.id);
+      if (pvEl) pvEl.onclick = toggleCollapse;
+      // Clicking the header of an EXPANDED card collapses it back — mirrors clicking the
+      // WYSIWYG box to expand it. Ignore clicks on the Done button itself (own handler above).
+      var headEl = document.getElementById('fchead_' + f.id);
+      if (headEl) headEl.onclick = function (e) { if (e.target.closest('.fcdone')) return; toggleCollapse(); };
       document.getElementById('up_' + f.id).onclick = function () { move(i, -1); markDirty(); };
       document.getElementById('dn_' + f.id).onclick = function () { move(i, 1); markDirty(); };
       document.getElementById('dup_' + f.id).onclick = function () { duplicateFieldAt(i); };
@@ -1104,17 +1719,79 @@
           '<select class="control" id="cop_' + f.id + '">' + condOpOpts(f.showIf) + '</select>' +
           '<input class="control" id="cval_' + f.id + '" value="' + esc((f.showIf && f.showIf.value) || '') + '" placeholder="value"></div></details>';
     }
-    return '<div class="fieldcard" draggable="true" data-idx="' + i + '" data-fid="' + f.id + '"><div class="fchead">' +
-      '<span class="draghandle" title="Drag to reorder" aria-hidden="true">' + FormsUI.icon('grip') + '</span>' +
-      '<span class="ftype">' + esc(typeLabel) + '</span>' +
-      '<span class="fclabel">' + esc(f.label || '') + '</span>' +
-      '<div class="fcacts">' +
-      '<button class="iconbtn" id="col_' + f.id + '" title="Collapse / expand" aria-label="Collapse or expand this field">' + FormsUI.icon('chevron', { cls: 'col-chevron' }) + '</button>' +
-      '<button class="iconbtn" id="up_' + f.id + '" title="Move up" aria-label="Move up">' + FormsUI.icon('up') + '</button>' +
-      '<button class="iconbtn" id="dn_' + f.id + '" title="Move down" aria-label="Move down">' + FormsUI.icon('down') + '</button>' +
-      '<button class="iconbtn" id="dup_' + f.id + '" title="Duplicate field" aria-label="Duplicate field">' + FormsUI.icon('dup') + '</button>' +
-      '<button class="iconbtn" id="del_' + f.id + '" title="Delete field" aria-label="Delete field">' + FormsUI.icon('trash') + '</button></div></div>' +
-      '<div class="fcbody">' + body + '</div></div>';
+    // Collapsed (default) shows the field exactly as a submitter would see it — the canvas
+    // IS the preview now, no separate docked pane. Expanded (click the preview, or the
+    // pencil icon) reveals the same settings body this editor has always had — regex
+    // patterns, capacity limits, and calc formulas don't have a sensible "click the
+    // rendered control" affordance, so those stay as organized controls, just attached
+    // to this field instead of living in a panel elsewhere on screen.
+    return '<div class="fieldcard" draggable="true" data-idx="' + i + '" data-fid="' + f.id + '">' +
+      '<div class="fctools">' +
+        '<span class="draghandle" title="Drag to reorder" aria-hidden="true">' + FormsUI.icon('grip') + '</span>' +
+        '<button class="iconbtn" id="col_' + f.id + '" title="Edit this field" aria-label="Edit this field">' + FormsUI.icon('edit') + '</button>' +
+        '<button class="iconbtn" id="up_' + f.id + '" title="Move up" aria-label="Move up">' + FormsUI.icon('up') + '</button>' +
+        '<button class="iconbtn" id="dn_' + f.id + '" title="Move down" aria-label="Move down">' + FormsUI.icon('down') + '</button>' +
+        '<button class="iconbtn" id="dup_' + f.id + '" title="Duplicate field" aria-label="Duplicate field">' + FormsUI.icon('dup') + '</button>' +
+        '<button class="iconbtn" id="del_' + f.id + '" title="Delete field" aria-label="Delete field">' + FormsUI.icon('trash') + '</button>' +
+      '</div>' +
+      '<div class="fcpreview" id="fcpv_' + f.id + '">' + pvField_(f, EDITING.schema, function () { return 1; }) + '</div>' +
+      '<div class="fceditor">' +
+        '<div class="fchead" id="fchead_' + f.id + '" title="Click to collapse"><span class="ftype">' + esc(typeLabel) + '</span><span class="fclabel">' + esc(f.label || '') + '</span>' +
+          '<button class="iconbtn fcdone" id="done_' + f.id + '" title="Done editing" aria-label="Done editing">' + FormsUI.icon('check', { size: 14 }) + '</button></div>' +
+        '<div class="fcbody">' + body + '</div>' +
+      '</div></div>';
+  }
+  /** Rebuild one field's collapsed WYSIWYG view from its current (possibly just-edited) state
+   *  — needed because collapsing is a CSS toggle, not a re-render, so the settings edits a
+   *  person just made via direct field-object mutation never touched this static HTML. */
+  function refreshFieldPreview_(f) {
+    var host = document.getElementById('fcpv_' + f.id);
+    if (host) host.innerHTML = pvField_(f, EDITING.schema, function () { return 1; });
+  }
+  function collapseField_(cardEl) {
+    var fid = cardEl.getAttribute('data-fid');
+    var f = fields().filter(function (x) { return x.id === fid; })[0];
+    cardEl.classList.add('collapsed');
+    COLLAPSED[fid] = true;
+    if (f) refreshFieldPreview_(f);
+    var tb = document.getElementById('btnToggleAll');
+    if (tb) tb.textContent = fields().every(function (x) { return COLLAPSED[x.id]; }) ? 'Expand all' : 'Collapse all';
+  }
+  // Clicking anywhere outside a field's own card collapses it back to its WYSIWYG preview —
+  // no explicit "Done" click required. Guarded to attach once for the page's lifetime;
+  // field cards are recreated on every Build-tab render, so this can't just live on them.
+  if (!window.__hcsFieldCollapseOutside) {
+    window.__hcsFieldCollapseOutside = true;
+    document.addEventListener('click', function (e) {
+      if (!EDITING) return;
+      // Structural actions (move/duplicate/delete) call renderCanvas() synchronously
+      // inside their own click handler, replacing the canvas DOM before this listener
+      // runs — e.target is then a detached node no card can ever "contain", which would
+      // otherwise make every open card look like it was clicked outside. Skip those.
+      if (!e.target.isConnected) return;
+      document.querySelectorAll('.fieldcard:not(.collapsed)').forEach(function (c) {
+        if (!c.contains(e.target)) collapseField_(c);
+      });
+    });
+  }
+  // Info icons (settings/field help) rely on the native `title` tooltip, which is easy to
+  // miss (small hit target, hover-only, invisible on touch) — a click/tap now shows the
+  // same text in a floating bubble next to the icon, closed by clicking anywhere else.
+  if (!window.__hcsInfoTip) {
+    window.__hcsInfoTip = true;
+    document.addEventListener('click', function (e) {
+      var existing = document.querySelector('.infotip'); if (existing) existing.remove();
+      var ic = e.target.closest('.infoicon');
+      if (!ic) return;
+      e.stopPropagation();
+      var tip = document.createElement('div');
+      tip.className = 'infotip';
+      tip.textContent = ic.getAttribute('title') || ic.getAttribute('aria-label') || '';
+      document.body.appendChild(tip);
+      var r = ic.getBoundingClientRect();
+      tip.style.left = Math.max(8, Math.min(r.left, window.innerWidth - tip.offsetWidth - 12)) + 'px';
+      tip.style.top = (r.bottom + 6) + 'px';
+    });
   }
   // Field types that can never be a condition source (no user-entered value to compare).
   var NON_CONDITION_TYPES = { sectionHeader: 1, description: 1, faq: 1, pageBreak: 1, calculation: 1, file: 1, signature: 1 };
@@ -1132,6 +1809,14 @@
     return [['equals', 'equals'], ['notEquals', 'does not equal'], ['contains', 'contains'], ['notEmpty', 'is not empty'], ['empty', 'is empty']]
       .map(function (o) { return '<option value="' + o[0] + '"' + (sel === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
   }
+  function approvalCondFieldOpts(sel) {
+    var opts = '<option value="">— always require approval when enabled —</option>';
+    fields().forEach(function (f) {
+      if (NON_CONDITION_TYPES[f.type]) return;
+      opts += '<option value="' + f.id + '"' + (sel === f.id ? ' selected' : '') + '>' + esc(f.label || f.id) + '</option>';
+    });
+    return opts;
+  }
   function dateFieldOpts(cur, sel) {
     var o = '<option value="">— none —</option>';
     fields().forEach(function (f) { if (f.id === cur.id || f.type !== 'date') return; o += '<option value="' + f.id + '"' + (sel === f.id ? ' selected' : '') + '>' + esc(f.label || f.id) + '</option>'; });
@@ -1148,8 +1833,21 @@
     } else if (f.type === 'date') {
       inner = '<div class="frow"><input class="control" type="date" id="vmind_' + f.id + '" value="' + esc(vr.minDate || '') + '"><input class="control" type="date" id="vmaxd_' + f.id + '" value="' + esc(vr.maxDate || '') + '"></div>' +
         '<label class="lbl">Must be on/after another date field</label><select class="control" id="vnb_' + f.id + '">' + dateFieldOpts(f, vr.notBefore) + '</select>';
+    } else if (['dropdown', 'radio'].indexOf(f.type) > -1) {
+      inner = '';
     } else { return ''; }
+    inner += '<label class="lbl" style="margin-top:8px">Must differ from' + info('Blocks submission if this field’s answer matches the selected field’s answer — e.g. a 2nd-choice picker that must not repeat the 1st choice.') + '</label>' +
+      '<div id="notsame_' + f.id + '">' + notSameAsFieldChecks(f) + '</div>';
     return '<details class="adv"><summary>Validation</summary>' + inner + '</details>';
+  }
+  function notSameAsFieldChecks(f) {
+    var vr = f.validation || {};
+    var sel = Array.isArray(vr.notSameAs) ? vr.notSameAs : (vr.notSameAs ? [vr.notSameAs] : []);
+    var eligible = fields().filter(function (g) { return g.id !== f.id && g.type === f.type; });
+    if (!eligible.length) return '<p class="help">Add another ' + f.type + ' field first, then pick it here.</p>';
+    return eligible.map(function (g) {
+      return '<label class="choice" style="padding:6px 10px"><input type="checkbox" data-notsame value="' + g.id + '"' + (sel.indexOf(g.id) > -1 ? ' checked' : '') + '><span>' + esc(g.label || g.id) + '</span></label>';
+    }).join('');
   }
   /** Per-option capacity rows (a number input beside each option; blank = unlimited). */
   function capRows(f) {
@@ -1179,7 +1877,7 @@
   function bindInput(id, cb) { var el = document.getElementById(id); if (el) el.oninput = function () { cb(this.value); }; }
   function move(i, d) { var fs = fields(); var j = i + d; if (j < 0 || j >= fs.length) return; snapshotUndo(); var t = fs[i]; fs[i] = fs[j]; fs[j] = t; renderCanvas(); }
 
-  function addField(type) {
+  function addField(type, atIndex) {
     snapshotUndo();
     var f = { id: uid(), type: type, label: '', required: false };
     if (OPTION_TYPES[type]) f.options = ['Option 1'];
@@ -1187,7 +1885,8 @@
     if (type === 'faq') { f.label = 'Frequently Asked Questions'; f.items = [{ q: 'Question?', a: 'Answer.' }]; }
     if (type === 'calculation') f.calc = { op: 'sum', fields: [] };
     if (type === 'rating') f.max = 5;
-    fields().push(f); renderCanvas(); markDirty();
+    if (atIndex == null) fields().push(f); else fields().splice(atIndex, 0, f);
+    renderCanvas(); markDirty();
     setTimeout(function () { var el = document.getElementById('lbl_' + f.id); if (el) el.focus(); }, 30);
   }
 
@@ -1215,45 +1914,62 @@
   }
 
   // ---------- side settings panel ----------
-  function sidePanel() {
-    var s = EDITING.schema.settings, m = EDITING.meta;
+  // Settings tab — a full-width page now, not a cramped sidebar, so grouped disclosures
+  // become always-visible cards. Same ids throughout: wireSettingsControls() is unchanged.
+  function settingsTabHtml() {
+    var s = EDITING.schema.settings;
     var ap = s.approval || {};
-    return '<div class="side"><h4>Settings</h4>' +
-      '<label class="lbl">Access</label><select class="control" id="sAccess">' +
-        opt('open', 'Open (anyone with link)', s.access) + opt('private', 'Private (FACTS email)', s.access) + opt('staff', 'Staff only (SSO)', s.access) + '</select>' +
-      '<label class="lbl">Status</label><select class="control" id="sLife">' +
-        opt('draft', 'Draft', s.lifecycle) + opt('published', 'Published', s.lifecycle) + opt('closed', 'Closed', s.lifecycle) + '</select>' +
-      '<div class="switchrow"><span>Not accepting responses' + info('Temporarily closes the form to new submissions without unpublishing it — submitters see a friendly “not accepting responses” message.') + '</span><span class="toggle"><input type="checkbox" id="sLock"' + (s.locked ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '<label class="lbl">Notify on submit (emails, comma-sep)</label><input class="control" id="sNotify" value="' + esc((s.notifyEmails || []).join(', ')) + '"><div id="sNotifyWarn" class="help" style="color:var(--hcs-red);display:none">Only @harfordchristian.org addresses are allowed — others are dropped when you save.</div>' +
-      '<label class="lbl">Confirmation message</label><textarea class="control" id="sConfirm">' + esc(s.confirmationMessage || '') + '</textarea>' +
-      // rarely-touched settings live behind grouped disclosures (open when something inside is set)
-      '<details class="sgroup"' + ((s.reviewMode || s.onePerEmail || s.multiStudent || s.pdfCopy || s.allowEdit) ? ' open' : '') + '><summary>Response options</summary>' +
+    var card = function (title, inner, extra) { return '<div class="setcard' + (extra || '') + '"><h4>' + esc(title) + '</h4>' + inner + '</div>'; };
+    // Access & status is the setting most likely to bite someone (wrong audience, form
+    // still in Draft, etc.), and Actions (share/responses/delete) are what people reach for
+    // right after checking it — merged into one full-width, visually spotlighted card so
+    // it's the first thing seen, instead of one card among six equal-weight ones. Laid out
+    // as two columns so the full card width is actually used, not a single narrow stack of
+    // controls with empty space beside it.
+    var accessCol =
+        '<label class="lbl">Who can open this</label><select class="control" id="sAccess">' +
+          opt('open', 'Open (anyone with link)', s.access) + opt('private', 'Private (FACTS email)', s.access) + opt('staff', 'Staff-only (SSO)', s.access) + '</select>' +
+        '<div id="sClassTagRow" style="display:' + (s.access === 'private' ? 'block' : 'none') + '">' +
+          '<label class="lbl">Restrict to my class' + info('Only parents whose child is enrolled in this class will see or be able to open this form.') + '</label>' +
+          '<select class="control" id="sClassTag"><option value="">— not restricted —</option></select>' +
+        '</div>' +
+        '<label class="lbl">Status</label><select class="control" id="sLife">' +
+          opt('draft', 'Draft', s.lifecycle) + opt('published', 'Published', s.lifecycle) + opt('closed', 'Closed', s.lifecycle) + '</select>' +
+        '<div class="switchrow"><span>Not accepting responses' + info('Temporarily closes the form to new submissions without unpublishing it — submitters see a friendly “not accepting responses” message.') + '</span><span class="toggle"><input type="checkbox" id="sLock"' + (s.locked ? ' checked' : '') + '><span class="sl"></span></span></div>';
+    var actionsCol =
+        '<div class="frow">' +
+          '<button class="btn ghost block" id="btnShare">Get share link</button>' +
+          '<button class="btn ghost block" id="btnResp">View responses</button>' +
+        '</div>' +
+        '<button class="btn ghost danger block" id="btnDelete" style="margin-top:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px">' + FormsUI.icon('trash') + ' Delete this form</button>' +
+        '<p class="help" style="margin-top:6px">To simply stop accepting responses, set <strong>Status</strong> to Closed instead — the form and its data stay put.</p>';
+    return '<div class="settingsgrid">' +
+      card('Access &amp; status', '<div class="spotlight-grid"><div>' + accessCol + '</div><div>' + actionsCol + '</div></div>', ' setcard-spotlight') +
+      card('Notifications',
+        '<label class="lbl">Notify on submit (emails, comma-sep)</label><input class="control" id="sNotify" value="' + esc((s.notifyEmails || []).join(', ')) + '"><div id="sNotifyWarn" class="help" style="color:var(--hcs-red);display:none">Only @harfordchristian.org addresses are allowed — others are dropped when you save.</div>' +
+        '<label class="lbl">Confirmation message</label><textarea class="control" id="sConfirm">' + esc(s.confirmationMessage || '') + '</textarea>') +
+      card('Response options',
         '<div class="switchrow"><span>Review mode' + info('The email the submitter enters gets BOTH the confirmation (as the requester) and a copy of the owner notification (as the reviewer). Useful when one person builds and submits the form.') + '</span><span class="toggle"><input type="checkbox" id="sReview"' + (s.reviewMode ? ' checked' : '') + '><span class="sl"></span></span></div>' +
         '<div class="switchrow"><span>One response per person' + info('Blocks a second submission from the same email address (verified email for parent/staff forms, or the entered email on open forms).') + '</span><span class="toggle"><input type="checkbox" id="sOnce"' + (s.onePerEmail ? ' checked' : '') + '><span class="sl"></span></span></div>' +
         '<div class="switchrow"><span>Save &amp; add another child' + info('After submitting, a parent can keep their entered info and quickly submit again for another of their children (one response per child). Best for per-student forms with a student picker.') + '</span><span class="toggle"><input type="checkbox" id="sMulti"' + (s.multiStudent ? ' checked' : '') + '><span class="sl"></span></span></div>' +
         '<div class="switchrow"><span>PDF copy with receipt' + info('The submitter’s receipt email includes a branded PDF of their answers. Great for signed permission slips, physicals, and KI forms. A copy is also saved in the form’s Uploads folder.') + '</span><span class="toggle"><input type="checkbox" id="sPdf"' + (s.pdfCopy ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-        '<div class="switchrow"><span>Allow edit &amp; withdraw' + info('Adds a secure “Edit or withdraw” link to the receipt email. They can change answers or cancel while the response is still Submitted or Pending Approval — no login needed.') + '</span><span class="toggle"><input type="checkbox" id="sEdit"' + (s.allowEdit ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-      '</details>' +
-      '<details class="sgroup"' + ((s.openDate || s.closeDate || Number(s.maxResponses)) ? ' open' : '') + '><summary>Scheduling &amp; limits</summary>' +
+        '<div class="switchrow"><span>Allow edit &amp; withdraw' + info('Adds a secure “Edit or withdraw” link to the receipt email. They can change answers or cancel while the response is still Submitted or Pending Approval — no login needed.') + '</span><span class="toggle"><input type="checkbox" id="sEdit"' + (s.allowEdit ? ' checked' : '') + '><span class="sl"></span></span></div>') +
+      card('Scheduling & limits',
         '<label class="lbl">Opens (optional)</label><input class="control" id="sOpen" type="datetime-local" value="' + esc(s.openDate || '') + '">' +
         '<label class="lbl">Closes (optional)</label><input class="control" id="sClose" type="datetime-local" value="' + esc(s.closeDate || '') + '">' +
-        '<label class="lbl">Max total responses (0 = unlimited)</label><input class="control" id="sMax" type="number" min="0" value="' + esc(s.maxResponses || 0) + '">' +
-      '</details>' +
-      '<details class="sgroup"' + (ap.enabled ? ' open' : '') + '><summary>Approvals</summary>' +
-        '<div class="switchrow"><span>Require approval' + info('Submissions land as “Pending Approval” and route to the approvers below. They approve/reject from the Approvals tab; the submitter is emailed the decision.') + '</span><span class="toggle"><input type="checkbox" id="aEn"' + (ap.enabled ? ' checked' : '') + '><span class="sl"></span></span></div>' +
-        '<label class="lbl">Approvers (emails or group names, comma-sep)</label><input class="control" id="aWho" value="' + esc((ap.approvers || []).join(', ')) + '">' +
+        '<label class="lbl">Max total responses (0 = unlimited)</label><input class="control" id="sMax" type="number" min="0" value="' + esc(s.maxResponses || 0) + '">') +
+      card('Approvals',
+        '<div class="switchrow"><span>Require approval' + info('Submissions land as “Pending Approval” and route to the approvers below. They approve/reject from the response sheet’s Status column via decideApproval. The submitter is emailed the decision.') + '</span><span class="toggle"><input type="checkbox" id="aEn"' + (ap.enabled ? ' checked' : '') + '><span class="sl"></span></span></div>' +
+        '<label class="lbl">Approvers' + info('Type staff email addresses directly, or the name of a group defined in the _System spreadsheet’s Approval_Groups tab (everyone in that group gets the request). Mix and match, comma-separated.') + '</label>' +
+        '<input class="control" id="aWho" placeholder="e.g. principal@harfordchristian.org, Athletics" value="' + esc((ap.approvers || []).join(', ')) + '">' +
+        '<p class="help" style="margin-top:4px">Comma-separated list of staff emails and/or Approval_Groups names.</p>' +
         '<label class="lbl">Require</label><select class="control" id="aMode">' + opt('any', 'Any one approver', ap.mode || 'any') + opt('all', 'All approvers', ap.mode || 'any') + '</select>' +
-      '</details>' +
-      '<div class="divider"></div>' +
-      (EDITING.structureLocked ? '' : '<button class="btn gold block" id="btnParent" style="margin-bottom:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px">' + FormsUI.icon('plus') + ' This form is for Parents</button>') +
-      '<button class="btn block" id="btnSave">Save</button>' +
-      '<button class="btn ghost block" id="btnPreview" style="margin-top:8px">Preview as submitter</button>' +
-      '<button class="btn ghost block" id="btnShare" style="margin-top:8px">Get share link</button>' +
-      '<button class="btn ghost block" id="btnResp" style="margin-top:8px">View responses</button>' +
-      '<div class="divider"></div>' +
-      '<button class="btn ghost danger block" id="btnDelete" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">' + FormsUI.icon('trash') + ' Delete this form</button>' +
-      '<p class="help" style="margin-top:6px">To simply stop accepting responses, set <strong>Status</strong> to Closed instead — the form and its data stay put.</p>' +
-      '</div>';
+        '<label class="lbl">Only require approval if…' + info('Optional. Leave the first dropdown on “always require approval” to require approval for every submission whenever this is enabled.') + '</label>' +
+        '<div class="frow">' +
+          '<select class="control" id="aCondField">' + approvalCondFieldOpts((ap.condition && ap.condition.field) || '') + '</select>' +
+          '<select class="control" id="aCondOp">' + condOpOpts(ap.condition) + '</select>' +
+          '<input class="control" id="aCondVal" value="' + esc((ap.condition && ap.condition.value) || '') + '" placeholder="value"></div>') +
+    '</div>';
   }
   function opt(v, label, sel) { return '<option value="' + v + '"' + (sel === v ? ' selected' : '') + '>' + esc(label) + '</option>'; }
   // Small hover/focus tooltip icon for settings — native title + accessible label.
@@ -1269,9 +1985,53 @@
   }
   function syncSideAccess() { var el = document.getElementById('sAccess'); if (el) el.value = EDITING.schema.settings.access; }
 
-  function wireSide() {
+  function wireClassTag() {
+    var sel = document.getElementById('sClassTag');
+    if (!sel) return;
+    var current = EDITING.meta.classCode || '';
+    call('getMyClassOptions', []).then(function (opts) {
+      if (!opts || !opts.length) {
+        var o0 = document.createElement('option');
+        o0.value = ''; o0.disabled = true; o0.textContent = '(no classes found for your login — ask an admin to check)';
+        sel.appendChild(o0);
+        return;
+      }
+      opts.forEach(function (c) {
+        var o = document.createElement('option');
+        o.value = c.classCode; o.textContent = c.label;
+        if (c.classCode === current) o.selected = true;
+        sel.appendChild(o);
+      });
+    }).catch(function (e) {
+      var o = document.createElement('option');
+      o.value = ''; o.disabled = true; o.textContent = 'Couldn\'t load your classes (error)';
+      sel.appendChild(o);
+      FormsUI.toast('Couldn\'t load your classes: ' + String(e && e.message || e));
+    });
+    sel.onchange = function () {
+      var code = this.value;
+      call('setFormClassTag', [EDITING.meta.id, code]).then(function (r) {
+        EDITING.meta.classCode = r.classCode || ''; EDITING.meta.classTeacher = r.classTeacher || '';
+        FormsUI.toast(code ? 'Restricted to that class' : 'Restriction removed');
+      }).catch(function (e) {
+        this.value = current;
+        FormsUI.toast(String(e && e.message || e));
+      }.bind(this));
+    };
+  }
+
+  function wireSettingsControls() {
     var s = EDITING.schema.settings;
-    document.getElementById('sAccess').onchange = function () { s.access = this.value; };
+    document.getElementById('sAccess').onchange = function () {
+      s.access = this.value;
+      var row = document.getElementById('sClassTagRow');
+      if (row) row.style.display = s.access === 'private' ? 'block' : 'none';
+      if (s.access !== 'private') {
+        var sel = document.getElementById('sClassTag');
+        if (sel && sel.value) { sel.value = ''; call('setFormClassTag', [EDITING.meta.id, '']).catch(function () {}); }
+      }
+    };
+    wireClassTag();
     document.getElementById('sLife').onchange = function () { s.lifecycle = this.value; };
     document.getElementById('sLock').onchange = function () { s.locked = this.checked; };
     document.getElementById('sReview').onchange = function () { s.reviewMode = this.checked; };
@@ -1286,6 +2046,14 @@
     document.getElementById('aEn').onchange = function () { s.approval.enabled = this.checked; };
     document.getElementById('aWho').oninput = function () { s.approval.approvers = this.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean); };
     document.getElementById('aMode').onchange = function () { s.approval.mode = this.value; };
+    var updApprovalCond = function () {
+      var f = document.getElementById('aCondField').value;
+      if (!f) { delete s.approval.condition; return; }
+      s.approval.condition = { field: f, op: document.getElementById('aCondOp').value, value: document.getElementById('aCondVal').value };
+    };
+    document.getElementById('aCondField').onchange = updApprovalCond;
+    document.getElementById('aCondOp').onchange = updApprovalCond;
+    document.getElementById('aCondVal').oninput = updApprovalCond;
     document.getElementById('sNotify').oninput = function () {
       s.notifyEmails = this.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
       var bad = s.notifyEmails.some(function (e) { return e.indexOf('@') > -1 && !/@harfordchristian\.org$/i.test(e); });
@@ -1293,15 +2061,10 @@
     };
     // Use-as-is (layout-locked) forms freeze access + approval for non-admins.
     if (EDITING.structureLocked) {
-      ['sAccess', 'aEn', 'aWho', 'aMode'].forEach(function (idd) { var el = document.getElementById(idd); if (el) el.disabled = true; });
+      ['sAccess', 'aEn', 'aWho', 'aMode', 'aCondField', 'aCondOp', 'aCondVal'].forEach(function (idd) { var el = document.getElementById(idd); if (el) el.disabled = true; });
     }
     document.getElementById('sConfirm').oninput = function () { s.confirmationMessage = this.value; };
-    var bp = document.getElementById('btnParent'); if (bp) bp.onclick = addParentBlock;
     document.getElementById('btnSave').onclick = saveAll;
-    document.getElementById('btnPreview').onclick = function () {
-      // save current edits first so the preview reflects them, then open
-      doSave(true).then(function () { doPreview(EDITING.meta.id); });
-    };
     document.getElementById('btnShare').onclick = function () { doShare(EDITING.meta.id); };
     document.getElementById('btnResp').onclick = function () { openResponses(EDITING.meta.id); };
     var bd = document.getElementById('btnDelete'); if (bd) bd.onclick = function () { doDelete(EDITING.meta.id, function () { DIRTY = false; renderDashboard(); }); };
@@ -1317,23 +2080,19 @@
     SETTINGS_STRINGS.forEach(function (k) { st[k] = s[k] || ''; });
     return st;
   }
-  var PREV_T = null;
-  function markDirty() {
-    DIRTY = true; setDirtyDot(true); scheduleAutosave();
-    if (LIVEPREV) { clearTimeout(PREV_T); PREV_T = setTimeout(renderLivePreview, 250); }
-  }
-  function refreshLivePreview() { if (LIVEPREV) renderLivePreview(); }
+  function markDirty() { DIRTY = true; setDirtyDot(true); scheduleAutosave(); }
 
-  // ---------- live preview (read-only mirror of what a submitter sees, re-rendered as you edit) ----------
-  function renderLivePreview() {
-    var host = document.getElementById('livePrev'); if (!host || !EDITING) return;
+  // Read-only mirror of what a submitter sees — shared by the template library's "Show
+  // preview" pane and each field's own collapsed WYSIWYG view in the editor (fieldCard()'s
+  // .fcpreview calls pvField_ directly per-field; this wraps the whole-form version).
+  function renderSchemaPreviewInto_(host, s) {
+    if (!host) return;
     try {
-      var s = EDITING.schema;
       var h = '<div class="pv-title">' + esc(s.title || 'Untitled form') + '</div>' +
         (s.description ? '<p class="pv-desc">' + esc(s.description) + '</p>' : '');
       var step = 1;
       (s.pages[0].fields || []).forEach(function (f) { h += pvField_(f, s, function () { step++; return step; }); });
-      host.innerHTML = h || '<p class="help">Nothing to preview yet.</p>';
+      host.innerHTML = '<div class="pv-sheet">' + (h || '<p class="help">Nothing to preview yet.</p>') + '</div>';
     } catch (e) {
       // never fail silently — show the problem where the preview would be
       host.innerHTML = '<p class="notice err">Preview couldn’t render: ' + esc(String(e && e.message || e)) + '</p>';
@@ -1424,7 +2183,7 @@
   }
 
   function openResponses(formId) {
-    chrome('<p class="help" style="padding:24px">Loading responses…</p>');
+    chrome(LOADING_HTML_ + 'Loading responses…</p>');
     call('getResponses', [formId, 100]).then(function (r) {
       var head = '<div style="display:flex;align-items:center;gap:10px;margin:16px 0">' +
         '<button class="btn ghost sm" id="back">← Back</button>' +
@@ -1432,8 +2191,13 @@
         '<button class="btn ghost sm" id="exportCsv" style="margin-left:auto">Export CSV</button>' +
         (r.sheetUrl ? '<a class="btn ghost sm" style="text-decoration:none" target="_blank" href="' + esc(r.sheetUrl) + '">Open Sheet ↗</a>' : '') + '</div>';
       var statusIdx = r.headers.indexOf('Status');
+      var submIdx = r.headers.indexOf('SubmissionID');
       var statuses = [];
       if (statusIdx > -1) r.rows.forEach(function (row) { var v = String(row[statusIdx] || ''); if (v && statuses.indexOf(v) === -1) statuses.push(v); });
+      // Approve/Reject only shows up as an extra column when this form's responses actually
+      // use approval routing (i.e. some row is sitting at Pending Approval) — most forms
+      // never have this status, so no point in an always-empty column for them.
+      var hasApprovals = statuses.indexOf('Pending Approval') > -1;
       var toolbar = !r.rows.length ? '' :
         '<div class="toolbar"><input id="rSearch" type="search" placeholder="Search responses (name, student, email…)" aria-label="Search responses">' +
         (statuses.length > 1 ? '<select id="rStatus" aria-label="Filter by status"><option value="">All statuses</option>' + statuses.map(function (v) { return '<option>' + esc(v) + '</option>'; }).join('') + '</select>' : '') + '</div>';
@@ -1452,12 +2216,19 @@
           !list.length ? '<p class="help">No responses match.</p>' :
           '<p class="help" style="margin:0 0 6px">Click a row to see the full response.</p>' +
           '<div style="overflow:auto"><table class="rtable"><thead><tr>' +
-            r.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-            list.map(function (x) { return '<tr data-ri="' + x.i + '" tabindex="0">' + x.row.map(function (c) { return '<td>' + respCellHtml(c) + '</td>'; }).join('') + '</tr>'; }).join('') +
+            r.headers.map(function (h) { return '<th>' + esc(h) + '</th>'; }).join('') + (hasApprovals ? '<th>Approve</th>' : '') + '</tr></thead><tbody>' +
+            list.map(function (x) {
+              var pending = statusIdx > -1 && String(x.row[statusIdx]) === 'Pending Approval';
+              var decideTd = !hasApprovals ? '' : '<td>' + (pending && submIdx > -1
+                ? '<button class="btn sm" data-decide="Approved" data-sid="' + esc(x.row[submIdx]) + '">Approve</button> ' +
+                  '<button class="btn ghost sm" data-decide="Rejected" data-sid="' + esc(x.row[submIdx]) + '">Reject</button>'
+                : '') + '</td>';
+              return '<tr data-ri="' + x.i + '" tabindex="0">' + x.row.map(function (c) { return '<td>' + respCellHtml(c) + '</td>'; }).join('') + decideTd + '</tr>';
+            }).join('') +
             '</tbody></table></div>';
         document.querySelectorAll('.rtable tr[data-ri]').forEach(function (tr) {
           var open = function (e) {
-            if (e.target && e.target.tagName === 'A') return; // let file links click through
+            if (e.target && (e.target.tagName === 'A' || e.target.closest('button'))) return; // let file links / decide buttons click through
             var row = r.rows[Number(tr.getAttribute('data-ri'))];
             var body = '<table style="border-collapse:collapse;font-size:.88rem">' + r.headers.map(function (h, ci) {
               var v = row[ci];
@@ -1468,6 +2239,23 @@
           };
           tr.onclick = open;
           tr.onkeydown = function (e) { if (e.key === 'Enter') open(e); };
+        });
+        document.querySelectorAll('.rtable [data-decide]').forEach(function (b) {
+          b.onclick = function (e) {
+            e.stopPropagation();
+            var sid = b.getAttribute('data-sid'), decision = b.getAttribute('data-decide');
+            FormsUI.prompt(decision, { body: '<p class="help">Add a note for the submitter (optional).</p>', placeholder: 'Note (optional)', okLabel: decision, multiline: true }).then(function (comment) {
+              if (comment === null) return;
+              b.disabled = true;
+              call('decideApproval', [formId, sid, decision, comment]).then(function (res) {
+                if (!res.ok) { b.disabled = false; return alert(res.message || 'Error'); }
+                var row = r.rows.filter(function (x) { return String(x[submIdx]) === sid; })[0];
+                if (row && statusIdx > -1) row[statusIdx] = res.status;
+                FormsUI.toast('Marked ' + res.status);
+                draw();
+              }).catch(function (e2) { b.disabled = false; alertErr(e2); });
+            });
+          };
         });
       };
       var qEl2 = document.getElementById('rSearch'); if (qEl2) qEl2.oninput = draw;
