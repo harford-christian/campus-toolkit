@@ -116,6 +116,18 @@
         '<p>A shared, phone-friendly system on top of the same Google Sheet. Staff do shelf counts on a touch <b>kiosk</b>, log incoming <b>shipments</b> with per-box expiry dates, and the <b>admin dashboard</b> surfaces FIFO expiry warnings, at-a-glance low-stock reorder lists, hot-pizza sell-through, shipment history, and usage-trend charts — right-sizing orders and cutting waste.</p>'
     },
 
+    'facts-directory': {
+      icon: '🔎', title: 'Directory Search', launch: 'demos/facts-directory/index.html',
+      summary: 'An instant staff lookup over the nightly SIS export: students, guardians, teachers, classes and rosters — searchable by name, parent email, subject or grade, with each student\'s schedule showing period, room, today\'s real bell times, and the class they are in right now.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Every small question — a parent\'s email, which homeroom a student is in, who teaches 7th-grade band, where a student is at 10:30 — meant logging into the student information system and clicking through several screens. Most staff don\'t have accounts for it, so the questions landed on the office instead, and answering "where is this student right now" meant reading a paper schedule against a bell chart.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>One search box over the nightly export. The whole searchable dataset is handed to the browser on load, so results appear <b>as you type</b> — no waiting between keystrokes — and typo-tolerant matching finds <i>Jonathan</i> when you typed <i>Johnathon</i>. Search a <b>subject</b> ("band", "7th grade band") and the class comes back with its instructor first, then the full roster; tap any student, teacher or class to walk straight into the next record.</p>' +
+        '<p>Each student\'s schedule shows <b>period · room · today\'s clock time</b> and <b>bolds the class in session</b>. Times come from the school\'s period grid joined to the live bell schedule, so delays and exam days shift correctly — and the school\'s reverse-order Friday (a first-period class meeting at 2:37pm) resolves on its own because the join is keyed on the time <i>slot</i>, not the period number. Add <code>?sim=2026-09-11 14:45</code> to the URL to time-travel and watch it.</p>' +
+        '<p>Read-only by design, gated to staff accounts in one org unit, and it never writes to the source data.</p>'
+    },
+
     'facts-provisioning': {
       icon: '🔑', title: 'Account Provisioning (FACTS → Google → Microsoft 365)', launch: 'demos/facts-provisioning/index.html',
       summary: 'Automated student/staff account provisioning: new enrollments flow from the FACTS SIS into auto-created Google Workspace accounts (email, org-unit, password), which then drive Microsoft 365 license assignment. Headless in production; shown here as a console.',

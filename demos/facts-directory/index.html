@@ -1,0 +1,1577 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<style>
+  /* Varsity theme (V6, chosen 2026-07-24): HCS red page, white cards, gold accents.
+     ONE theme in all modes: `only light` is the hard opt-out that stops Chrome Auto Dark
+     from reinterpreting the palette (it was inverting red/cream to greens and breaking
+     input contrast). Every color is explicit — nothing left for the browser to guess. */
+  :root {
+    color-scheme: only light;
+    --red: #8E1420; --red-deep: #6d0f18; --gold: #F2B705; --gold-ink: #3a2a00;
+    --page: #8E1420; --title: #fff; --who: #e9c2c7; --status: #f0d3d7;
+    /* NOTE: avoid warm-light backgrounds (cream/ivory) anywhere — forced dark mode
+       (Chrome Auto Dark inside the GAS wrapper frame, immune to color-scheme opt-outs)
+       darkens them into ugly olive. Dark saturated colors like the red pass through. */
+    --card: #fff; --card-border: #6d0f18; --line: #e5e7eb;
+    --tabhead-bg: #8E1420; --tabhead-fg: #fff;
+    --dt: #6b7280; --dd: #1f2430;
+    --input-bg: #fff; --input-ink: #1f2430; --input-border: #6d0f18;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--dd);
+         background: var(--page); margin: 0; padding: 1rem; min-height: 100dvh;
+         overscroll-behavior-y: contain; touch-action: manipulation; }
+  .wrap { max-width: 56rem; margin: 0 auto; }
+  /* sticky search area (house pattern: sticky top bar) — stays put while scrolling results */
+  .top { position: sticky; top: 0; z-index: 10; background: var(--page);
+         margin: -1rem -1rem 0; padding: 1rem 1rem .75rem; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+           flex-wrap: wrap; margin: 0 0 .8rem; }
+  h1 { font-size: 1.2rem; margin: 0; color: var(--title); font-weight: 700; }
+  h1 b { color: var(--gold); }
+  .who { color: var(--who); font-size: .8rem; }
+  .searchbar { display: flex; gap: .5rem; }
+  /* inputs >= 16px so iOS doesn't zoom on focus; tap targets >= 44px (HCS house rules) */
+  #q { flex: 1; font-size: 1.05rem; min-height: 44px; padding: .6rem .8rem;
+       border: 1px solid var(--input-border); border-radius: .5rem;
+       background: var(--input-bg); color: var(--input-ink); caret-color: var(--gold); }
+  #q::placeholder { color: var(--dt); opacity: 1; }
+  #q:focus { outline: 2px solid var(--gold); border-color: transparent; }
+  button { font-size: 1rem; min-height: 44px; padding: .6rem 1.1rem; border: 0;
+           border-radius: .5rem; background: var(--gold); color: var(--gold-ink);
+           font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  .status { color: var(--status); font-size: .85rem; margin: .8rem 0; min-height: 1.2em; }
+
+  /* person list */
+  .people { background: var(--card); border: 1px solid var(--card-border); border-radius: .6rem;
+            overflow: hidden; }
+  .person { display: flex; align-items: center; justify-content: space-between; gap: .8rem;
+            width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+            min-height: 52px; padding: .55rem .9rem; border-bottom: 1px solid var(--line);
+            border-radius: 0; color: var(--dd); font-weight: 400; font-size: 1rem; }
+  .person:last-child { border-bottom: 0; }
+  .person:hover, .person:focus-visible { background: #FBECEE; }
+  .pname { font-weight: 600; }
+  .pmeta { color: var(--dt); font-size: .78rem; white-space: nowrap; }
+  .tag { background: var(--gold); color: var(--gold-ink); font-size: .62rem; font-weight: 700;
+         padding: .1em .45em; border-radius: .6em; vertical-align: middle; }
+  .grouplabel { color: #f0d3d7; font-size: .75rem; font-weight: 700; text-transform: uppercase;
+                letter-spacing: .06em; margin: .9rem 0 .35rem; }
+  .grouplabel:first-child { margin-top: 0; }
+  mark { background: var(--gold); color: var(--gold-ink); padding: 0 .1em; border-radius: .15em; }
+  mark.ex { background: #8FE39B; color: #0d3a17; } /* green = exact name match */
+  mark.cl { background: var(--gold); color: var(--gold-ink); } /* yellow = close spelling */
+
+  /* person detail */
+  /* min-height 44px per HCS touch rule — was 0, a ~20px tap target on phones */
+  .back { display: flex; align-items: center; background: none; border: 0; color: #fff;
+          font-size: .9rem; font-weight: 600; padding: 0 .6rem .4rem 0; min-height: 44px;
+          cursor: pointer; }
+  .tab { background: var(--card); border: 1px solid var(--card-border); border-radius: .6rem;
+         margin: 0 0 1rem; overflow: hidden; }
+  .tab > h2 { font-size: .9rem; margin: 0; padding: .55rem .9rem; background: var(--tabhead-bg);
+              color: var(--tabhead-fg); border-bottom: 1px solid var(--line); }
+  .tab > h2 small { color: #f0d3d7; font-weight: normal; }
+  .hit { padding: .6rem .9rem; border-bottom: 1px solid var(--line); }
+  .hit:last-child { border-bottom: 0; }
+  .hit dl { display: grid; grid-template-columns: auto 1fr; gap: .1rem .8rem; margin: 0; }
+  .hit dt { color: var(--dt); font-size: .75rem; white-space: nowrap; padding-top: .12rem; }
+  .hit dd { margin: 0; font-size: .9rem; color: var(--dd); word-break: break-word; }
+  /* schedule rows: the class happening RIGHT NOW is bold with a gold rail */
+  .cls.now { font-weight: 700; background: #FFF8E1; box-shadow: inset 3px 0 0 var(--gold); }
+  .cls.now .t { color: #6b5400; font-weight: 600; }
+  .cls.off { opacity: .62; } /* doesn't meet today */
+  .nowtag { background: #8FE39B; color: #0d3a17; font-size: .62rem; font-weight: 700;
+            padding: .1em .45em; border-radius: .6em; vertical-align: middle; margin-left: .35rem; }
+  .clstime { float: right; color: var(--dt); font-size: .78rem; font-weight: 600; white-space: nowrap;
+             margin-left: .5rem; }
+  .cls.now .clstime { color: #6b5400; }
+  .daybar { padding: .5rem .9rem; font-size: .8rem; color: var(--dd);
+            background: #FBECEE; border-bottom: 1px solid var(--line); }
+  .daybar b { color: var(--red); }
+  .daybar.warn { background: #FFF3CD; }
+  .cls { padding: .55rem .9rem; border-bottom: 1px solid var(--line); font-size: .9rem; }
+  .cls:last-child { border-bottom: 0; }
+  .cls .t { color: var(--dt); font-size: .78rem; }
+  /* tappable class rows inside detail views (teacher's classes, student's schedule) */
+  button.cls { display: block; width: 100%; text-align: left; background: none;
+               border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+               color: var(--dd); font-weight: 400; font-family: inherit; cursor: pointer; }
+  button.cls:last-child { border-bottom: 0; }
+  button.cls:hover, button.cls:focus-visible { background: #FBECEE; }
+  .trunc { padding: .5rem .9rem; color: var(--dt); font-size: .8rem; font-style: italic;
+           background: var(--card); border: 1px solid var(--card-border);
+           border-radius: .6rem; margin-top: .6rem; }
+
+  /* HCS standard breakpoints: 640px phone, 380px tiny phone */
+  @media (max-width: 640px) {
+    body { padding: .75rem; }
+    .top { margin: -.75rem -.75rem 0; padding: .75rem .75rem .6rem; }
+    header { margin-bottom: .6rem; }
+    .who { display: none; } /* reclaim header space on phones */
+  }
+  @media (max-width: 380px) {
+    .hit dl { grid-template-columns: 1fr; gap: 0 0; }
+    .hit dt { padding-top: .3rem; }
+    .pmeta { white-space: normal; }
+  }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Directory Search" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <header>
+      <h1><b>HCS</b> Directory Search</h1>
+      <span class="who">demo.staff@harfordchristian.org</span>
+    </header>
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="Student name, ID, parent email, homeroom…"
+             autofocus autocomplete="off">
+      <button id="go">Search</button>
+    </div>
+  </div>
+  <div class="status" id="status">Type a name — pick a student to see their full record.</div>
+  <div id="results"></div>
+</div>
+<script>
+// GENERATED from Search.gs by tools/build-client.mjs — DO NOT EDIT.
+/**
+ * facts-directory-search — PURE search logic, environment-agnostic (Node + GAS).
+ * No SpreadsheetApp here; callers supply already-loaded tab values.
+ * This exact file is exercised by tools/test-search.mjs (Node) and by Code.gs (GAS).
+ *
+ * Input tabs shape: [{ name: 'Sheet1', values: [[hdr,...],[cell,...],...] }]
+ * (values[0] is the header row, as returned by getDataRange().getValues()).
+ */
+
+var SEARCH_MAX_ROWS_PER_TAB = 100;
+
+/**
+ * Stringify a cell for matching/display. GAS getValues() yields Dates for date cells —
+ * AND for time-only cells, which Sheets stores as a time-of-day on the spreadsheet epoch
+ * 1899-12-30. Rendering those date-only silently destroyed every bell/period time
+ * ("08:36:00" -> "1899-12-30"), so:
+ *   - epoch 1899-12-30 + a time  -> "HH:MM:SS"        (a bare time value)
+ *   - a real date with a time    -> "YYYY-MM-DD HH:MM:SS"
+ *   - a real date at midnight    -> "YYYY-MM-DD"      (unchanged)
+ */
+function searchCellToString_(v) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) {
+    var p2 = function (n) { return ('0' + n).slice(-2); };
+    var hh = v.getHours(), mi = v.getMinutes(), ss = v.getSeconds();
+    var time = p2(hh) + ':' + p2(mi) + ':' + p2(ss);
+    var y = v.getFullYear(), mo = v.getMonth(), d = v.getDate();
+    if (y === 1899 && mo === 11 && d === 30) return time; // Sheets' time-only epoch
+    var date = y + '-' + p2(mo + 1) + '-' + p2(d);
+    return (hh || mi || ss) ? (date + ' ' + time) : date;
+  }
+  return String(v);
+}
+
+/**
+ * Deep-copy tabs with every cell stringified (dates → YYYY-MM-DD). Needed to hand
+ * tab data to the web client: google.script.run cannot serialize Date objects.
+ * All search/detail functions here accept serialized tabs identically to raw ones.
+ */
+function serializeTabs(tabs) {
+  return (tabs || []).map(function (t) {
+    return {
+      name: t.name,
+      values: (t.values || []).map(function (row) { return row.map(searchCellToString_); })
+    };
+  });
+}
+
+/**
+ * Search every cell of every tab for a query.
+ * Multi-word query = AND: every token must appear (case-insensitive substring)
+ * somewhere in the row. Header rows are never returned as hits.
+ *
+ * @param {Array<{name:string, values:Array<Array>}>} tabs
+ * @param {string} query
+ * @param {Object} [opts] { maxRowsPerTab=SEARCH_MAX_ROWS_PER_TAB }
+ * @return {{query:string, tokens:Array<string>, totalHits:number, tabs:Array<{
+ *   name:string, headers:Array<string>, hits:Array<{rowIndex:number, cells:Array<string>,
+ *   matchedCols:Array<number>}>, total:number, truncated:boolean}>}}
+ *   tabs[] only contains tabs with >=1 hit. rowIndex is the 1-based sheet row.
+ */
+function searchWorkbook(tabs, query, opts) {
+  opts = opts || {};
+  var cap = opts.maxRowsPerTab || SEARCH_MAX_ROWS_PER_TAB;
+
+  var tokens = String(query || '').toLowerCase().split(/\s+/).filter(function (t) { return t; });
+  var out = { query: String(query || ''), tokens: tokens, totalHits: 0, tabs: [] };
+  if (!tokens.length) return out;
+
+  (tabs || []).forEach(function (tab) {
+    var values = tab.values || [];
+    if (values.length < 2) return; // header-only or empty tab
+    var headers = values[0].map(searchCellToString_);
+
+    var hits = [];
+    var total = 0;
+    for (var r = 1; r < values.length; r++) {
+      var cells = values[r].map(searchCellToString_);
+      var lower = cells.map(function (c) { return c.toLowerCase(); });
+
+      var allTokensHit = tokens.every(function (t) {
+        return lower.some(function (c) { return c.indexOf(t) !== -1; });
+      });
+      if (!allTokensHit) continue;
+
+      total++;
+      if (hits.length < cap) {
+        var matchedCols = [];
+        lower.forEach(function (c, i) {
+          if (tokens.some(function (t) { return c.indexOf(t) !== -1; })) matchedCols.push(i);
+        });
+        hits.push({ rowIndex: r + 1, cells: cells, matchedCols: matchedCols });
+      }
+    }
+
+    if (total > 0) {
+      out.totalHits += total;
+      out.tabs.push({
+        name: tab.name,
+        headers: headers,
+        hits: hits,
+        total: total,
+        truncated: total > hits.length
+      });
+    }
+  });
+
+  return out;
+}
+
+/* ====================================================================
+   People search — the staff UI is a person picker: match PEOPLE (students),
+   list them, then fetch one person's full profile by ID. This keeps
+   "noah may" from surfacing Noah Lambert just because his teacher is
+   Ann-Marie May: schedule teachers are NOT part of a person's search blob.
+   ==================================================================== */
+
+var SEARCH_MAX_PEOPLE = 50;
+var SEARCH_MAX_TEACHERS = 20;
+var SEARCH_MAX_CLASSES = 25;
+var PERIOD_TIMES_TAB = 'Period Times';
+var DIRECTORY_TAB_NAMES = ['Directory', 'Sheet1'];
+var SCHEDULES_TAB_NAME = 'Student Schedules';
+var TEACHERS_TAB_NAME = 'Teachers';
+
+/**
+ * Stable class identity. Two sections CAN share class code + teacher while meeting in
+ * different periods (real at HCS: BI08-LOC with the same teacher is both Period 1 and
+ * Period 3), so the FACTS Class ID wins when the export carries it; the old
+ * code+teacher key remains the fallback for pre-2026-08-06 exports.
+ */
+function classKey_(classId, code, teacher) {
+  return classId ? ('id:' + classId) : (code + '|' + teacher);
+}
+
+function searchTabByName_(tabs, names) {
+  for (var i = 0; i < (tabs || []).length; i++) {
+    if (names.indexOf(tabs[i].name) !== -1) return tabs[i];
+  }
+  return null;
+}
+
+/** @return {Object} header name (exact string) -> column index. */
+function searchHeaderMap_(headerRow) {
+  var map = {};
+  (headerRow || []).forEach(function (h, i) { map[searchCellToString_(h)] = i; });
+  return map;
+}
+
+/**
+ * Group the LONG-format directory tab (one row per student+guardian) into people.
+ * Parses columns by HEADER NAME (facts-api-sync's contract: columns are append-only).
+ * @return {Array<{id,name,grade,homeroom,homeroomTeacher,status,email,gender,
+ *                 guardians:Array<{name:string,emails:Array<string>}>}>} sorted by name.
+ */
+function buildPeople(tabs) {
+  var dir = searchTabByName_(tabs, DIRECTORY_TAB_NAMES);
+  if (!dir || (dir.values || []).length < 2) return [];
+  var h = searchHeaderMap_(dir.values[0]);
+  var byId = {};
+  var order = [];
+  for (var r = 1; r < dir.values.length; r++) {
+    var row = dir.values[r];
+    var cell = function (name) { return searchCellToString_(row[h[name]]).trim(); };
+    var id = cell('Student ID (System)');
+    if (!id) continue;
+    var p = byId[id];
+    if (!p) {
+      p = byId[id] = {
+        id: id,
+        name: cell('LastName FirstName'),
+        grade: cell('Grade Level'),
+        homeroom: cell('Homeroom'),
+        homeroomTeacher: cell('Homeroom Teacher'),
+        status: cell('Status'),
+        email: cell('Email'),
+        gender: cell('Gender'),
+        guardians: []
+      };
+      order.push(p);
+    }
+    var gName = cell('LastName FirstName 1');
+    var gEmails = [cell('Email 1'), cell('Email2')].filter(function (e) { return e; });
+    if (gName || gEmails.length) p.guardians.push({ name: gName, emails: gEmails });
+  }
+  order.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  return order;
+}
+
+/**
+ * Teachers from the Teachers tab (name format "Last, First" — same string the
+ * schedules tab uses, so classes can be matched to a teacher by name).
+ */
+function buildTeachers(tabs) {
+  var tt = searchTabByName_(tabs, [TEACHERS_TAB_NAME]);
+  if (!tt || (tt.values || []).length < 2) return [];
+  var h = searchHeaderMap_(tt.values[0]);
+  var out = [];
+  for (var r = 1; r < tt.values.length; r++) {
+    var row = tt.values[r];
+    var cell = function (name) { return searchCellToString_(row[h[name]]).trim(); };
+    if (!cell('Teacher')) continue;
+    out.push({
+      id: cell('Staff ID'),
+      name: cell('Teacher'),
+      active: cell('Active'),
+      level: cell('Level'),
+      department: cell('Department'),
+      grades: cell('Grades'),
+      core: cell('Core'),
+      specials: cell('Specials'),
+      fineArts: cell('Fine-Arts Electives'),
+      athletics: cell('Athletics'),
+      homerooms: cell('Homerooms'),
+      elc: cell('ELC')
+    });
+  }
+  return out;
+}
+
+/* ---------- grade-word normalization ----------
+   Real gradeLevel values in the export are zero-padded: 01..12, K4, K5.
+   Staff type "7", "7th", "seventh", "seventh grade" — all must hit grade 07. */
+
+var SEARCH_GRADE_WORDS = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6,
+  seventh: 7, eighth: 8, ninth: 9, tenth: 10, eleventh: 11, twelfth: 12 };
+
+/** @return {Array<string>} canonical grade keys a token could mean ('07', 'K5', …), [] if none. */
+function searchGradeKeys_(t) {
+  if (t === 'k' || t === 'kindergarten' || t === 'kinder') return ['K4', 'K5'];
+  if (/^k[45]$/.test(t)) return [t.toUpperCase()];
+  var n = null;
+  var m = t.match(/^(\d{1,2})(?:st|nd|rd|th)?$/);
+  if (m) n = Number(m[1]);
+  else if (SEARCH_GRADE_WORDS[t]) n = SEARCH_GRADE_WORDS[t];
+  if (n === null || n < 1 || n > 12) return [];
+  return [(n < 10 ? '0' : '') + n];
+}
+
+/** Display form of a grade key: '07' → '7', 'K5' stays. */
+function searchGradeLabel_(g) {
+  return String(g || '').replace(/^0/, '');
+}
+
+function searchGradeSortVal_(g) {
+  if (g === 'K4') return -2;
+  if (g === 'K5') return -1;
+  return Number(g) || 99;
+}
+
+/** What a person can be FOUND by: their identity fields + guardians. Not status/gender. */
+function personBlob_(p) {
+  var bits = [p.id, p.name, p.grade, p.homeroom, p.homeroomTeacher, p.email];
+  p.guardians.forEach(function (g) { bits.push(g.name); bits.push(g.emails.join(' ')); });
+  return bits.join(' | ').toLowerCase();
+}
+
+/** Edit-distance budget for a fuzzy token, scaled by its length (0 = no fuzzing). */
+function searchFuzzBudget_(token) {
+  if (token.length < 3 || !/^[a-z'-]+$/.test(token)) return 0; // IDs/emails: exact only
+  return token.length <= 4 ? 1 : token.length <= 7 ? 2 : 3;
+}
+
+/**
+ * Group the schedules tab into classes, keyed by class code + teacher (two sections
+ * of the same course under different teachers stay separate). A class's GRADES come
+ * from its enrolled students — real course titles often carry no grade at all
+ * ("Concert Band - Junior High"), so "7th band" must match via the roster.
+ * @return {Array<{key,code,description,category,teacher,grades:Object,
+ *                 quarters:Object, students:Array<{id,name,grade,quarters}>}>}
+ */
+function buildClasses(tabs) {
+  var sched = searchTabByName_(tabs, [SCHEDULES_TAB_NAME]);
+  if (!sched || (sched.values || []).length < 2) return [];
+  var h = searchHeaderMap_(sched.values[0]);
+  var byKey = {};
+  var order = [];
+  for (var r = 1; r < sched.values.length; r++) {
+    var row = sched.values[r];
+    var cell = function (name) { return h[name] === undefined ? '' : searchCellToString_(row[h[name]]).trim(); };
+    var code = cell('Class Code');
+    if (!code) continue;
+    var teacher = cell('Teacher');
+    var classId = cell('Class ID');
+    var key = classKey_(classId, code, teacher);
+    var c = byKey[key];
+    if (!c) {
+      c = byKey[key] = {
+        key: key,
+        classId: classId,
+        code: code,
+        description: cell('Class Description'),
+        category: cell('Category'),
+        teacher: teacher,
+        period: cell('Period'),
+        room: cell('Room'),
+        pattern: cell('Pattern'),
+        grades: {},
+        quarters: {},
+        students: []
+      };
+      order.push(c);
+    }
+    var grade = cell('Grade');
+    if (grade) c.grades[grade] = true;
+    var qtr = cell('Quarters');
+    if (qtr) c.quarters[qtr] = true;
+    c.students.push({ id: cell('Student ID'), name: cell('Student Name'), grade: grade, quarters: qtr });
+  }
+  order.forEach(function (c) {
+    c.students.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  });
+  return order;
+}
+
+/** Sorted display label for a class's grade set: {"07","08"} -> '7, 8'. */
+function classGradesLabel_(gradesObj) {
+  return Object.keys(gradesObj)
+    .sort(function (a, b) { return searchGradeSortVal_(a) - searchGradeSortVal_(b); })
+    .map(searchGradeLabel_)
+    .join(', ');
+}
+
+/**
+ * Person search with built-in fuzzy name matching: every token (AND) must match the
+ * person either exactly (case-insensitive substring of their blob) or as a CLOSE
+ * SPELLING of one of their name words (edit distance with cheap transpositions) —
+ * so "johnathon" lists every Jonathon/Jonathan/Johnathan. Exact matches rank first;
+ * close-spelling matches carry close:true.
+ * @return {{query,tokens,total,truncated,hasClose:boolean,
+ *           people:Array<{id,name,grade,homeroom,homeroomTeacher,close:boolean}>}}
+ */
+function searchPeople(tabs, query, opts) {
+  opts = opts || {};
+  var cap = opts.maxPeople || SEARCH_MAX_PEOPLE;
+  var tokens = String(query || '').toLowerCase().split(/\s+/).filter(function (t) { return t; });
+  var out = { query: String(query || ''), tokens: tokens, total: 0, truncated: false, hasClose: false, people: [] };
+  if (!tokens.length) return out;
+
+  var people = buildPeople(tabs);
+
+  // per token: the grades it could name ("7th"/"seventh" → 07) — used for students AND classes
+  var gradeKeys = tokens.map(searchGradeKeys_);
+
+  // vocabulary of STUDENT name words only — fuzzy spelling applies to the student's own
+  // first/last name, never guardians (a parent named Jonathan must not make his kid a
+  // "close match" for johnathon; that read as random names in the list)
+  var vocab = {};
+  people.forEach(function (p) {
+    p.name.split(/[\s,]+/).forEach(function (w) {
+      if (w.length >= 2) vocab[w.toLowerCase()] = true;
+    });
+  });
+  var vocabWords = Object.keys(vocab);
+
+  // per token: the set of real name words it's a close spelling of
+  var fuzzySets = tokens.map(function (t) {
+    var budget = searchFuzzBudget_(t);
+    var set = {};
+    if (budget) {
+      vocabWords.forEach(function (w) {
+        if (Math.abs(w.length - t.length) > budget) return;
+        if (searchEditDistance_(t, w) <= budget) set[w] = true;
+      });
+    }
+    return set;
+  });
+
+  var matches = [];
+  people.forEach(function (p) {
+    var own = [p.id, p.name, 'grade ' + p.grade, p.homeroom, p.homeroomTeacher, p.email]
+      .join(' | ').toLowerCase(); // 'grade' literal so "seventh grade" matches 07 students
+    var studentWords = p.name.toLowerCase().split(/[\s,]+/);
+    var exactCount = 0;
+    var via = null;     // guardian whose name/email carried the match (shown in the list)
+    var fw = {};        // name words matched by close spelling (yellow-highlighted in the UI)
+    var ok = tokens.every(function (t, i) {
+      if (own.indexOf(t) !== -1) { exactCount++; return true; }
+      if (gradeKeys[i].indexOf(p.grade) !== -1) { exactCount++; return true; } // "seventh" → grade 07
+      for (var k = 0; k < p.guardians.length; k++) {
+        var g = p.guardians[k];
+        if ((g.name + ' ' + g.emails.join(' ')).toLowerCase().indexOf(t) !== -1) {
+          exactCount++;
+          if (!via) via = g.name;
+          return true;
+        }
+      }
+      var hits = studentWords.filter(function (w) { return fuzzySets[i][w]; });
+      hits.forEach(function (w) { fw[w] = true; });
+      return hits.length > 0;
+    });
+    if (!ok) return;
+    var nameLower = p.name.toLowerCase();
+    var nameHits = tokens.filter(function (t) { return nameLower.indexOf(t) !== -1; }).length;
+    matches.push({ p: p, allExact: exactCount === tokens.length, nameHits: nameHits, via: via,
+                   fuzzyWords: Object.keys(fw) });
+  });
+  matches.sort(function (a, b) {
+    return (b.allExact - a.allExact) || (b.nameHits - a.nameHits) ||
+           (a.p.name < b.p.name ? -1 : a.p.name > b.p.name ? 1 : 0);
+  });
+
+  out.total = matches.length;
+  out.truncated = matches.length > cap;
+  out.people = matches.slice(0, cap).map(function (m) {
+    return { id: m.p.id, name: m.p.name, grade: m.p.grade, homeroom: m.p.homeroom,
+             homeroomTeacher: m.p.homeroomTeacher, close: !m.allExact, via: m.via,
+             fuzzyWords: m.fuzzyWords };
+  });
+
+  // teachers: same exact-or-fuzzy-name matching against the Teachers tab
+  var teachers = buildTeachers(tabs);
+  var tVocab = {};
+  teachers.forEach(function (t) {
+    t.name.split(/[\s,]+/).forEach(function (w) {
+      if (w.length >= 2) tVocab[w.toLowerCase()] = true;
+    });
+  });
+  var tVocabWords = Object.keys(tVocab);
+  var tFuzzySets = tokens.map(function (t) {
+    var budget = searchFuzzBudget_(t);
+    var set = {};
+    if (budget) {
+      tVocabWords.forEach(function (w) {
+        if (Math.abs(w.length - t.length) > budget) return;
+        if (searchEditDistance_(t, w) <= budget) set[w] = true;
+      });
+    }
+    return set;
+  });
+  var tMatches = [];
+  teachers.forEach(function (t) {
+    if (t.active === 'N') return; // staff request: never list inactive teachers
+    var blob = [t.id, t.name, t.department, t.level, t.grades, t.homerooms]
+      .join(' | ').toLowerCase();
+    var words = t.name.toLowerCase().split(/[\s,]+/);
+    var exactCount = 0;
+    var fw = {};
+    var ok = tokens.every(function (tok, i) {
+      if (blob.indexOf(tok) !== -1) { exactCount++; return true; }
+      var hits = words.filter(function (w) { return tFuzzySets[i][w]; });
+      hits.forEach(function (w) { fw[w] = true; });
+      return hits.length > 0;
+    });
+    if (!ok) return;
+    var nameLower = t.name.toLowerCase();
+    var nameHits = tokens.filter(function (tok) { return nameLower.indexOf(tok) !== -1; }).length;
+    tMatches.push({ t: t, allExact: exactCount === tokens.length, nameHits: nameHits,
+                    fuzzyWords: Object.keys(fw) });
+  });
+  tMatches.sort(function (a, b) {
+    return (b.allExact - a.allExact) || (b.nameHits - a.nameHits) ||
+           (a.t.name < b.t.name ? -1 : a.t.name > b.t.name ? 1 : 0);
+  });
+  out.teachers = tMatches.slice(0, SEARCH_MAX_TEACHERS).map(function (m) {
+    return { id: m.t.id, name: m.t.name, department: m.t.department, level: m.t.level,
+             grades: m.t.grades, close: !m.allExact, fuzzyWords: m.fuzzyWords };
+  });
+
+  // classes: token must hit the class blob (title/code/category/teacher) OR name a grade
+  // with enrolled students ("7th band" → title has band, roster has 07 kids)
+  var classes = buildClasses(tabs);
+  var cMatches = [];
+  classes.forEach(function (c) {
+    var gradesLabel = classGradesLabel_(c.grades);
+    var blob = [c.code, c.description, c.category, c.teacher, 'grade ' + gradesLabel]
+      .join(' | ').toLowerCase();
+    var descLower = c.description.toLowerCase();
+    var descHits = 0;
+    var ok = tokens.every(function (tok, i) {
+      if (blob.indexOf(tok) !== -1) {
+        if (descLower.indexOf(tok) !== -1) descHits++;
+        return true;
+      }
+      return gradeKeys[i].some(function (g) { return c.grades[g]; });
+    });
+    if (!ok) return;
+    cMatches.push({ c: c, descHits: descHits, gradesLabel: gradesLabel });
+  });
+  cMatches.sort(function (a, b) {
+    return (b.descHits - a.descHits) || (b.c.students.length - a.c.students.length) ||
+           (a.c.description < b.c.description ? -1 : a.c.description > b.c.description ? 1 : 0);
+  });
+  out.classesTotal = cMatches.length;
+  out.classes = cMatches.slice(0, SEARCH_MAX_CLASSES).map(function (m) {
+    return { key: m.c.key, code: m.c.code, description: m.c.description,
+             category: m.c.category, teacher: m.c.teacher, grades: m.gradesLabel,
+             students: m.c.students.length };
+  });
+
+  out.hasClose = out.people.concat(out.teachers).some(function (x) { return x.close; });
+  return out;
+}
+
+/**
+ * One class's full record: instructor(s) resolved against the Teachers tab (tappable
+ * when found there), class info, then the roster joined to the directory so every
+ * student row carries grade + homeroom + homeroom teacher.
+ * @return {?{profile:Object, instructors:Array, students:Array}} null if key unknown.
+ */
+function classDetail(tabs, key) {
+  var classes = buildClasses(tabs);
+  var c = null;
+  for (var i = 0; i < classes.length; i++) if (classes[i].key === String(key)) { c = classes[i]; break; }
+  if (!c) return null;
+
+  var peopleById = {};
+  buildPeople(tabs).forEach(function (p) { peopleById[p.id] = p; });
+  var teachersByName = {};
+  buildTeachers(tabs).forEach(function (t) { teachersByName[t.name] = t; });
+
+  // export writes co-taught classes as "Last, First / Last, First"
+  var instructors = c.teacher.split(' / ').map(function (n) { return n.trim(); })
+    .filter(function (n) { return n; })
+    .map(function (n) {
+      var t = teachersByName[n];
+      return t ? { id: t.id, name: t.name, department: t.department, level: t.level, grades: t.grades }
+               : { id: null, name: n };
+    });
+
+  return {
+    profile: {
+      key: c.key, code: c.code, classId: c.classId, description: c.description,
+      category: c.category, teacher: c.teacher, grades: classGradesLabel_(c.grades),
+      period: c.period, room: c.room,
+      quarters: Object.keys(c.quarters).sort().join(' / '), students: c.students.length
+    },
+    instructors: instructors,
+    students: c.students.map(function (s) {
+      var p = peopleById[s.id];
+      return { id: s.id, name: p ? p.name : s.name, grade: s.grade,
+               homeroom: p ? p.homeroom : '', homeroomTeacher: p ? p.homeroomTeacher : '',
+               quarters: s.quarters };
+    })
+  };
+}
+
+/**
+ * One teacher's full record: Teachers-tab profile + the classes they teach
+ * (grouped from the schedules tab by matching the teacher's name, with student counts).
+ * @return {?{profile:Object, classes:Array}} null if id unknown.
+ */
+function teacherDetail(tabs, id) {
+  var teachers = buildTeachers(tabs);
+  var t = null;
+  for (var i = 0; i < teachers.length; i++) if (teachers[i].id === String(id)) { t = teachers[i]; break; }
+  if (!t) return null;
+
+  var byCode = {};
+  var order = [];
+  var sched = searchTabByName_(tabs, [SCHEDULES_TAB_NAME]);
+  if (sched && (sched.values || []).length > 1) {
+    var h = searchHeaderMap_(sched.values[0]);
+    for (var r = 1; r < sched.values.length; r++) {
+      var row = sched.values[r];
+      if (searchCellToString_(row[h['Teacher']]).indexOf(t.name) === -1) continue;
+      var code = searchCellToString_(row[h['Class Code']]);
+      var cid = h['Class ID'] === undefined ? '' : searchCellToString_(row[h['Class ID']]).trim();
+      var code2 = cid || code; // group per SECTION when the export carries Class ID
+      var c = byCode[code2];
+      if (!c) {
+        c = byCode[code2] = {
+          code: code,
+          key: classKey_(cid, code, searchCellToString_(row[h['Teacher']])), // opens classDetail
+          description: searchCellToString_(row[h['Class Description']]),
+          category: searchCellToString_(row[h['Category']]),
+          period: h['Period'] === undefined ? '' : searchCellToString_(row[h['Period']]).trim(),
+          room: h['Room'] === undefined ? '' : searchCellToString_(row[h['Room']]).trim(),
+          quarters: {},
+          students: 0
+        };
+        order.push(c);
+      }
+      c.students++;
+      var qtr = searchCellToString_(row[h['Quarters']]).trim();
+      if (qtr) c.quarters[qtr] = true; // distinct enrollment patterns, e.g. "Q1,2,3,4" vs "Q3"
+    }
+  }
+  return {
+    profile: t,
+    classes: order.map(function (c) {
+      return { code: c.code, key: c.key, description: c.description, category: c.category,
+               period: c.period, room: c.room,
+               quarters: Object.keys(c.quarters).sort().join(' / '), students: c.students };
+    })
+  };
+}
+
+/**
+ * One person's full record: directory profile + guardians + their schedule rows.
+ * @return {?{profile:Object, guardians:Array, classes:Array}} null if id unknown.
+ */
+function personDetail(tabs, id) {
+  var people = buildPeople(tabs);
+  var p = null;
+  for (var i = 0; i < people.length; i++) if (people[i].id === String(id)) { p = people[i]; break; }
+  if (!p) return null;
+
+  var classes = [];
+  var sched = searchTabByName_(tabs, [SCHEDULES_TAB_NAME]);
+  if (sched && (sched.values || []).length > 1) {
+    var h = searchHeaderMap_(sched.values[0]);
+    for (var r = 1; r < sched.values.length; r++) {
+      var row = sched.values[r];
+      if (searchCellToString_(row[h['Student ID']]).trim() !== p.id) continue;
+      var cell = function (name) { return h[name] === undefined ? '' : searchCellToString_(row[h[name]]).trim(); };
+      var clCode = cell('Class Code');
+      var clTeacher = cell('Teacher');
+      var clId = cell('Class ID');
+      classes.push({
+        code: clCode,
+        classId: clId,
+        key: classKey_(clId, clCode, clTeacher), // opens classDetail
+        description: cell('Class Description'),
+        category: cell('Category'),
+        teacher: clTeacher,
+        quarters: cell('Quarters'),
+        period: cell('Period'),   // e.g. "Period 3" / "P5" — blank for K4-6 (no periods in FACTS)
+        room: cell('Room'),
+        pattern: cell('Pattern')  // joins to the Period Times tab for today's clock time
+      });
+    }
+  }
+  return {
+    profile: { id: p.id, name: p.name, grade: p.grade, homeroom: p.homeroom,
+               homeroomTeacher: p.homeroomTeacher, status: p.status, email: p.email,
+               gender: p.gender },
+    guardians: p.guardians,
+    classes: classes
+  };
+}
+
+/* ====================================================================
+   PERIODS — "which class is this student in right now?"
+
+   facts-api-sync writes a `Period Times` tab: one row per (pattern, weekday)
+   carrying the TIME SLOT that pattern occupies that day plus its clock times.
+   The slot — not the period number — is the join key, which is what makes
+   HCS's reverse-order Friday work: pattern "Period 1" sits in the P1 slot
+   Mon-Thu and in the P8 slot (2:37pm) on Friday.
+
+   On a normal day the FACTS times are correct. On a delay/exam/custom day the
+   BELL schedule is authoritative, so today's bell times are matched onto the
+   same slots and win when present (Josh 2026-08-06: every day must bold).
+   ==================================================================== */
+
+/** "HH:MM[:SS]" -> minutes since midnight; -1 if unparseable. */
+function searchTimeToMin_(s) {
+  var m = /^(\d{1,2}):(\d{2})/.exec(String(s || ''));
+  return m ? (parseInt(m[1], 10) * 60 + parseInt(m[2], 10)) : -1;
+}
+
+/** "8:36 AM"-style display for an "HH:MM:SS" value ('' stays ''). */
+function searchTimeLabel_(s) {
+  var mins = searchTimeToMin_(s);
+  if (mins < 0) return '';
+  var h = Math.floor(mins / 60), m = mins % 60;
+  var ap = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + ('0' + m).slice(-2) + ' ' + ap;
+}
+
+/**
+ * Index the `Period Times` tab.
+ * @return {{byPattern: Object, dayName: Object}}
+ *   byPattern[pattern][dayCol] = {slot, slotLabel, period, begin, end}
+ */
+function buildPeriodTimes(tabs) {
+  var pt = searchTabByName_(tabs, [PERIOD_TIMES_TAB]);
+  var out = { byPattern: {}, bySlot: {}, dayName: {} };
+  if (!pt || (pt.values || []).length < 2) return out;
+  var h = searchHeaderMap_(pt.values[0]);
+  for (var r = 1; r < pt.values.length; r++) {
+    var row = pt.values[r];
+    var cell = function (n) { return h[n] === undefined ? '' : searchCellToString_(row[h[n]]).trim(); };
+    var pattern = cell('Pattern'), day = cell('Day');
+    if (!pattern || !day) continue;
+    var entry = {
+      slot: cell('Slot'), slotLabel: cell('Slot Label'), period: cell('Period'),
+      begin: cell('Begin'), end: cell('End')
+    };
+    // Pattern 0 = a "slot row": a grid cell no pattern occupies (Homeroom, Lunch)
+    if (Number(pattern) === 0) {
+      (out.bySlot[entry.slotLabel] = out.bySlot[entry.slotLabel] || {})[day] = entry;
+    } else {
+      (out.byPattern[pattern] = out.byPattern[pattern] || {})[day] = entry;
+    }
+    out.dayName[day] = cell('Day Name');
+  }
+  return out;
+}
+
+/**
+ * Homeroom carries no FACTS pattern, but it does meet (08:28-08:33) and it's exactly where a
+ * student is first thing in the morning — so it resolves through the Homeroom SLOT instead.
+ */
+function isHomeroomClass_(c) {
+  return /homeroom/i.test(String((c && c.category) || '')) ||
+         /^HR-/i.test(String((c && c.code) || ''));
+}
+
+/**
+ * Today's bell periods -> { slotKey: {start, end, name} }, keyed to match FACTS slot
+ * labels. BellHub names periods "1st Period".."8th Period", "Homeroom", "Chapel", "Lunch".
+ */
+function bellSlotTimes(bellPeriods) {
+  var out = {};
+  (bellPeriods || []).forEach(function (p) {
+    var name = String((p && p.name) || '');
+    if (!p || !p.start) return;
+    var key = null;
+    var m = /(\d+)\s*(?:st|nd|rd|th)?\s*period/i.exec(name);
+    if (m) key = 'P' + Number(m[1]);
+    else if (/homeroom/i.test(name)) key = 'Homeroom';
+    else if (/lunch/i.test(name)) key = 'Lunch';
+    else if (/chapel/i.test(name)) key = 'Chapel';
+    if (key && !out[key]) out[key] = { start: p.start, end: p.end || '', name: name };
+  });
+  return out;
+}
+
+/**
+ * Bell time for a FACTS slot label. Handles the grade-banded labels the template uses
+ * ('P4 7-8' -> the bells' P4; 'Lunch 9-12' -> the bells' Lunch).
+ */
+function bellTimeForSlot_(bells, slotLabel) {
+  bells = bells || {};
+  var label = String(slotLabel || '');
+  if (!label) return null;
+  if (bells[label]) return bells[label];
+  var m = /^P\s*(\d+)/i.exec(label);
+  if (m && bells['P' + Number(m[1])]) return bells['P' + Number(m[1])];
+  if (/^lunch/i.test(label) && bells['Lunch']) return bells['Lunch'];
+  if (/^homeroom/i.test(label) && bells['Homeroom']) return bells['Homeroom'];
+  return null;
+}
+
+/**
+ * Annotate a student's classes with today's slot/time and flag the one happening NOW.
+ *
+ * @param {Array} classes personDetail().classes
+ * @param {Object} periodTimes buildPeriodTimes() output
+ * @param {Object} ctx { dayCol:1..5 ('' = weekend), nowMin:number, bells:Object }
+ *   ctx.closed is accepted but INFORMATIONAL ONLY — it drives the banner, not the highlight.
+ *   Josh 2026-08-06: every day needs the bold, so a day the bell calendar calls "closed"
+ *   (a real holiday, or simply a date nobody has entered yet) still highlights from the
+ *   FACTS normal-day times rather than going blank.
+ * @return {Array} same rows + {slotLabel, begin, end, beginLabel, endLabel, timeSource,
+ *                 meetsToday, current}; today's classes first in clock order.
+ */
+function annotateSchedule(classes, periodTimes, ctx) {
+  ctx = ctx || {};
+  periodTimes = periodTimes || { byPattern: {} };
+  var day = String(ctx.dayCol || '');
+  var bells = ctx.bells || {};
+
+  var out = (classes || []).map(function (c) {
+    var o = {
+      code: c.code, key: c.key, classId: c.classId, description: c.description,
+      category: c.category, teacher: c.teacher, quarters: c.quarters,
+      period: c.period, room: c.room, pattern: c.pattern,
+      slotLabel: '', begin: '', end: '', beginLabel: '', endLabel: '',
+      timeSource: '', meetsToday: false, current: false, offQuarter: false, sharedSlot: false
+    };
+    // semester-split classes: if we know today's quarter and this class doesn't meet in it,
+    // keep the row (informative) but never let it meet or highlight
+    if (ctx.quarter) {
+      var qs = parseQuartersField_(c.quarters);
+      var listed = false;
+      for (var k in qs) { if (qs.hasOwnProperty(k)) { listed = true; break; } }
+      if (listed && !qs[ctx.quarter]) o.offQuarter = true;
+    }
+    var byDay = c.pattern ? periodTimes.byPattern[String(c.pattern)] : null;
+    var cell = byDay && day ? byDay[day] : null;
+    if (!cell && day && isHomeroomClass_(c)) {
+      var hr = (periodTimes.bySlot || {})['Homeroom'];
+      cell = (hr && hr[day]) || null;
+    }
+    if (cell) {
+      o.meetsToday = !o.offQuarter;
+      o.slotLabel = cell.slotLabel;
+      o.begin = cell.begin;
+      o.end = cell.end;
+      o.timeSource = cell.begin ? 'facts' : '';
+      if (!o.period && cell.period) o.period = cell.period; // e.g. label homeroom "Homeroom"
+      var b = bellTimeForSlot_(bells, cell.slotLabel);
+      if (b && b.start) {
+        o.begin = b.start;
+        o.end = b.end || o.end;
+        o.timeSource = 'bell';
+      }
+    }
+    o.beginLabel = searchTimeLabel_(o.begin);
+    o.endLabel = searchTimeLabel_(o.end);
+    return o;
+  });
+
+  if (ctx.nowMin !== null && ctx.nowMin !== undefined && ctx.nowMin >= 0) {
+    out.forEach(function (o) {
+      var s = searchTimeToMin_(o.begin), e = searchTimeToMin_(o.end);
+      o.current = !!o.meetsToday && s >= 0 && e > s && ctx.nowMin >= s && ctx.nowMin < e;
+    });
+  }
+
+  // Two classes can look "current" at once when they're semester-split into the same period
+  // (Government Q1,2 vs Economics Q3,4). Without configured quarter dates we cannot know which
+  // one is really meeting, so flag it rather than pick one silently — the Q labels are on screen.
+  var live = out.filter(function (o) { return o.current; });
+  if (live.length > 1) live.forEach(function (o) { o.sharedSlot = true; });
+
+  out.sort(function (a, b) {
+    if (a.meetsToday !== b.meetsToday) return a.meetsToday ? -1 : 1;
+    if (a.meetsToday) {
+      var d = searchTimeToMin_(a.begin) - searchTimeToMin_(b.begin);
+      if (d) return d;
+    }
+    return a.description < b.description ? -1 : a.description > b.description ? 1 : 0;
+  });
+  return out;
+}
+
+/* ---------- quarters ----------
+   A class's `Quarters` column is positional term flags ("Q1,2" = terms 1+2). Two
+   semester-split classes can share a period — Zion has Government (Q1,2) and Economics
+   (Q3,4) both in Period 2 — so without knowing which quarter a date falls in, BOTH would
+   highlight. FACTS exposes no reachable GET for term date ranges (/SchoolTerms/v2's GET is
+   shadowed by its by-id route; /SchoolTerms is POST-only), so the ranges are configured
+   once a year in a Script Property. Unset = no filtering, i.e. the old behaviour. */
+
+/** "Q1,2" / "Q1,2,3,4" -> {1:true,2:true}. Blank = meets every quarter. */
+function parseQuartersField_(s) {
+  var out = {};
+  String(s || '').replace(/[^0-9,]/g, '').split(',').forEach(function (n) {
+    if (n) out[Number(n)] = true;
+  });
+  return out;
+}
+
+/**
+ * Parse the configured ranges: "1:2026-08-20..2026-10-24,2:2026-10-27..2027-01-16,..."
+ * @return {Array<{q:number, start:string, end:string}>}
+ */
+function parseQuarterRanges(str) {
+  var out = [];
+  String(str || '').split(',').forEach(function (part) {
+    var m = /^\s*([1-6])\s*:\s*(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})\s*$/.exec(part);
+    if (m) out.push({ q: Number(m[1]), start: m[2], end: m[3] });
+  });
+  return out;
+}
+
+/** Which quarter an ISO date falls in; 0 = unknown (outside every range, or none set). */
+function quarterForDate(ranges, isoDate) {
+  var d = String(isoDate || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return 0;
+  for (var i = 0; i < (ranges || []).length; i++) {
+    if (d >= ranges[i].start && d <= ranges[i].end) return ranges[i].q;
+  }
+  return 0;
+}
+
+/**
+ * Parse a `?sim=` time-travel value into a schedule context seed, so the current-class
+ * highlight can be stress-tested on any date (a Friday, a Thursday, a past delay day)
+ * without waiting for that day to arrive. Accepts "YYYY-MM-DD" (defaults to 08:45) or
+ * "YYYY-MM-DD HH:MM" / "YYYY-MM-DDTHH:MM".
+ * @return {?{date:string, dayCol:(number|string), nowMin:number, label:string}}
+ */
+function parseSimClock(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(String(s || '').trim());
+  if (!m) return null;
+  var y = +m[1], mo = +m[2], d = +m[3];
+  var hh = m[4] === undefined ? 8 : +m[4];
+  var mi = m[5] === undefined ? 45 : +m[5];
+  if (mo < 1 || mo > 12 || d < 1 || d > 31 || hh > 23 || mi > 59) return null;
+  // UTC construction so the weekday can't shift with the viewer's timezone
+  var dow = new Date(Date.UTC(y, mo - 1, d)).getUTCDay(); // 0=Sun..6=Sat
+  var iso = m[1] + '-' + m[2] + '-' + m[3];
+  return {
+    date: iso,
+    dayCol: (dow >= 1 && dow <= 5) ? dow : '', // '' = weekend, nothing meets
+    nowMin: hh * 60 + mi,
+    label: iso + ' ' + ('0' + hh).slice(-2) + ':' + ('0' + mi).slice(-2)
+  };
+}
+
+/** Optimal-string-alignment distance (Levenshtein + adjacent transposition = 1). */
+function searchEditDistance_(a, b) {
+  var la = a.length, lb = b.length;
+  var d = [];
+  for (var i = 0; i <= la; i++) { d[i] = [i]; }
+  for (var j = 0; j <= lb; j++) { d[0][j] = j; }
+  for (i = 1; i <= la; i++) {
+    for (j = 1; j <= lb; j++) {
+      var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[la][lb];
+}
+
+// Node interop; harmless in GAS (`module` is undefined there).
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    searchWorkbook: searchWorkbook,
+    searchCellToString_: searchCellToString_,
+    serializeTabs: serializeTabs,
+    SEARCH_MAX_ROWS_PER_TAB: SEARCH_MAX_ROWS_PER_TAB,
+    buildPeople: buildPeople,
+    buildTeachers: buildTeachers,
+    buildClasses: buildClasses,
+    searchPeople: searchPeople,
+    personDetail: personDetail,
+    teacherDetail: teacherDetail,
+    classDetail: classDetail,
+    buildPeriodTimes: buildPeriodTimes,
+    bellSlotTimes: bellSlotTimes,
+    annotateSchedule: annotateSchedule,
+    parseSimClock: parseSimClock,
+    isHomeroomClass_: isHomeroomClass_,
+    parseQuarterRanges: parseQuarterRanges,
+    quarterForDate: quarterForDate,
+    searchTimeToMin_: searchTimeToMin_,
+    searchTimeLabel_: searchTimeLabel_,
+    searchGradeKeys_: searchGradeKeys_,
+    searchEditDistance_: searchEditDistance_
+  };
+}
+</script>
+
+<script>
+  var q = document.getElementById('q');
+  var go = document.getElementById('go');
+  var statusEl = document.getElementById('status');
+  var resultsEl = document.getElementById('results');
+  var debounceTimer = null;
+  var reqSeq = 0;            // only the newest request may render (guards out-of-order responses)
+  var lastList = null;       // last people-list result, so "back" needs no new server call
+  var lastListStatus = '';
+  var lastPersonDetail = null; // open student's record, for the 60s NOW re-render
+  var IDLE_MSG = 'Type a name — pick a student to see their full record.';
+
+  /* Full dataset, fetched ONCE at page load. Until it arrives, searches fall back to
+     the server; after that every keystroke runs searchPeople() (SearchClient) locally —
+     instant, no debounce, works from the first character. */
+  var tabsData = null;
+  var periodTimes = null;      // buildPeriodTimes() index, from the Period Times tab
+  google.script.run
+    .withSuccessHandler(function (tabs) {
+      tabsData = tabs;
+      periodTimes = buildPeriodTimes(tabs);
+      if (q.value.trim()) run(); // rerun whatever's typed through the instant engine
+    })
+    .withFailureHandler(function () { /* server-search fallback keeps working */ })
+    .tabsApi();
+
+  /* Today's bells + the school-time clock. Bells are authoritative on delay/exam days;
+     if the hub is unreachable we fall back to the FACTS grid's normal-day times. */
+  var bellToday = null;
+  var clockSkewMs = 0;         // server(school) time - device time, so a wrong phone clock can't mislead
+  // ?sim=YYYY-MM-DD[ HH:MM] pins the clock AND pulls that date's bells, so the NOW highlight
+  // can be exercised out of session (or replayed against a past delay day).
+  var SIM = parseSimClock(new URLSearchParams(location.search).get('sim') || '');
+  google.script.run
+    .withSuccessHandler(function (b) { bellToday = b; rerenderIfPerson_(); })
+    .withFailureHandler(function () { bellToday = { ok: false, closed: false, periods: [] }; })
+    [SIM ? 'bellForDateApi' : 'bellTodayApi'](SIM ? SIM.date : undefined);
+  google.script.run
+    .withSuccessHandler(function (n) {
+      var parts = String(n.time || '').split(':');
+      if (parts.length === 2) {
+        var d = new Date();
+        var serverMin = Number(parts[0]) * 60 + Number(parts[1]);
+        var deviceMin = d.getHours() * 60 + d.getMinutes();
+        clockSkewMs = (serverMin - deviceMin) * 60000;
+      }
+      serverDow = n.dayOfWeek || 0;
+      serverDate = n.date || '';
+      quarterRanges = parseQuarterRanges(n.quarterDates || '');
+      rerenderIfPerson_();
+    })
+    .withFailureHandler(function () { /* device clock it is */ })
+    .nowApi();
+  var serverDow = 0;           // 1=Mon .. 7=Sun, from the server
+  var serverDate = '';         // school-time YYYY-MM-DD
+  var quarterRanges = [];      // configured quarter date ranges ([] = no filtering)
+
+  /** School-time "now" as {dayCol 1..5 or '', nowMin} — or the simulated moment. */
+  function schoolNow_() {
+    if (SIM) return { dayCol: SIM.dayCol, nowMin: SIM.nowMin };
+    var d = new Date(Date.now() + clockSkewMs);
+    var dow = serverDow || ((d.getDay() + 6) % 7 + 1); // JS 0=Sun -> 1=Mon..7=Sun
+    return { dayCol: dow >= 1 && dow <= 5 ? dow : '', nowMin: d.getHours() * 60 + d.getMinutes() };
+  }
+
+  function scheduleCtx_() {
+    var t = schoolNow_();
+    return {
+      dayCol: t.dayCol,
+      nowMin: t.nowMin,
+      bells: bellToday && bellToday.ok ? bellSlotTimes(bellToday.periods) : {},
+      closed: !!(bellToday && bellToday.closed) || !t.dayCol,
+      // 0 when unconfigured or out of range -> no quarter filtering
+      quarter: quarterForDate(quarterRanges, SIM ? SIM.date : serverDate)
+    };
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  // Highlight query tokens inside an ALREADY-ESCAPED string. cls: 'ex' green, 'cl' yellow.
+  function highlight(escaped, tokens, cls) {
+    var out = escaped;
+    (tokens || []).forEach(function (t) {
+      var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp('(' + safe + ')', 'gi'),
+        '<mark class="' + (cls || 'ex') + '">$1</mark>');
+    });
+    return out;
+  }
+  // Exact token hits in green, then close-spelling name words (whole words) in yellow.
+  function nameHtml(name, tokens, fuzzyWords) {
+    var out = highlight(esc(name), tokens, 'ex');
+    (fuzzyWords || []).forEach(function (w) {
+      var safe = esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp('\\b(' + safe + ')\\b', 'gi'), '<mark class="cl">$1</mark>');
+    });
+    return out;
+  }
+
+  function dispGrade(g) { return String(g || '').replace(/^0/, ''); } // export pads: 07 → 7
+
+  /* ---------- navigation trail ----------
+     Every tap-through (list → class → student → …) pushes the view it came FROM,
+     so Back walks the trail one step at a time instead of jumping to the results. */
+  var navStack = [];
+  var currentView = { type: 'list' };
+
+  function navPush_(view) { navStack.push(currentView); currentView = view; }
+
+  function backLabel_() {
+    var d = navStack[navStack.length - 1];
+    if (!d || d.type === 'list') return '‹ Back to results';
+    return '‹ Back to ' + (d.type === 'class' ? (d.ref.description || d.ref.code) : d.ref.name);
+  }
+
+  function goBack() {
+    var d = navStack.pop() || { type: 'list' };
+    currentView = d;
+    if (d.type === 'list') {
+      if (lastList) { renderList(lastList); statusEl.innerHTML = lastListStatus; }
+      else { resultsEl.innerHTML = ''; statusEl.textContent = IDLE_MSG; }
+    }
+    else if (d.type === 'person') openPerson(d.ref, false);
+    else if (d.type === 'teacher') openTeacher(d.ref, false);
+    else openClass(d.ref, false);
+    window.scrollTo(0, 0);
+  }
+
+  function backButtonHtml_() { return '<button class="back" id="back">' + esc(backLabel_()) + '</button>'; }
+  function bindBack_() { document.getElementById('back').addEventListener('click', goBack); }
+
+  /* ---------- people list ---------- */
+  function renderList(res) {
+    lastList = res;
+    navStack.length = 0;                 // a results render is the root of the tap trail
+    currentView = { type: 'list' };
+    var teachers = res.teachers || [];
+    var classes = res.classes || [];
+    if (!res.tokens.length) { resultsEl.innerHTML = ''; statusEl.textContent = ''; return; }
+    if (!res.total && !teachers.length && !classes.length) {
+      resultsEl.innerHTML = '';
+      statusEl.textContent = 'No matches for “' + res.query + '”.';
+      lastListStatus = statusEl.innerHTML;
+      return;
+    }
+    var parts = [];
+    if (classes.length) parts.push((res.classesTotal || classes.length) + ' class' + (res.classesTotal === 1 ? '' : 'es'));
+    if (teachers.length) parts.push(teachers.length + ' teacher' + (teachers.length === 1 ? '' : 's'));
+    if (res.total) parts.push(res.total + ' student' + (res.total === 1 ? '' : 's'));
+    statusEl.textContent = parts.join(', ') +
+      (res.hasClose ? ' (including similar spellings)' : '') +
+      (res.truncated ? ' — showing ' + res.people.length + ' students, add another word to narrow down' : '') +
+      '. Tap one for the full record.';
+    lastListStatus = statusEl.innerHTML;
+
+    var groupCount = (classes.length ? 1 : 0) + (teachers.length ? 1 : 0) + (res.total ? 1 : 0);
+    var labels = groupCount > 1;
+    var html = '';
+    if (classes.length) {
+      html += (labels ? '<div class="grouplabel">Classes</div>' : '') +
+        '<div class="people">' + classes.map(function (c, i) {
+          var meta = [c.teacher, c.grades ? 'Grades ' + c.grades : '',
+            c.students + ' student' + (c.students === 1 ? '' : 's')].filter(String).join(' · ');
+          return '<button class="person" data-c="' + i + '">' +
+            '<span class="pname">' + highlight(esc(c.description || c.code), res.tokens, 'ex') +
+            ' <span class="tag">Class</span></span>' +
+            '<span class="pmeta">' + esc(meta) + '</span></button>';
+        }).join('') + '</div>';
+    }
+    if (teachers.length) {
+      html += (labels ? '<div class="grouplabel">Teachers</div>' : '') +
+        '<div class="people">' + teachers.map(function (t, i) {
+          var meta = [t.department, t.level, t.grades ? 'Grades ' + t.grades : '']
+            .filter(String).join(' · ') || 'Teacher';
+          if (t.close) meta += ' · similar spelling';
+          return '<button class="person" data-t="' + i + '">' +
+            '<span class="pname">' + nameHtml(t.name, res.tokens, t.fuzzyWords) +
+            ' <span class="tag">Teacher</span></span>' +
+            '<span class="pmeta">' + esc(meta) + '</span></button>';
+        }).join('') + '</div>';
+    }
+    if (res.total) {
+      html += (labels ? '<div class="grouplabel">Students</div>' : '') +
+        '<div class="people">' + res.people.map(function (p, i) {
+          var meta = ['Grade ' + dispGrade(p.grade), p.homeroom, p.homeroomTeacher]
+            .filter(function (x) { return x && x !== 'Grade '; }).join(' · ');
+          if (p.via) meta = 'parent: ' + p.via + (meta ? ' · ' + meta : '');
+          if (p.close) meta = (meta ? meta + ' · ' : '') + 'similar spelling';
+          return '<button class="person" data-i="' + i + '">' +
+            '<span class="pname">' + nameHtml(p.name, res.tokens, p.fuzzyWords) + '</span>' +
+            '<span class="pmeta">' + esc(meta) + '</span></button>';
+        }).join('') + '</div>';
+    }
+    resultsEl.innerHTML = html;
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('.person'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.hasAttribute('data-c')) openClass(classes[Number(btn.getAttribute('data-c'))]);
+        else if (btn.hasAttribute('data-t')) openTeacher(teachers[Number(btn.getAttribute('data-t'))]);
+        else openPerson(res.people[Number(btn.getAttribute('data-i'))]);
+      });
+    });
+  }
+
+  /* ---------- person detail ---------- */
+  function openPerson(p, push) {
+    if (push !== false) navPush_({ type: 'person', ref: p });
+    if (tabsData) { reqSeq++; renderPerson(personDetail(tabsData, p.id), p); return; }
+    var seq = ++reqSeq;
+    statusEl.textContent = 'Loading ' + p.name + '…';
+    google.script.run
+      .withSuccessHandler(function (d) { if (seq === reqSeq) renderPerson(d, p); })
+      .withFailureHandler(function (err) {
+        if (seq === reqSeq) statusEl.textContent = 'Error: ' + err.message;
+      })
+      .personApi(p.id);
+  }
+
+  function dlRow(label, value) {
+    return value ? '<dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd>' : '';
+  }
+
+  function renderPerson(d, p) {
+    if (!d) { statusEl.textContent = 'No record found for ' + p.name + '.'; return; }
+    lastPersonDetail = d;
+    statusEl.textContent = '';
+    var html = backButtonHtml_();
+
+    html += '<section class="tab"><h2>' + esc(d.profile.name) + ' <small>— Student</small></h2>' +
+      '<div class="hit"><dl>' +
+      dlRow('Student ID', d.profile.id) +
+      dlRow('Grade', dispGrade(d.profile.grade)) +
+      dlRow('Homeroom', d.profile.homeroom) +
+      dlRow('Homeroom Teacher', d.profile.homeroomTeacher) +
+      dlRow('Student Email', d.profile.email) +
+      dlRow('Status', d.profile.status) +
+      dlRow('Gender', d.profile.gender) +
+      '</dl></div></section>';
+
+    html += '<section class="tab"><h2>Parents / Guardians <small>(' + d.guardians.length + ')</small></h2>' +
+      (d.guardians.length ? d.guardians.map(function (g) {
+        return '<div class="hit"><dl>' +
+          dlRow('Name', g.name) +
+          g.emails.map(function (e, i) { return dlRow(i ? 'Email ' + (i + 1) : 'Email', e); }).join('') +
+          '</dl></div>';
+      }).join('') : '<div class="hit">None on file.</div>') + '</section>';
+
+    // today's schedule: period + room + real clock times, with the current class bolded
+    var ctx = scheduleCtx_();
+    var sched = periodTimes ? annotateSchedule(d.classes, periodTimes, ctx) : d.classes.map(function (c) {
+      return { code: c.code, key: c.key, description: c.description, category: c.category,
+               teacher: c.teacher, quarters: c.quarters, period: c.period, room: c.room,
+               meetsToday: false, current: false, beginLabel: '', endLabel: '', timeSource: '' };
+    });
+    var anyTimes = sched.some(function (c) { return c.beginLabel; });
+
+    html += '<section class="tab"><h2>Schedule <small>(' + d.classes.length + ')</small></h2>' +
+      dayBarHtml_(sched, ctx, anyTimes) +
+      (sched.length ? sched.map(function (c, i) {
+        var meta = [c.period, c.room ? 'Room ' + c.room : '', c.teacher, c.quarters, c.category]
+          .filter(String).join(' · ');
+        var time = c.offQuarter ? 'not this quarter'
+          : c.beginLabel ? (c.beginLabel + (c.endLabel ? '–' + c.endLabel : ''))
+          : (anyTimes && c.period ? 'not today' : '');
+        return '<button class="cls' + (c.current ? ' now' : (anyTimes && !c.meetsToday ? ' off' : '')) +
+          '" data-cl="' + i + '">' +
+          (time ? '<span class="clstime">' + esc(time) + '</span>' : '') +
+          esc(c.description || c.code) +
+          (c.current ? '<span class="nowtag">' + (c.sharedSlot ? 'NOW?' : 'NOW') + '</span>' : '') +
+          '<div class="t">' + esc(meta) + '</div></button>';
+      }).join('') : '<div class="hit">No classes on file.</div>') + '</section>';
+
+    resultsEl.innerHTML = html;
+    bindBack_();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-cl]'), function (btn) {
+      btn.addEventListener('click', function () {
+        openClass(sched[Number(btn.getAttribute('data-cl'))]);
+      });
+    });
+    window.scrollTo(0, 0);
+  }
+
+  /** The line above a schedule explaining what today is and where the times came from. */
+  function dayBarHtml_(sched, ctx, anyTimes) {
+    var simNote = SIM ? '<div class="daybar warn"><b>SIMULATED TIME</b> — ' + esc(SIM.label) +
+      ' (' + (ctx.dayCol ? ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][ctx.dayCol] : 'weekend') +
+      '). Remove <code>?sim=</code> from the URL for real time.</div>' : '';
+    if (!anyTimes) {
+      // Distinguish the two very different reasons for "no times" instead of blaming elementary
+      // for what may be a broken join (that mislabelling shipped in @17 and confused a 12th grader).
+      var hasPatterns = sched.some(function (c) { return c.pattern; });
+      if (!hasPatterns) {
+        return simNote + '<div class="daybar">No periods scheduled for these classes — FACTS ' +
+          'assigns class periods for grades 7-12 only.</div>';
+      }
+      return simNote + '<div class="daybar warn">These classes have periods (' +
+        esc(sched.filter(function (c) { return c.period; }).map(function (c) { return c.period; })
+          .slice(0, 4).join(', ')) + '…) but the <b>Period Times</b> reference didn’t match — ' +
+        'times unavailable. Tell IT: run RUN_diagnosePeriods.</div>';
+    }
+    if (!ctx.dayCol) return simNote + '<div class="daybar">Weekend — showing each class’s usual weekday time.</div>';
+    var live = sched.filter(function (c) { return c.current; });
+    var cur = live[0];
+    // Two classes can share a slot for DIFFERENT reasons: semester-split (different Q labels,
+    // e.g. Health Q3,4 vs PE Q1,2) or a part-week class sitting on a daily one (Concert Band
+    // Mon/Wed/Fri over a daily Study Hall). Say which, rather than asserting semester-split.
+    function daysPerWeek_(c) {
+      var byDay = periodTimes && c.pattern ? periodTimes.byPattern[String(c.pattern)] : null;
+      return byDay ? Object.keys(byDay).length : 0;
+    }
+    var qs = live.map(function (c) { return String(c.quarters || ''); });
+    var mixedQuarters = qs.some(function (q) { return q !== qs[0]; });
+    var curPhrase = !cur ? 'no class in session at this time'
+      : live.length === 1 ? 'in <b>' + esc(cur.description || cur.code) + '</b> now'
+      : live.length + ' classes share this period — <b>' +
+        live.map(function (c) {
+          var d = daysPerWeek_(c);
+          return esc(c.description || c.code) + (d && d < 5 ? ' (' + d + ' days/wk)' : '');
+        }).join('</b> or <b>') + '</b>' +
+        (mixedQuarters ? ' — semester-split, compare the Q labels' : '');
+    if (bellToday && bellToday.closed) {
+      // Either a real holiday or a date the bell calendar has no entry for — indistinguishable
+      // from here, so say what we know and still highlight off the normal schedule.
+      return simNote + '<div class="daybar warn"><b>' + esc(bellToday.mode || 'No school') +
+        '</b> per the bell calendar, so no bell times for this date — highlight uses the normal ' +
+        'schedule · ' + curPhrase + '</div>';
+    }
+    var usingBells = sched.some(function (c) { return c.timeSource === 'bell'; });
+    var mode = bellToday && bellToday.ok ? (bellToday.mode || '') : '';
+    var abnormal = mode && !/^normal/i.test(mode);
+    var bits = [];
+    if (mode) bits.push('<b>' + esc(mode) + '</b>');
+    bits.push(curPhrase);
+    if (abnormal && !usingBells) {
+      bits.push('bell times unavailable for these periods — showing the normal schedule');
+    }
+    return simNote + '<div class="daybar' + (abnormal ? ' warn' : '') + '">' + bits.join(' · ') + '</div>';
+  }
+
+  /** Re-render an open student so the NOW highlight follows the clock. */
+  function rerenderIfPerson_() {
+    if (currentView.type === 'person' && lastPersonDetail) {
+      var scrollY = window.scrollY;
+      renderPerson(lastPersonDetail, currentView.ref);
+      window.scrollTo(0, scrollY);
+    }
+  }
+  setInterval(rerenderIfPerson_, 60000);
+
+  /* ---------- teacher detail ---------- */
+  function openTeacher(t, push) {
+    if (push !== false) navPush_({ type: 'teacher', ref: t });
+    if (tabsData) { reqSeq++; renderTeacher(teacherDetail(tabsData, t.id), t); return; }
+    var seq = ++reqSeq;
+    statusEl.textContent = 'Loading ' + t.name + '…';
+    google.script.run
+      .withSuccessHandler(function (d) { if (seq === reqSeq) renderTeacher(d, t); })
+      .withFailureHandler(function (err) {
+        if (seq === reqSeq) statusEl.textContent = 'Error: ' + err.message;
+      })
+      .teacherApi(t.id);
+  }
+
+  function renderTeacher(d, t) {
+    if (!d) { statusEl.textContent = 'No record found for ' + t.name + '.'; return; }
+    statusEl.textContent = '';
+    var p = d.profile;
+    var html = backButtonHtml_();
+
+    html += '<section class="tab"><h2>' + esc(p.name) + ' <small>— Teacher</small></h2>' +
+      '<div class="hit"><dl>' +
+      dlRow('Department', p.department) +
+      dlRow('Level', p.level) +
+      dlRow('Grades', p.grades) +
+      dlRow('Homerooms', p.homerooms) +
+      dlRow('Core', p.core) +
+      dlRow('Specials', p.specials) +
+      dlRow('Fine-Arts Electives', p.fineArts) +
+      dlRow('Athletics', p.athletics) +
+      dlRow('ELC', p.elc) +
+      dlRow('Active', p.active) +
+      '</dl></div></section>';
+
+    html += '<section class="tab"><h2>Classes <small>(' + d.classes.length + ')</small></h2>' +
+      (d.classes.length ? d.classes.map(function (c, i) {
+        return '<button class="cls" data-cl="' + i + '">' + esc(c.description || c.code) +
+          '<div class="t">' + esc([c.period, c.room ? 'Room ' + c.room : '',
+            c.students + ' student' + (c.students === 1 ? '' : 's'),
+            c.quarters, c.category].filter(String).join(' · ')) + '</div></button>';
+      }).join('') : '<div class="hit">No classes on the schedule tab.</div>') + '</section>';
+
+    resultsEl.innerHTML = html;
+    bindBack_();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-cl]'), function (btn) {
+      btn.addEventListener('click', function () {
+        openClass(d.classes[Number(btn.getAttribute('data-cl'))]);
+      });
+    });
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- class detail: instructor first, class info, then the roster ---------- */
+  function openClass(c, push) {
+    if (push !== false) navPush_({ type: 'class', ref: c });
+    if (tabsData) { reqSeq++; renderClass(classDetail(tabsData, c.key), c); return; }
+    var seq = ++reqSeq;
+    statusEl.textContent = 'Loading ' + (c.description || c.code) + '…';
+    google.script.run
+      .withSuccessHandler(function (d) { if (seq === reqSeq) renderClass(d, c); })
+      .withFailureHandler(function (err) {
+        if (seq === reqSeq) statusEl.textContent = 'Error: ' + err.message;
+      })
+      .classApi(c.key);
+  }
+
+  function renderClass(d, c) {
+    if (!d) { statusEl.textContent = 'No record found for ' + (c.description || c.code) + '.'; return; }
+    statusEl.textContent = '';
+    var p = d.profile;
+    var html = backButtonHtml_();
+
+    html += '<section class="tab"><h2>Instructor' + (d.instructors.length > 1 ? 's' : '') + '</h2>' +
+      (d.instructors.length ? d.instructors.map(function (t, i) {
+        if (!t.id) return '<div class="hit">' + esc(t.name) + '</div>';
+        var meta = [t.department, t.level, t.grades ? 'Grades ' + t.grades : '']
+          .filter(String).join(' · ') || 'tap for profile';
+        return '<button class="person" data-t="' + i + '">' +
+          '<span class="pname">' + esc(t.name) + ' <span class="tag">Teacher</span></span>' +
+          '<span class="pmeta">' + esc(meta) + '</span></button>';
+      }).join('') : '<div class="hit">None on file.</div>') + '</section>';
+
+    html += '<section class="tab"><h2>' + esc(p.description || p.code) + ' <small>— Class</small></h2>' +
+      '<div class="hit"><dl>' +
+      dlRow('Class Code', p.code) +
+      dlRow('Period', p.period) +
+      dlRow('Room', p.room) +
+      dlRow('Category', p.category) +
+      dlRow('Grades', p.grades) +
+      dlRow('Quarters', p.quarters) +
+      dlRow('Students', String(p.students)) +
+      '</dl></div></section>';
+
+    html += '<section class="tab"><h2>Students <small>(' + d.students.length + ')</small></h2>' +
+      (d.students.length ? d.students.map(function (s, i) {
+        var meta = ['Grade ' + dispGrade(s.grade), s.homeroom, s.homeroomTeacher]
+          .filter(function (x) { return x && x !== 'Grade '; }).join(' · ');
+        return '<button class="person" data-s="' + i + '">' +
+          '<span class="pname">' + esc(s.name) + '</span>' +
+          '<span class="pmeta">' + esc(meta) + '</span></button>';
+      }).join('') : '<div class="hit">No students on file.</div>') + '</section>';
+
+    resultsEl.innerHTML = html;
+    bindBack_();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('.person'), function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.hasAttribute('data-t')) openTeacher(d.instructors[Number(btn.getAttribute('data-t'))]);
+        else openPerson(d.students[Number(btn.getAttribute('data-s'))]);
+      });
+    });
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- search plumbing ---------- */
+  function run() {
+    var query = q.value.trim();
+    if (tabsData) {
+      reqSeq++; // cancel any in-flight server render
+      if (!query) { resultsEl.innerHTML = ''; statusEl.textContent = IDLE_MSG; return; }
+      renderList(searchPeople(tabsData, query));
+      return;
+    }
+    if (query.length < 2) return; // server fallback keeps the old floor
+    var seq = ++reqSeq;
+    statusEl.textContent = 'Searching…';
+    google.script.run
+      .withSuccessHandler(function (res) { if (seq === reqSeq) renderList(res); })
+      .withFailureHandler(function (err) {
+        if (seq === reqSeq) statusEl.textContent = 'Error: ' + err.message;
+      })
+      .searchApi(query);
+  }
+  function runNow() { clearTimeout(debounceTimer); run(); }
+
+  // every keystroke searches: instantly once the local dataset is in, debounced
+  // server call for the few seconds before that
+  q.addEventListener('input', function () {
+    clearTimeout(debounceTimer);
+    if (tabsData) { run(); return; }
+    debounceTimer = setTimeout(run, 300);
+  });
+  go.addEventListener('click', runNow);
+  q.addEventListener('keydown', function (e) { if (e.key === 'Enter') runNow(); });
+</script>
+</body>
+</html>

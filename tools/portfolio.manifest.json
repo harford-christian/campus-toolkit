@@ -1,6 +1,14 @@
 {
   "_note": "Hand-authored map of showcased tools -> their source projects, used by scan-portfolio.mjs to detect NEW demoable projects and SIGNIFICANT changes to existing demos. Paths are relative to the Projects root (the parent of apps-script-showcase). Fingerprint baselines live in portfolio-baseline.json (machine-written by `node scan-portfolio.mjs mark`). buildMethod records how the demo was assembled; exact build-demo.mjs configs are reconstructed per-run.",
   "tools": {
+    "facts-directory": {
+      "title": "Directory Search",
+      "demoFolder": "demos/facts-directory",
+      "launch": "demos/facts-directory/index.html",
+      "sourceProject": ["FACTS/facts-directory-search"],
+      "builtFrom": ["FACTS/facts-directory-search/Index.html", "FACTS/facts-directory-search/SearchClient.html"],
+      "buildMethod": "build-demo.mjs (includeDir=project root, inlines SearchClient) + hand data/mock"
+    },
     "library": {
       "title": "Library Catalog",
       "demoFolder": "demos/library",
