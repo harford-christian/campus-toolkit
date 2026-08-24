@@ -5,23 +5,38 @@
       "title": "Directory Search",
       "demoFolder": "demos/facts-directory",
       "launch": "demos/facts-directory/index.html",
-      "sourceProject": ["FACTS/facts-directory-search"],
-      "builtFrom": ["FACTS/facts-directory-search/Index.html", "FACTS/facts-directory-search/SearchClient.html"],
+      "sourceProject": [
+        "FACTS/facts-directory-search"
+      ],
+      "builtFrom": [
+        "FACTS/facts-directory-search/Index.html",
+        "FACTS/facts-directory-search/SearchClient.html"
+      ],
       "buildMethod": "build-demo.mjs (includeDir=project root, inlines SearchClient) + hand data/mock"
     },
     "library": {
       "title": "Library Catalog",
       "demoFolder": "demos/library",
       "launch": "demos/library/index.html",
-      "sourceProject": ["hcs-library-portal/library-portal"],
-      "builtFrom": ["hcs-library-portal/library-portal/BrowseCatalog.html"],
+      "sourceProject": [
+        "hcs-library-portal/library-portal"
+      ],
+      "builtFrom": [
+        "hcs-library-portal/library-portal/BrowseCatalog.html"
+      ],
       "buildMethod": "sed (lib-inject) + hand data/mock"
     },
     "campus-control": {
       "title": "Campus Control (suite)",
       "demoFolder": "demos/campus-control",
       "launch": "demos/campus-control/index.html",
-      "sourceProject": ["campus-control/door-automation", "campus-control/event-requests", "campus-control/lockdown", "campus-control/bell-schedule", "campus-control/monitoring"],
+      "sourceProject": [
+        "campus-control/door-automation",
+        "campus-control/event-requests",
+        "campus-control/lockdown",
+        "campus-control/bell-schedule",
+        "campus-control/monitoring"
+      ],
       "builtFrom": [
         "campus-control/door-automation/Index.html",
         "campus-control/door-automation/Today.html",
@@ -42,23 +57,38 @@
       "title": "Athletics Logistics (Talon Hub)",
       "demoFolder": "demos/talon-hub",
       "launch": "demos/talon-hub/index.html",
-      "sourceProject": ["athletics/talon-hub/apps/staff"],
-      "builtFrom": ["athletics/talon-hub/apps/staff/pages/Staff.html", "athletics/talon-hub/apps/staff/pages/StaffApp.html", "athletics/talon-hub/apps/staff/pages/StaffStyles.html", "athletics/talon-hub/apps/staff/pages/Theme.html", "athletics/talon-hub/apps/staff/pages/ClientLogic.html"],
+      "sourceProject": [
+        "athletics/talon-hub/apps/staff"
+      ],
+      "builtFrom": [
+        "athletics/talon-hub/apps/staff/pages/Staff.html",
+        "athletics/talon-hub/apps/staff/pages/StaffApp.html",
+        "athletics/talon-hub/apps/staff/pages/StaffStyles.html",
+        "athletics/talon-hub/apps/staff/pages/Theme.html",
+        "athletics/talon-hub/apps/staff/pages/ClientLogic.html"
+      ],
       "buildMethod": "build-demo.mjs + hand data/mock"
     },
     "purchasing": {
       "title": "Purchasing & Procurement",
       "demoFolder": "demos/purchasing",
       "launch": "demos/purchasing/index.html",
-      "sourceProject": ["hcs-purchasing-system"],
-      "builtFrom": ["hcs-purchasing-system/Index.html", "hcs-purchasing-system/JavaScript.html"],
+      "sourceProject": [
+        "hcs-purchasing-system"
+      ],
+      "builtFrom": [
+        "hcs-purchasing-system/Index.html",
+        "hcs-purchasing-system/JavaScript.html"
+      ],
       "buildMethod": "custom node assembly (inline JavaScript.html) + hand data/mock"
     },
     "leave-sub": {
       "title": "Leave & Substitute Tracker",
       "demoFolder": "demos/leave-sub",
       "launch": "demos/leave-sub/index.html",
-      "sourceProject": ["leave-sub-automation/public-interface"],
+      "sourceProject": [
+        "leave-sub-automation/public-interface"
+      ],
       "builtFrom": [
         "leave-sub-automation/public-interface/Public.html",
         "leave-sub-automation/public-interface/PublicForecast.html",
@@ -73,7 +103,9 @@
       "title": "Concessions Ordering System",
       "demoFolder": "demos/pos",
       "launch": "demos/pos/index.html",
-      "sourceProject": ["athletics/eagles-landing/apps/public"],
+      "sourceProject": [
+        "athletics/eagles-landing/apps/public"
+      ],
       "builtFrom": [
         "athletics/eagles-landing/apps/public/kiosk/Kiosk.html",
         "athletics/eagles-landing/apps/public/kiosk/KioskUI.html",
@@ -88,39 +120,64 @@
       "title": "Lobby Display TV",
       "demoFolder": "demos/lobby-tv",
       "launch": "demos/lobby-tv/index.html",
-      "sourceProject": ["lobby-tv-project"],
-      "builtFrom": ["lobby-tv-project/LobbyControlDashboard.html", "lobby-tv-project/LobbyPreview.html"],
+      "sourceProject": [
+        "lobby-tv-project"
+      ],
+      "builtFrom": [
+        "lobby-tv-project/LobbyControlDashboard.html",
+        "lobby-tv-project/LobbyPreview.html"
+      ],
       "buildMethod": "build-demo.mjs (dashboard+preview) + hand wrapper/data/mock/samples"
     },
     "custom-forms": {
       "title": "Custom Forms",
       "demoFolder": "demos/custom-forms",
       "launch": "demos/custom-forms/index.html",
-      "sourceProject": ["custom-forms"],
-      "builtFrom": ["custom-forms/preview/index.html", "custom-forms/preview/fill.html", "custom-forms/preview/admin.html"],
+      "sourceProject": [
+        "custom-forms"
+      ],
+      "builtFrom": [
+        "custom-forms/preview/index.html",
+        "custom-forms/preview/fill.html",
+        "custom-forms/preview/admin.html"
+      ],
       "buildMethod": "reuse project's own preview build + scrub + banner"
     },
     "gym-tv": {
       "title": "Gym Display TV",
       "demoFolder": "demos/gym-tv",
       "launch": "demos/gym-tv/index.html",
-      "sourceProject": ["athletics/gym-tv-project"],
-      "builtFrom": ["athletics/gym-tv-project/GymControlDashboard.html", "athletics/gym-tv-project/GymDisplay.html"],
+      "sourceProject": [
+        "athletics/gym-tv-project"
+      ],
+      "builtFrom": [
+        "athletics/gym-tv-project/GymControlDashboard.html",
+        "athletics/gym-tv-project/GymDisplay.html"
+      ],
       "buildMethod": "build-demo.mjs (dashboard+display) + hand wrapper/data/mock"
     },
     "lunch-inventory": {
       "title": "Lunch Inventory",
       "demoFolder": "demos/lunch-inventory",
       "launch": "demos/lunch-inventory/index.html",
-      "sourceProject": ["lunch-inventory-management"],
-      "builtFrom": ["lunch-inventory-management/Lunch_Home.html", "lunch-inventory-management/Lunch_Kiosk.html", "lunch-inventory-management/Lunch_Shipment.html", "lunch-inventory-management/Lunch_Admin.html"],
+      "sourceProject": [
+        "lunch-inventory-management"
+      ],
+      "builtFrom": [
+        "lunch-inventory-management/Lunch_Home.html",
+        "lunch-inventory-management/Lunch_Kiosk.html",
+        "lunch-inventory-management/Lunch_Shipment.html",
+        "lunch-inventory-management/Lunch_Admin.html"
+      ],
       "buildMethod": "build-demo.mjs (4 pages) + hand wrapper/data/mock"
     },
     "facts-provisioning": {
       "title": "Account Provisioning (FACTS → Google → M365)",
       "demoFolder": "demos/facts-provisioning",
       "launch": "demos/facts-provisioning/index.html",
-      "sourceProject": ["FACTS/facts-to-gac-sync"],
+      "sourceProject": [
+        "FACTS/facts-to-gac-sync"
+      ],
       "builtFrom": [],
       "buildMethod": "bespoke console — source tool is headless (no web UI to port)"
     },
@@ -128,33 +185,38 @@
       "title": "Staff Onboarding",
       "demoFolder": "demos/staff-onboarding",
       "launch": "demos/staff-onboarding/index.html",
-      "sourceProject": ["FACTS/facts-to-gac-staff-email-config"],
-      "builtFrom": ["FACTS/facts-to-gac-staff-email-config/Index.html"],
+      "sourceProject": [
+        "FACTS/facts-to-gac-staff-email-config"
+      ],
+      "builtFrom": [
+        "FACTS/facts-to-gac-staff-email-config/Index.html"
+      ],
       "buildMethod": "build-demo.mjs + hand data/mock (name scrubs in replace list)"
     }
   },
   "coveredProjects": [
-    "hcs-library-portal/library-portal",
-    "hcs-library-portal/library-management",
+    "FACTS/facts-directory-search",
+    "FACTS/facts-to-gac-staff-email-config",
+    "athletics/eagles-landing/apps/admin",
+    "athletics/eagles-landing/apps/public",
+    "athletics/gym-tv-project",
+    "athletics/talon-hub/apps/parent",
+    "athletics/talon-hub/apps/staff",
+    "athletics/talon-hub/apps/student",
+    "athletics/talon-hub/apps/tryout",
+    "campus-control/bell-schedule",
     "campus-control/door-automation",
     "campus-control/event-requests",
     "campus-control/lockdown",
-    "campus-control/bell-schedule",
     "campus-control/monitoring",
-    "athletics/talon-hub/apps/staff",
-    "athletics/talon-hub/apps/parent",
-    "athletics/talon-hub/apps/student",
-    "athletics/talon-hub/apps/tryout",
-    "hcs-purchasing-system",
-    "leave-sub-automation/public-interface",
-    "leave-sub-automation/admin-interface",
-    "athletics/eagles-landing/apps/public",
-    "athletics/eagles-landing/apps/admin",
-    "lobby-tv-project",
     "custom-forms",
-    "athletics/gym-tv-project",
-    "lunch-inventory-management",
-    "FACTS/facts-to-gac-staff-email-config"
+    "hcs-library-portal/library-management",
+    "hcs-library-portal/library-portal",
+    "hcs-purchasing-system",
+    "leave-sub-automation/admin-interface",
+    "leave-sub-automation/public-interface",
+    "lobby-tv-project",
+    "lunch-inventory-management"
   ],
   "excludeDirs": [
     "apps-script-showcase",

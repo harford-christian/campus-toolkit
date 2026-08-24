@@ -233,5 +233,20 @@
       "contentApi"
     ],
     "hash": "b30fe2f4d282a7ca"
+  },
+  "facts-directory": {
+    "files": [
+      "FACTS/facts-directory-search/Index.html",
+      "FACTS/facts-directory-search/SearchClient.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "classApi",
+      "nowApi",
+      "personApi",
+      "searchApi",
+      "teacherApi"
+    ],
+    "hash": "7ad0f347e40891d5"
   }
 }
