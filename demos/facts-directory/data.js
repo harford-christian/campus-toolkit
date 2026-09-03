@@ -146,7 +146,8 @@ window.DIRECTORY_DATA = (function () {
   /* ---------- fabricated schedules ----------
      [studentId, code, description, category, teacher, quarters, classId, pattern, room] */
   var SCHED_HEADER = ['Student ID', 'Student Name', 'Grade', 'Class Code', 'Class Description',
-                      'Category', 'Teacher', 'Quarters', 'Class ID', 'Pattern', 'Period', 'Room'];
+                      'Category', 'Teacher', 'Quarters', 'Class ID', 'Pattern', 'Period', 'Room',
+                      'Activity', 'Course Dept'];
   var CLASSES = [
     // grade 12 — Nora. Includes the semester-split pair (Q1,2 vs Q3,4) sharing Period 6.
     [400101, 'HR-12',     'Homeroom - 12th Grade',        'Homeroom', 'Whitfield Dana', 'Q1,2,3,4', 7301, '',  '108'],
@@ -214,6 +215,73 @@ window.DIRECTORY_DATA = (function () {
     [400113, '3ART',      'Art - 3rd Grade',              'Specials', 'Marchetti Dov','Q1,2,3,4', 7372, '', 'Art Room']
   ];
 
+  /* Teams and clubs. In the real system these are ordinary class enrolments whose COURSE
+     carries an `activity` flag — so they arrive with the schedule and are split out by that
+     structural flag, not by guessing from the name. Most have no period: they meet after
+     school, which is exactly why they'd otherwise clutter a timed schedule as "not today".
+     [studentId, code, description, category, teacher, quarters, classId, pattern, room,
+      activity, courseDept] */
+  var ACTIVITIES = [
+    [400101, 'VGSC',    'Varsity Girls Soccer',        'Athletics', 'Sandoval Rico',  'Q1,2',     7401, '', '', 'Y', 'Athletics'],
+    [400101, 'HonSoc',  'Honor Society 26-27',         'Core',      'Whitfield Dana', 'Q1,2,3,4', 7402, '', '', 'Y', 'Other'],
+    [400103, 'VGSC',    'Varsity Girls Soccer',        'Athletics', 'Sandoval Rico',  'Q1,2',     7401, '', '', 'Y', 'Athletics'],
+    [400106, 'JVVBSoc', 'JV/Varsity Boys Soccer',      'Athletics', 'Sandoval Rico',  'Q1,2',     7403, '', '', 'Y', 'Athletics'],
+    [400106, 'PlayCast','Fall Play Cast',              'Core',      'Peters Wesley',  'Q1,2',     7404, '', '', 'Y', 'Fine Arts'],
+    [400107, 'MSCCTRY', 'MS Cross Country',            'Athletics', 'Sandoval Rico',  'Q1,2',     7405, '', '', 'Y', 'Athletics'],
+    [400110, 'MSVB',    'Middle School Volleyball',    'Athletics', 'Duvall Marta',   'Q1,2',     7406, '', '', 'Y', 'Athletics'],
+    [400114, 'JVVBSoc', 'JV/Varsity Boys Soccer',      'Athletics', 'Sandoval Rico',  'Q1,2',     7403, '', '', 'Y', 'Athletics']
+  ];
+
+  /* The emergency call list — a separate list in the source system from the guardians on the
+     directory tab (who to call vs. who the parents are). Every name/number here is invented. */
+  var EMERGENCY_HEADER = ['Student ID', 'Student Name', 'Order', 'Contact Name', 'Relationship',
+                          'Cell Phone', 'Home Phone', 'Work Phone', 'Email', 'Note'];
+  var EMERGENCY = [
+    [400101, 1, 'Priya Alderman',  'Mother',      '555-0101', '555-0140', '',         'priya.alderman@example.com', ''],
+    [400101, 2, 'Ross Alderman',   'Father',      '555-0102', '555-0140', '555-0150', '',                            'call cell first'],
+    [400101, 3, 'Vera Alderman',   'Grandparent', '555-0103', '',         '',         '',                            'lives nearby'],
+    [400102, 1, 'Trina Boyette',   'Mother',      '555-0104', '',         '555-0151', 'trina.boyette@example.com',   ''],
+    [400106, 1, 'Greta Fairbanks', 'Mother',      '555-0105', '555-0141', '',         'greta.fairbanks@example.com', ''],
+    [400106, 2, 'Neil Fairbanks',  'Father',      '555-0106', '555-0141', '',         '',                            ''],
+    [400107, 1, 'Greta Fairbanks', 'Mother',      '555-0105', '555-0141', '',         'greta.fairbanks@example.com', ''],
+    [400112, 1, 'Helena Kirkwood', 'Mother',      '555-0107', '',         '',         'helena.kirkwood@example.com', ''],
+    [400112, 2, 'Dot Kirkwood',    'Aunt',        '555-0108', '',         '',         '',                            'emergency pickup only']
+  ];
+
+  function emergencyValues() {
+    var byId = {};
+    STUDENTS.forEach(function (s) { byId[s[0]] = s; });
+    var rows = [EMERGENCY_HEADER];
+    EMERGENCY.forEach(function (e) {
+      rows.push([e[0], byId[e[0]][1], e[1], e[2], e[3], e[4], e[5], e[6], e[7], e[8]]);
+    });
+    return rows;
+  }
+
+  /* Today's attendance exceptions. The real feed refreshes every 15 minutes during school
+     hours and only carries students who are NOT present, each row stamped with the date it
+     was pulled so a stalled feed can't report yesterday's absences as today's. */
+  var ATTENDANCE_HEADER = ['Student ID', 'Student Name', 'Date', 'Code', 'Status', 'Detail',
+                           'Excused', 'Reason', 'Recorded At'];
+  var ATTENDANCE = [
+    [400103, 'AE', 'Absent',     'Absent - Excused',   'Y', 'fever, mom emailed'],
+    [400109, 'AU', 'Absent',     'Absent - Unexcused', 'N', ''],
+    [400105, 'LA', 'Late',       'Late Arrival',       'N', 'arrived at 8:43'],
+    [400111, 'TU', 'Late',       'Tardy - Unexcused',  'N', 'signed in at 8:55'],
+    [400114, 'ED', 'Left early', 'Early Dismissal',    'N', 'orthodontist, signed out 11:20']
+  ];
+
+  function attendanceValues(dateStr) {
+    var byId = {};
+    STUDENTS.forEach(function (s) { byId[s[0]] = s; });
+    var rows = [ATTENDANCE_HEADER];
+    ATTENDANCE.forEach(function (a) {
+      rows.push([a[0], byId[a[0]][1], dateStr, a[1], a[2], a[3], a[4], a[5],
+                 dateStr + 'T12:15:00Z']);
+    });
+    return rows;
+  }
+
   function scheduleValues() {
     var byId = {};
     STUDENTS.forEach(function (s) { byId[s[0]] = s; });
@@ -228,10 +296,12 @@ window.DIRECTORY_DATA = (function () {
       slotOf[p] = canonical(best);
     });
     var rows = [SCHED_HEADER];
-    CLASSES.forEach(function (c) {
+    CLASSES.concat(ACTIVITIES).forEach(function (c) {
       var s = byId[c[0]];
+      var isActivity = c[9] === 'Y';
       rows.push([c[0], s[1], s[3], c[1], c[2], c[3], c[4], c[5], c[6], c[7] || '',
-                 c[7] ? slotOf[c[7]] : '', c[8]]);
+                 c[7] ? slotOf[c[7]] : '', c[8],
+                 isActivity ? 'Y' : 'N', c[10] || '']);
     });
     return rows;
   }
@@ -282,15 +352,26 @@ window.DIRECTORY_DATA = (function () {
     { name: '8th Period',  start: '14:37', end: '15:17', type: 'period' }
   ];
 
+  // The demo clock: Tuesday 2026-09-08, mid-morning — a school day, so a class is always in
+  // session when the page opens. It also falls inside Q1 below, which is what lets the
+  // semester-split pair resolve to a single answer instead of two maybes.
+  var DEMO_NOW = { date: '2026-09-08', time: '10:30', dayOfWeek: 2 };
+
   return {
     tabs: [
-      { name: 'Sheet1',            values: directoryValues() },
-      { name: 'Student Schedules', values: scheduleValues() },
-      { name: 'Teachers',          values: teacherValues() },
-      { name: 'Period Times',      values: periodTimesValues() }
+      { name: 'Sheet1',             values: directoryValues() },
+      { name: 'Student Schedules',  values: scheduleValues() },
+      { name: 'Teachers',           values: teacherValues() },
+      { name: 'Period Times',       values: periodTimesValues() },
+      { name: 'Emergency Contacts', values: emergencyValues() },
+      { name: 'Attendance Today',   values: attendanceValues(DEMO_NOW.date) }
     ],
     bellPeriods: BELL_PERIODS,
-    // the demo clock: a Tuesday mid-morning, so a class is always in session on open
-    demoNow: { date: '2026-09-08', time: '10:30', dayOfWeek: 2 }
+    demoNow: DEMO_NOW,
+    // Quarter ranges: a class marked Q1,2 vs Q3,4 can share a period, and only the one whose
+    // quarter contains today is really meeting. Without these the app says so rather than
+    // guessing; with them it gives one definite answer.
+    quarterDates: '1:2026-09-08..2026-11-08,2:2026-11-09..2027-01-31,' +
+                  '3:2027-02-01..2027-04-11,4:2027-04-12..2027-06-30'
   };
 })();

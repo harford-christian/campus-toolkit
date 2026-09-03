@@ -46,7 +46,7 @@ window.MOCK_BACKEND = (function () {
         date: D.demoNow.date,
         time: D.demoNow.time,
         dayOfWeek: D.demoNow.dayOfWeek,
-        quarterDates: '' // unset in the demo -> semester-split classes are flagged, not filtered
+        quarterDates: D.quarterDates // set, so semester-split classes resolve to one answer
       };
     },
 

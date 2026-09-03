@@ -75,6 +75,22 @@
   .tab > h2 { font-size: .9rem; margin: 0; padding: .55rem .9rem; background: var(--tabhead-bg);
               color: var(--tabhead-fg); border-bottom: 1px solid var(--line); }
   .tab > h2 small { color: #f0d3d7; font-weight: normal; }
+  /* collapsible sections: native <details> so it works without JS and stays keyboard-accessible */
+  details.tab > summary { font-size: .9rem; font-weight: 700; margin: 0; padding: .55rem .9rem;
+                          background: var(--tabhead-bg); color: var(--tabhead-fg);
+                          border-bottom: 1px solid var(--line); cursor: pointer;
+                          min-height: 44px; display: flex; align-items: center; gap: .4rem;
+                          list-style: none; -webkit-tap-highlight-color: transparent; }
+  details.tab > summary::-webkit-details-marker { display: none; } /* iOS/Safari default triangle */
+  details.tab > summary::marker { content: ''; }
+  details.tab > summary small { color: #f0d3d7; font-weight: normal; }
+  details.tab > summary:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+  details.tab > summary .chev { margin-left: auto; transition: transform .15s;
+                                border: solid #f0d3d7; border-width: 0 2px 2px 0;
+                                padding: 3px; transform: rotate(45deg); flex: none; }
+  details.tab[open] > summary .chev { transform: rotate(-135deg); }
+  details.tab:not([open]) > summary { border-bottom: 0; }
+  @media (prefers-reduced-motion: reduce) { details.tab > summary .chev { transition: none; } }
   .hit { padding: .6rem .9rem; border-bottom: 1px solid var(--line); }
   .hit:last-child { border-bottom: 0; }
   .hit dl { display: grid; grid-template-columns: auto 1fr; gap: .1rem .8rem; margin: 0; }
@@ -86,6 +102,17 @@
   .cls.off { opacity: .62; } /* doesn't meet today */
   .nowtag { background: #8FE39B; color: #0d3a17; font-size: .62rem; font-weight: 700;
             padding: .1em .45em; border-radius: .6em; vertical-align: middle; margin-left: .35rem; }
+  /* today's attendance — deliberately loud, it changes where a student physically is */
+  .att { font-size: .62rem; font-weight: 700; padding: .12em .5em; border-radius: .6em;
+         vertical-align: middle; margin-left: .35rem; white-space: nowrap; }
+  .att.absent { background: #C62828; color: #fff; }
+  .att.late { background: var(--gold); color: var(--gold-ink); }
+  .att.left { background: #6b7280; color: #fff; }
+  .attbar { padding: .5rem .9rem; font-size: .85rem; background: #FDECEA;
+            border-bottom: 1px solid var(--line); color: #7f1d1d; }
+  .attbar.late { background: #FFF3CD; color: #6b5400; }
+  .attbar.left { background: #EEF0F2; color: #374151; }
+  .attbar b { font-weight: 700; }
   .clstime { float: right; color: var(--dt); font-size: .78rem; font-weight: 600; white-space: nowrap;
              margin-left: .5rem; }
   .cls.now .clstime { color: #6b5400; }
@@ -266,6 +293,8 @@ var SEARCH_MAX_PEOPLE = 50;
 var SEARCH_MAX_TEACHERS = 20;
 var SEARCH_MAX_CLASSES = 25;
 var PERIOD_TIMES_TAB = 'Period Times';
+var EMERGENCY_TAB_NAME = 'Emergency Contacts';
+var ATTENDANCE_TAB_NAME = 'Attendance Today';
 var DIRECTORY_TAB_NAMES = ['Directory', 'Sheet1'];
 var SCHEDULES_TAB_NAME = 'Student Schedules';
 var TEACHERS_TAB_NAME = 'Teachers';
@@ -480,6 +509,8 @@ function classGradesLabel_(gradesObj) {
 function searchPeople(tabs, query, opts) {
   opts = opts || {};
   var cap = opts.maxPeople || SEARCH_MAX_PEOPLE;
+  // opts.today ('YYYY-MM-DD') switches on today's absent/late badge in the result list
+  var attendance = opts.today === undefined ? {} : buildAttendance(tabs, opts.today);
   var tokens = String(query || '').toLowerCase().split(/\s+/).filter(function (t) { return t; });
   var out = { query: String(query || ''), tokens: tokens, total: 0, truncated: false, hasClose: false, people: [] };
   if (!tokens.length) return out;
@@ -552,7 +583,8 @@ function searchPeople(tabs, query, opts) {
   out.people = matches.slice(0, cap).map(function (m) {
     return { id: m.p.id, name: m.p.name, grade: m.p.grade, homeroom: m.p.homeroom,
              homeroomTeacher: m.p.homeroomTeacher, close: !m.allExact, via: m.via,
-             fuzzyWords: m.fuzzyWords };
+             fuzzyWords: m.fuzzyWords,
+             attendance: attendance[m.p.id] || null }; // absent/late shows in the list itself
   });
 
   // teachers: same exact-or-fuzzy-name matching against the Teachers tab
@@ -734,10 +766,65 @@ function teacherDetail(tabs, id) {
 }
 
 /**
+ * Today's attendance exceptions from the `Attendance Today` tab, indexed by student id.
+ * Only students who are NOT present appear — the producer omits present rows entirely.
+ *
+ * `today` guards against a stale tab: the producer stamps each row with the date it pulled,
+ * so if the 15-minute job stops running, yesterday's absences are ignored rather than
+ * reported as today's. Pass '' to accept whatever the tab holds (used by tests).
+ *
+ * @return {Object} studentId -> {status, detail, code, excused, reason, date}
+ */
+function buildAttendance(tabs, today) {
+  var t = searchTabByName_(tabs, [ATTENDANCE_TAB_NAME]);
+  var out = {};
+  if (!t || (t.values || []).length < 2) return out;
+  var h = searchHeaderMap_(t.values[0]);
+  for (var r = 1; r < t.values.length; r++) {
+    var row = t.values[r];
+    var cell = function (n) { return h[n] === undefined ? '' : searchCellToString_(row[h[n]]).trim(); };
+    var sid = cell('Student ID');
+    if (!sid) continue;
+    var date = cell('Date');
+    if (today && date && date.slice(0, 10) !== String(today).slice(0, 10)) continue; // stale
+    out[sid] = {
+      status: cell('Status'), detail: cell('Detail'), code: cell('Code'),
+      excused: cell('Excused'), reason: cell('Reason'), date: date
+    };
+  }
+  return out;
+}
+
+/**
+ * Emergency call list from the `Emergency Contacts` tab, indexed by student id.
+ * A DIFFERENT list from the directory's guardians (who to call vs. who the parents are),
+ * and separate again from FACTS' pickup-authorisation list.
+ * @return {Object} studentId -> [{name, relationship, cell, home, work, email, note, order}]
+ */
+function buildEmergencyContacts(tabs) {
+  var t = searchTabByName_(tabs, [EMERGENCY_TAB_NAME]);
+  var out = {};
+  if (!t || (t.values || []).length < 2) return out;
+  var h = searchHeaderMap_(t.values[0]);
+  for (var r = 1; r < t.values.length; r++) {
+    var row = t.values[r];
+    var cell = function (n) { return h[n] === undefined ? '' : searchCellToString_(row[h[n]]).trim(); };
+    var sid = cell('Student ID');
+    if (!sid) continue;
+    (out[sid] = out[sid] || []).push({
+      order: cell('Order'), name: cell('Contact Name'), relationship: cell('Relationship'),
+      cell: cell('Cell Phone'), home: cell('Home Phone'), work: cell('Work Phone'),
+      email: cell('Email'), note: cell('Note')
+    });
+  }
+  return out;
+}
+
+/**
  * One person's full record: directory profile + guardians + their schedule rows.
  * @return {?{profile:Object, guardians:Array, classes:Array}} null if id unknown.
  */
-function personDetail(tabs, id) {
+function personDetail(tabs, id, today) {
   var people = buildPeople(tabs);
   var p = null;
   for (var i = 0; i < people.length; i++) if (people[i].id === String(id)) { p = people[i]; break; }
@@ -762,9 +849,11 @@ function personDetail(tabs, id) {
         category: cell('Category'),
         teacher: clTeacher,
         quarters: cell('Quarters'),
-        period: cell('Period'),   // e.g. "Period 3" / "P5" — blank for K4-6 (no periods in FACTS)
+        period: cell('Period'),   // canonical, e.g. "Period 3" — blank for K4-6 (no periods in FACTS)
         room: cell('Room'),
-        pattern: cell('Pattern')  // joins to the Period Times tab for today's clock time
+        pattern: cell('Pattern'), // joins to the Period Times tab for today's clock time
+        activity: cell('Activity') === 'Y', // team/club: listed apart from academic periods
+        dept: cell('Course Dept')           // 'Athletics' distinguishes sports from other activities
       });
     }
   }
@@ -773,7 +862,11 @@ function personDetail(tabs, id) {
                homeroomTeacher: p.homeroomTeacher, status: p.status, email: p.email,
                gender: p.gender },
     guardians: p.guardians,
-    classes: classes
+    emergency: buildEmergencyContacts(tabs)[p.id] || [],
+    attendance: (today === undefined ? {} : buildAttendance(tabs, today))[p.id] || null,
+    // teams/clubs are split out of the academic schedule (structural `activity` flag)
+    classes: classes.filter(function (c) { return !c.activity; }),
+    activities: classes.filter(function (c) { return c.activity; })
   };
 }
 
@@ -1064,6 +1157,8 @@ if (typeof module !== 'undefined' && module.exports) {
     teacherDetail: teacherDetail,
     classDetail: classDetail,
     buildPeriodTimes: buildPeriodTimes,
+    buildEmergencyContacts: buildEmergencyContacts,
+    buildAttendance: buildAttendance,
     bellSlotTimes: bellSlotTimes,
     annotateSchedule: annotateSchedule,
     parseSimClock: parseSimClock,
@@ -1182,6 +1277,23 @@ if (typeof module !== 'undefined' && module.exports) {
 
   function dispGrade(g) { return String(g || '').replace(/^0/, ''); } // export pads: 07 → 7
 
+  /**
+   * The date attendance is judged against: the simulated day when time-travelling, else
+   * school time from the server. Passing it explicitly means a stale `Attendance Today` tab
+   * (15-minute job stopped) is ignored rather than shown as today's absences.
+   */
+  function attendanceDate_() {
+    if (SIM) return SIM.date;
+    return serverDate || '';
+  }
+
+  /** Attendance pill for a student who is not present today ('' when they are). */
+  function attTag_(a) {
+    if (!a || !a.status) return '';
+    var cls = /absent/i.test(a.status) ? 'absent' : /late/i.test(a.status) ? 'late' : 'left';
+    return '<span class="att ' + cls + '">' + esc(a.status.toUpperCase()) + '</span>';
+  }
+
   /* ---------- navigation trail ----------
      Every tap-through (list → class → student → …) pushes the view it came FROM,
      so Back walks the trail one step at a time instead of jumping to the results. */
@@ -1270,7 +1382,8 @@ if (typeof module !== 'undefined' && module.exports) {
           if (p.via) meta = 'parent: ' + p.via + (meta ? ' · ' + meta : '');
           if (p.close) meta = (meta ? meta + ' · ' : '') + 'similar spelling';
           return '<button class="person" data-i="' + i + '">' +
-            '<span class="pname">' + nameHtml(p.name, res.tokens, p.fuzzyWords) + '</span>' +
+            '<span class="pname">' + nameHtml(p.name, res.tokens, p.fuzzyWords) +
+            attTag_(p.attendance) + '</span>' +
             '<span class="pmeta">' + esc(meta) + '</span></button>';
         }).join('') + '</div>';
     }
@@ -1287,7 +1400,7 @@ if (typeof module !== 'undefined' && module.exports) {
   /* ---------- person detail ---------- */
   function openPerson(p, push) {
     if (push !== false) navPush_({ type: 'person', ref: p });
-    if (tabsData) { reqSeq++; renderPerson(personDetail(tabsData, p.id), p); return; }
+    if (tabsData) { reqSeq++; renderPerson(personDetail(tabsData, p.id, attendanceDate_()), p); return; }
     var seq = ++reqSeq;
     statusEl.textContent = 'Loading ' + p.name + '…';
     google.script.run
@@ -1302,14 +1415,50 @@ if (typeof module !== 'undefined' && module.exports) {
     return value ? '<dt>' + esc(label) + '</dt><dd>' + esc(value) + '</dd>' : '';
   }
 
+  /* ---------- collapsible sections ----------
+     Records are getting long (schedule + guardians + emergency contacts + transportation),
+     so each block is a <details>. Open/closed is remembered per section in localStorage —
+     which also survives the 60s NOW re-render, since that rebuilds the DOM. */
+  function sectionOpen_(key, dflt) {
+    try {
+      var v = localStorage.getItem('sec:' + key);
+      return v === null ? dflt : v === '1';
+    } catch (e) { return dflt; } // private mode / storage blocked
+  }
+
+  function section_(key, titleHtml, smallHtml, bodyHtml, defaultOpen) {
+    return '<details class="tab" data-sec="' + esc(key) + '"' + (sectionOpen_(key, defaultOpen) ? ' open' : '') + '>' +
+      '<summary>' + titleHtml + (smallHtml ? ' <small>' + smallHtml + '</small>' : '') +
+      '<span class="chev"></span></summary>' + bodyHtml + '</details>';
+  }
+
+  function bindSections_() {
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('details[data-sec]'), function (d) {
+      d.addEventListener('toggle', function () {
+        try { localStorage.setItem('sec:' + d.getAttribute('data-sec'), d.open ? '1' : '0'); } catch (e) {}
+      });
+    });
+  }
+
   function renderPerson(d, p) {
     if (!d) { statusEl.textContent = 'No record found for ' + p.name + '.'; return; }
     lastPersonDetail = d;
     statusEl.textContent = '';
     var html = backButtonHtml_();
 
-    html += '<section class="tab"><h2>' + esc(d.profile.name) + ' <small>— Student</small></h2>' +
-      '<div class="hit"><dl>' +
+    // Today's attendance goes at the very top of the record and in the section header —
+    // if a student isn't in the building, that outranks everything else on the page.
+    var att = d.attendance;
+    var attBar = '';
+    if (att && att.status) {
+      var acls = /absent/i.test(att.status) ? '' : /late/i.test(att.status) ? ' late' : ' left';
+      attBar = '<div class="attbar' + acls + '"><b>' + esc(att.status) + ' today</b>' +
+        (att.detail && att.detail !== att.status ? ' — ' + esc(att.detail) : '') +
+        (att.reason ? ' · ' + esc(att.reason) : '') + '</div>';
+    }
+
+    html += section_('student', esc(d.profile.name) + attTag_(att), '— Student',
+      attBar + '<div class="hit"><dl>' +
       dlRow('Student ID', d.profile.id) +
       dlRow('Grade', dispGrade(d.profile.grade)) +
       dlRow('Homeroom', d.profile.homeroom) +
@@ -1317,15 +1466,31 @@ if (typeof module !== 'undefined' && module.exports) {
       dlRow('Student Email', d.profile.email) +
       dlRow('Status', d.profile.status) +
       dlRow('Gender', d.profile.gender) +
-      '</dl></div></section>';
+      '</dl></div>', true);
 
-    html += '<section class="tab"><h2>Parents / Guardians <small>(' + d.guardians.length + ')</small></h2>' +
+    html += section_('guardians', 'Parents / Guardians', '(' + d.guardians.length + ')',
       (d.guardians.length ? d.guardians.map(function (g) {
         return '<div class="hit"><dl>' +
           dlRow('Name', g.name) +
           g.emails.map(function (e, i) { return dlRow(i ? 'Email ' + (i + 1) : 'Email', e); }).join('') +
           '</dl></div>';
-      }).join('') : '<div class="hit">None on file.</div>') + '</section>';
+      }).join('') : '<div class="hit">None on file.</div>'), true);
+
+    // Emergency call list — a separate FACTS list from the guardians above. Collapsed by
+    // default: it carries phone numbers and most lookups don't need it.
+    var em = d.emergency || [];
+    html += section_('emergency', 'Emergency Contacts', '(' + em.length + ')',
+      (em.length ? em.map(function (c) {
+        return '<div class="hit"><dl>' +
+          dlRow('Name', c.name + (c.relationship ? ' — ' + c.relationship : '')) +
+          dlRow('Cell', c.cell) +
+          dlRow('Home', c.home) +
+          dlRow('Work', c.work) +
+          dlRow('Email', c.email) +
+          dlRow('Note', c.note) +
+          '</dl></div>';
+      }).join('')
+        : '<div class="hit">None on file in FACTS.</div>'), false);
 
     // today's schedule: period + room + real clock times, with the current class bolded
     var ctx = scheduleCtx_();
@@ -1336,7 +1501,7 @@ if (typeof module !== 'undefined' && module.exports) {
     });
     var anyTimes = sched.some(function (c) { return c.beginLabel; });
 
-    html += '<section class="tab"><h2>Schedule <small>(' + d.classes.length + ')</small></h2>' +
+    html += section_('schedule', 'Schedule', '(' + d.classes.length + ')',
       dayBarHtml_(sched, ctx, anyTimes) +
       (sched.length ? sched.map(function (c, i) {
         var meta = [c.period, c.room ? 'Room ' + c.room : '', c.teacher, c.quarters, c.category]
@@ -1350,13 +1515,32 @@ if (typeof module !== 'undefined' && module.exports) {
           esc(c.description || c.code) +
           (c.current ? '<span class="nowtag">' + (c.sharedSlot ? 'NOW?' : 'NOW') + '</span>' : '') +
           '<div class="t">' + esc(meta) + '</div></button>';
-      }).join('') : '<div class="hit">No classes on file.</div>') + '</section>';
+      }).join('') : '<div class="hit">No classes on file.</div>'), true);
+
+    // Teams and clubs, kept out of the period-by-period schedule above. Most carry no
+    // period in FACTS (they meet after school), so they'd otherwise clutter it as "not today".
+    var acts = d.activities || [];
+    html += section_('activities', 'Sports &amp; Activities', '(' + acts.length + ')',
+      (acts.length ? acts.map(function (c, i) {
+        var meta = [/athletic/i.test(c.dept || '') ? 'Athletics' : (c.dept || 'Activity'),
+          c.teacher, c.period, c.room ? 'Room ' + c.room : '', c.quarters]
+          .filter(String).join(' · ');
+        return '<button class="cls" data-act="' + i + '">' + esc(c.description || c.code) +
+          '<div class="t">' + esc(meta) + '</div></button>';
+      }).join('')
+        : '<div class="hit">Not on a team or club roster in FACTS.</div>'), false);
 
     resultsEl.innerHTML = html;
     bindBack_();
+    bindSections_();
     Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-cl]'), function (btn) {
       btn.addEventListener('click', function () {
         openClass(sched[Number(btn.getAttribute('data-cl'))]);
+      });
+    });
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-act]'), function (btn) {
+      btn.addEventListener('click', function () {
+        openClass(acts[Number(btn.getAttribute('data-act'))]);
       });
     });
     window.scrollTo(0, 0);
@@ -1449,7 +1633,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var p = d.profile;
     var html = backButtonHtml_();
 
-    html += '<section class="tab"><h2>' + esc(p.name) + ' <small>— Teacher</small></h2>' +
+    html += section_('teacher', esc(p.name), '— Teacher',
       '<div class="hit"><dl>' +
       dlRow('Department', p.department) +
       dlRow('Level', p.level) +
@@ -1461,18 +1645,19 @@ if (typeof module !== 'undefined' && module.exports) {
       dlRow('Athletics', p.athletics) +
       dlRow('ELC', p.elc) +
       dlRow('Active', p.active) +
-      '</dl></div></section>';
+      '</dl></div>', true);
 
-    html += '<section class="tab"><h2>Classes <small>(' + d.classes.length + ')</small></h2>' +
+    html += section_('teacherClasses', 'Classes', '(' + d.classes.length + ')',
       (d.classes.length ? d.classes.map(function (c, i) {
         return '<button class="cls" data-cl="' + i + '">' + esc(c.description || c.code) +
           '<div class="t">' + esc([c.period, c.room ? 'Room ' + c.room : '',
             c.students + ' student' + (c.students === 1 ? '' : 's'),
             c.quarters, c.category].filter(String).join(' · ')) + '</div></button>';
-      }).join('') : '<div class="hit">No classes on the schedule tab.</div>') + '</section>';
+      }).join('') : '<div class="hit">No classes on the schedule tab.</div>'), true);
 
     resultsEl.innerHTML = html;
     bindBack_();
+    bindSections_();
     Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-cl]'), function (btn) {
       btn.addEventListener('click', function () {
         openClass(d.classes[Number(btn.getAttribute('data-cl'))]);
@@ -1501,7 +1686,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var p = d.profile;
     var html = backButtonHtml_();
 
-    html += '<section class="tab"><h2>Instructor' + (d.instructors.length > 1 ? 's' : '') + '</h2>' +
+    html += section_('classInstructors', 'Instructor' + (d.instructors.length > 1 ? 's' : ''), '',
       (d.instructors.length ? d.instructors.map(function (t, i) {
         if (!t.id) return '<div class="hit">' + esc(t.name) + '</div>';
         var meta = [t.department, t.level, t.grades ? 'Grades ' + t.grades : '']
@@ -1509,9 +1694,9 @@ if (typeof module !== 'undefined' && module.exports) {
         return '<button class="person" data-t="' + i + '">' +
           '<span class="pname">' + esc(t.name) + ' <span class="tag">Teacher</span></span>' +
           '<span class="pmeta">' + esc(meta) + '</span></button>';
-      }).join('') : '<div class="hit">None on file.</div>') + '</section>';
+      }).join('') : '<div class="hit">None on file.</div>'), true);
 
-    html += '<section class="tab"><h2>' + esc(p.description || p.code) + ' <small>— Class</small></h2>' +
+    html += section_('classInfo', esc(p.description || p.code), '— Class',
       '<div class="hit"><dl>' +
       dlRow('Class Code', p.code) +
       dlRow('Period', p.period) +
@@ -1520,19 +1705,20 @@ if (typeof module !== 'undefined' && module.exports) {
       dlRow('Grades', p.grades) +
       dlRow('Quarters', p.quarters) +
       dlRow('Students', String(p.students)) +
-      '</dl></div></section>';
+      '</dl></div>', true);
 
-    html += '<section class="tab"><h2>Students <small>(' + d.students.length + ')</small></h2>' +
+    html += section_('classRoster', 'Students', '(' + d.students.length + ')',
       (d.students.length ? d.students.map(function (s, i) {
         var meta = ['Grade ' + dispGrade(s.grade), s.homeroom, s.homeroomTeacher]
           .filter(function (x) { return x && x !== 'Grade '; }).join(' · ');
         return '<button class="person" data-s="' + i + '">' +
           '<span class="pname">' + esc(s.name) + '</span>' +
           '<span class="pmeta">' + esc(meta) + '</span></button>';
-      }).join('') : '<div class="hit">No students on file.</div>') + '</section>';
+      }).join('') : '<div class="hit">No students on file.</div>'), true);
 
     resultsEl.innerHTML = html;
     bindBack_();
+    bindSections_();
     Array.prototype.forEach.call(resultsEl.querySelectorAll('.person'), function (btn) {
       btn.addEventListener('click', function () {
         if (btn.hasAttribute('data-t')) openTeacher(d.instructors[Number(btn.getAttribute('data-t'))]);
@@ -1548,7 +1734,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (tabsData) {
       reqSeq++; // cancel any in-flight server render
       if (!query) { resultsEl.innerHTML = ''; statusEl.textContent = IDLE_MSG; return; }
-      renderList(searchPeople(tabsData, query));
+      renderList(searchPeople(tabsData, query, { today: attendanceDate_() }));
       return;
     }
     if (query.length < 2) return; // server fallback keeps the old floor
