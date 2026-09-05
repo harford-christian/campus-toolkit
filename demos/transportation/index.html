@@ -1,0 +1,2103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCS Dismissal</title>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Dismissal Board" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<!--
+  HCS Dismissal.
+
+  TWO MODES, because there are two very different jobs:
+    RAMP    — one flat ALPHABETICAL list. A child arrives in front of you by name, not by lane, so
+              the list is sorted the way they arrive. Flagged students stay INLINE in red rather
+              than moving to a separate section: they must still be findable the moment someone
+              asks where that child is. Tapping a name is INSTANT — the card is built client-side
+              from data already loaded, never a round trip.
+    EXPLORE — grouped by lane and drilled into, for teachers checking who rides what.
+
+  Everything after the first load is local: filtering, searching and tapping never hit the server.
+-->
+<style>
+  /* Varsity theme, verbatim from ../facts-directory-search/Index.html so the staff tools look like
+     one system. `only light` stops Chrome Auto Dark reinterpreting the palette. */
+  :root {
+    color-scheme: only light;
+    --red: #8E1420; --red-deep: #6d0f18; --gold: #F2B705; --gold-ink: #3a2a00;
+    --page: #8E1420; --title: #fff; --who: #e9c2c7; --status: #f0d3d7;
+    --card: #fff; --card-border: #6d0f18; --line: #e5e7eb;
+    --dt: #6b7280; --dd: #1f2430;
+    --input-bg: #fff; --input-ink: #1f2430; --input-border: #6d0f18;
+    --ok: #1f8a4c; --flag: #C62828; --flag-bg: #FDECEA;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--dd);
+         background: var(--page); margin: 0; padding: 1rem; min-height: 100dvh;
+         overscroll-behavior-y: contain; touch-action: manipulation; }
+  .wrap { max-width: 60rem; margin: 0 auto; }
+  .top { position: sticky; top: 0; z-index: 10; background: var(--page);
+         margin: -1rem -1rem 0; padding: .8rem 1rem .55rem; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+           margin: 0 0 .5rem; }
+  h1 { color: var(--title); font-size: 1.1rem; margin: 0; font-weight: 500; }
+  h1 b { font-weight: 800; }
+  .who { color: var(--who); font-size: .72rem; }
+
+  .modes { display: flex; gap: .3rem; }
+  .modes button { min-height: 38px; padding: .35rem .9rem; font-size: .85rem; border-radius: .5rem;
+                  background: transparent; color: var(--status); border: 1px solid var(--who); }
+  .modes button[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink);
+                                       border-color: var(--gold); font-weight: 700; }
+
+  .filters { display: flex; gap: .45rem; flex-wrap: wrap; align-items: center; }
+  select, input[type=search] {
+    font-size: 1.05rem; min-height: 44px; padding: .5rem .7rem; border-radius: .5rem;
+    border: 1px solid var(--input-border); background: var(--input-bg); color: var(--input-ink);
+  }
+  input[type=search] { flex: 1; min-width: 7rem; caret-color: var(--gold); }
+  input[type=search]:focus, select:focus { outline: 2px solid var(--gold); border-color: transparent; }
+  button { font-size: 1rem; min-height: 44px; padding: .5rem 1rem; border: 0; border-radius: .5rem;
+           background: var(--gold); color: var(--gold-ink); font-weight: 600; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--status); border: 1px solid var(--who);
+                 min-height: 44px; }
+  .chiprow { display: flex; gap: .25rem; flex-wrap: wrap; margin: .4rem 0 0; }
+  .chiprow button { min-height: 38px; padding: .3rem .6rem; font-size: .85rem; border-radius: .5rem;
+                    background: transparent; color: var(--status); border: 1px solid var(--who); }
+  .chiprow button[aria-pressed="true"] { background: #fff; color: var(--red-deep); font-weight: 700;
+                                         border-color: #fff; }
+  .tick { color: var(--status); font-size: .8rem; display: flex; align-items: center; gap: .3rem;
+          min-height: 44px; padding: 0 .3rem; white-space: nowrap; }
+  .tick input { width: 20px; height: 20px; }
+  .wnote { color: var(--dt); font-size: .78rem; }
+  /* THE ROUTE IS ITS COLOUR. Each bus shows a coloured sheet in its window and every child is
+     handed a matching stick; the driver checks the match. So the route NAME is rendered as a chip
+     FILLED with that colour — the same object as the paper in the window — with the colour word
+     inside it for a colour-blind reader, for mono print, and because "purple stick" is what people
+     say out loud. Filled rather than coloured text because one route is WHITE. */
+  .rchip { display: inline-block; font-weight: 800; font-size: .8rem;
+           padding: .14em .7em; border-radius: 1em; border: 1px solid; margin-left: .5rem;
+           vertical-align: middle; line-height: 1.3; }
+  .rchip.big { font-size: 1.2rem; padding: .22em .85em; margin: .15rem 0 0; }
+  .person.flag .rchip { opacity: .7; }        /* on a flagged row the flag stays the loudest thing */
+  .driver { color: inherit; opacity: .85; font-size: .74rem; font-weight: 500; }
+  .driver a { color: inherit; font-weight: 700; text-decoration: underline; }
+  .driver.gap { color: #fff; background: #C62828; padding: .1em .45em; border-radius: .5em;
+                font-weight: 700; }
+  .person.notwalk { background: #f1f0ee; }
+  .person.notwalk .pname { color: #6b7280; text-decoration: line-through; }
+  .grades { display: flex; gap: .25rem; flex-wrap: wrap; }
+  .grades button { min-height: 38px; min-width: 38px; padding: .3rem .55rem; font-size: .85rem;
+                   background: transparent; color: var(--status); border: 1px solid var(--who); }
+  .grades button[aria-pressed="true"] { background: #fff; color: var(--red-deep); font-weight: 700;
+                                        border-color: #fff; }
+
+  .tally { color: var(--status); font-size: .82rem; margin: .5rem 0 0; }
+  .tally b { color: #fff; }
+  .tally .flagged { color: #ffd9d9; }
+  .freshness { color: var(--who); font-size: .7rem; margin: .2rem 0 0; }
+  /* Deliberately quiet and last in the header — the ramp lead asked for it "out of the way", and it is
+     opened a few times a year, not at 3:10pm. */
+  .gear { background: transparent; border: 0; color: var(--who); font-size: 1.1rem; min-height: 38px;
+          padding: 0 .2rem; line-height: 1; opacity: .75; }
+  .gear:hover { opacity: 1; }
+
+  .list { background: var(--card); border: 1px solid var(--card-border); border-radius: .6rem;
+          overflow: hidden; margin: .8rem 0; }
+  .ghead { display: flex; align-items: center; justify-content: space-between; gap: .6rem;
+           background: var(--red); color: #fff; padding: .5rem .9rem; font-weight: 700;
+           font-size: .95rem; }
+  /* a bus lane's header takes the ROUTE colour; the inline style sets bg + text, so everything
+     inside must inherit rather than assume a red background */
+  .gcount { font-weight: 500; font-size: .78rem; color: inherit; opacity: .85; white-space: nowrap; }
+
+  /* 56px rows: this is scanned at speed with a thumb, so tap targets stay generous. */
+  .person { display: flex; align-items: center; justify-content: space-between; gap: .7rem;
+            width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+            min-height: 56px; padding: .5rem .9rem; border-bottom: 1px solid var(--line);
+            font-size: 1.02rem; color: var(--dd); }
+  .person:last-child { border-bottom: 0; }
+  .person:hover, .person:focus-visible { background: #FBECEE; }
+  .person.flag { background: var(--flag-bg); }
+  .person.flag .pname { color: var(--flag); }
+  .pname { font-weight: 600; }
+  .pdest { color: var(--dt); font-size: .82rem; margin-left: .5rem; font-weight: 400; }
+  .person.flag .pdest { color: var(--flag); }
+  .pmeta { color: var(--dt); font-size: .78rem; white-space: nowrap; text-align: right; }
+
+  .att { font-size: .62rem; font-weight: 700; padding: .15em .5em; border-radius: .6em;
+         margin-left: .4em; vertical-align: middle; letter-spacing: .02em; white-space: nowrap; }
+  .att.flag   { background: var(--flag); color: #fff; }
+  .att.late   { background: var(--gold); color: var(--gold-ink); }
+  .att.split  { background: #1f4e8a; color: #fff; }
+  .att.walk   { background: #e7e9ee; color: #3a2a00; }
+  .att.ovr    { background: var(--ok); color: #fff; }
+
+  .empty { padding: 1rem .9rem; color: var(--dt); }
+  .simbar { background: var(--gold); color: var(--gold-ink); font-weight: 700; padding: .5rem .9rem;
+            border-radius: .5rem; margin: 0 0 .6rem; }
+  .warn { background: #FFF3CD; color: #7a5b00; padding: .5rem .9rem; border-radius: .5rem;
+          margin: 0 0 .6rem; font-size: .85rem; }
+
+  dialog { border: 1px solid var(--card-border); border-radius: .6rem; padding: 0; width: 24rem;
+           max-width: calc(100vw - 1.5rem); }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  .dlg { padding: 1rem; }
+  .dlg h3 { margin: 0; font-size: 1.15rem; }
+  .dlg .sub { color: var(--dt); font-size: .82rem; margin: .15rem 0 .8rem; }
+  .sect { border-top: 1px solid var(--line); padding: .7rem 0 0; margin: .7rem 0 0; }
+  .sect h4 { margin: 0 0 .4rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+             color: var(--dt); }
+  .bigdest { font-size: 1.25rem; font-weight: 800; color: var(--red-deep); }
+  .flagbox { background: var(--flag-bg); color: var(--flag); border-radius: .4rem;
+             padding: .5rem .65rem; font-weight: 700; margin: .5rem 0 0; }
+  .row { display: flex; justify-content: space-between; gap: .6rem; padding: .3rem 0;
+         border-bottom: 1px dotted var(--line); font-size: .92rem; }
+  .row:last-child { border-bottom: 0; }
+  .row .r { color: var(--dt); font-size: .78rem; white-space: nowrap; }
+  .row a { color: var(--red-deep); font-weight: 600; text-decoration: none; }
+  .showphone { background: #e7e9ee; color: var(--dd); font-size: .7rem; font-weight: 600;
+               border-radius: .4em; padding: .2em .55em; min-height: 0; }
+  .sib { display: flex; justify-content: space-between; gap: .6rem; padding: .35rem 0;
+         border-bottom: 1px dotted var(--line); font-size: .92rem; cursor: pointer; }
+  .sib:last-child { border-bottom: 0; }
+  .dlgrow { display: flex; gap: .5rem; margin-top: .9rem; }
+  .dlgrow button { flex: 1; }
+  .dlgrow button.cancel { background: #e7e9ee; color: var(--dd); }
+  .muted { color: var(--dt); font-size: .85rem; }
+
+  /* settings: role membership */
+  .mrow { display: flex; align-items: center; gap: .5rem; padding: .35rem 0;
+          border-bottom: 1px dotted var(--line); font-size: .9rem; }
+  .mrow:last-of-type { border-bottom: 0; }
+  .mrow .me { flex: 1; overflow-wrap: anywhere; }
+  .mrow .adm { background: var(--red); color: #fff; font-size: .6rem; font-weight: 700;
+               padding: .15em .45em; border-radius: .6em; letter-spacing: .03em; }
+  .mrow .del { background: #e7e9ee; color: var(--flag); font-size: .72rem; font-weight: 700;
+               min-height: 32px; padding: .2rem .55rem; }
+  .addrow { display: flex; gap: .4rem; margin: .5rem 0 0; }
+  .addrow input[type=text] { flex: 1; min-width: 0; font-size: 1rem; min-height: 40px;
+    padding: .4rem .6rem; border-radius: .5rem; border: 1px solid var(--input-border); }
+  .mrow .me b { font-weight: 700; }
+  .mrow .me .wnote { display: block; }
+  .addrow button { min-height: 40px; padding: .4rem .8rem; font-size: .9rem; }
+  .cfgnote { color: var(--dt); font-size: .78rem; margin: .35rem 0 0; }
+  .viewnote { color: var(--gold); font-size: .72rem; margin: .2rem 0 0; font-weight: 600; }
+  .nochange { background: #f1f0ee; color: var(--dt); font-size: .82rem; padding: .5rem .65rem;
+              border-radius: .4rem; margin-top: .9rem; }
+
+  @media (max-width: 640px) { body { padding: .7rem; } .who { display: none; } }
+  @media (max-width: 380px) { .pmeta { display: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <header>
+      <h1><b>HCS</b> Dismissal</h1>
+      <div class="modes">
+        <button id="mRamp" aria-pressed="true">Ramp</button>
+        <button id="mClass" aria-pressed="false">Class</button>
+        <button id="mWalk" aria-pressed="false">Walk-Up</button>
+        <button id="mExplore" aria-pressed="false">Explore</button>
+      </div>
+      <span class="who">demo.staff@example.edu</span>
+      <button class="gear" id="gear" hidden title="Roles and shared views"
+              aria-label="Settings">&#9881;</button>
+    </header>
+    <div class="filters" id="filterBar">
+      <select id="fRoute"><option value="">All routes</option></select>
+      <input id="q" type="search" placeholder="Name or ID…" autocomplete="off">
+      <label class="tick" title="Search past your saved view, across the whole school">
+        <input type="checkbox" id="qAll"> all students
+      </label>
+      <button id="saveBtn" class="ghost" title="Remember these filters for me">☆ Save view</button>
+      <button id="refresh" class="ghost" title="Reload">↻</button>
+    </div>
+    <div class="chiprow" id="typeRow"></div>
+    <div class="chiprow" id="scopeRow" hidden></div>
+    <div class="chiprow grades" id="grades"></div>
+    <div class="tally" id="tally">Loading…</div>
+    <div class="viewnote" id="viewnote"></div>
+    <div class="freshness" id="freshness"></div>
+  </div>
+
+  <div id="banners"></div>
+  <div id="board"></div>
+</div>
+
+<dialog id="card"><div class="dlg" id="cardBody"></div></dialog>
+
+<dialog id="ovr"><div class="dlg">
+  <h3 id="ovrName">Student</h3>
+  <p class="sub">Change for <b>today only</b>. Clears overnight — a permanent change belongs in FACTS.</p>
+  <label class="muted" for="ovrType">Dismissal today</label>
+  <select id="ovrType" style="width:100%">
+    <option>Bus</option><option>Car</option><option>Early Bird</option><option>Staff Kid</option>
+  </select>
+  <label class="muted" for="ovrRoute">Route (buses only)</label>
+  <input id="ovrRoute" placeholder="e.g. J" style="width:100%">
+  <label class="muted" for="ovrDest">Handed to today</label>
+  <select id="ovrDest" style="width:100%"></select>
+  <input id="ovrDestOther" placeholder="or type a name / place" style="width:100%;margin-top:.3rem">
+  <label class="muted" for="ovrNote">Note</label>
+  <input id="ovrNote" placeholder="e.g. mum called at 1pm" style="width:100%">
+  <div class="dlgrow">
+    <button class="cancel" id="ovrCancel">Cancel</button>
+    <button id="ovrSave">Save for today</button>
+  </div>
+</div></dialog>
+
+<!--
+  Settings. Shown ONLY to someone who administers at least one role, and it lists only the roles
+  they administer — so the ramp lead opens this and sees Ramp, with no way to reach Walk-Up or Office.
+-->
+<dialog id="cfg"><div class="dlg">
+  <h3>Settings</h3>
+  <p class="sub" id="cfgSub"></p>
+  <div id="cfgBody"></div>
+  <!-- one shared suggestion list for every role's add box: staff names, values are the emails -->
+  <datalist id="staffList"></datalist>
+  <div class="dlgrow"><button class="cancel" id="cfgClose">Close</button></div>
+</div></dialog>
+
+<script>
+// GENERATED from Dismissal.gs by tools/build-client.mjs — DO NOT EDIT.
+// Edit Dismissal.gs, then re-run the generator.
+/**
+ * Dismissal.gs — PURE dismissal logic. No SpreadsheetApp, no DriveApp, no GAS globals.
+ *
+ * Runs in three places from this one source, like Search.gs in ../facts-directory-search:
+ *   GAS      — the server calls it after reading the tabs
+ *   Node     — tools/test-dismissal.mjs
+ *   Browser  — DismissalClient.html, GENERATED by tools/build-client.mjs. After ANY edit here,
+ *              re-run that generator or the client goes stale (the test suite fails if it is).
+ *
+ * WHAT THE BOARD ANSWERS, in order of what costs most if wrong:
+ *   1. Who should be in each bus/van line right now.
+ *   2. Who should NOT — because they are absent, left early, or were signed out mid-day. A child
+ *      waited for who already went home wastes staff time; a child NOT waited for who is still
+ *      here is the serious failure. So an unknown always reads as EXPECTED, never as absent.
+ *
+ * DATA IN (all read-only, produced elsewhere):
+ *   roster      Dismissal_WORKING!Roster        — ../facts-api-sync/Transportation.gs, daily 04:00
+ *   attendance  FACTS_API_Sync_STAGING!'Attendance Today' — facts-api-sync, every 15 min
+ *   signedOut   SignInOut_DB!EVENTS             — campus-sign-in-out-system. DORMANT until that
+ *               project reaches M6; the reader is gated on a Script Property so an unset id skips
+ *               silently rather than erroring.
+ *   overrides   Dismissal_WORKING!Overrides     — today-only, entered in this app.
+ *
+ * DISMISSAL IS PM. The roster carries AM rows too (a student can ride a different route each way,
+ * and 11 ride in but not home). Everything here filters to Session=PM unless asked otherwise —
+ * showing all riders would have staff waiting on 11 children who never board.
+ */
+
+/* ------------------------------------ cell helpers ------------------------------------ */
+
+/**
+ * Sheets hands back a Date for anything it parsed as one, and google.script.run cannot serialize
+ * Dates — so every cell is stringified before it leaves the server. The 1899-12-30 epoch is Sheets'
+ * time-only value; paid for in blood in ../facts-directory-search/Search.gs.
+ */
+function dsCellToString(v) {
+  if (v instanceof Date) {
+    var y = v.getFullYear(), mo = v.getMonth(), d = v.getDate();
+    var hh = ('0' + v.getHours()).slice(-2), mm = ('0' + v.getMinutes()).slice(-2);
+    if (y === 1899 && mo === 11 && d === 30) return hh + ':' + mm;
+    return y + '-' + ('0' + (mo + 1)).slice(-2) + '-' + ('0' + d).slice(-2) + ' ' + hh + ':' + mm;
+  }
+  return v == null ? '' : String(v);
+}
+
+/** header row -> {name: index}. Parse by NAME; column order is not a contract we control. */
+function dsHeaderMap(headerRow) {
+  var map = {};
+  (headerRow || []).forEach(function (h, i) { map[dsCellToString(h).trim()] = i; });
+  return map;
+}
+
+/** Every cell of a tab as a string, so nothing downstream has to think about Dates. */
+function dsSerializeTab(values) {
+  return (values || []).map(function (row) {
+    return (row || []).map(dsCellToString);
+  });
+}
+
+/* ------------------------------------ parsing ------------------------------------ */
+
+/**
+ * Roster rows -> student records. One row per (student, session, route), so a split-custody child
+ * legitimately appears twice in a session; they are kept as separate entries and marked split.
+ * @return {Array<Object>}
+ */
+function dsBuildRoster(values) {
+  if (!values || values.length < 2) return [];
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  var out = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var id = get(row, 'Student ID');
+    if (!id) continue;
+    out.push({
+      id: id,
+      name: get(row, 'Student Name'),
+      grade: get(row, 'Grade'),
+      session: get(row, 'Session'),
+      type: get(row, 'Type'),
+      routeCode: get(row, 'Route Code'),
+      routeName: get(row, 'Route Name'),
+      vehicle: get(row, 'Vehicle'),
+      split: get(row, 'Split') === 'Y',
+      building: get(row, 'Building'),
+      pickup: get(row, 'Pickup'),
+      walkTo: get(row, 'Walk To'),
+      familyId: get(row, 'Family ID'),
+      homeroom: get(row, 'Homeroom'),
+      homeroomTeacher: get(row, 'Homeroom Teacher'),
+      source: get(row, 'Source'),
+      note: get(row, 'Note')
+    });
+  }
+  return out;
+}
+
+/**
+ * 'Attendance Today' -> {studentId: {code, status, detail, reason, excused}}.
+ * The tab holds ONLY exceptions — a student absent from it was not marked anything, which is not
+ * the same as being present. See dsClassify.
+ */
+function dsBuildAttendance(values) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var id = get(values[r], 'Student ID');
+    if (!id) continue;
+    out[id] = {
+      code: get(values[r], 'Code').toUpperCase(),
+      status: get(values[r], 'Status'),
+      detail: get(values[r], 'Detail'),
+      reason: get(values[r], 'Reason'),
+      excused: get(values[r], 'Excused')
+    };
+  }
+  return out;
+}
+
+/**
+ * Today's overrides -> {studentId: {type, note, by, at}}. Last write for a student wins.
+ * Rows for any other date are ignored, which is what makes overrides self-expiring: nothing has to
+ * clean up yesterday's, and a stale row can never leak into today's board.
+ */
+function dsBuildOverrides(values, todayKey) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var id = get(row, 'Student ID');
+    var date = get(row, 'Date').slice(0, 10);
+    if (!id || date !== todayKey) continue;
+    out[id] = {
+      type: get(row, 'Type'),
+      routeCode: get(row, 'Route Code'),
+      destination: get(row, 'Destination'),
+      note: get(row, 'Note'),
+      by: get(row, 'By'),
+      at: get(row, 'At')
+    };
+  }
+  return out;
+}
+
+/**
+ * Today's COMPLETED mid-day sign-outs, folded from Campus Presence's append-only EVENTS log.
+ *
+ * Column names are from campus-sign-in-out-system/logic/schema.js (read 2026-09-05, not assumed):
+ *   Date 'yyyy-MM-dd' · Type · PersonKey (the FACTS Student ID) · Timestamp 'yyyy-MM-dd HH:mm:ss'
+ *   · GuardianName · PickupMatch ('matched' | 'mismatch' | 'override' | 'n/a')
+ *
+ * The fold mirrors their logic/presence.js exactly:
+ *   student_early_out with PickupMatch !== 'mismatch'  -> OFF campus
+ *   student_return_in                                   -> back; clears the early-out
+ *   a LATER early-out supersedes an earlier return      -> out, in, out again = OFF
+ *   pickup_flag, visitor_*, movement, student_late_in   -> no effect on dismissal
+ *
+ * A MISMATCH IS AN OPEN FLAG, NOT A SIGN-OUT. It means someone whose name did not match the
+ * authorised list tried to collect the child. Counting it would remove a child from the board on a
+ * stranger's failed attempt — the one failure this app must never produce. The first (dormant)
+ * version of this reader did not check PickupMatch; it never ran, but it would have.
+ *
+ * Their columns are text-formatted at bootstrap, yet their own gateway notes Sheets still hands
+ * Date objects back — so Date is compared on its first ten characters, whatever shape it arrives in.
+ *
+ * @return {Object} {studentId: {at: 'HH:mm', withWhom}}
+ */
+function dsBuildSignedOut(values, dayKey) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (get(row, 'Date').slice(0, 10) !== dayKey) continue;
+    var type = get(row, 'Type');
+    var sid = get(row, 'PersonKey');
+    if (!sid) continue;
+    if (type === 'student_early_out') {
+      if (get(row, 'PickupMatch') === 'mismatch') continue;
+      out[sid] = { at: get(row, 'Timestamp').slice(11, 16), withWhom: get(row, 'GuardianName') };
+    } else if (type === 'student_return_in') {
+      delete out[sid];
+    }
+  }
+  return out;
+}
+
+/**
+ * PickupContacts -> {studentId: [{name, relationship, cell, home, work, email, note}]}.
+ * Who is authorised to collect a child. 568 of 653 enrolled students have at least one; the other
+ * 85 have NONE recorded, which the card states plainly rather than rendering an empty list that
+ * looks like a load failure.
+ */
+function dsBuildPickups(values) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var sid = get(row, 'studentId');
+    if (!sid) continue;
+    var last = get(row, 'lastName'), first = get(row, 'firstName');
+    var nm = (last + (last && first ? ', ' : '') + first).trim();
+    if (!nm) continue;
+    (out[sid] = out[sid] || []).push({
+      name: nm,
+      rel: get(row, 'relationship'),
+      cell: get(row, 'cellPhone'),
+      home: get(row, 'homePhone'),
+      work: get(row, 'workPhone'),
+      email: get(row, 'email'),
+      note: get(row, 'note'),
+      order: Number(get(row, 'portalSortOrder') || 99)
+    });
+  }
+  Object.keys(out).forEach(function (sid) {
+    out[sid].sort(function (a, b) {
+      if (a.order !== b.order) return a.order - b.order;
+      return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+    });
+  });
+  return out;
+}
+
+/**
+ * ONE ROW PER STUDENT, alphabetical — the ramp view.
+ *
+ * The grouped board is for exploring; the person receiving children off the ramp needs a single
+ * flat list she can scan by name, because a child arrives in front of her by name, not by lane.
+ * Flagged students stay INLINE and marked rather than moving to a separate section: she has to see
+ * the whole set in front of her, and a child who is absent should still be findable at the moment
+ * someone asks where they are.
+ *
+ * Split-custody students hold two route rows; here they collapse to one entry carrying both, so a
+ * name never appears twice in a list being scanned at speed.
+ */
+function dsFlatList(board) {
+  var by = {}, order = [];
+  (board.groups || []).forEach(function (g) {
+    g.rows.forEach(function (r) {
+      var e = by[r.id];
+      if (!e) {
+        e = by[r.id] = {
+          id: r.id, name: r.name, grade: r.grade, type: r.type,
+          // `routes` are human labels (the FACTS course title, e.g. "Jarrettsville Bus Route");
+          // `routeCodes` is the PARALLEL array of codes ("J"). The route table is keyed by code and
+          // its names are the office's short ones ("Jarrettsville"), so the code is the only join
+          // that works — the first version shipped labels alone and no colour ever rendered.
+          routes: [], routeCodes: [], vehicle: r.vehicle, split: r.split,
+          building: r.building, pickup: r.pickup, walkTo: r.walkTo, familyId: r.familyId,
+          homeroom: r.homeroom, homeroomTeacher: r.homeroomTeacher,
+          overridden: r.overridden, overrideNote: r.overrideNote,
+          overrideBy: r.overrideBy || '', overrideAt: r.overrideAt || '',
+          overrideDestination: r.overrideDestination || '',
+          expected: r.expected, reason: r.reason, detail: r.detail, note: r.note
+        };
+        order.push(e);
+      }
+      var label = r.routeName || r.routeCode;
+      if (label && e.routes.indexOf(label) === -1) {
+        e.routes.push(label);
+        e.routeCodes.push(r.routeCode || '');     // keep the two arrays index-aligned
+      }
+      // a flag on ANY of a student's rows flags the student
+      if (!r.expected && e.expected) {
+        e.expected = false; e.reason = r.reason; e.detail = r.detail;
+      }
+    });
+  });
+  order.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  return order;
+}
+
+/**
+ * Everything shown when a name is tapped: where they go, who may collect them, and their siblings.
+ * PURE and computed client-side from the payload already loaded, so a tap costs no round trip —
+ * speed at the ramp is the whole point.
+ */
+function dsStudentCard(id, flat, pickups) {
+  var me = null;
+  for (var i = 0; i < (flat || []).length; i++) {
+    if (flat[i].id === id) { me = flat[i]; break; }
+  }
+  if (!me) return null;
+
+  // Siblings come from the FLAT list, not a separately-shipped roster. Shipping the raw roster as
+  // well as the board and the flat list meant the same student rows crossed the wire THREE times —
+  // 558KB of a 1329KB payload. The flat list already has every enrolled student exactly once.
+  var sibs = (flat || []).filter(function (r) {
+    return me.familyId && r.familyId === me.familyId && r.id !== id;
+  }).map(function (r) {
+    return { id: r.id, name: r.name, grade: r.grade, type: r.type,
+             routes: r.routes || [], routeCodes: r.routeCodes || [],
+             pickup: r.pickup, expected: r.expected, reason: r.reason };
+  });
+  sibs.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+
+  var pk = (pickups || {})[id];
+  return {
+    student: me,
+    familyId: me.familyId || '',
+    siblings: sibs,
+    pickups: pk || [],
+    hasPickups: !!(pk && pk.length),
+    pickupsLoaded: !!pickups            // false while the second phase is still in flight
+  };
+}
+
+
+/**
+ * The APPROVED staff-kid walk-up list (Dismissal_WORKING!Walkers).
+ *
+ * THIS IS AUTHORITATIVE AND HUMAN-APPROVED. It replaces the derived Walk To entirely.
+ * Deriving walk-ups from the staff parent's Google OU placement produced ~127 candidates against
+ * an approved list of 30 — over five times too many — because "a parent works here" is not the
+ * same decision as "this child may walk between buildings unaccompanied". That decision is signed
+ * off by a human, per child, and must never be inferred.
+ *
+ * Scope is K4 through 4th grade (per "Staff Kids Dismissal Process"), NOT all of elementary.
+ *
+ * Columns: Student ID | Student Name | Grade | Teacher | Frequency | Destination |
+ *          Except Day | Except Reason | Note
+ *   Frequency    'Daily' | 'Occasional'  — Occasional children come only when the office says so
+ *   Destination  where the child is handed over; usually blank meaning "to their parent in the
+ *                HS lobby", but some are specific ("to Mom", "to her brother an older sibling 12th")
+ *   Except Day   a weekday abbreviation, e.g. 'Fri' — on that day the child is NOT walked
+ *   Except Reason why, e.g. 'Art' — they are already in a specials room up by the high school
+ *
+ * Structured columns rather than free text: the source document wrote these as notes
+ * ("Fridays - Art"), and a runtime parser guessing at prose is exactly how a child ends up in the
+ * wrong place. The office edits these cells directly.
+ */
+function dsBuildWalkers(values) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var id = get(row, 'Student ID');
+    if (!id) continue;
+    out[id] = {
+      id: id,
+      name: get(row, 'Student Name'),
+      grade: get(row, 'Grade'),
+      teacher: get(row, 'Teacher'),
+      frequency: get(row, 'Frequency') || 'Daily',
+      destination: get(row, 'Destination'),
+      exceptDay: get(row, 'Except Day'),
+      exceptReason: get(row, 'Except Reason'),
+      // Where the child goes ON the exception day. the walk-up chaperone, 2026-09-04: some parents are happy for
+      // an Art child to go from the specials room straight to their own classroom, which is a
+      // STANDING arrangement rather than a daily call-in — so it lives on the approved list.
+      exceptDestination: get(row, 'Except Destination'),
+      note: get(row, 'Note')
+    };
+  }
+  return out;
+}
+
+/**
+ * Today's walk-up list: who is walking, who is not, and WHY not.
+ *
+ * Everyone on the approved list appears EVERY day (Josh, 2026-09-04) — a child is never silently
+ * dropped, because "why isn't X here?" is a question asked at the door and the answer has to be on
+ * the sheet. The reasons a child is not walking, most specific first:
+ *   1. signed out mid-day / absent / left early  — from attendance and Campus Presence
+ *   2. a weekday exception                       — already in a special up by the HS
+ *   3. Occasional and not flagged for today      — only comes when the office says so
+ * Anything else is walking.
+ *
+ * The counts let the chaperone check a headcount before lining up, which is the safety step the
+ * paper process relied on, without hiding anybody to get it.
+ *
+ * @param {string} dayName 'Mon'..'Sun' in school time
+ * @param {Object} occasionalToday {studentId: true} — today's confirmed Occasional children
+ */
+function dsWalkUpList(flat, walkers, att, outs, dayName, occasionalToday, overrides) {
+  var byId = {};
+  (flat || []).forEach(function (r) { byId[r.id] = r; });
+  var rows = [];
+  Object.keys(walkers || {}).forEach(function (id) {
+    var w = walkers[id];
+    var st = byId[id] || null;
+    var ov = (overrides || {})[id] || null;
+    var v = dsClassify(st || {}, (att || {})[id], (outs || {})[id]);
+
+    var isExceptDay = !!(w.exceptDay && dayName &&
+      w.exceptDay.toLowerCase().slice(0, 3) === dayName.toLowerCase().slice(0, 3));
+
+    // Where this child is handed over today, most specific first:
+    //   1. a today-only change someone phoned in
+    //   2. the standing arrangement for this exception day (e.g. Fridays -> their own classroom)
+    //   3. their standing destination
+    //   4. blank, meaning the default: to their parent in the HS lobby
+    var dest = (ov && ov.destination) ? ov.destination
+             : (isExceptDay && w.exceptDestination) ? w.exceptDestination
+             : w.destination;
+
+    var walking = true, why = '', kind = '';
+    if (!v.expected) {
+      walking = false; kind = v.reason; why = v.detail;
+    } else if (isExceptDay) {
+      // A standing exception destination means the child still GOES somewhere, just not walked up
+      // from the Elementary by the chaperone — so say where, rather than only that they are absent
+      // from the line.
+      walking = false; kind = 'IN A SPECIAL';
+      why = (w.exceptReason ? 'in ' + w.exceptReason : 'not walked today') +
+        (w.exceptDestination ? ' — goes ' + w.exceptDestination : ' — already up by the HS');
+    } else if (w.frequency === 'Occasional' && !((occasionalToday || {})[id])) {
+      walking = false; kind = 'NOT TODAY';
+      why = 'occasional — only when the office confirms';
+    }
+    rows.push({
+      id: id, name: w.name || (st ? st.name : id), grade: w.grade || (st ? st.grade : ''),
+      teacher: w.teacher, frequency: w.frequency,
+      destination: dest, standingDestination: w.destination, note: w.note,
+      exceptDay: w.exceptDay, exceptReason: w.exceptReason,
+      exceptDestination: w.exceptDestination,
+      walking: walking, kind: kind, why: why,
+      overridden: !!ov, overrideNote: ov ? (ov.note || '') : '',
+      overrideBy: ov ? (ov.by || '') : '', overrideAt: ov ? (ov.at || '') : '',
+      onRoster: !!st
+    });
+  });
+  rows.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  var walkingN = rows.filter(function (r) { return r.walking; }).length;
+  return {
+    dayName: dayName || '', rows: rows,
+    counts: { onList: rows.length, walking: walkingN, notWalking: rows.length - walkingN }
+  };
+}
+
+/**
+ * Routes tab -> {routeCode: {code, name, colour, vehicle, drivers: [...]}}.
+ *
+ * The colour is the safety mechanism: children are handed a coloured stick matching the vehicle
+ * window, and the driver checks it. So it is surfaced everywhere a route is named, together with
+ * the colour NAME — a swatch alone fails a colour-blind reader and fails in mono print, and the
+ * name is what people actually say ("orange stick").
+ */
+function dsBuildRoutes(values) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var code = get(row, 'Route Code');
+    if (!code) continue;
+    var e = out[code] || (out[code] = {
+      code: code, name: get(row, 'Route Name'), colour: get(row, 'Colour'),
+      vehicle: get(row, 'Vehicle'), drivers: []
+    });
+    if (!e.name) e.name = get(row, 'Route Name');
+    if (!e.colour) e.colour = get(row, 'Colour');
+    if (!e.vehicle) e.vehicle = get(row, 'Vehicle');
+    var drv = get(row, 'Driver');
+    if (drv) {
+      e.drivers.push({
+        session: get(row, 'Session') || 'PM',
+        name: drv,
+        phone: get(row, 'Phone'),
+        days: get(row, 'Days').split(/[,\s]+/).filter(String),
+        note: get(row, 'Note')
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Find a route's table entry for a student row. CODE FIRST — it is the only key both sides share.
+ *
+ * The roster's Route Name is the FACTS course TITLE ("Jarrettsville Bus Route", "Aberdeen/Havre
+ * de Grace Route") while the office's Routes tab uses the short name ("Jarrettsville"). The first
+ * version joined on name equality from page-side JS, matched nothing, and no colour ever rendered
+ * on a ramp row or a card — found only when Josh asked where the colours were. The name fallback
+ * is a STARTS-WITH so "Jarrettsville" still finds "Jarrettsville Bus Route" if a code is ever
+ * missing, and it lives here so the join is tested rather than assumed.
+ *
+ * @param {Object} routes dsBuildRoutes output, keyed by code
+ * @param {string} code   the route code, or ''
+ * @param {string} label  the human label the row carries, or ''
+ * @return {Object|null}
+ */
+function dsRouteFor(routes, code, label) {
+  routes = routes || {};
+  var c = String(code || '').trim();
+  if (c && routes[c]) return routes[c];
+  var l = String(label || '').trim().toLowerCase();
+  if (!l) return null;
+  if (routes[label]) return routes[label];                 // a label that IS a code
+  var keys = Object.keys(routes);
+  for (var i = 0; i < keys.length; i++) {
+    var rt = routes[keys[i]];
+    var n = String(rt.name || '').trim().toLowerCase();
+    if (n && (l === n || l.indexOf(n) === 0)) return rt;
+  }
+  return null;
+}
+
+/**
+ * Who is driving this route for a session on a given weekday.
+ *
+ * A driver with NO days listed covers every school day. Returns an ARRAY on purpose: zero means
+ * nobody is listed for today, which the UI must say out loud rather than hide — Aberdeen/HdG PM
+ * has no Tuesday driver in the source sheet and 19 children ride it. More than one means the
+ * source double-covers that day, which is equally worth showing.
+ */
+function dsDriversFor(route, session, dayName) {
+  if (!route) return [];
+  var d = String(dayName || '').slice(0, 3).toLowerCase();
+  return (route.drivers || []).filter(function (x) {
+    if (String(x.session).toUpperCase() !== String(session).toUpperCase()) return false;
+    if (!x.days.length) return true;
+    for (var i = 0; i < x.days.length; i++) {
+      if (String(x.days[i]).slice(0, 3).toLowerCase() === d) return true;
+    }
+    return false;
+  });
+}
+
+/* ------------------------------------ roles + permissions ------------------------------------ */
+
+/**
+ * The role vocabulary. READ is broad for everyone (Josh, 2026-09-03: roles set a default view, not
+ * a wall — same as FACTS Finder, where any staff member can look up any student). WRITE is narrow
+ * by default, because a mis-tap puts a child in the wrong line.
+ *
+ * The real control is not this table: it is that EVERY change stamps who and when, and shows on
+ * the board. A permission model stops accidents; an audit trail catches the rest.
+ */
+var DS_ROLES = ['Admin', 'Office', 'Ramp', 'Walk-Up', 'Teacher', 'Transportation'];
+
+/** Roles tab -> [{role, email, admin, note}] */
+function dsBuildRoles(values) {
+  var out = [];
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var email = get(values[r], 'Email').toLowerCase();
+    var role = get(values[r], 'Role');
+    if (!email || !role) continue;
+    out.push({
+      role: role, email: email,
+      admin: /^(y|yes|true)$/i.test(get(values[r], 'Admin')),
+      note: get(values[r], 'Note')
+    });
+  }
+  return out;
+}
+
+/**
+ * What this person may do. PURE, so the same answer is computed on the server (to enforce) and in
+ * the browser (to hide what they cannot use). The server NEVER trusts the browser's copy —
+ * google.script.run will call any global function in the project, so hiding a button is not a
+ * permission check.
+ *
+ * @param {string} email        the SIGNED-IN visitor
+ * @param {Array}  roleRows     dsBuildRoles output
+ * @param {string} teacherName  their "LastName FirstName" from the Staff tab, '' if not staff
+ * @param {Object} [homeroomTeachers]  {lowercased "LastName FirstName": true} — every name the
+ *                 roster lists as somebody's Homeroom Teacher. Holding a homeroom IS the Teacher
+ *                 role: it comes and goes with FACTS, not with a row somebody has to remember to
+ *                 add or remove. Rows in the Roles tab still count too.
+ * @return {Object} capability set
+ */
+function dsPermissions(email, roleRows, teacherName, homeroomTeachers) {
+  var e = String(email || '').toLowerCase();
+  var mine = (roleRows || []).filter(function (r) { return r.email === e; });
+  var roles = {}, adminOf = {};
+  mine.forEach(function (r) {
+    roles[r.role] = true;
+    if (r.admin) adminOf[r.role] = true;
+  });
+
+  // IMPLICIT Teacher: the roster says students list this person as their homeroom teacher. A new
+  // hire gets the role the morning FACTS shows their homeroom; a leaver loses it the same way.
+  var teacherImplicit = false;
+  if (teacherName && homeroomTeachers &&
+      homeroomTeachers[String(teacherName).trim().toLowerCase()] === true) {
+    teacherImplicit = true;
+    roles['Teacher'] = true;
+  }
+
+  var isAdmin = !!roles['Admin'];
+  // An Admin administers every role without needing a row per role.
+  if (isAdmin) DS_ROLES.forEach(function (r) { adminOf[r] = true; });
+
+  return {
+    email: e,
+    roles: Object.keys(roles).sort(),
+    adminOf: Object.keys(adminOf).sort(),
+    teacherName: teacherName || '',
+    // WRITE SCOPE, widest first. Office take the phone calls, so they are deliberately the widest.
+    // Ramp is unfenced (Josh, 2026-09-04): a parent can arrive at the ramp for ANY child, and the
+    // person physically holding that child must be able to record what just happened.
+    canChangeAnyone: isAdmin || !!roles['Office'] || !!roles['Ramp'],
+    canChangeWalkUp: isAdmin || !!roles['Office'] || !!roles['Ramp'] || !!roles['Walk-Up'],
+    canChangeOwnClass: isAdmin || !!roles['Office'] || !!roles['Ramp'] || !!roles['Teacher'],
+    canEditRoutes: isAdmin || !!roles['Transportation'],
+    canManageRoles: Object.keys(adminOf).length > 0,
+    isAdmin: isAdmin,
+    teacherImplicit: teacherImplicit
+  };
+}
+
+/** {lowercased teacher name: true} for every Homeroom Teacher the roster names. */
+function dsHomeroomTeacherSet(roster) {
+  var out = {};
+  (roster || []).forEach(function (r) {
+    var t = String(r.homeroomTeacher || '').trim().toLowerCase();
+    if (t) out[t] = true;
+  });
+  return out;
+}
+
+/**
+ * May this person change THIS child's dismissal today?
+ *
+ * @param {Object} perm      dsPermissions output
+ * @param {Object} student   the child's flat/roster entry ({homeroomTeacher}), or null
+ * @param {boolean} isWalkUp whether the child is on the approved walk-up list
+ * @return {{ok: boolean, why: string}} why is shown to the person, so it must be plain English
+ */
+function dsCanChange(perm, student, isWalkUp) {
+  if (!perm || !perm.roles || !perm.roles.length) {
+    return { ok: false, why: 'You have no dismissal role yet — ask the office to add you.' };
+  }
+  if (perm.canChangeAnyone) return { ok: true, why: '' };
+  if (isWalkUp && perm.canChangeWalkUp) return { ok: true, why: '' };
+  if (perm.canChangeOwnClass && student && perm.teacherName &&
+      String(student.homeroomTeacher || '').toLowerCase() === String(perm.teacherName).toLowerCase()) {
+    return { ok: true, why: '' };
+  }
+  if (perm.canChangeOwnClass) {
+    return { ok: false, why: 'You can only change students in your own class. Ask the office for ' +
+      'anyone else.' };
+  }
+  return { ok: false, why: 'Your role does not allow changing a dismissal.' };
+}
+
+/**
+ * The classroom view's three widening scopes. Lives here rather than in the page so the SAME
+ * comparison decides what a teacher sees and what they may change — two rules would drift, and the
+ * drift would look like "I can see her but I can't change her", which is worse than either alone.
+ *
+ * 'class'  — students whose Homeroom Teacher is this person. FACTS records ONE homeroom teacher per
+ *            student, so where a grade is shared between teachers each sees their own homeroom.
+ * 'grade'  — every student in any grade this person teaches. The answer for a co-teacher, and for
+ *            "a parent is asking about a child two doors down".
+ * 'school' — everyone. Reading is broad by design; only writing is scoped.
+ *
+ * @param {Array}  rows        flat list rows
+ * @param {string} teacherName "LastName FirstName", or '' if the sign-in matched no staff record
+ * @param {string} scope       'class' | 'grade' | 'school'
+ */
+function dsScopeRows(rows, teacherName, scope) {
+  rows = rows || [];
+  if (scope === 'school') return rows.slice();
+  var t = String(teacherName || '').trim().toLowerCase();
+  if (!t) return [];                       // no match is NOT everyone — fail closed and say so
+  var mine = rows.filter(function (r) {
+    return String(r.homeroomTeacher || '').trim().toLowerCase() === t;
+  });
+  if (scope !== 'grade') return mine;
+  var grades = {};
+  mine.forEach(function (r) { grades[String(r.grade)] = true; });
+  return rows.filter(function (r) { return grades[String(r.grade)] === true; });
+}
+
+/**
+ * Turn what someone typed into the settings "add" box into ONE email, or say why not.
+ *
+ * An address goes through as-is. A name matches when every typed token appears somewhere in the
+ * staff name, in any order — "gina", "sowell gi" and "Gina Sowell" all find "Sowell Gina",
+ * because people say first-name-first and FACTS stores last-name-first. Exactly one hit is an
+ * answer; none or several is a message the person can act on, never a guess. This is the same
+ * resolution whether the browser's own suggestion list rendered or not, so an iPad that shows no
+ * dropdown still gets the right person.
+ *
+ * @param {Array<{email, name}>} staff  the directory
+ * @param {string} typed
+ * @return {{email?: string, name?: string, error?: string}}
+ */
+function dsResolveStaff(staff, typed) {
+  var t = String(typed || '').trim().toLowerCase();
+  if (!t) return { error: 'Type a name or an email.' };
+  if (t.indexOf('@') !== -1) {
+    var exact = (staff || []).filter(function (s) { return String(s.email).toLowerCase() === t; })[0];
+    return exact ? { email: exact.email, name: exact.name } : { email: t };
+  }
+  var toks = t.split(/\s+/).filter(String);
+  var hits = (staff || []).filter(function (s) {
+    var n = String(s.name || '').toLowerCase();
+    return toks.every(function (k) { return n.indexOf(k) !== -1; });
+  });
+  if (hits.length === 1) return { email: hits[0].email, name: hits[0].name };
+  if (!hits.length) return { error: 'Nobody on staff matches "' + typed + '". Type the email instead.' };
+  return { error: hits.length + ' people match "' + typed + '": ' +
+    hits.slice(0, 6).map(function (s) { return s.name; }).join(', ') +
+    (hits.length > 6 ? '…' : '') + ' — keep typing.' };
+}
+
+/**
+ * The staff DIRECTORY for the settings add box: [{email, name}] for ACTIVE staff on the school
+ * domain, sorted by name. Distinct from dsBuildStaffNames, which maps every address it can for the
+ * own-class check — this one is what gets SUGGESTED to a role admin, so it must not offer someone
+ * who left in June. Source is FACTS /people/staff via the staging Staff tab, refreshed 07/11/15, so
+ * it follows HR without anyone maintaining a list here. A tab with no Active column is not filtered
+ * (defensive), but the real tab has one.
+ */
+function dsBuildStaffDirectory(values, domain) {
+  var out = [];
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  var d = String(domain || '').toLowerCase();
+  var seen = {};
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (h['Active'] !== undefined && !/^(y|yes|true)$/i.test(get(row, 'Active'))) continue;
+    var nm = (get(row, 'Last Name') + ' ' + get(row, 'First Name')).trim();
+    if (!nm) continue;
+    ['Email', 'Email2'].forEach(function (c) {
+      var e = get(row, c).toLowerCase();
+      if (!e || seen[e]) return;
+      if (d && e.split('@')[1] !== d) return;              // a personal address can never sign in
+      seen[e] = 1;
+      out.push({ email: e, name: nm });
+    });
+  }
+  out.sort(function (a, b) {
+    return a.name < b.name ? -1 : a.name > b.name ? 1 : (a.email < b.email ? -1 : 1);
+  });
+  return out;
+}
+
+/** email -> "LastName FirstName", from the staging Staff tab, for the own-class check. */
+function dsBuildStaffNames(values) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    // FACTS convention, matching the roster's Homeroom Teacher: "LastName FirstName", NO comma.
+    var nm = (get(row, 'Last Name') + ' ' + get(row, 'First Name')).trim();
+    if (!nm) continue;
+    ['Email', 'Email2'].forEach(function (c) {
+      var e = get(row, c).toLowerCase();
+      if (e) out[e] = nm;
+    });
+  }
+  return out;
+}
+
+/* ------------------------------------ classification ------------------------------------ */
+
+/**
+ * Is this student expected in their line today, and if not, why not?
+ *
+ * Precedence, most specific first. Each step is a POSITIVE statement that the child left or never
+ * arrived; anything else means expected.
+ *   1. signed out mid-day and not back   -> NOT expected
+ *   2. attendance code ED (early dismissal) -> NOT expected
+ *   3. attendance flagged absent (AE/AU)  -> NOT expected
+ *   4. everything else                    -> EXPECTED
+ *
+ * LA / TE / TU are deliberately EXPECTED: a late arrival is present by dismissal, and treating
+ * "arrived late" as "gone home" is the failure that leaves a child standing outside.
+ *
+ * THE HONEST LIMIT: a student who never came in and was never marked absent reads as expected.
+ * Campus Presence has no attendance feed by design and FACTS attendance depends on a teacher
+ * entering it. The UI must show data freshness rather than implying certainty.
+ *
+ * @return {{expected: boolean, reason: string, detail: string}}
+ */
+function dsClassify(student, att, out) {
+  if (out) {
+    return {
+      expected: false, reason: 'SIGNED OUT',
+      detail: (out.at ? out.at + ' ' : '') + (out.withWhom ? 'with ' + out.withWhom : '')
+    };
+  }
+  var a = att || null;
+  if (a) {
+    // Code OR the producer's own Status bucket. facts-api-sync/Attendance.gs classifies from the
+    // FACTS flags into 'Absent' | 'Late' | 'Left early' and writes that as Status; matching on it
+    // means a second early-dismissal code added in FACTS is caught here without a code change.
+    if (a.code === 'ED' || /left early|early dismissal/i.test(a.status || '')) {
+      return { expected: false, reason: 'LEFT EARLY', detail: a.reason || a.detail || '' };
+    }
+    if (a.code === 'AE' || a.code === 'AU' || /absent/i.test(a.status || '')) {
+      return {
+        expected: false, reason: 'ABSENT',
+        detail: (a.excused === 'Y' ? 'excused' : a.excused === 'N' ? 'unexcused' : '') +
+                (a.reason ? (a.excused ? ' — ' : '') + a.reason : '')
+      };
+    }
+    if (a.code === 'LA' || a.code === 'TE' || a.code === 'TU' || /late|tardy/i.test(a.status || '')) {
+      return { expected: true, reason: 'LATE', detail: a.reason || '' };
+    }
+  }
+  return { expected: true, reason: '', detail: '' };
+}
+
+/* ------------------------------------ the board ------------------------------------ */
+
+/**
+ * Fold everything into the structure the UI renders.
+ *
+ * @param {Object} d roster, attendance, signedOut, overrides
+ * @param {Object} [opts] {session: 'PM', routes: dsBuildRoutes output}
+ * @return {Object} {session, counts, groups[], notExpected[], conflicts[], types[], routes[]}
+ */
+function dsBuildBoard(d, opts) {
+  d = d || {}; opts = opts || {};
+  var session = opts.session || 'PM';
+  var att = d.attendance || {};
+  var outs = d.signedOut || {};
+  var ovr = d.overrides || {};
+  var routes = opts.routes || {};
+
+  var rows = (d.roster || []).filter(function (s) { return s.session === session; });
+  var byGroup = {}, notExpected = [], seen = {};
+  var counts = { total: 0, expected: 0, notExpected: 0, byType: {} };
+
+  rows.forEach(function (s) {
+    var o = ovr[s.id] || null;
+    var type = o && o.type ? o.type : s.type;
+    var routeCode = o && o.routeCode ? o.routeCode : s.routeCode;
+    var v = dsClassify(s, att[s.id], outs[s.id]);
+
+    // AN OVERRIDE REPLACES THE JOURNEY, NOT JUST THE LABEL. The first version changed `type` and
+    // left routeName/vehicle as the roster had them, so "mum is collecting Ella, not the bus"
+    // produced a Car row whose destination still read "Jarrettsville" — the one thing the override
+    // existed to stop saying. Anything not a bus carries no route; a bus with a changed route takes
+    // the name and vehicle of the route it was changed TO, not the one it left.
+    var routeName = s.routeName, vehicle = s.vehicle, split = s.split;
+    if (type !== 'Bus') {
+      routeCode = ''; routeName = ''; vehicle = ''; split = false;
+    } else if (routeCode !== s.routeCode) {
+      var rt = routes[routeCode];
+      routeName = rt ? (rt.name || routeCode) : '';
+      vehicle = rt ? (rt.vehicle || '') : '';
+      split = false;                        // one route was chosen for today; nothing to confirm
+    }
+
+    var entry = {
+      id: s.id, name: s.name, grade: s.grade, type: type,
+      routeCode: routeCode, routeName: routeName, vehicle: vehicle,
+      split: split, building: s.building, pickup: s.pickup, walkTo: s.walkTo,
+      familyId: s.familyId, homeroom: s.homeroom, homeroomTeacher: s.homeroomTeacher,
+      note: s.note, source: s.source,
+      // The audit trail travels with the row. Every change stamps who and when; the card must be
+      // able to say so, or the stamp is a promise the sheet keeps and the app breaks.
+      overridden: !!o, overrideNote: o ? (o.note || '') : '',
+      overrideBy: o ? (o.by || '') : '', overrideAt: o ? (o.at || '') : '',
+      overrideDestination: o ? (o.destination || '') : '',
+      expected: v.expected, reason: v.reason, detail: v.detail
+    };
+
+    // A student appears once per (session, route); count distinct students, not rows.
+    if (!seen[s.id]) { seen[s.id] = 1; counts.total++; }
+    counts.byType[type] = (counts.byType[type] || 0) + 1;
+    if (v.expected) counts.expected++; else { counts.notExpected++; notExpected.push(entry); }
+
+    var key = type === 'Bus' ? (routeName || routeCode || 'Bus') : type;
+    (byGroup[key] = byGroup[key] || { key: key, type: type, rows: [] }).rows.push(entry);
+  });
+
+  // Bus groups first (a missed bus is unrecoverable), then Early Bird (they leave first),
+  // then Staff Kid, then Car.
+  var rank = { 'Bus': 0, 'Early Bird': 1, 'Staff Kid': 2, 'Car': 3 };
+  var groups = Object.keys(byGroup).map(function (k) { return byGroup[k]; });
+  groups.forEach(function (g) {
+    g.rows.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    g.expected = g.rows.filter(function (r) { return r.expected; }).length;
+    g.notExpected = g.rows.length - g.expected;
+  });
+  groups.sort(function (a, b) {
+    var ra = rank[a.type] === undefined ? 9 : rank[a.type];
+    var rb = rank[b.type] === undefined ? 9 : rank[b.type];
+    return ra !== rb ? ra - rb : (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  });
+  notExpected.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+
+  return {
+    session: session, counts: counts, groups: groups, notExpected: notExpected,
+    types: groups.map(function (g) { return g.type; }).filter(function (t, i, arr) {
+      return arr.indexOf(t) === i;
+    }),
+    routes: groups.filter(function (g) { return g.type === 'Bus'; }).map(function (g) { return g.key; })
+  };
+}
+
+/**
+ * Narrow a board client-side. Returns the same shape so the renderer never branches on filtered vs
+ * not. Search matches name, student id and route.
+ */
+function dsFilterBoard(board, f) {
+  f = f || {};
+  var q = String(f.q || '').trim().toLowerCase();
+  var grades = f.grades && f.grades.length ? f.grades : null;
+  var notTypes = f.excludeTypes && f.excludeTypes.length ? f.excludeTypes : null;
+  // `types` is a MULTI-select include list. the ramp lead needs Bus AND Car at once and does not want
+  // Staff Kid — a single-value dropdown literally cannot express that, which is an accuracy gap
+  // rather than a convenience one. `type` (singular) is kept for older saved views.
+  var types = f.types && f.types.length ? f.types : (f.type ? [f.type] : null);
+  var keep = function (r) {
+    if (types && types.indexOf(r.type) === -1) return false;
+    if (notTypes && notTypes.indexOf(r.type) !== -1) return false;
+    if (grades && grades.indexOf(String(r.grade)) === -1) return false;
+    if (f.route && (r.routeName || r.routeCode) !== f.route) return false;
+    if (f.pickup && r.pickup !== f.pickup) return false;
+    if (f.expected === true && !r.expected) return false;
+    if (f.expected === false && r.expected) return false;
+    if (q) {
+      var hay = (r.name + ' ' + r.id + ' ' + (r.routeName || '') + ' ' + (r.routeCode || '')).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  };
+  var groups = [], counts = { total: 0, expected: 0, notExpected: 0, byType: {} }, seen = {};
+  (board.groups || []).forEach(function (g) {
+    var rows = g.rows.filter(keep);
+    if (!rows.length) return;
+    var exp = rows.filter(function (r) { return r.expected; }).length;
+    rows.forEach(function (r) {
+      if (!seen[r.id]) { seen[r.id] = 1; counts.total++; }
+      counts.byType[r.type] = (counts.byType[r.type] || 0) + 1;
+    });
+    counts.expected += exp;
+    counts.notExpected += rows.length - exp;
+    groups.push({ key: g.key, type: g.type, rows: rows, expected: exp, notExpected: rows.length - exp });
+  });
+  return {
+    session: board.session, counts: counts, groups: groups,
+    notExpected: (board.notExpected || []).filter(keep),
+    types: board.types, routes: board.routes
+  };
+}
+
+// Node test harness reaches these directly; GAS and the browser ignore the export.
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    dsCellToString: dsCellToString, dsHeaderMap: dsHeaderMap, dsSerializeTab: dsSerializeTab,
+    dsBuildRoster: dsBuildRoster, dsBuildAttendance: dsBuildAttendance,
+    dsBuildOverrides: dsBuildOverrides, dsBuildSignedOut: dsBuildSignedOut, dsClassify: dsClassify,
+    dsBuildBoard: dsBuildBoard, dsFilterBoard: dsFilterBoard,
+    dsBuildPickups: dsBuildPickups, dsFlatList: dsFlatList, dsStudentCard: dsStudentCard,
+    dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
+    dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor,
+    DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
+    dsCanChange: dsCanChange, dsBuildStaffNames: dsBuildStaffNames, dsScopeRows: dsScopeRows,
+    dsResolveStaff: dsResolveStaff, dsBuildStaffDirectory: dsBuildStaffDirectory,
+    dsHomeroomTeacherSet: dsHomeroomTeacherSet
+  };
+}
+</script>
+
+<script>
+  // RAW scriptlet on purpose. The escaping form (question-mark-equals) in JS-expression position
+  // makes Apps Script emit the value as its OWN quoted literal — so the first version's '""'
+  // fallback became a JS string CONTAINING two quote characters: truthy, and the plain URL showed
+  // 'SIMULATED — showing ""' (Josh, 2026-09-05). JSON.stringify produces exactly one literal, and
+  // `sim` is already sanitised server-side to [0-9:\- T], so raw output is safe.
+  var SIM = (new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\- T]/g, '').slice(0, 16);
+  var raw = null, flat = [], pickups = null, reqSeq = 0, mode = 'ramp';
+  var viewApplied = false;      // the saved view is applied ONCE, on the first successful load
+  var lastGoodAt = '';          // server time of the last payload that rendered
+  var GRADES = ['K4','K5','1','2','3','4','5','6','7','8','9','10','11','12'];
+  var gradeSel = {};            // {grade: true}
+  var typeSel = {};             // {type: true} — MULTI-select; the ramp lead needs Bus AND Car
+  var TYPES = ['Bus', 'Car', 'Early Bird', 'Staff Kid'];
+  var excludeTypes = [];        // the ramp lead: Early Bird + Staff Kid off her ramp
+  // Until the first load answers, assume NO write rights. Failing closed means the worst case is a
+  // hidden button on a slow connection, not an offered control that the server then refuses.
+  var myPerm = { email: '', roles: [], adminOf: [], teacherName: '', canChangeAnyone: false,
+                 canChangeWalkUp: false, canChangeOwnClass: false, canEditRoutes: false,
+                 canManageRoles: false, isAdmin: false };
+
+  var $ = function (id) { return document.getElementById(id); };
+  // The seven colours in use, each with a text colour chosen for contrast. WHITE is why this is a
+  // filled chip and not coloured text — white text on a white card is invisible; a white chip with
+  // a dark border reads exactly like the white sheet in that bus's window. Anything unrecognised
+  // renders grey with its name still shown, so a new colour degrades rather than disappears.
+  var CHIP = { white:  { bg: '#ffffff', fg: '#1f2430', bd: '#8a8f98' },
+               orange: { bg: '#F57C00', fg: '#ffffff', bd: '#F57C00' },
+               pink:   { bg: '#EC407A', fg: '#ffffff', bd: '#EC407A' },
+               purple: { bg: '#7E57C2', fg: '#ffffff', bd: '#7E57C2' },
+               red:    { bg: '#D32F2F', fg: '#ffffff', bd: '#D32F2F' },
+               green:  { bg: '#2E7D32', fg: '#ffffff', bd: '#2E7D32' },
+               blue:   { bg: '#1976D2', fg: '#ffffff', bd: '#1976D2' } };
+  function chipStyle(colour) {
+    var c = CHIP[String(colour || '').toLowerCase()] || { bg: '#9e9e9e', fg: '#ffffff', bd: '#9e9e9e' };
+    return 'background:' + c.bg + ';color:' + c.fg + ';border-color:' + c.bd;
+  }
+  /** The route name IN its colour. The colour word is NOT printed (Josh, 2026-09-05: "the color
+   *  is now showing") — it rides along as a title, so hover and screen readers still get it, and
+   *  the card spells it out where it matters: "Hand them the purple stick." */
+  function routeChip(code, label, big) {
+    var rt = dsRouteFor(raw && raw.routes, code, label);
+    if (!rt || !rt.colour) return '<span class="pdest">' + esc(label || code) + '</span>';
+    return '<span class="rchip' + (big ? ' big' : '') + '" style="' + chipStyle(rt.colour) +
+      '" title="' + esc(rt.colour) + '">' + esc(rt.name || label) + '</span>';
+  }
+  /** Where this child goes, as HTML: coloured chips for bus routes, plain text for everything else.
+   *  A split-custody child gets one chip per route, because either bus may be the right one.
+   *  Works for a FLAT row (routes[] + routeCodes[]) and for a BOARD entry (routeName + routeCode). */
+  function destHtml(r, big) {
+    if (r.routes && r.routes.length) {
+      var codes = r.routeCodes || [];
+      return r.routes.map(function (l, i) { return routeChip(codes[i] || '', l, big); })
+        .join('<span class="pdest">or</span>');
+    }
+    if (r.routeName || r.routeCode) return routeChip(r.routeCode, r.routeName, big);
+    return '<span class="pdest">' + esc(destOf(r)) + '</span>';
+  }
+  /** The FIRST route table entry for a row — enough for a driver line or a lane header colour. */
+  function routeOf(r) {
+    if (!r) return null;
+    var code = (r.routeCodes && r.routeCodes[0]) || r.routeCode || '';
+    var label = (r.routes && r.routes[0]) || r.routeName || '';
+    return dsRouteFor(raw && raw.routes, code, label);
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+  function selectedGrades() {
+    return GRADES.filter(function (g) { return gradeSel[g]; });
+  }
+  function selectedTypes() { return TYPES.filter(function (t) { return typeSel[t]; }); }
+  /**
+   * When "all students" is ticked the saved view's grade/type limits are DROPPED for the search,
+   * so a name can always be found even if it sits outside the lane you normally watch. The tick is
+   * the escape hatch; the saved view is only ever a default.
+   */
+  function filters() {
+    var all = $('qAll').checked;
+    return {
+      route: all ? '' : ($('fRoute').value || ''),
+      q: $('q').value || '',
+      types: all ? [] : selectedTypes(),
+      grades: all ? [] : selectedGrades(),
+      excludeTypes: all ? [] : excludeTypes
+    };
+  }
+  /** The filters as a SAVEABLE view — the "all students" tick is a momentary escape hatch, not
+   *  part of anyone's default, so this reads the real selections rather than filters(). */
+  function currentView() {
+    return { mode: mode, scope: scope, types: selectedTypes(), route: $('fRoute').value || '',
+             grades: selectedGrades(), excludeTypes: excludeTypes };
+  }
+
+  /* ------------------------------ rendering ------------------------------ */
+
+  function destOf(r) {
+    if (r.routes && r.routes.length) return r.routes.join(' or ');
+    if (r.routeName || r.routeCode) return r.routeName || r.routeCode;
+    if (r.type === 'Staff Kid' && r.walkTo && r.walkTo !== 'Unresolved') return 'walk to ' + r.walkTo;
+    return r.type;
+  }
+  function flagBadge(r) {
+    if (r.expected) {
+      return r.reason === 'LATE'
+        ? '<span class="att late">LATE' + (r.detail ? ' ' + esc(r.detail) : '') + '</span>' : '';
+    }
+    return '<span class="att flag">' + esc(r.reason) +
+           (r.detail ? ' ' + esc(r.detail) : '') + '</span>';
+  }
+  function extraBadges(r) {
+    var b = '';
+    if (r.split) b += '<span class="att split">SPLIT</span>';
+    if (r.walkTo === 'Unresolved') b += '<span class="att walk">walk-to unknown</span>';
+    if (r.overridden) b += '<span class="att ovr">TODAY</span>';
+    return b;
+  }
+  function personRow(r) {
+    return '<button class="person' + (r.expected ? '' : ' flag') + '" data-id="' + esc(r.id) + '">' +
+      '<span class="pname">' + esc(r.name) + destHtml(r) +
+        flagBadge(r) + extraBadges(r) + '</span>' +
+      '<span class="pmeta">' + esc(r.grade) + '</span></button>';
+  }
+
+  // client-side filter over the FLAT list — the ramp view
+  function flatFiltered() {
+    var f = filters();
+    var q = f.q.trim().toLowerCase();
+    return flat.filter(function (r) {
+      if (f.types.length && f.types.indexOf(r.type) === -1) return false;
+      if (f.excludeTypes.length && f.excludeTypes.indexOf(r.type) !== -1) return false;
+      if (f.grades.length && f.grades.indexOf(String(r.grade)) === -1) return false;
+      if (f.route && (r.routes || []).indexOf(f.route) === -1) return false;
+      if (q) {
+        var hay = (r.name + ' ' + r.id + ' ' + (r.routes || []).join(' ')).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  /* ------------------------------ classroom mode ------------------------------
+   *
+   * A teacher's question is narrower than the ramp lead's: "where do MY children go, and who has already
+   * gone home". Three widening scopes, because the answer moves outward as the afternoon does —
+   * my class, then my grade (a colleague asks about a child two doors down), then the whole school.
+   *
+   * MY CLASS matches the roster's Homeroom Teacher against the signed-in teacher's name. FACTS
+   * records ONE homeroom teacher per student, so in a grade taught by three people each sees their
+   * own homeroom — a co-teacher looking for a colleague's child uses MY GRADE. That is a real
+   * limitation of the FACTS data, so the empty-state says it rather than looking broken.
+   */
+  var scope = 'class';
+  var SCOPES = [['class', 'My class'], ['grade', 'My grade'], ['school', 'Whole school']];
+
+  function myClassRows() { return dsScopeRows(flat, myPerm.teacherName, 'class'); }
+
+  function classFiltered() {
+    var f = filters();
+    var q = f.q.trim().toLowerCase();
+    // The "all students" tick is the same escape hatch it is everywhere else: it widens past the
+    // scope so a name can always be found, without changing which scope is selected.
+    var rows = dsScopeRows(flat, myPerm.teacherName,
+                           $('qAll').checked ? 'school' : scope);
+    return rows.filter(function (r) {
+      if (f.types.length && f.types.indexOf(r.type) === -1) return false;
+      if (!q) return true;
+      var hay = (r.name + ' ' + r.id + ' ' + (r.homeroom || '')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+  }
+  function classRow(r) {
+    return '<button class="person' + (r.expected ? '' : ' flag') + '" data-id="' + esc(r.id) + '">' +
+      '<span class="pname">' + esc(r.name) + destHtml(r) +
+        flagBadge(r) + extraBadges(r) + '</span>' +
+      '<span class="pmeta">' + esc(r.grade) +
+        (r.homeroom ? ' &middot; ' + esc(r.homeroom) : '') + '</span></button>';
+  }
+  function renderClass() {
+    var rows = classFiltered();
+    var flagged = rows.filter(function (r) { return !r.expected; }).length;
+    var mine = myClassRows().length;
+    var label = $('qAll').checked ? 'every student'
+      : (scope === 'class' ? 'my class' : scope === 'grade' ? 'my grade' : 'the whole school');
+    $('tally').innerHTML = '<b>' + (rows.length - flagged) + '</b> expected' +
+      (flagged ? ' &middot; <span class="flagged"><b>' + flagged + '</b> flagged</span>' : '') +
+      ' &middot; ' + rows.length + ' in ' + label;
+
+    var empty;
+    if (rows.length) empty = '';
+    else if (scope !== 'school' && !myPerm.teacherName) {
+      empty = 'We could not match your sign-in to a staff record, so "my class" is empty. ' +
+              'Use Whole school, and ask the office to check your email in FACTS.';
+    } else if (scope !== 'school' && !mine) {
+      empty = 'No students list you as their homeroom teacher in FACTS. If you share a grade with ' +
+              'another teacher, the homeroom belongs to one of you — try My grade.';
+    } else {
+      empty = 'Nobody matches this search.';
+    }
+    $('board').innerHTML = rows.length
+      ? '<div class="list">' + rows.map(classRow).join('') + '</div>'
+      : '<div class="list"><div class="empty">' + esc(empty) + '</div></div>';
+  }
+
+  /**
+   * The chaperone list. Everyone approved appears EVERY day; the ones not walking are struck
+   * through with the reason, because "why isn't X here?" gets asked at the door and the answer has
+   * to be on the sheet. Teacher is shown so a missing child can be chased to the right classroom.
+   */
+  function renderWalkUp() {
+    var w = raw.walkUp;
+    if (!w || !w.rows.length) {
+      $('tally').textContent = '';
+      $('board').innerHTML = '<div class="list"><div class="empty">No approved walk-up list yet. ' +
+        'Run RUN_seedWalkers in Walkers.gs.</div></div>';
+      return;
+    }
+    var q = ($('q').value || '').trim().toLowerCase();
+    var rows = w.rows.filter(function (r) {
+      if (!q) return true;
+      return (r.name + ' ' + r.id + ' ' + (r.teacher || '')).toLowerCase().indexOf(q) !== -1;
+    });
+    $('tally').innerHTML = '<b>' + w.counts.walking + '</b> walking - <span class="flagged"><b>' +
+      w.counts.notWalking + '</b> not</span> - ' + w.counts.onList + ' on the list' +
+      (w.dayName ? ' - ' + esc(w.dayName) : '');
+    $('board').innerHTML = '<div class="list">' +
+      '<div class="ghead"><span>Staff kids to the High School</span>' +
+      '<span class="gcount">line up 2:55 - K4 to 4th</span></div>' +
+      (rows.length ? rows.map(function (r) {
+        var right = esc(r.grade) + (r.teacher ? ' - ' + esc(r.teacher.split(' ')[0]) : '');
+        var badge = r.walking ? '' : '<span class="att flag">' + esc(r.kind) + '</span>';
+        if (r.overridden) badge += '<span class="att ovr">CHANGED</span>';
+        var sub = [];
+        if (!r.walking && r.why) sub.push(r.why);
+        // the destination is the thing the walk-up chaperone most needs: who is this child handed to today
+        if (r.destination) sub.push('-> ' + r.destination);
+        if (r.frequency === 'Occasional') sub.push('occasional');
+        if (r.note) sub.push(r.note);
+        if (r.overrideNote) sub.push('TODAY: ' + r.overrideNote);
+        if (!r.onRoster) sub.push('NOT on the current roster');
+        return '<button class="person' + (r.walking ? '' : ' notwalk') + '" data-id="' + esc(r.id) + '">' +
+          '<span class="pname">' + esc(r.name) + badge +
+          (sub.length ? '<div class="wnote">' + esc(sub.join(' - ')) + '</div>' : '') + '</span>' +
+          '<span class="pmeta">' + right + '</span></button>';
+      }).join('') : '<div class="empty">Nobody matches that search.</div>') + '</div>';
+    Array.prototype.forEach.call(document.querySelectorAll('.person'), function (el) {
+      el.addEventListener('click', function () { openCard(el.dataset.id); });
+    });
+  }
+
+  function render() {
+    if (!raw || !raw.ok) {
+      $('board').innerHTML = '<div class="list"><div class="empty">' +
+        esc((raw && raw.error) || 'Could not load the board.') + '</div></div>';
+      $('tally').textContent = '';
+      return;
+    }
+    if (mode === 'walk') { renderWalkUp(); return; }
+    if (mode === 'class') {
+      renderClass();
+      Array.prototype.forEach.call(document.querySelectorAll('.person'), function (el) {
+        el.addEventListener('click', function () { openCard(el.dataset.id); });
+      });
+      return;
+    }
+    if (mode === 'ramp') {
+      var rows = flatFiltered();
+      var flagged = rows.filter(function (r) { return !r.expected; }).length;
+      $('tally').innerHTML = '<b>' + (rows.length - flagged) + '</b> expected' +
+        (flagged ? ' · <span class="flagged"><b>' + flagged + '</b> flagged</span>' : '') +
+        ' · ' + rows.length + ' on this list';
+      $('board').innerHTML = rows.length
+        ? '<div class="list">' + rows.map(personRow).join('') + '</div>'
+        : '<div class="list"><div class="empty">Nobody matches these filters.</div></div>';
+    } else {
+      var view = dsFilterBoard(raw.board, filters());
+      var c = view.counts;
+      $('tally').innerHTML = '<b>' + c.expected + '</b> expected · <span class="flagged"><b>' +
+        c.notExpected + '</b> flagged</span> · ' + c.total + ' students';
+      $('board').innerHTML = view.groups.map(function (g) {
+        var rt = g.type === 'Bus' ? routeOf(g.rows[0] || {}) : null;
+        var drv = '';
+        if (rt) {
+          var who = dsDriversFor(rt, 'PM', raw.dayName);
+          if (!who.length) {
+            drv = '<span class="driver gap">no driver listed for ' + esc(raw.dayName || 'today') + '</span>';
+          } else {
+            drv = '<span class="driver">' + who.map(function (d) {
+              return esc(d.name) + (d.phone ? ' <a href="tel:' +
+                esc(d.phone.replace(/[^0-9+]/g, '')) + '">' + esc(d.phone) + '</a>' : '');
+            }).join(' + ') + (who.length > 1 ? ' — TWO listed today' : '') + '</span>';
+          }
+        }
+        // the whole lane header takes the route colour — this block IS the purple bus
+        var hdrStyle = (rt && rt.colour)
+          ? ' style="' + chipStyle(rt.colour) + '" title="' + esc(rt.colour) + '"' : '';
+        // the office's short name when the table knows the route; the FACTS title otherwise
+        return '<div class="list"><div class="ghead"' + hdrStyle + '><span>' +
+          esc(rt && rt.name ? rt.name : g.key) + '</span>' +
+          '<span class="gcount">' + drv + ' &nbsp; ' + g.expected + ' expected' +
+          (g.notExpected ? ' · ' + g.notExpected + ' flagged' : '') + '</span></div>' +
+          g.rows.map(personRow).join('') + '</div>';
+      }).join('') || '<div class="list"><div class="empty">Nobody matches these filters.</div></div>';
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.person'), function (el) {
+      el.addEventListener('click', function () { openCard(el.dataset.id); });
+    });
+  }
+
+  /* ------------------------------ the student card ------------------------------ */
+
+  function openCard(id) {
+    // built locally from data already loaded — no round trip, so this is instant
+    var c = dsStudentCard(id, flat, pickups);
+    if (!c) return;
+    var s = c.student;
+    var h = '<h3>' + esc(s.name) + '</h3>' +
+      '<div class="sub">Grade ' + esc(s.grade) + ' · ' + esc(s.building || '') +
+      (s.pickup ? ' · collected at ' + esc(s.pickup) : '') + '</div>';
+
+    var srt = s.type === 'Bus' ? routeOf(s) : null;
+    h += '<div class="sect"><h4>Goes home by</h4>';
+    if (srt) {
+      // the route in its colour, large — and the instruction that colour translates to
+      h += '<div>' + destHtml(s, true) + '</div>';
+      if (srt.colour) {
+        h += '<div class="muted" style="margin-top:.35rem">Hand them the <b>' +
+          esc(String(srt.colour).toLowerCase()) + '</b> stick.</div>';
+      }
+    } else {
+      h += '<div class="bigdest">' + esc(destOf(s)) + '</div>';
+    }
+    if (s.vehicle) h += '<div class="muted">' + esc(s.vehicle) + '</div>';
+    if (srt) {
+      var dw = dsDriversFor(srt, 'PM', raw.dayName);
+      h += dw.length
+        ? '<div class="muted">Driver today: ' + dw.map(function (d) {
+            return esc(d.name) + (d.phone ? ' — ' + esc(d.phone) : ''); }).join(' + ') + '</div>'
+        : '<div class="muted" style="color:#C62828;font-weight:700">No driver listed for ' +
+          esc(raw.dayName || 'today') + '</div>';
+    }
+    if (s.split) h += '<div class="muted">Rides a different route on different days — confirm which today.</div>';
+    if (s.type === 'Staff Kid' && s.walkTo === 'Unresolved') {
+      h += '<div class="muted">Staff child, but the parent\'s building is not recorded — ask the office.</div>';
+    }
+    if (s.overridden) {
+      // who and when — the stamp the sheet keeps, finally shown where the question gets asked
+      h += '<div class="muted">Changed for today' +
+        (s.overrideNote ? ': ' + esc(s.overrideNote) : '') +
+        (s.overrideBy ? ' <span class="wnote">(' + esc(s.overrideBy) +
+          (s.overrideAt ? ' at ' + esc(s.overrideAt) : '') + ')</span>' : '') + '</div>';
+      if (s.overrideDestination) {
+        h += '<div class="muted">Handed to: ' + esc(s.overrideDestination) + '</div>';
+      }
+    }
+    if (!s.expected) h += '<div class="flagbox">' + esc(s.reason) +
+      (s.detail ? ' — ' + esc(s.detail) : '') + '</div>';
+    h += '</div>';
+
+    // a walk-up child: today's hand-over, which may be a standing Friday arrangement or a call-in
+    var wk = (raw.walkUp && raw.walkUp.rows || []).filter(function (x) { return x.id === id; })[0];
+    if (wk) {
+      h += '<div class="sect"><h4>Walk-up today</h4>';
+      h += wk.walking
+        ? '<div class="bigdest">Walking up</div>'
+        : '<div class="flagbox">' + esc(wk.kind) + (wk.why ? ' — ' + esc(wk.why) : '') + '</div>';
+      if (wk.destination) h += '<div class="muted">Handed to: ' + esc(wk.destination) + '</div>';
+      if (wk.overrideNote) {
+        h += '<div class="muted">Changed today: ' + esc(wk.overrideNote) +
+          (wk.overrideBy ? ' (' + esc(wk.overrideBy) + ' at ' + esc(wk.overrideAt) + ')' : '') + '</div>';
+      }
+      if (wk.teacher) h += '<div class="muted">Teacher: ' + esc(wk.teacher) + '</div>';
+      h += '</div>';
+    }
+    h += '<div class="sect"><h4>Authorized to collect</h4>';
+    if (!c.pickupsLoaded) {
+      h += '<div class="muted">Loading contacts…</div>';   // phase 2 still in flight
+    } else if (!c.hasPickups) {
+      h += '<div class="muted">None recorded in FACTS for this student.</div>';
+    } else {
+      // positional [name, relationship, phone] — trimmed on the server to save ~650KB
+      h += c.pickups.map(function (p, i) {
+        return '<div class="row"><span>' + esc(p[0]) +
+          (p[2] ? ' <button class="showphone" data-ph="' + esc(p[2]) + '" data-i="' + i +
+                  '">show phone</button><span id="ph' + i + '"></span>' : '') +
+          '</span><span class="r">' + esc(p[1]) + '</span></div>';
+      }).join('');
+    }
+    h += '</div>';
+
+    h += '<div class="sect"><h4>Siblings</h4>';
+    h += c.siblings.length
+      ? c.siblings.map(function (s2) {
+          return '<div class="sib" data-sib="' + esc(s2.id) + '"><span>' + esc(s2.name) +
+            '</span><span class="r">Gr ' + esc(s2.grade) + destHtml(s2) + '</span></div>';
+        }).join('')
+      : '<div class="muted">No enrolled siblings.</div>';
+    h += '</div>';
+
+    // The SAME pure function the server enforces with (dsCanChange). Hiding the button is only
+    // presentation — setOverride re-checks and refuses — but showing a control that will be
+    // refused, at the ramp, in front of a parent, is its own kind of failure.
+    var mayChange = dsCanChange(myPerm, s, !!wk);
+    h += mayChange.ok
+      ? '<div class="dlgrow"><button class="cancel" id="cardClose">Close</button>' +
+        '<button id="cardOvr">Change for today</button></div>'
+      : '<div class="nochange">' + esc(mayChange.why) + '</div>' +
+        '<div class="dlgrow"><button class="cancel" id="cardClose">Close</button></div>';
+
+    $('cardBody').innerHTML = h;
+    $('card').showModal();
+
+    $('cardClose').addEventListener('click', function () { $('card').close(); });
+    if (mayChange.ok) {
+      $('cardOvr').addEventListener('click', function () { $('card').close(); openOverride(s); });
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('.showphone'), function (b) {
+      b.addEventListener('click', function () {
+        $('ph' + b.dataset.i).innerHTML = ' <a href="tel:' +
+          esc(b.dataset.ph.replace(/[^0-9+]/g, '')) + '">' + esc(b.dataset.ph) + '</a>';
+        b.remove();
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.sib'), function (el) {
+      el.addEventListener('click', function () { $('card').close(); openCard(el.dataset.sib); });
+    });
+  }
+
+  /* ------------------------------ overrides ------------------------------ */
+
+  var current = null;
+  function openOverride(s) {
+    current = s;
+    $('ovrName').textContent = s.name;
+    if (s.type) $('ovrType').value = s.type;
+    $('ovrRoute').value = ''; $('ovrNote').value = ''; $('ovrDestOther').value = '';
+    // The dropdown is the child's AUTHORISED pickup contacts, so a one-off hand-over defaults to
+    // someone who is already allowed to collect them, rather than a free-text guess. Their own
+    // classroom is offered because that is the common Friday arrangement the walk-up chaperone described.
+    var pk = (pickups || {})[s.id] || [];
+    $('ovrDest').innerHTML = '<option value="">(no change — usual destination)</option>' +
+      pk.map(function (p) {
+        return '<option>' + esc(p[0]) + (p[1] ? ' (' + esc(p[1]) + ')' : '') + '</option>';
+      }).join('') +
+      '<option>to their own classroom</option>' +
+      '<option>to the HS lobby as usual</option>';
+    $('ovr').showModal();
+  }
+  $('ovrCancel').addEventListener('click', function () { $('ovr').close(); });
+  $('ovrSave').addEventListener('click', function () {
+    if (!current) return;
+    var b = $('ovrSave'); b.disabled = true; b.textContent = 'Saving…';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        b.disabled = false; b.textContent = 'Save for today';
+        if (res && res.ok) { applyPayload(res); renderFreshness(res.freshness || {}); }
+        $('ovr').close(); banners(); render();
+      })
+      .withFailureHandler(function (err) {
+        b.disabled = false; b.textContent = 'Save for today';
+        alert('Could not save: ' + (err && err.message ? err.message : err));
+      })
+      .setOverride(current.id, $('ovrType').value, $('ovrRoute').value, $('ovrNote').value, SIM,
+                   $('ovrDestOther').value.trim() || $('ovrDest').value);
+  });
+
+  /* ------------------------------ settings ------------------------------ */
+
+  /**
+   * the ramp lead's answer to "what if I'm off sick". Two things live here and nothing else:
+   *   MEMBERSHIP — add or remove people in the roles YOU administer. She administers 'Ramp' alone,
+   *                so this dialog offers her Ramp and there is no path to Walk-Up or Office.
+   *   THE SHARED VIEW — her exact filters, attached to the ROLE. Whoever covers the ramp opens her
+   *                board rather than a blank one and having to guess.
+   * Everything shown here is re-checked on the server; this is the doorway, not the lock.
+   */
+  var cfg = null;
+
+  function renderSettings() {
+    var p = (cfg && cfg.perm) || myPerm;
+    $('cfgSub').innerHTML = p.adminOf.length
+      ? 'You administer <b>' + p.adminOf.map(esc).join('</b>, <b>') + '</b>. Changes apply at once.'
+      : 'You do not administer any role.';
+    var mem = (cfg && cfg.members) || [];
+    var views = (cfg && cfg.views) || {};
+    var staff = (cfg && cfg.staff) || [];
+    var nameOf = {};
+    staff.forEach(function (s) { nameOf[s.email] = s.name; });
+    // Names as suggestions, emails as values: pick "Sowell Gina" and the box holds her address.
+    $('staffList').innerHTML = staff.map(function (s) {
+      return '<option value="' + esc(s.email) + '">' + esc(s.name) + '</option>';
+    }).join('');
+    // What MEMBERSHIP grants, in the words a role admin would use. The tick is separate and means
+    // one thing everywhere: "can add and remove people in this role". Josh, 2026-09-05, after
+    // putting three people in Admin without the tick: "what exactly does that mean?" — for Admin,
+    // nothing; membership already grants everything, so the tick is not offered there.
+    var ROLE_HELP = {
+      'Admin':          'Full control: change any child, edit routes, manage every role, grant admin.',
+      'Office':         'Change ANY child\'s dismissal for today — they take the phone calls.',
+      'Ramp':           'Change ANY child\'s dismissal for today — a parent can arrive for anyone.',
+      'Walk-Up':        'Change a child on the approved walk-up list.',
+      'Teacher':        'Change their own homeroom class only. Automatic for every homeroom teacher — rows here are optional.',
+      'Transportation': 'Edit the Routes tab. Cannot change a child\'s dismissal.'
+    };
+    $('cfgBody').innerHTML = p.adminOf.map(function (role) {
+      var people = mem.filter(function (m) { return m.role === role; });
+      var v = views[role];
+      return '<div class="sect"><h4>' + esc(role) + ' &mdash; ' + people.length + ' ' +
+          (people.length === 1 ? 'person' : 'people') + '</h4>' +
+        '<div class="cfgnote" style="margin:0 0 .4rem">' + esc(ROLE_HELP[role] || '') + '</div>' +
+        (people.length ? people.map(function (m) {
+          var nm = nameOf[m.email];
+          return '<div class="mrow"><span class="me">' +
+            (nm ? '<b>' + esc(nm) + '</b><span class="wnote">' + esc(m.email) + '</span>' : esc(m.email)) +
+            '</span>' +
+            (m.admin && role !== 'Admin' ? '<span class="adm" title="Can add and remove people in this role">MANAGES</span>' : '') +
+            '<button class="del" data-role="' + esc(role) + '" data-email="' + esc(m.email) +
+            '">Remove</button></div>';
+        }).join('') : '<div class="muted">Nobody yet.</div>') +
+        '<div class="addrow">' +
+          '<input type="text" list="staffList" id="add_' + esc(role) + '" placeholder="type a name" ' +
+            'autocomplete="off" autocapitalize="off" spellcheck="false">' +
+          (p.isAdmin && role !== 'Admin'
+            ? '<label class="tick" style="color:var(--dt)" title="Can add and remove people in this role">' +
+              '<input type="checkbox" id="adm_' + esc(role) + '"> manages this role</label>' : '') +
+          '<button data-add="' + esc(role) + '">Add</button>' +
+        '</div>' +
+        '<div class="cfgnote">Shared default view for everyone in ' + esc(role) + ': ' +
+          (v ? 'set by ' + esc(v.savedBy) + ' on ' + esc(v.savedAt) : '<b>none yet</b>') +
+          ' &middot; <a href="#" data-rv="' + esc(role) + '" style="color:var(--red-deep)">' +
+          'use my current filters</a></div>' +
+        '</div>';
+    }).join('');
+
+    Array.prototype.forEach.call($('cfgBody').querySelectorAll('.del'), function (b) {
+      b.addEventListener('click', function () {
+        if (!confirm('Remove ' + b.dataset.email + ' from ' + b.dataset.role + '?')) return;
+        cfgCall(b, 'removeRoleMember', [b.dataset.role, b.dataset.email]);
+      });
+    });
+    Array.prototype.forEach.call($('cfgBody').querySelectorAll('[data-add]'), function (b) {
+      b.addEventListener('click', function () {
+        var role = b.dataset.add;
+        var box = $('add_' + role), adm = $('adm_' + role);
+        // Whatever was typed — a picked suggestion (already the email), a bare name, or an address
+        // — resolves through the same pure function, so a device that never showed the dropdown
+        // still lands on the right person or gets told why not.
+        var r = dsResolveStaff((cfg && cfg.staff) || [], box.value);
+        if (r.error) { alert(r.error); box.focus(); return; }
+        cfgCall(b, 'addRoleMember', [role, r.email, !!(adm && adm.checked), '']);
+      });
+    });
+    Array.prototype.forEach.call($('cfgBody').querySelectorAll('[data-rv]'), function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var role = a.dataset.rv;
+        if (!confirm('Everyone in ' + role + ' without their own saved view will open the board ' +
+                     'with your current filters. Continue?')) return;
+        var txt = a.textContent; a.textContent = 'saving…';
+        google.script.run
+          .withSuccessHandler(function (v) {
+            (cfg.views = cfg.views || {})[role] = v; renderSettings();
+          })
+          .withFailureHandler(function (err) {
+            a.textContent = txt; alert(errMsg(err));
+          })
+          .saveRoleView(role, currentView());
+      });
+    });
+  }
+
+  /** One membership call, one shape: disable, call, replace the whole rolesApi payload. */
+  function cfgCall(btn, fn, args) {
+    var txt = btn.textContent;
+    btn.disabled = true; btn.textContent = '…';
+    google.script.run
+      .withSuccessHandler(function (res) { cfg = res; renderSettings(); })
+      .withFailureHandler(function (err) {
+        btn.disabled = false; btn.textContent = txt; alert(errMsg(err));
+      })[fn].apply(null, args);
+  }
+
+  function errMsg(err) { return (err && err.message) ? err.message : String(err); }
+
+  function openSettings() {
+    $('cfgSub').textContent = 'Loading…';
+    $('cfgBody').innerHTML = '';
+    $('cfg').showModal();
+    google.script.run
+      .withSuccessHandler(function (res) { cfg = res; renderSettings(); })
+      .withFailureHandler(function (err) { $('cfgSub').textContent = errMsg(err); })
+      .rolesApi();
+  }
+
+  /* ------------------------------ chrome ------------------------------ */
+
+  function buildTypes() {
+    $('typeRow').innerHTML =
+      '<span class="tick" style="min-height:0;padding-right:.2rem">type</span>' +
+      TYPES.map(function (t) {
+        return '<button data-t="' + esc(t) + '" aria-pressed="' + (typeSel[t] ? 'true' : 'false') +
+          '">' + esc(t) + '</button>';
+      }).join('');
+    Array.prototype.forEach.call($('typeRow').querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () {
+        var t = b.dataset.t;
+        typeSel[t] = !typeSel[t];
+        b.setAttribute('aria-pressed', typeSel[t] ? 'true' : 'false');
+        render();
+      });
+    });
+  }
+
+  function buildScope() {
+    $('scopeRow').innerHTML =
+      '<span class="tick" style="min-height:0;padding-right:.2rem">show</span>' +
+      SCOPES.map(function (s) {
+        return '<button data-s="' + s[0] + '" aria-pressed="' + (scope === s[0] ? 'true' : 'false') +
+          '">' + s[1] + '</button>';
+      }).join('');
+    Array.prototype.forEach.call($('scopeRow').querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () {
+        scope = b.dataset.s;
+        buildScope();
+        render();
+      });
+    });
+  }
+
+  function buildGrades() {
+    $('grades').innerHTML = GRADES.map(function (g) {
+      return '<button data-g="' + g + '" aria-pressed="' + (gradeSel[g] ? 'true' : 'false') + '">' +
+        g + '</button>';
+    }).join('');
+    Array.prototype.forEach.call($('grades').children, function (b) {
+      b.addEventListener('click', function () {
+        var g = b.dataset.g;
+        gradeSel[g] = !gradeSel[g];
+        b.setAttribute('aria-pressed', gradeSel[g] ? 'true' : 'false');
+        render();
+      });
+    });
+  }
+  function fillFilters(board) {
+    // Rebuilding the options resets the selection to blank; keep what the person had chosen.
+    var keep = $('fRoute').value;
+    $('fRoute').innerHTML = '<option value="">All routes</option>' +
+      (board.routes || []).map(function (r) { return '<option>' + esc(r) + '</option>'; }).join('');
+    $('fRoute').value = keep;             // a route that no longer exists simply falls back to ''
+  }
+  /**
+   * The ONE place a server payload is accepted, so a save and a reload cannot drift apart. The
+   * first version rebuilt `flat` only inside load(); after saving an override the ramp list — which
+   * renders from `flat` — stayed exactly as it was until the next five-minute tick, so the person
+   * who had just recorded the change saw no change.
+   */
+  function applyPayload(res) {
+    raw = res;
+    flat = dsFlatList(res.board);
+    fillFilters(res.board);
+    lastGoodAt = res.serverNow || '';
+  }
+  function applyView(v) {
+    if (!v) return;
+    mode = v.mode || 'ramp';
+    scope = v.scope || 'class';
+    $('fRoute').value = v.route || '';
+    gradeSel = {}; (v.grades || []).forEach(function (g) { gradeSel[g] = true; });
+    typeSel = {};
+    // accept the multi-select `types` AND the single `type` of any view saved before this change
+    (v.types && v.types.length ? v.types : (v.type ? [v.type] : [])).forEach(function (t) {
+      typeSel[t] = true;
+    });
+    excludeTypes = v.excludeTypes || [];
+    setMode(mode, true);
+    buildTypes(); buildGrades();
+  }
+  function setMode(m, quiet) {
+    mode = m;
+    $('mRamp').setAttribute('aria-pressed', m === 'ramp' ? 'true' : 'false');
+    $('mClass').setAttribute('aria-pressed', m === 'class' ? 'true' : 'false');
+    $('mWalk').setAttribute('aria-pressed', m === 'walk' ? 'true' : 'false');
+    $('mExplore').setAttribute('aria-pressed', m === 'explore' ? 'true' : 'false');
+    // the walk-up list is its own fixed roster - lane and grade filters do not apply to it
+    var hide = (m === 'walk');
+    // In class mode the SCOPE owns which grades are shown, so the grade chips would only be a
+    // second, contradictory control. Lane chips stay — "who in my class rides a bus" is a real
+    // question at 3pm.
+    $('typeRow').hidden = hide;
+    $('scopeRow').hidden = (m !== 'class');
+    $('grades').hidden = hide || m === 'class';
+    $('fRoute').hidden = hide || m === 'class';
+    if (m === 'class') buildScope();
+    if (!quiet) render();
+  }
+  function banners() {
+    var b = '';
+    // Only the DATE is simulated — it decides the weekday (drivers, walk-up exceptions) and which
+    // today-only changes count. Roster, routes, roles and attendance are always the real, current
+    // data. The first wording said "not live data", which read as a demo mode with a switch.
+    if (SIM) {
+      b += '<div class="simbar">SIMULATING ' + esc(SIM) + ' — the date is pretend; the roster, ' +
+           'routes and attendance are real. Remove <b>?sim</b> from the address for today\'s board.</div>';
+    }
+    if (raw && raw.ok) {
+      var fr = raw.freshness || {};
+      if (fr.syncStale) {
+        // FIRST, because it changes what every other line on the page means.
+        b += '<div class="warn"><b>Attendance may be out of date.</b> FACTS was last synced at ' +
+             esc(fr.syncedAt) + ' — ' + esc(fr.syncedAgeMin) + ' minutes ago. Anyone marked ' +
+             'absent or collected since then still shows as expected.</div>';
+      }
+      if (!raw.signOutActive) {
+        b += '<div class="warn">Mid-day sign-outs are not connected yet, so a student collected ' +
+             'during the day still shows as expected. Absences come from FACTS attendance.</div>';
+      }
+      if (raw.freshness && raw.freshness.attendanceRows === 0) {
+        b += '<div class="warn">No attendance exceptions recorded today — either nobody is out, ' +
+             'or attendance has not been entered yet.</div>';
+      }
+    }
+    $('banners').innerHTML = b;
+  }
+
+  function load() {
+    var seq = ++reqSeq;
+    $('tally').textContent = 'Loading…';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (seq !== reqSeq) return;              // a newer request already answered
+        if (res.ok) {
+          myPerm = res.perm || myPerm;
+          $('gear').hidden = !myPerm.canManageRoles;
+          applyPayload(res);
+          // The saved view is applied ONCE. Every later load — the five-minute tick, the refresh
+          // button, a save — keeps whatever the person has set since. The first version re-applied
+          // it on every load, so a filter narrowed to find one child snapped back mid-search, and
+          // the walk-up chaperone in Walk-Up with a Ramp view saved was yanked back to Ramp every five minutes.
+          if (!viewApplied) {
+            viewApplied = true;
+            if (res.savedView) applyView(res.savedView);
+            // Say WHOSE view this is. A stand-in on the ramp needs to know the board is filtered
+            // by somebody else's choices, and how to make it their own.
+            $('viewnote').innerHTML = (res.viewFrom && res.viewFrom !== 'personal')
+              ? 'Using the ' + esc(res.viewFrom) + ' team view. Save your own to override it.' : '';
+          }
+          renderFreshness(res.freshness || {});
+        } else if (!raw || !raw.ok) {
+          raw = res;                             // nothing good to fall back on — show the error
+        } else {
+          // A background refresh failed but we HAVE a board. Keep showing it rather than
+          // replacing the ramp list with an error message at 3:10pm.
+          $('freshness').textContent = 'Refresh failed — showing data from ' + lastGoodAt +
+            '. ' + (res.error || '');
+          return;
+        }
+        banners(); render();                     // PAINT NOW — do not wait for contacts
+        if (!pickups) loadPickups();             // phase 2, once — contacts change daily at most
+      })
+      .withFailureHandler(function (err) {
+        if (seq !== reqSeq) return;
+        var msg = err && err.message ? err.message : String(err);
+        if (raw && raw.ok) {
+          // same rule: a working board is never replaced by an error from a background tick
+          $('freshness').textContent = 'Refresh failed — showing data from ' + lastGoodAt + '. ' + msg;
+          return;
+        }
+        raw = { ok: false, error: msg };
+        banners(); render();
+      })
+      .dismissalApi(SIM);
+  }
+
+  /**
+   * How current is what you are looking at. The attendance sync time is the line that matters:
+   * a dead 15-minute trigger looks exactly like a quiet day, and this is the only place that says
+   * otherwise. Computed on the server so the school timezone is right.
+   */
+  function renderFreshness(f) {
+    $('freshness').textContent =
+      'FACTS synced ' + (f.syncedAt || '?') +
+      (f.syncedAgeMin != null ? ' (' + f.syncedAgeMin + ' min ago)' : '') +
+      ' · ' + (f.attendanceRows || 0) + ' attendance exception(s)' +
+      (f.signOutActive ? ' · ' + (f.signOutCount || 0) + ' signed out today' : '') +
+      ' · roster ' + (f.rosterAt || '?');
+  }
+
+  // Phase 2. The list is scannable and searchable without contacts, so this never blocks a paint.
+  // If it fails, the board keeps working and a tapped card says contacts are unavailable.
+  function loadPickups() {
+    google.script.run
+      .withSuccessHandler(function (p) { pickups = p || {}; })
+      .withFailureHandler(function () { pickups = {}; })
+      .pickupsApi();
+  }
+
+  $('mRamp').addEventListener('click', function () { setMode('ramp'); });
+  $('mClass').addEventListener('click', function () { setMode('class'); });
+  $('mExplore').addEventListener('click', function () { setMode('explore'); });
+  $('fRoute').addEventListener('change', render);
+  $('qAll').addEventListener('change', render);
+  $('mWalk').addEventListener('click', function () { setMode('walk'); });
+  $('q').addEventListener('input', render);      // local — never a round trip
+  $('refresh').addEventListener('click', load);
+  $('gear').addEventListener('click', openSettings);
+  $('cfgClose').addEventListener('click', function () { $('cfg').close(); });
+  $('saveBtn').addEventListener('click', function () {
+    var b = $('saveBtn'); b.textContent = 'Saving…';
+    google.script.run
+      .withSuccessHandler(function () { b.textContent = '★ Saved';
+        // a personal view now wins over any team view, so stop claiming otherwise
+        $('viewnote').innerHTML = '';
+        setTimeout(function () { b.textContent = '☆ Save view'; }, 2000); })
+      .withFailureHandler(function (err) {
+        b.textContent = '☆ Save view'; alert(errMsg(err));
+      })
+      .saveView(currentView());
+  });
+
+  buildTypes(); buildGrades();
+  load();
+  // Attendance refreshes every 15 min upstream; re-pull so a board left open on a cart goes stale
+  // slowly rather than silently.
+  setInterval(load, 5 * 60 * 1000);
+</script>
+</body>
+</html>

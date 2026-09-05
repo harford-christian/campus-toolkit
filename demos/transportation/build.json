@@ -1,0 +1,19 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/transportation/build.json. The source Index.html is an Apps Script template FRAGMENT (no <head>): HtmlService wraps it in a document and doGet sets the title + viewport, so the first two replacements reproduce that wrapper — which is also where build-demo.mjs injects the demo shim (before </head>). The SIM scriptlet is replaced with the same URL-parameter read and sanitiser doGet applies, so ?sim= still time-travels the board. Staff first names in code comments are scrubbed to their roles or to the demo's fabricated teacher; the app's own JavaScript is otherwise untouched.",
+  "src": "../FACTS/transportation/Index.html",
+  "dst": "demos/transportation/index.html",
+  "includeDir": "../FACTS/transportation",
+  "demoName": "Dismissal Board",
+  "replace": [
+    ["<!--\n  HCS Dismissal.", "<!DOCTYPE html>\n<html>\n<head>\n<base target=\"_top\">\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>HCS Dismissal</title>\n</head>\n<body>\n<!--\n  HCS Dismissal."],
+    ["  setInterval(load, 5 * 60 * 1000);\n</script>\n", "  setInterval(load, 5 * 60 * 1000);\n</script>\n</body>\n</html>\n"],
+    ["<?= userEmail ?>", "demo.staff@example.edu"],
+    ["var SIM = <?!= JSON.stringify(sim || '') ?>;", "var SIM = (new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\\- T]/g, '').slice(0, 16);"],
+    ["\"angela\", \"burge ang\" and \"Angela Burge\" all find \"Burge Angela\"", "\"gina\", \"sowell gi\" and \"Gina Sowell\" all find \"Sowell Gina\""],
+    ["Burge Angela", "Sowell Gina"],
+    ["Angela's", "the ramp lead's"],
+    ["Angela", "the ramp lead"],
+    ["Becky", "the walk-up chaperone"],
+    ["Charlie Huber", "an older sibling"]
+  ]
+}
