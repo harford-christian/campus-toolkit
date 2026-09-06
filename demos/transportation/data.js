@@ -32,11 +32,12 @@ window.DISMISSAL_DATA = (function () {
   };
 
   /* ---------- vendored producer rules (facts-api-sync/Transportation.gs) ---------- */
-  // Two entries are counter-intuitive and load-bearing: 1st grade is in the KINDERGARTEN
-  // building, and so is 5th (the basement). 6th is a modular unit between the buildings.
+  // One entry is counter-intuitive and load-bearing: 5th grade is in the KINDERGARTEN building
+  // (the basement). 6th is a modular unit between the buildings. (Corrected 2026-09-05 to match
+  // the producer: 1st grade is Elementary, not Kindergarten.)
   var GRADE_BUILDING = {
-    'K4': 'Kindergarten', 'K5': 'Kindergarten', '1': 'Kindergarten',
-    '2': 'Elementary', '3': 'Elementary', '4': 'Elementary',
+    'K4': 'Kindergarten', 'K5': 'Kindergarten',
+    '1': 'Elementary', '2': 'Elementary', '3': 'Elementary', '4': 'Elementary',
     '5': 'Kindergarten', '6': '6th Grade',
     '7': 'High School', '8': 'High School', '9': 'High School',
     '10': 'High School', '11': 'High School', '12': 'High School'
@@ -123,8 +124,8 @@ window.DISMISSAL_DATA = (function () {
     [9123, 'Abernathy Sol',        'STAFF_MUSIC',  's.abernathy@example.edu', ''],
     [9124, 'Quill Hortensia',      'TEACHER_ELEM', 'h.quill@example.edu', '', 'N']   // left in June
   ];
-  var placementOf = {};
-  STAFF.forEach(function (s) { placementOf[s[1]] = s[2]; });
+  var placementOf = {}, staffIdOf = {};
+  STAFF.forEach(function (s) { placementOf[s[1]] = s[2]; staffIdOf[s[1]] = String(s[0]); });
 
   // Homeroom by grade. Grade 4 is taught by two people, so a co-teacher's "My class" shows only
   // their own homeroom and "My grade" is the answer — a real limit of one-homeroom-per-student.
@@ -276,7 +277,7 @@ window.DISMISSAL_DATA = (function () {
         ['Chioma', 'Mother', '410-555-0164', 'chioma.okafor@example.com']],
       kids: [[400151, 'Adaeze', '4', { staff: 'Okafor Simon' }], [400152, 'Chidubem', 'K4', { staff: 'Okafor Simon' }]] },
     { fid: 7044, last: 'Sowell', guardians: [['Gina', 'Mother', '410-555-0165', DEMO.email]],
-      kids: [[400153, 'Tobias', '1', { staff: 'Sowell Gina' }]] },               // walks to Elementary
+      kids: [[400153, 'Tobias', 'K5', { staff: 'Sowell Gina' }]] },              // KG child, Elementary parent: walks to Elementary
     { fid: 7045, last: 'Marchetti', guardians: [['Dov', 'Father', '410-555-0166', 'd.marchetti@example.edu'],
         ['Serena', 'Mother', '410-555-0167', '']],
       kids: [[400154, 'Bianca', '3', { staff: 'Marchetti Dov' }]] },             // same building as parent
@@ -361,7 +362,10 @@ window.DISMISSAL_DATA = (function () {
       nameById[sid] = name; gradeById[sid] = k[2]; familyById[sid] = f.fid;
       var hr = d.hr === 'none' ? null : HOMEROOM[d.hr === '4b' ? '4b' : k[2]];
       homeroomById[sid] = hr ? { code: hr[0], teacher: hr[1] } : { code: '', teacher: '' };
-      if (d.staff) staffChild[sid] = { parentName: d.staff, placementCode: placementOf[d.staff] || '' };
+      if (d.staff) {
+        staffChild[sid] = { parentName: d.staff, parentStaffId: staffIdOf[d.staff] || '',
+                            placementCode: placementOf[d.staff] || '' };
+      }
       ['am', 'pm'].forEach(function (s) {
         (d[s] || []).forEach(function (code) {
           var b = routesByStudent[sid] = routesByStudent[sid] || {};
@@ -371,6 +375,14 @@ window.DISMISSAL_DATA = (function () {
       });
       students.push({ id: sid, name: name, first: k[1], last: f.last, grade: k[2], fid: f.fid, d: d });
     });
+  });
+  // Where each homeroom teacher physically stands, from the grades of the students they hold a
+  // homeroom for, keyed by staff id. Vendored from the producer's trTeacherBuildings_ (2026-09-05):
+  // the placement code is an OU, not a floor plan, and a homeroom beats it.
+  var teacherBuildings = {};
+  Object.keys(homeroomById).forEach(function (sid) {
+    var t = homeroomById[sid].teacher, b = GRADE_BUILDING[gradeById[sid]], id = staffIdOf[t];
+    if (t && b && id) (teacherBuildings[id] = teacherBuildings[id] || {})[b] = true;
   });
   // split custody: two routes in one session mark each other
   Object.keys(routesByStudent).forEach(function (sid) {
@@ -442,12 +454,17 @@ window.DISMISSAL_DATA = (function () {
           return;
         }
         if (kid) {                                        // 2. Staff Kid
-          var pb = PLACEMENT_BUILDING[kid.placementCode] || '';
+          // A homeroom teacher stands in the building of the grade they teach; that beats the
+          // placement code. Same rule, same note text, as the producer — verify.mjs diffs the rows.
+          var taught = Object.keys(teacherBuildings[kid.parentStaffId] || {});
+          var fromHomeroom = taught.length === 1;
+          var pb = fromHomeroom ? taught[0] : (PLACEMENT_BUILDING[kid.placementCode] || '');
           var walkTo = !pb ? 'Unresolved' : (pb === building ? '' : pb);
+          var basis = fromHomeroom ? ' — from the grade they teach' : '';
           var note = !pb
             ? 'staff parent placement "' + (kid.placementCode || '(blank)') + '" does not identify a building'
-            : (walkTo ? 'walk to ' + walkTo + ' (parent: ' + kid.parentName + ')'
-                      : 'same building as parent (' + kid.parentName + ')');
+            : (walkTo ? 'walk to ' + walkTo + ' (parent: ' + kid.parentName + ')' + basis
+                      : 'same building as parent (' + kid.parentName + ')' + basis);
           rows.push([sid, name, grade, sess, 'Staff Kid', '', '', '', '', building, pk.pickup, pk.basis,
                      walkTo, fid, hrCode, hrTeacher, 'parent-link', note]);
           return;
@@ -619,7 +636,8 @@ window.DISMISSAL_DATA = (function () {
     // feeds these to facts-api-sync/Transportation.gs and checks its output equals tabs.Roster
     producerInputs: {
       routesByStudent: routesByStudent, staffChild: staffChild, earlyBird: earlyBird,
-      familyById: familyById, nameById: nameById, gradeById: gradeById, homeroomById: homeroomById
+      familyById: familyById, nameById: nameById, gradeById: gradeById, homeroomById: homeroomById,
+      teacherBuildings: teacherBuildings
     }
   };
 })();
