@@ -77,6 +77,12 @@
   .tick { color: var(--status); font-size: .8rem; display: flex; align-items: center; gap: .3rem;
           min-height: 44px; padding: 0 .3rem; white-space: nowrap; }
   .tick input { width: 20px; height: 20px; }
+  #filtersBtn { white-space: nowrap; }
+  #filtersBtn .fsum { font-weight: 400; font-size: .74rem; opacity: .85; margin-left: .35em;
+                      max-width: 42vw; overflow: hidden; text-overflow: ellipsis;
+                      display: inline-block; vertical-align: middle; }
+  #filterPanel { margin-top: .35rem; }
+  #filterPanel .filters { margin-bottom: .1rem; }
   .wnote { color: var(--dt); font-size: .78rem; }
   /* THE ROUTE IS ITS COLOUR. Each bus shows a coloured sheet in its window and every child is
      handed a matching stick; the driver checks the match. So the route NAME is rendered as a chip
@@ -212,18 +218,29 @@
       <button class="gear" id="gear" hidden title="Roles and shared views"
               aria-label="Settings">&#9881;</button>
     </header>
+    <!-- ALWAYS visible: the search is the ramp's primary control, and "all students" is its escape
+         hatch. Everything that shapes the list lives behind one button below. -->
     <div class="filters" id="filterBar">
-      <select id="fRoute"><option value="">All routes</option></select>
       <input id="q" type="search" placeholder="Name or ID…" autocomplete="off">
       <label class="tick" title="Search past your saved view, across the whole school">
         <input type="checkbox" id="qAll"> all students
       </label>
-      <button id="saveBtn" class="ghost" title="Remember these filters for me">☆ Save view</button>
-      <button id="refresh" class="ghost" title="Reload">↻</button>
+      <button id="filtersBtn" class="ghost" aria-expanded="true" aria-controls="filterPanel"
+              title="Show or hide the lane, grade and route filters">▾ Filters</button>
     </div>
-    <div class="chiprow" id="typeRow"></div>
+    <!-- COLLAPSIBLE. On a phone the chips alone are most of the screen; once a view is saved they are
+         rarely touched at 3:10. Collapsed, the button above says what is filtering. -->
+    <div id="filterPanel">
+      <div class="filters">
+        <select id="fRoute"><option value="">All routes</option></select>
+        <button id="saveBtn" class="ghost" title="Remember these filters for me">☆ Save view</button>
+        <button id="refresh" class="ghost" title="Reload">↻</button>
+      </div>
+      <div class="chiprow" id="typeRow"></div>
+      <div class="chiprow grades" id="grades"></div>
+    </div>
+    <!-- Class mode's scope is navigation, not a filter — it stays out of the panel. -->
     <div class="chiprow" id="scopeRow" hidden></div>
-    <div class="chiprow grades" id="grades"></div>
     <div class="tally" id="tally">Loading…</div>
     <div class="viewnote" id="viewnote"></div>
     <div class="freshness" id="freshness"></div>
@@ -1365,6 +1382,42 @@ if (typeof module !== 'undefined' && module.exports) {
       excludeTypes: all ? [] : excludeTypes
     };
   }
+  /* ------------------------------ the collapsible filter panel ------------------------------
+   *
+   * Everything that shapes the list — route, lanes, grades, save, refresh — sits behind one button.
+   * Collapsed is the default once a view has loaded (the view IS the filters) and open when there
+   * is none; the device remembers the last toggle. Collapsed, the button names what is filtering,
+   * so a short list is never mistaken for missing children.
+   */
+  var FILTERS_KEY = 'ds.filtersOpen';
+  function filtersRemembered() {
+    try { var v = localStorage.getItem(FILTERS_KEY); return v === null ? null : v === '1'; }
+    catch (e) { return null; }
+  }
+  function setFiltersOpen(open, remember) {
+    $('filterPanel').hidden = !open;
+    $('filtersBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (remember) { try { localStorage.setItem(FILTERS_KEY, open ? '1' : '0'); } catch (e) { /* private mode */ } }
+    filtersSummary();
+  }
+  function filtersSummary() {
+    var open = !$('filterPanel').hidden;
+    var parts = [];
+    if (mode !== 'walk' && mode !== 'class') {
+      var t = selectedTypes();
+      if (t.length && t.length < TYPES.length) parts.push(t.join(', '));
+      if (excludeTypes.length) parts.push('not ' + excludeTypes.join(', '));
+      var gs = selectedGrades();
+      if (gs.length) parts.push('gr ' + gs.join(' '));
+      if ($('fRoute').value) parts.push($('fRoute').value);
+    } else if (mode === 'class') {
+      var t2 = selectedTypes();
+      if (t2.length && t2.length < TYPES.length) parts.push(t2.join(', '));
+    }
+    $('filtersBtn').innerHTML = (open ? '▾ ' : '▸ ') + 'Filters' +
+      (!open && parts.length ? '<span class="fsum">· ' + esc(parts.join(' · ')) + '</span>' : '');
+  }
+
   /** The filters as a SAVEABLE view — the "all students" tick is a momentary escape hatch, not
    *  part of anyone's default, so this reads the real selections rather than filters(). */
   function currentView() {
@@ -1529,6 +1582,7 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   function render() {
+    filtersSummary();                      // the button reflects the chips whether open or shut
     if (!raw || !raw.ok) {
       $('board').innerHTML = '<div class="list"><div class="empty">' +
         esc((raw && raw.error) || 'Could not load the board.') + '</div></div>';
@@ -2019,6 +2073,10 @@ if (typeof module !== 'undefined' && module.exports) {
           if (!viewApplied) {
             viewApplied = true;
             if (res.savedView) applyView(res.savedView);
+            // First paint decides the panel: shut when a view came with the load, open when the
+            // person has nothing set yet — unless this device remembers a choice.
+            var remembered = filtersRemembered();
+            setFiltersOpen(remembered === null ? !res.savedView : remembered, false);
             // Say WHOSE view this is. A stand-in on the ramp needs to know the board is filtered
             // by somebody else's choices, and how to make it their own.
             $('viewnote').innerHTML = (res.viewFrom && res.viewFrom !== 'personal')
@@ -2082,6 +2140,9 @@ if (typeof module !== 'undefined' && module.exports) {
   $('mWalk').addEventListener('click', function () { setMode('walk'); });
   $('q').addEventListener('input', render);      // local — never a round trip
   $('refresh').addEventListener('click', load);
+  $('filtersBtn').addEventListener('click', function () {
+    setFiltersOpen($('filterPanel').hidden, true);
+  });
   $('gear').addEventListener('click', openSettings);
   $('cfgClose').addEventListener('click', function () { $('cfg').close(); });
   $('saveBtn').addEventListener('click', function () {
