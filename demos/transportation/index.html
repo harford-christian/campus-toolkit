@@ -77,12 +77,12 @@
   .tick { color: var(--status); font-size: .8rem; display: flex; align-items: center; gap: .3rem;
           min-height: 44px; padding: 0 .3rem; white-space: nowrap; }
   .tick input { width: 20px; height: 20px; }
-  #filtersBtn { white-space: nowrap; }
-  #filtersBtn .fsum { font-weight: 400; font-size: .74rem; opacity: .85; margin-left: .35em;
-                      max-width: 42vw; overflow: hidden; text-overflow: ellipsis;
-                      display: inline-block; vertical-align: middle; }
-  #filterPanel { margin-top: .35rem; }
-  #filterPanel .filters { margin-bottom: .1rem; }
+  #menuBtn .fsum { font-weight: 400; font-size: .74rem; opacity: .85; margin-left: .35em;
+                   max-width: 38vw; overflow: hidden; text-overflow: ellipsis;
+                   display: inline-block; vertical-align: middle; }
+  #menuPanel { margin-top: .35rem; }
+  #menuPanel .modes { margin: 0 0 .45rem; }
+  #menuPanel .filters { margin-bottom: .1rem; }
   .wnote { color: var(--dt); font-size: .78rem; }
   /* THE ROUTE IS ITS COLOUR. Each bus shows a coloured sheet in its window and every child is
      handed a matching stick; the driver checks the match. So the route NAME is rendered as a chip
@@ -110,11 +110,8 @@
   .tally b { color: #fff; }
   .tally .flagged { color: #ffd9d9; }
   .freshness { color: var(--who); font-size: .7rem; margin: .2rem 0 0; }
-  /* Deliberately quiet and last in the header — the ramp lead asked for it "out of the way", and it is
-     opened a few times a year, not at 3:10pm. */
-  .gear { background: transparent; border: 0; color: var(--who); font-size: 1.1rem; min-height: 38px;
-          padding: 0 .2rem; line-height: 1; opacity: .75; }
-  .gear:hover { opacity: 1; }
+  .topbtns { display: flex; gap: .3rem; }
+  .topbtns button { min-height: 38px; padding: .35rem .75rem; font-size: .85rem; white-space: nowrap; }
 
   .list { background: var(--card); border: 1px solid var(--card-border); border-radius: .6rem;
           overflow: hidden; margin: .8rem 0; }
@@ -206,31 +203,33 @@
 
 <div class="wrap">
   <div class="top">
+    <!-- THE TOP, collapsed (Josh, 2026-09-06): title, Filters, Settings. Filters expands the modes
+         AND the chips; Settings opens the dialog for everyone. Default open; shut once a view is
+         saved, because the view IS the filters and at 3:10 the list is what matters. -->
     <header>
       <h1><b>HCS</b> Dismissal</h1>
+      <div class="topbtns">
+        <button id="menuBtn" class="ghost" aria-expanded="true" aria-controls="menuPanel"
+                title="Show or hide the mode, lane, grade and route controls">▾ Filters</button>
+        <button id="gear" class="ghost" title="Your access; roles and shared views if you manage any">&#9881; Settings</button>
+      </div>
+      <span class="who">demo.staff@example.edu</span>
+    </header>
+    <!-- ALWAYS visible: the search is the ramp's primary control and "all students" its escape hatch. -->
+    <div class="filters" id="filterBar">
+      <input id="q" type="search" placeholder="Name or ID…" autocomplete="off">
+      <label class="tick" title="Search past your saved view, across the whole school">
+        <input type="checkbox" id="qAll"> all students
+      </label>
+    </div>
+    <!-- COLLAPSIBLE: everything that decides WHAT the list is. -->
+    <div id="menuPanel">
       <div class="modes">
         <button id="mRamp" aria-pressed="true">Ramp</button>
         <button id="mClass" aria-pressed="false">Class</button>
         <button id="mWalk" aria-pressed="false">Walk-Up</button>
         <button id="mExplore" aria-pressed="false">Explore</button>
       </div>
-      <span class="who">demo.staff@example.edu</span>
-      <button class="gear" id="gear" hidden title="Roles and shared views"
-              aria-label="Settings">&#9881;</button>
-    </header>
-    <!-- ALWAYS visible: the search is the ramp's primary control, and "all students" is its escape
-         hatch. Everything that shapes the list lives behind one button below. -->
-    <div class="filters" id="filterBar">
-      <input id="q" type="search" placeholder="Name or ID…" autocomplete="off">
-      <label class="tick" title="Search past your saved view, across the whole school">
-        <input type="checkbox" id="qAll"> all students
-      </label>
-      <button id="filtersBtn" class="ghost" aria-expanded="true" aria-controls="filterPanel"
-              title="Show or hide the lane, grade and route filters">▾ Filters</button>
-    </div>
-    <!-- COLLAPSIBLE. On a phone the chips alone are most of the screen; once a view is saved they are
-         rarely touched at 3:10. Collapsed, the button above says what is filtering. -->
-    <div id="filterPanel">
       <div class="filters">
         <select id="fRoute"><option value="">All routes</option></select>
         <button id="saveBtn" class="ghost" title="Remember these filters for me">☆ Save view</button>
@@ -1382,28 +1381,25 @@ if (typeof module !== 'undefined' && module.exports) {
       excludeTypes: all ? [] : excludeTypes
     };
   }
-  /* ------------------------------ the collapsible filter panel ------------------------------
+  /* ------------------------------ the collapsible top ------------------------------
    *
-   * Everything that shapes the list — route, lanes, grades, save, refresh — sits behind one button.
-   * Collapsed is the default once a view has loaded (the view IS the filters) and open when there
-   * is none; the device remembers the last toggle. Collapsed, the button names what is filtering,
-   * so a short list is never mistaken for missing children.
+   * Modes, route, lanes, grades, save and refresh sit behind one Filters button (Josh, 2026-09-06:
+   * "make ALL of the top menu collapsible"). Default OPEN; SHUT when a saved or team view arrived
+   * with the load, because the view is the filters and at 3:10 the list is what matters. Not
+   * remembered per device — the rule is about what loads, and one tap reopens it. Collapsed, the
+   * button names the mode and what is filtering, so a short list is never mistaken for missing
+   * children and nobody wonders which board they are on with the mode buttons hidden.
    */
-  var FILTERS_KEY = 'ds.filtersOpen';
-  function filtersRemembered() {
-    try { var v = localStorage.getItem(FILTERS_KEY); return v === null ? null : v === '1'; }
-    catch (e) { return null; }
+  var MODE_LABEL = { ramp: 'Ramp', 'class': 'Class', walk: 'Walk-Up', explore: 'Explore' };
+  function setMenuOpen(open) {
+    $('menuPanel').hidden = !open;
+    $('menuBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+    menuSummary();
   }
-  function setFiltersOpen(open, remember) {
-    $('filterPanel').hidden = !open;
-    $('filtersBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (remember) { try { localStorage.setItem(FILTERS_KEY, open ? '1' : '0'); } catch (e) { /* private mode */ } }
-    filtersSummary();
-  }
-  function filtersSummary() {
-    var open = !$('filterPanel').hidden;
-    var parts = [];
-    if (mode !== 'walk' && mode !== 'class') {
+  function menuSummary() {
+    var open = !$('menuPanel').hidden;
+    var parts = [MODE_LABEL[mode] || mode];
+    if (mode === 'ramp' || mode === 'explore') {
       var t = selectedTypes();
       if (t.length && t.length < TYPES.length) parts.push(t.join(', '));
       if (excludeTypes.length) parts.push('not ' + excludeTypes.join(', '));
@@ -1414,8 +1410,8 @@ if (typeof module !== 'undefined' && module.exports) {
       var t2 = selectedTypes();
       if (t2.length && t2.length < TYPES.length) parts.push(t2.join(', '));
     }
-    $('filtersBtn').innerHTML = (open ? '▾ ' : '▸ ') + 'Filters' +
-      (!open && parts.length ? '<span class="fsum">· ' + esc(parts.join(' · ')) + '</span>' : '');
+    $('menuBtn').innerHTML = (open ? '▾ ' : '▸ ') + 'Filters' +
+      (!open ? '<span class="fsum">· ' + esc(parts.join(' · ')) + '</span>' : '');
   }
 
   /** The filters as a SAVEABLE view — the "all students" tick is a momentary escape hatch, not
@@ -1582,7 +1578,7 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   function render() {
-    filtersSummary();                      // the button reflects the chips whether open or shut
+    menuSummary();                         // the button reflects mode + chips whether open or shut
     if (!raw || !raw.ok) {
       $('board').innerHTML = '<div class="list"><div class="empty">' +
         esc((raw && raw.error) || 'Could not load the board.') + '</div></div>';
@@ -1810,11 +1806,40 @@ if (typeof module !== 'undefined' && module.exports) {
    */
   var cfg = null;
 
+  // What MEMBERSHIP grants, in the words a role admin would use. The tick is separate and means
+  // one thing everywhere: "can add and remove people in this role". Josh, 2026-09-05, after
+  // putting three people in Admin without the tick: "what exactly does that mean?" — for Admin,
+  // nothing; membership already grants everything, so the tick is not offered there.
+  var ROLE_HELP = {
+    'Admin':          'Full control: change any child, edit routes, manage every role, grant admin.',
+    'Office':         'Change ANY child\'s dismissal for today — they take the phone calls.',
+    'Ramp':           'Change ANY child\'s dismissal for today — a parent can arrive for anyone.',
+    'Walk-Up':        'Change a child on the approved walk-up list.',
+    'Teacher':        'Look up any student and see their own class. Read-only — changes go through the office. Automatic for every homeroom teacher; rows here are optional.',
+    'Transportation': 'Edit the Routes tab. Cannot change a child\'s dismissal.'
+  };
+
   function renderSettings() {
     var p = (cfg && cfg.perm) || myPerm;
-    $('cfgSub').innerHTML = p.adminOf.length
-      ? 'You administer <b>' + p.adminOf.map(esc).join('</b>, <b>') + '</b>. Changes apply at once.'
-      : 'You do not administer any role.';
+    // Settings is for EVERYONE now (Josh, 2026-09-06). Someone who manages no role sees what they
+    // are and what that lets them do — which for most staff is "look up anyone, change nothing,
+    // tell the office" — rather than an empty dialog that looks broken.
+    if (!p.adminOf.length) {
+      $('cfgSub').innerHTML = 'Signed in as <b>' + esc(p.email || '') + '</b>';
+      $('cfgBody').innerHTML = '<div class="sect"><h4>Your access</h4>' +
+        (p.roles.length
+          ? p.roles.map(function (r) {
+              return '<div class="mrow"><span class="me"><b>' + esc(r) + '</b>' +
+                '<span class="wnote">' + esc(ROLE_HELP[r] || '') + '</span></span></div>';
+            }).join('')
+          : '<div class="muted">Staff — you can look up any student and every lane. Changes for ' +
+            'today are recorded by the office or the ramp: tell them and they\'ll record it.</div>') +
+        (p.teacherName ? '<div class="cfgnote">Class mode knows you as <b>' + esc(p.teacherName) + '</b>.</div>' : '') +
+        '</div>';
+      return;
+    }
+    $('cfgSub').innerHTML = 'You administer <b>' + p.adminOf.map(esc).join('</b>, <b>') +
+      '</b>. Changes apply at once.';
     var mem = (cfg && cfg.members) || [];
     var views = (cfg && cfg.views) || {};
     var staff = (cfg && cfg.staff) || [];
@@ -1824,18 +1849,6 @@ if (typeof module !== 'undefined' && module.exports) {
     $('staffList').innerHTML = staff.map(function (s) {
       return '<option value="' + esc(s.email) + '">' + esc(s.name) + '</option>';
     }).join('');
-    // What MEMBERSHIP grants, in the words a role admin would use. The tick is separate and means
-    // one thing everywhere: "can add and remove people in this role". Josh, 2026-09-05, after
-    // putting three people in Admin without the tick: "what exactly does that mean?" — for Admin,
-    // nothing; membership already grants everything, so the tick is not offered there.
-    var ROLE_HELP = {
-      'Admin':          'Full control: change any child, edit routes, manage every role, grant admin.',
-      'Office':         'Change ANY child\'s dismissal for today — they take the phone calls.',
-      'Ramp':           'Change ANY child\'s dismissal for today — a parent can arrive for anyone.',
-      'Walk-Up':        'Change a child on the approved walk-up list.',
-      'Teacher':        'Look up any student and see their own class. Read-only — changes go through the office. Automatic for every homeroom teacher; rows here are optional.',
-      'Transportation': 'Edit the Routes tab. Cannot change a child\'s dismissal.'
-    };
     $('cfgBody').innerHTML = p.adminOf.map(function (role) {
       var people = mem.filter(function (m) { return m.role === role; });
       var v = views[role];
@@ -2064,7 +2077,6 @@ if (typeof module !== 'undefined' && module.exports) {
         if (seq !== reqSeq) return;              // a newer request already answered
         if (res.ok) {
           myPerm = res.perm || myPerm;
-          $('gear').hidden = !myPerm.canManageRoles;
           applyPayload(res);
           // The saved view is applied ONCE. Every later load — the five-minute tick, the refresh
           // button, a save — keeps whatever the person has set since. The first version re-applied
@@ -2073,10 +2085,8 @@ if (typeof module !== 'undefined' && module.exports) {
           if (!viewApplied) {
             viewApplied = true;
             if (res.savedView) applyView(res.savedView);
-            // First paint decides the panel: shut when a view came with the load, open when the
-            // person has nothing set yet — unless this device remembers a choice.
-            var remembered = filtersRemembered();
-            setFiltersOpen(remembered === null ? !res.savedView : remembered, false);
+            // First paint decides the top: shut when a view came with the load, open otherwise.
+            setMenuOpen(!res.savedView);
             // Say WHOSE view this is. A stand-in on the ramp needs to know the board is filtered
             // by somebody else's choices, and how to make it their own.
             $('viewnote').innerHTML = (res.viewFrom && res.viewFrom !== 'personal')
@@ -2140,9 +2150,7 @@ if (typeof module !== 'undefined' && module.exports) {
   $('mWalk').addEventListener('click', function () { setMode('walk'); });
   $('q').addEventListener('input', render);      // local — never a round trip
   $('refresh').addEventListener('click', load);
-  $('filtersBtn').addEventListener('click', function () {
-    setFiltersOpen($('filterPanel').hidden, true);
-  });
+  $('menuBtn').addEventListener('click', function () { setMenuOpen($('menuPanel').hidden); });
   $('gear').addEventListener('click', openSettings);
   $('cfgClose').addEventListener('click', function () { $('cfg').close(); });
   $('saveBtn').addEventListener('click', function () {
