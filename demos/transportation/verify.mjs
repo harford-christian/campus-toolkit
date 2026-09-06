@@ -191,9 +191,13 @@ check('"My class" is her ten 3rd graders; a co-teacher\'s "My grade" widens past
   S.dsScopeRows(flat, 'Quon Beatrix', 'class').length < S.dsScopeRows(flat, 'Quon Beatrix', 'grade').length);
 const quon = S.dsPermissions('b.quon@example.edu', S.dsBuildRoles(D.tabs.Roles), 'Quon Beatrix',
                              S.dsHomeroomTeacherSet(S.dsBuildRoster(D.tabs.Roster)));
-check('a homeroom teacher with NO Roles row may change her own class and nobody else\'s',
+// Teachers are READ-ONLY (Josh, 2026-09-05): the implicit role scopes what she sees, and every
+// change goes through Office / Ramp / Walk-Up. This check used to assert she could change her own
+// class; the app's rule reversed and so did this.
+check('a homeroom teacher with NO Roles row holds the Teacher role but may change nobody, own class included',
   quon.teacherImplicit === true && !quon.canChangeAnyone &&
-  S.dsCanChange(quon, byId(flat, '400115'), false).ok && !S.dsCanChange(quon, byId(flat, '400113'), false).ok);
+  !S.dsCanChange(quon, byId(flat, '400115'), false).ok && !S.dsCanChange(quon, byId(flat, '400113'), false).ok &&
+  /office/.test(S.dsCanChange(quon, byId(flat, '400115'), false).why));
 
 /* ---------- the student card ---------- */
 const pk = M.pickupsApi();

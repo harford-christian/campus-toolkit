@@ -901,9 +901,13 @@ function dsPermissions(email, roleRows, teacherName, homeroomTeachers) {
     // WRITE SCOPE, widest first. Office take the phone calls, so they are deliberately the widest.
     // Ramp is unfenced (Josh, 2026-09-04): a parent can arrive at the ramp for ANY child, and the
     // person physically holding that child must be able to record what just happened.
+    // TEACHERS ARE READ-ONLY (Josh, 2026-09-05): they look up any student and see their own class,
+    // but a change goes through the office or the ramp — "that has to go through the right people."
+    // This reverses the 09-04 own-class allowance; canChangeOwnClass is kept as a field for the
+    // client's payload shape and now means nothing beyond canChangeAnyone.
     canChangeAnyone: isAdmin || !!roles['Office'] || !!roles['Ramp'],
     canChangeWalkUp: isAdmin || !!roles['Office'] || !!roles['Ramp'] || !!roles['Walk-Up'],
-    canChangeOwnClass: isAdmin || !!roles['Office'] || !!roles['Ramp'] || !!roles['Teacher'],
+    canChangeOwnClass: isAdmin || !!roles['Office'] || !!roles['Ramp'],
     canEditRoutes: isAdmin || !!roles['Transportation'],
     canManageRoles: Object.keys(adminOf).length > 0,
     isAdmin: isAdmin,
@@ -924,32 +928,32 @@ function dsHomeroomTeacherSet(roster) {
 /**
  * May this person change THIS child's dismissal today?
  *
+ * Read is broad; write belongs to the people who take the calls. Office and Ramp may change anyone,
+ * Walk-Up may change a child on the approved list, and everyone else — teachers included, since
+ * 2026-09-05 — is told who to tell. The refusal never says "get a role": for most staff, read-only
+ * is the correct state, not a missing permission.
+ *
  * @param {Object} perm      dsPermissions output
- * @param {Object} student   the child's flat/roster entry ({homeroomTeacher}), or null
+ * @param {Object} student   the child's flat/roster entry, or null (kept for the call sites; the
+ *                           own-class allowance it served was withdrawn)
  * @param {boolean} isWalkUp whether the child is on the approved walk-up list
  * @return {{ok: boolean, why: string}} why is shown to the person, so it must be plain English
  */
 function dsCanChange(perm, student, isWalkUp) {
-  if (!perm || !perm.roles || !perm.roles.length) {
-    return { ok: false, why: 'You have no dismissal role yet — ask the office to add you.' };
+  if (perm && perm.canChangeAnyone) return { ok: true, why: '' };
+  if (isWalkUp && perm && perm.canChangeWalkUp) return { ok: true, why: '' };
+  if (perm && perm.canChangeWalkUp) {
+    return { ok: false, why: 'You can change children on the approved walk-up list. For anyone ' +
+      'else, tell the office and they\'ll record it.' };
   }
-  if (perm.canChangeAnyone) return { ok: true, why: '' };
-  if (isWalkUp && perm.canChangeWalkUp) return { ok: true, why: '' };
-  if (perm.canChangeOwnClass && student && perm.teacherName &&
-      String(student.homeroomTeacher || '').toLowerCase() === String(perm.teacherName).toLowerCase()) {
-    return { ok: true, why: '' };
-  }
-  if (perm.canChangeOwnClass) {
-    return { ok: false, why: 'You can only change students in your own class. Ask the office for ' +
-      'anyone else.' };
-  }
-  return { ok: false, why: 'Your role does not allow changing a dismissal.' };
+  return { ok: false, why: 'Changes are recorded by the office or the ramp — tell them and ' +
+    'they\'ll record it.' };
 }
 
 /**
- * The classroom view's three widening scopes. Lives here rather than in the page so the SAME
- * comparison decides what a teacher sees and what they may change — two rules would drift, and the
- * drift would look like "I can see her but I can't change her", which is worse than either alone.
+ * The classroom view's three widening scopes. Lives here rather than in the page so it is tested,
+ * and so the name comparison is the one dsPermissions uses to recognise a homeroom teacher.
+ * (Teachers are read-only since 2026-09-05; this decides only what they SEE.)
  *
  * 'class'  — students whose Homeroom Teacher is this person. FACTS records ONE homeroom teacher per
  *            student, so where a grade is shared between teachers each sees their own homeroom.
@@ -1775,7 +1779,7 @@ if (typeof module !== 'undefined' && module.exports) {
       'Office':         'Change ANY child\'s dismissal for today — they take the phone calls.',
       'Ramp':           'Change ANY child\'s dismissal for today — a parent can arrive for anyone.',
       'Walk-Up':        'Change a child on the approved walk-up list.',
-      'Teacher':        'Change their own homeroom class only. Automatic for every homeroom teacher — rows here are optional.',
+      'Teacher':        'Look up any student and see their own class. Read-only — changes go through the office. Automatic for every homeroom teacher; rows here are optional.',
       'Transportation': 'Edit the Routes tab. Cannot change a child\'s dismissal.'
     };
     $('cfgBody').innerHTML = p.adminOf.map(function (role) {
