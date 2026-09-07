@@ -88,18 +88,23 @@ window.MOCK_BACKEND = (function () {
     var dayKey = todayKey(sim), dayName = dayNameOf(dayKey);
     var roster = dsBuildRoster(T.Roster);
     var attendance = dsBuildAttendance(T['Attendance Today']);
-    var overrides = dsBuildOverrides(state.overrides, dayKey);
+    var todayOverrides = dsBuildOverrides(state.overrides, dayKey);
+    // The office's STANDING answers sit under today's call-ins (today wins) — mirrors dismissalApi.
+    var overrides = dsMergeOverrides(dsBuildStanding(T.Standing), todayOverrides);
     var signedOut = dsBuildSignedOut(T.EVENTS, dayKey);     // the app's own fold, real kiosk columns
     var walkers = dsBuildWalkers(T.Walkers);
     var routes = dsBuildRoutes(T.Routes);
     var board = dsBuildBoard({ roster: roster, attendance: attendance, signedOut: signedOut, overrides: overrides },
                              { session: 'PM', routes: routes });
+    // Only TODAY's overrides feed the walk-up list; then the approved walkers are MARKED on the board.
+    var walkUp = dsWalkUpList(dsFlatList(board), walkers, attendance, signedOut, dayName,
+                              occasionalToday(todayOverrides), todayOverrides);
+    dsApplyWalkUps(board, walkUp);
     var perm = myPerm(), eff = effectiveView(perm);
     var fresh = freshness(attendance, signedOut);
     return {
       ok: true, board: board, routes: routes,
-      walkUp: dsWalkUpList(dsFlatList(board), walkers, attendance, signedOut, dayName,
-                           occasionalToday(overrides), overrides),
+      walkUp: walkUp,
       dayKey: dayKey, dayName: dayName, sim: String(sim || ''),
       perm: perm,
       savedView: eff.view, viewFrom: eff.from,

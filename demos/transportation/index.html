@@ -143,6 +143,8 @@
   .att.split  { background: #1f4e8a; color: #fff; }
   .att.walk   { background: #e7e9ee; color: #3a2a00; }
   .att.ovr    { background: var(--ok); color: #fff; }
+  .att.walkup { background: #00796B; color: #fff; }
+  .att.standing { background: #e7e9ee; color: var(--dd); }
 
   .empty { padding: 1rem .9rem; color: var(--dt); }
   .simbar { background: var(--gold); color: var(--gold-ink); font-weight: 700; padding: .5rem .9rem;
@@ -446,6 +448,72 @@ function dsBuildOverrides(values, todayKey) {
 }
 
 /**
+ * STANDING answers -> {studentId: {type, routeCode, destination, note, by, at, standing: true}}.
+ *
+ * The third kind of truth on this board. FACTS says where a parent WORKS; the walk-up list says who
+ * is WALKED; this says what a specific child DOES every day when neither of those is right. First
+ * case (office, 2026-09-06): the Boehm boys' mother drives an AM van route, so the placement code
+ * puts them at the High School at 3:10 — and in fact she is a parent at the north-lot ramp like
+ * anyone else. There was nowhere to write that down that outlived midnight.
+ *
+ * Office-owned, like Walkers and Routes. Applied UNDER today's overrides, so a phone call still
+ * wins for the day. Only the four lanes are accepted; anything else is skipped here and named by
+ * RUN_readiness rather than guessed at.
+ */
+var DS_STANDING_TYPES = ['Bus', 'Car', 'Early Bird', 'Staff Kid'];
+function dsBuildStanding(values) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var id = get(row, 'Student ID'), type = get(row, 'Type');
+    if (!id || DS_STANDING_TYPES.indexOf(type) === -1) continue;
+    out[id] = {
+      type: type, routeCode: get(row, 'Route Code'), destination: get(row, 'Destination'),
+      note: get(row, 'Note'), by: get(row, 'By'), at: get(row, 'Since'), standing: true
+    };
+  }
+  return out;
+}
+
+/** Standing answers with today's overrides laid on top — today always wins for its student. */
+function dsMergeOverrides(standing, today) {
+  var out = {};
+  Object.keys(standing || {}).forEach(function (id) { out[id] = standing[id]; });
+  Object.keys(today || {}).forEach(function (id) { out[id] = today[id]; });
+  return out;
+}
+
+/**
+ * Mark board rows for children on the APPROVED walk-up list, so the ramp never reads them as a
+ * pickup. Evelyn Hodgson (office, 2026-09-06) has no staff parent — she walks up to meet her
+ * brother — so the roster types her Car and the ramp lead's list would have waited for a car that was
+ * never coming. Eighteen more walkers read "Staff Kid". The list is authoritative; the rows now
+ * say so. Type is left alone (a bus child on the list stays Bus and is flagged elsewhere); the
+ * row gains walkUp / walkUpWalking / walkUpTo / walkUpWhy for the renderer.
+ */
+function dsApplyWalkUps(board, walkUp) {
+  var byId = {};
+  ((walkUp && walkUp.rows) || []).forEach(function (w) { byId[w.id] = w; });
+  ((board && board.groups) || []).forEach(function (g) {
+    g.rows.forEach(function (r) {
+      var w = byId[r.id];
+      if (!w) return;
+      r.walkUp = true;
+      r.walkUpWalking = !!w.walking;
+      r.walkUpTo = w.destination || '';
+      r.walkUpWhy = w.walking ? '' : (w.why || w.kind || '');
+    });
+  });
+  return board;
+}
+
+/**
  * Today's COMPLETED mid-day sign-outs, folded from Campus Presence's append-only EVENTS log.
  *
  * Column names are from campus-sign-in-out-system/logic/schema.js (read 2026-09-05, not assumed):
@@ -563,6 +631,9 @@ function dsFlatList(board) {
           overridden: r.overridden, overrideNote: r.overrideNote,
           overrideBy: r.overrideBy || '', overrideAt: r.overrideAt || '',
           overrideDestination: r.overrideDestination || '',
+          standing: !!r.standing, standingNote: r.standingNote || '',
+          walkUp: !!r.walkUp, walkUpWalking: !!r.walkUpWalking,
+          walkUpTo: r.walkUpTo || '', walkUpWhy: r.walkUpWhy || '',
           expected: r.expected, reason: r.reason, detail: r.detail, note: r.note
         };
         order.push(e);
@@ -1186,10 +1257,13 @@ function dsBuildBoard(d, opts) {
       familyId: s.familyId, homeroom: s.homeroom, homeroomTeacher: s.homeroomTeacher,
       note: s.note, source: s.source,
       // The audit trail travels with the row. Every change stamps who and when; the card must be
-      // able to say so, or the stamp is a promise the sheet keeps and the app breaks.
-      overridden: !!o, overrideNote: o ? (o.note || '') : '',
-      overrideBy: o ? (o.by || '') : '', overrideAt: o ? (o.at || '') : '',
+      // able to say so, or the stamp is a promise the sheet keeps and the app breaks. A STANDING
+      // answer is not "today" — it is the child's normal — so it gets its own flag and note and
+      // never earns the TODAY badge.
+      overridden: !!(o && !o.standing), overrideNote: (o && !o.standing) ? (o.note || '') : '',
+      overrideBy: (o && !o.standing) ? (o.by || '') : '', overrideAt: (o && !o.standing) ? (o.at || '') : '',
       overrideDestination: o ? (o.destination || '') : '',
+      standing: !!(o && o.standing), standingNote: (o && o.standing) ? (o.note || '') : '',
       expected: v.expected, reason: v.reason, detail: v.detail
     };
 
@@ -1280,6 +1354,8 @@ if (typeof module !== 'undefined' && module.exports) {
     dsCellToString: dsCellToString, dsHeaderMap: dsHeaderMap, dsSerializeTab: dsSerializeTab,
     dsBuildRoster: dsBuildRoster, dsBuildAttendance: dsBuildAttendance,
     dsBuildOverrides: dsBuildOverrides, dsBuildSignedOut: dsBuildSignedOut, dsClassify: dsClassify,
+    dsBuildStanding: dsBuildStanding, dsMergeOverrides: dsMergeOverrides, dsApplyWalkUps: dsApplyWalkUps,
+    DS_STANDING_TYPES: DS_STANDING_TYPES,
     dsBuildBoard: dsBuildBoard, dsFilterBoard: dsFilterBoard,
     dsBuildPickups: dsBuildPickups, dsFlatList: dsFlatList, dsStudentCard: dsStudentCard,
     dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
@@ -1426,6 +1502,12 @@ if (typeof module !== 'undefined' && module.exports) {
   function destOf(r) {
     if (r.routes && r.routes.length) return r.routes.join(' or ');
     if (r.routeName || r.routeCode) return r.routeName || r.routeCode;
+    // The approved walk-up list outranks whatever the roster derived: a child on it is walked up,
+    // whether FACTS calls them Car (Evelyn, walking to her brother) or Staff Kid.
+    if (r.walkUp) {
+      return r.walkUpWalking ? 'walks up' + (r.walkUpTo ? ' → ' + r.walkUpTo : ' to the HS')
+                             : 'walk-up · ' + (r.walkUpWhy || 'not today');
+    }
     if (r.type === 'Staff Kid' && r.walkTo && r.walkTo !== 'Unresolved') return 'walk to ' + r.walkTo;
     return r.type;
   }
@@ -1440,7 +1522,9 @@ if (typeof module !== 'undefined' && module.exports) {
   function extraBadges(r) {
     var b = '';
     if (r.split) b += '<span class="att split">SPLIT</span>';
-    if (r.walkTo === 'Unresolved') b += '<span class="att walk">walk-to unknown</span>';
+    if (r.walkUp) b += '<span class="att walkup">WALK-UP</span>';
+    else if (r.walkTo === 'Unresolved') b += '<span class="att walk">walk-to unknown</span>';
+    if (r.standing) b += '<span class="att standing" title="A standing arrangement the office wrote down">STANDING</span>';
     if (r.overridden) b += '<span class="att ovr">TODAY</span>';
     return b;
   }
@@ -1682,6 +1766,11 @@ if (typeof module !== 'undefined' && module.exports) {
       if (s.overrideDestination) {
         h += '<div class="muted">Handed to: ' + esc(s.overrideDestination) + '</div>';
       }
+    }
+    if (s.standing) {
+      // the office wrote this down; it is the child's normal, not a change
+      h += '<div class="muted"><b>Standing arrangement</b>' +
+        (s.standingNote ? ': ' + esc(s.standingNote) : '') + '</div>';
     }
     if (!s.expected) h += '<div class="flagbox">' + esc(s.reason) +
       (s.detail ? ' — ' + esc(s.detail) : '') + '</div>';

@@ -615,10 +615,22 @@ window.DISMISSAL_DATA = (function () {
               savedAt: '2026-09-08 14:40' }
   };
 
+  // STANDING per-child answers that are not walk-ups and do not expire (office-owned). The real
+  // one (2026-09-06): a driver's children derived as "walk to the High School" from the parent's
+  // placement code — and the office said no, she drives a MORNING route; they are car pickups.
+  var STANDING_HEADER = ['Student ID', 'Student Name', 'Type', 'Route Code', 'Destination', 'Note', 'By', 'Since'];
+  function standingValues() {
+    return [STANDING_HEADER.slice(),
+      ['400156', 'Ashby Clover', 'Car', '', '',
+       'EL ramp, north lot. Dad drives an AM van route only — not a dismissal route. Not a walk-up.',
+       'office.demo@example.edu', '2026-09-06']];
+  }
+
   var tabs = {
     'Roster': rosterValues(),
     'Attendance Today': attendanceValues(),
     'Overrides': overridesValues(),
+    'Standing': standingValues(),
     'Walkers': walkersValues(),
     'Routes': routesValues(),
     'Roles': rolesValues(),

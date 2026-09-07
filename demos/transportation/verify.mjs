@@ -56,9 +56,9 @@ check('Early Bird is computed by the producer\'s family rule, not hand-written',
   eq(P.trEarlyBirdSet_(D.producerInputs.gradeById, D.producerInputs.familyById), D.producerInputs.earlyBird));
 check('87 fabricated students, one PM row each plus AM and split rows',
   Object.keys(D.producerInputs.nameById).length === 87 && D.tabs.Roster.length - 1 > 87);
-check('all nine tabs the app reads are present',
+check('all ten tabs the app reads are present',
   eq(Object.keys(D.tabs).sort(), ['Attendance Today', 'EVENTS', 'Overrides', 'PickupContacts', 'Roles',
-                                  'Roster', 'Routes', 'Staff', 'Walkers']));
+                                  'Roster', 'Routes', 'Staff', 'Standing', 'Walkers']));
 check('every student in the sign-out log, attendance, overrides and walkers is on the roster',
   [...D.tabs.EVENTS.slice(1).map(r => r[3]), ...D.tabs['Attendance Today'].slice(1).map(r => r[0]),
    ...D.tabs.Overrides.slice(1).map(r => r[1]), ...D.tabs.Walkers.slice(1).map(r => r[0])]
@@ -123,6 +123,11 @@ check('staff kids: walk to the HS / same building / Unresolved / to Elementary /
   byId(flat, '400150').walkTo === 'High School' && byId(flat, '400154').walkTo === '' &&
   byId(flat, '400155').walkTo === 'Unresolved' && byId(flat, '400153').walkTo === 'Elementary' &&
   byId(flat, '400159').walkTo === 'Kindergarten');
+check("a STANDING answer overrides the derivation: the driver's child is Car, badge data on, no TODAY stamp",
+  (() => { const c = byId(flat, '400156'); return !!c && c.type === 'Car' && c.standing === true &&
+    c.overridden === false && /AM van route/.test(c.standingNote) && c.routes.length === 0; })());
+check('approved walkers are MARKED on the ramp rows — every one of the 8 carries a destination or a reason',
+  (() => { const w = flat.filter(r => r.walkUp); return w.length === 8 && w.every(r => r.walkUpWalking ? true : !!r.walkUpWhy); })());
 check('6th-grade pickup follows the siblings: EL with an EL-side sibling, HS otherwise',
   byId(flat, '400132').pickup === 'EL' && byId(flat, '400170').pickup === 'EL' &&
   byId(flat, '400117').pickup === 'HS' && byId(flat, '400143').pickup === 'HS' && byId(flat, '400181').pickup === 'HS');
