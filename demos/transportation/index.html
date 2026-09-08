@@ -201,6 +201,27 @@
 
   @media (max-width: 640px) { body { padding: .7rem; } .who { display: none; } }
   @media (max-width: 380px) { .pmeta { display: none; } }
+  /* PRINT — the driver's list (Josh, 2026-09-08). One page per PM route, built by printLists()
+     into #printArea. The swap is gated on body.printing, set by the button, so a bare Ctrl+P still
+     prints the board the way it always did. The colour band is forced to print: on paper the
+     colour IS the route. */
+  #printArea { display: none; }
+  @media print {
+    body.printing .wrap, body.printing dialog { display: none !important; }
+    body.printing #printArea { display: block; }
+    .sheet { page-break-after: always; break-after: page; color: #000;
+             font: 12pt/1.35 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .sheet:last-child { page-break-after: auto; break-after: auto; }
+    .sheet h2 { margin: 0 0 .3rem; padding: .35rem .6rem; border: 2px solid; border-radius: 6px;
+                font-size: 16pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sheet h3 { margin: .9rem 0 .2rem; font-size: 12pt; }
+    .sheet .meta { margin: .15rem 0; font-size: 10.5pt; }
+    .sheet table { width: 100%; border-collapse: collapse; margin-top: .4rem; }
+    .sheet th, .sheet td { border-bottom: 1px solid #999; padding: .22rem .35rem; text-align: left;
+                           vertical-align: top; }
+    .sheet th { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .03em; }
+    .sheet .foot { margin-top: .9rem; font-size: 9pt; color: #333; }
+  }
 </style>
 
 <div class="wrap">
@@ -236,6 +257,8 @@
         <select id="fRoute"><option value="">All routes</option></select>
         <button id="saveBtn" class="ghost" title="Remember these filters for me">☆ Save view</button>
         <button id="refresh" class="ghost" title="Reload">↻</button>
+        <button id="printBtn" class="ghost"
+                title="Print one page per bus route for the drivers — who rides today and who does not. Pick a route above to print just that bus.">&#128424; Print bus lists</button>
       </div>
       <div class="chiprow" id="typeRow"></div>
       <div class="chiprow grades" id="grades"></div>
@@ -250,6 +273,9 @@
   <div id="banners"></div>
   <div id="board"></div>
 </div>
+
+<!-- The driver's list, filled by printLists() and shown only while printing. -->
+<div id="printArea" aria-hidden="true"></div>
 
 <dialog id="card"><div class="dlg" id="cardBody"></div></dialog>
 
@@ -632,6 +658,7 @@ function dsFlatList(board) {
           overrideBy: r.overrideBy || '', overrideAt: r.overrideAt || '',
           overrideDestination: r.overrideDestination || '',
           standing: !!r.standing, standingNote: r.standingNote || '',
+          fromRouteCode: r.fromRouteCode || '', fromRouteName: r.fromRouteName || '',
           walkUp: !!r.walkUp, walkUpWalking: !!r.walkUpWalking,
           walkUpTo: r.walkUpTo || '', walkUpWhy: r.walkUpWhy || '',
           expected: r.expected, reason: r.reason, detail: r.detail, note: r.note
@@ -1227,6 +1254,12 @@ function dsBuildBoard(d, opts) {
 
   var rows = (d.roster || []).filter(function (s) { return s.session === session; });
   var byGroup = {}, notExpected = [], seen = {};
+  // LANES ARE KEYED BY THE ROSTER'S ROUTE NAME (the FACTS course title). A child overridden ONTO a
+  // bus must join that bus's lane, so the name for a code comes from the roster first and from the
+  // Routes tab only for a code no rider carries today — found 2026-09-08, when the first override
+  // to J opened a second "Jarrettsville" lane beside "Jarrettsville Bus Route".
+  var nameByCode = {};
+  rows.forEach(function (s) { if (s.routeCode && s.routeName && !nameByCode[s.routeCode]) nameByCode[s.routeCode] = s.routeName; });
   var counts = { total: 0, expected: 0, notExpected: 0, byType: {} };
 
   rows.forEach(function (s) {
@@ -1245,10 +1278,15 @@ function dsBuildBoard(d, opts) {
       routeCode = ''; routeName = ''; vehicle = ''; split = false;
     } else if (routeCode !== s.routeCode) {
       var rt = routes[routeCode];
-      routeName = rt ? (rt.name || routeCode) : '';
+      routeName = nameByCode[routeCode] || (rt ? (rt.name || routeCode) : '');
       vehicle = rt ? (rt.vehicle || '') : '';
       split = false;                        // one route was chosen for today; nothing to confirm
     }
+
+    // WHEN AN OVERRIDE TAKES A RIDER OFF THEIR BUS, THE BUS STILL NEEDS TO KNOW. The driver's list
+    // (dsDriverLists) is built from the board alone, so the route the roster had rides along on the
+    // row whenever an override changed the journey away from it — blank otherwise.
+    var moved = !!o && s.type === 'Bus' && !!s.routeCode && (type !== 'Bus' || routeCode !== s.routeCode);
 
     var entry = {
       id: s.id, name: s.name, grade: s.grade, type: type,
@@ -1264,6 +1302,7 @@ function dsBuildBoard(d, opts) {
       overrideBy: (o && !o.standing) ? (o.by || '') : '', overrideAt: (o && !o.standing) ? (o.at || '') : '',
       overrideDestination: o ? (o.destination || '') : '',
       standing: !!(o && o.standing), standingNote: (o && o.standing) ? (o.note || '') : '',
+      fromRouteCode: moved ? s.routeCode : '', fromRouteName: moved ? s.routeName : '',
       expected: v.expected, reason: v.reason, detail: v.detail
     };
 
@@ -1349,6 +1388,98 @@ function dsFilterBoard(board, f) {
 }
 
 // Node test harness reaches these directly; GAS and the browser ignore the export.
+/* ------------------------------------ the driver's list ------------------------------------ */
+
+/**
+ * One printable list per PM bus route — who is riding today, who is NOT, and who is driving —
+ * built from the SAME board the ramp sees, so paper and screen cannot disagree (the front desk
+ * prints these for the drivers; Josh, 2026-09-08).
+ *
+ * A rider on the route's group today is RIDING when expected, NOT RIDING with the board's reason
+ * (ABSENT / LEFT EARLY / SIGNED OUT) otherwise. A rider an override took OFF the bus reaches the
+ * list through fromRouteCode as "CAR TODAY" (or "ON <other route> TODAY"), because the driver
+ * still needs to know not to wait. A standing answer says so — "(STANDING)" — rather than reading
+ * as a fresh change every day. Unknown reads as riding, same as everywhere else in this app.
+ *
+ * @param board   dsBuildBoard output
+ * @param routes  dsBuildRoutes output — colour, vehicle, who drives which day
+ * @param dayName 'Mon'..'Fri'
+ * @param only    optional route code or name — just that route's list, for a one-bus reprint
+ * @return [{ code, name, colour, vehicle, drivers: [{name, phone}],
+ *            riding:    [{ id, name, grade, building, flags: ['also on …', 'added today — …', 'standing — …'] }],
+ *            notRiding: [{ id, name, grade, reason, detail }] }]  alphabetical, riders alphabetical
+ */
+function dsDriverLists(board, routes, dayName, only) {
+  routes = routes || {};
+  var lists = {}, routesOf = {}, rows = [];
+  ((board && board.groups) || []).forEach(function (g) {
+    (g.rows || []).forEach(function (r) { rows.push(r); });
+  });
+  var onBus = function (r) { return r.type === 'Bus' && !!(r.routeCode || r.routeName); };
+  var labelOf = function (r) { return r.routeName || r.routeCode; };
+
+  function listFor(code, label) {
+    var rt = dsRouteFor(routes, code, label);
+    var key = (rt && rt.code) || code || label;
+    if (!lists[key]) {
+      lists[key] = {
+        code: (rt && rt.code) || code || '',
+        name: (rt && rt.name) || label || code || 'Bus',
+        colour: (rt && rt.colour) || '', vehicle: (rt && rt.vehicle) || '',
+        drivers: dsDriversFor(rt, 'PM', dayName).map(function (d) {
+          return { name: d.name, phone: d.phone || '' };
+        }),
+        riding: [], notRiding: []
+      };
+    }
+    return lists[key];
+  }
+
+  rows.forEach(function (r) {
+    if (onBus(r)) (routesOf[r.id] = routesOf[r.id] || []).push(labelOf(r));
+  });
+  rows.forEach(function (r) {
+    if (onBus(r)) {
+      var L = listFor(r.routeCode, r.routeName);
+      if (r.expected) {
+        var flags = [];
+        (routesOf[r.id] || []).forEach(function (n) { if (n !== labelOf(r)) flags.push('also on ' + n); });
+        if (r.overridden) flags.push('added today' + (r.overrideNote ? ' — ' + r.overrideNote : ''));
+        else if (r.standing) flags.push('standing' + (r.standingNote ? ' — ' + r.standingNote : ''));
+        L.riding.push({ id: r.id, name: r.name, grade: r.grade, building: r.building || '', flags: flags });
+      } else {
+        L.notRiding.push({ id: r.id, name: r.name, grade: r.grade, reason: r.reason || 'NOT EXPECTED',
+                           detail: r.detail || '' });
+      }
+    }
+    if (r.fromRouteCode || r.fromRouteName) {
+      var F = listFor(r.fromRouteCode, r.fromRouteName);
+      var to = r.type === 'Bus' ? dsRouteFor(routes, r.routeCode, r.routeName) : null;
+      var where = r.type === 'Bus'
+        ? 'ON ' + String((to && to.name) || r.routeName || r.routeCode || 'ANOTHER BUS').toUpperCase()
+        : String(r.type || 'CHANGED').toUpperCase();
+      var note = r.standing ? r.standingNote : r.overrideNote;
+      F.notRiding.push({
+        id: r.id, name: r.name, grade: r.grade,
+        reason: where + (r.standing ? ' (STANDING)' : ' TODAY'),
+        detail: [r.overrideDestination || '', note || ''].filter(String).join(' — ')
+      });
+    }
+  });
+
+  var byName = function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; };
+  var out = Object.keys(lists).map(function (k) { return lists[k]; });
+  out.forEach(function (L) { L.riding.sort(byName); L.notRiding.sort(byName); });
+  out.sort(byName);
+  if (only) {
+    var o = String(only).trim().toLowerCase();
+    out = out.filter(function (L) {
+      return L.code.toLowerCase() === o || L.name.toLowerCase() === o;
+    });
+  }
+  return out;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     dsCellToString: dsCellToString, dsHeaderMap: dsHeaderMap, dsSerializeTab: dsSerializeTab,
@@ -1360,6 +1491,7 @@ if (typeof module !== 'undefined' && module.exports) {
     dsBuildPickups: dsBuildPickups, dsFlatList: dsFlatList, dsStudentCard: dsStudentCard,
     dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
     dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor,
+    dsDriverLists: dsDriverLists,
     DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
     dsCanChange: dsCanChange, dsBuildStaffNames: dsBuildStaffNames, dsScopeRows: dsScopeRows,
     dsResolveStaff: dsResolveStaff, dsBuildStaffDirectory: dsBuildStaffDirectory,
@@ -2239,6 +2371,61 @@ if (typeof module !== 'undefined' && module.exports) {
   $('mWalk').addEventListener('click', function () { setMode('walk'); });
   $('q').addEventListener('input', render);      // local — never a round trip
   $('refresh').addEventListener('click', load);
+
+  /* ------------------------------ the driver's list, on paper ------------------------------
+   *
+   * The front desk prints one page per PM route for the drivers (Josh, 2026-09-08). It is built
+   * from the SAME payload the ramp is looking at — dsDriverLists over raw.board — so paper and
+   * screen cannot disagree, and it honours the route filter so one bus can be reprinted alone.
+   * The colour WORD is printed here, unlike the on-screen chips: a driver's sheet may come out
+   * of a mono printer, and "the purple bus" is what people say out loud. */
+  var BLDG_SHORT = { 'Kindergarten': 'K', 'Elementary': 'EL', '6th Grade': '6', 'High School': 'HS' };
+  function printLists() {
+    if (!raw || !raw.ok) { alert('The board has not loaded yet.'); return; }
+    var only = $('qAll').checked ? '' : ($('fRoute').value || '');
+    var lists = dsDriverLists(raw.board, raw.routes, raw.dayName, only);
+    if (!lists.length) { alert(only ? 'No riders listed for ' + only + ' today.' : 'No bus routes on the board.'); return; }
+    var f = raw.freshness || {};
+    var stamp = (raw.dayName || '') + ' ' + (raw.dayKey || '') + ' · PM · printed ' +
+      String(raw.serverNow || '').slice(11) + ' · FACTS attendance as of ' + (f.syncedAt || '?') +
+      (f.signOutActive ? ' · ' + (f.signOutCount || 0) + ' signed out today' : '');
+    $('printArea').innerHTML = lists.map(function (L) {
+      var drv = L.drivers.length
+        ? L.drivers.map(function (d) { return esc(d.name) + (d.phone ? ' ' + esc(d.phone) : ''); }).join(' + ')
+        : 'NO DRIVER LISTED for ' + esc(raw.dayName || 'today') + ' — check the Routes tab';
+      return '<section class="sheet">' +
+        '<h2 style="' + chipStyle(L.colour) + '">' + esc(L.name) +
+          (L.vehicle ? ' · ' + esc(L.vehicle) : '') + (L.colour ? ' · ' + esc(L.colour) : '') + '</h2>' +
+        '<div class="meta">' + esc(stamp) + '</div>' +
+        '<div class="meta">Driver: ' + drv + '</div>' +
+        '<div class="meta"><b>' + L.riding.length + '</b> riding today · <b>' + L.notRiding.length +
+          '</b> not riding</div>' +
+        '<table><thead><tr><th>#</th><th>Student</th><th>Gr</th><th>Bldg</th><th>Notes</th></tr></thead><tbody>' +
+        L.riding.map(function (r, i) {
+          return '<tr><td>' + (i + 1) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.grade) + '</td><td>' +
+            esc(BLDG_SHORT[r.building] || r.building) + '</td><td>' + esc(r.flags.join('; ')) + '</td></tr>';
+        }).join('') + '</tbody></table>' +
+        (L.notRiding.length
+          ? '<h3>Not riding today — do not wait</h3><table><tbody>' + L.notRiding.map(function (r) {
+              return '<tr><td>' + esc(r.name) + '</td><td>' + esc(r.grade) + '</td><td><b>' + esc(r.reason) +
+                '</b>' + (r.detail ? ' — ' + esc(r.detail) : '') + '</td></tr>';
+            }).join('') + '</tbody></table>'
+          : '') +
+        '<p class="foot">Riders are the FACTS route enrollment plus today\'s office changes as of the time ' +
+          'printed. A child who is absent but not yet marked in FACTS still appears — unknown reads as ' +
+          'riding. A child with a note from home who is not on this list: check with the office.</p>' +
+        '</section>';
+    }).join('');
+    document.body.classList.add('printing');
+    var done = function () {
+      document.body.classList.remove('printing');
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); }, 50);     // let the layout settle before the dialog
+    setTimeout(done, 60000);                              // Safari does not always fire afterprint
+  }
+  $('printBtn').addEventListener('click', printLists);
   $('menuBtn').addEventListener('click', function () { setMenuOpen($('menuPanel').hidden); });
   $('gear').addEventListener('click', openSettings);
   $('cfgClose').addEventListener('click', function () { $('cfg').close(); });
