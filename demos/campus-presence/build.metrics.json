@@ -1,0 +1,18 @@
+{
+  "_note": "Config for tools/build-demo.mjs — see build.board.json's note for the doctrine behind every replacement here; the office surfaces share the same token set. Metrics-specific: this page loads Chart.js 4.4.6 from cdn.jsdelivr.net, pinned, and that <script> tag is left exactly as production has it — the app itself already treats a blocked CDN as a first-class state (it re-checks `typeof Chart` on every repaint, opens every paired data table and says so in a toast), so offline the page degrades to the tables rather than breaking. Everything on the page is folded server-side by logic/metrics.js from the whole event log; the demo's log runs from the first day of school to the pinned demo date, which is what gives the range presets and the daily trend something real to show.",
+  "src": "../campus-sign-in-out-system/apps/office/pages/Metrics.html",
+  "dst": "demos/campus-presence/metrics.html",
+  "includeDir": "../campus-sign-in-out-system/apps/office",
+  "demoName": "Campus Presence — Metrics",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Campus Presence — Metrics</title>\n<script src=\"logic.js\"></script>"],
+    ["<?= me ?>", "demo.staff@example.edu"],
+    ["<?= isAdmin ?>", "1"],
+    ["<?= execUrl ?>", ""],
+    ["href=\"?page=board\"", "href=\"board.html\""],
+    ["href=\"?page=muster\"", "href=\"muster.html\""],
+    ["href=\"?page=metrics\"", "href=\"metrics.html\""],
+    ["<a data-nav=\"flags\" href=\"?page=flags\">Flags</a>", "<!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->"],
+    ["<a data-nav=\"settings\" id=\"navSettings\" class=\"hidden\" href=\"?page=settings\">Settings</a>", "<span id=\"navSettings\" hidden><!-- Settings: not part of this demo --></span>"]
+  ]
+}

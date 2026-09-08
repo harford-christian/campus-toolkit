@@ -1,0 +1,18 @@
+{
+  "_note": "Config for tools/build-demo.mjs — see build.board.json's note for the doctrine behind every replacement here; the office surfaces share the same token set. Muster-specific: the page's own <style> block and the 'Back to board' button also carry ?page= links, so those are rewritten to the built filenames too. The roster's FACTS-Finder deep links stay switched OFF because SETTINGS factsfinder.url is blank in data.js — a supported production setting (blank disables the links) and the honest one here, since the directory demo next door holds only 14 of this school's 87 students.",
+  "src": "../campus-sign-in-out-system/apps/office/pages/Muster.html",
+  "dst": "demos/campus-presence/muster.html",
+  "includeDir": "../campus-sign-in-out-system/apps/office",
+  "demoName": "Campus Presence — Muster",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Campus Presence — Muster</title>\n<script src=\"logic.js\"></script>"],
+    ["<?= me ?>", "demo.staff@example.edu"],
+    ["<?= isAdmin ?>", "1"],
+    ["<?= execUrl ?>", ""],
+    ["href=\"?page=board\"", "href=\"board.html\""],
+    ["href=\"?page=muster\"", "href=\"muster.html\""],
+    ["href=\"?page=metrics\"", "href=\"metrics.html\""],
+    ["<a data-nav=\"flags\" href=\"?page=flags\">Flags</a>", "<!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->"],
+    ["<a data-nav=\"settings\" id=\"navSettings\" class=\"hidden\" href=\"?page=settings\">Settings</a>", "<span id=\"navSettings\" hidden><!-- Settings: not part of this demo --></span>"]
+  ]
+}

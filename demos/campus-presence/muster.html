@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<!-- pages/Muster.html — the print-optimized "who's on campus RIGHT NOW" report
+     (?page=muster) for a drill, evacuation, or lockdown. Served by
+     server/Router.js as a TEMPLATE (me / isAdmin); viewport meta added
+     server-side. Fetches getMusterReport once on load (mode from bootstrap's
+     muster.rosterMode default) — no polling: this is a point-in-time document,
+     re-fetched via the mode toggle or Refresh. The print CSS in OfficeStyles
+     strips buttons/header for clean black-on-white output. -->
+<html lang="en">
+<head>
+<base target="_self">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Presence — Muster</title>
+<script src="logic.js"></script>
+<!-- pages/OfficeStyles.html — shared style partial for the office app
+     (?page=board | muster | flags | settings). GAS serves no static files,
+     so this inlines the Eagle Eye hcs-ui tokens (source: campus-control
+     design/system/hcs-ui.css, via the apps/demo adaptation) plus the office
+     desktop components: header/nav, live-board cards and chips, alert cards
+     (red flags / amber pending), muster report + print CSS, settings forms.
+     Desktop-first: staff use this on office machines, not the iPads. -->
+<style>
+/* =====================================================================
+   1. HCS tokens (Eagle Eye family — keep in sync with hcs-ui.css)
+   ===================================================================== */
+:root{
+  --hcs-red:#B22222;
+  --hcs-red-dark:#8f1b1b;
+  --hcs-red-soft:#fff5f5;
+  --hcs-gold:#D4AF37;
+  --hcs-gold-soft:#fffdf4;
+  --hcs-ink:#23272e;
+  --hcs-muted:#6b7280;
+  --hcs-line:#e7e9ee;
+  --hcs-bg:#f6f7f9;
+  --hcs-surface:#ffffff;
+  --hcs-surface-2:#f7f8fa;
+  --hcs-ok:#1f8a4c;       --hcs-ok-bg:#e9f7ef;     --hcs-ok-line:#bfe6cd;
+  --hcs-warn:#b5751a;     --hcs-warn-bg:#fdf3e2;   --hcs-warn-line:#f1d9a8;
+  --hcs-closed:#8a8f98;   --hcs-closed-bg:#f1f0ee;
+  --hcs-radius-sm:8px;
+  --hcs-radius:12px;
+  --hcs-radius-lg:16px;
+  --hcs-gap:14px;
+  --hcs-pad:18px 20px;
+}
+body.hcs-app{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--hcs-bg);
+  color:var(--hcs-ink);
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+body.hcs-app *{box-sizing:border-box;}
+.hidden{display:none !important;}
+.muted{color:var(--hcs-muted);}
+.small{font-size:.82rem;}
+
+/* =====================================================================
+   2. Buttons + form controls (Bootstrap stand-in, CDN-free)
+   ===================================================================== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1.5px solid transparent;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-weight:700;font-size:.95rem;line-height:1.2;
+  padding:9px 16px;min-height:40px;text-decoration:none;color:inherit;
+  background:var(--hcs-surface);transition:.12s;
+}
+.btn:disabled{opacity:.45;cursor:default;}
+.btn-plain{border-color:var(--hcs-line);}
+.btn-plain:hover:not(:disabled){border-color:var(--hcs-gold);}
+.btn-hcs{background:var(--hcs-red);border-color:var(--hcs-red);color:#fff;}
+.btn-hcs:hover:not(:disabled){background:var(--hcs-red-dark);border-color:var(--hcs-red-dark);color:#fff;}
+.btn-outline-hcs{color:var(--hcs-red);border:1.5px solid var(--hcs-red);background:#fff;}
+.btn-outline-hcs:hover:not(:disabled){background:var(--hcs-red-soft);color:var(--hcs-red);}
+.btn-sm{min-height:32px;padding:5px 12px;font-size:.82rem;border-radius:9px;}
+.form-control{
+  font-family:inherit;font-size:.95rem;color:var(--hcs-ink);
+  border:1.5px solid var(--hcs-line);border-radius:10px;
+  padding:9px 12px;min-height:40px;width:100%;background:var(--hcs-surface);
+}
+.form-control:focus{outline:none;border-color:var(--hcs-gold);box-shadow:0 0 0 3px rgba(212,175,55,.25);}
+textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;line-height:1.45;resize:vertical;}
+.hcs-seg{display:inline-flex;background:#ece9e2;border-radius:12px;padding:4px;gap:2px;}
+.hcs-seg button{border:0;background:transparent;font-weight:700;font-size:.85rem;padding:7px 18px;border-radius:9px;color:var(--hcs-muted);cursor:pointer;font-family:inherit;}
+.hcs-seg button.active{background:#fff;color:var(--hcs-red);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+
+/* =====================================================================
+   3. Page shell: header, nav, banners, wrap, toast, denied gate
+   ===================================================================== */
+.office-header{
+  position:sticky;top:0;z-index:100;
+  background:var(--hcs-surface);border-bottom:1px solid var(--hcs-line);
+  padding:12px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.hcs-brand{
+  width:40px;height:40px;border-radius:11px;background:var(--hcs-red);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:1.05rem;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);flex:none;
+}
+.hcs-title{font-weight:800;font-size:1.12rem;line-height:1.1;margin:0;}
+.hcs-subtitle{color:var(--hcs-muted);font-size:.8rem;margin:2px 0 0;}
+.head-actions{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.head-nav{display:flex;gap:4px;align-items:center;}
+.head-nav a{
+  font-weight:700;font-size:.88rem;color:var(--hcs-muted);text-decoration:none;
+  padding:7px 12px;border-radius:9px;
+}
+.head-nav a:hover{color:var(--hcs-red);background:var(--hcs-red-soft);}
+.head-nav a.current{color:var(--hcs-red);background:var(--hcs-red-soft);}
+.snd-btn.armed{border-color:var(--hcs-ok);color:var(--hcs-ok);background:var(--hcs-ok-bg);}
+
+.conn-banner{
+  position:sticky;top:64px;z-index:99;
+  background:var(--hcs-red);color:#fff;font-weight:700;font-size:.9rem;
+  padding:9px 22px;text-align:center;
+}
+.office-wrap{max-width:1100px;margin:0 auto;padding:18px 20px 60px;}
+.page-loading{color:var(--hcs-muted);font-weight:600;text-align:center;padding:60px 0;}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.18);
+  border-top-color:var(--hcs-red);border-radius:50%;animation:ospin .7s linear infinite;vertical-align:-2px;}
+@keyframes ospin{to{transform:rotate(360deg);}}
+
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  background:#23272e;color:#fff;padding:10px 18px;border-radius:10px;
+  font-size:.9rem;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:2000;max-width:90vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%);}
+.toast.warn{background:var(--hcs-red);}
+
+.gate-cover{
+  position:fixed;inset:0;background:var(--hcs-bg);z-index:3000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  text-align:center;padding:24px;
+}
+.gate-cover h1{font-size:1.3rem;margin:0;}
+.gate-cover p{color:var(--hcs-muted);margin:0;max-width:34em;}
+
+/* =====================================================================
+   4. Live board: sections, alert cards, visitor chips, exception cards
+   ===================================================================== */
+.section-h{
+  font-size:.85rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--hcs-muted);margin:22px 0 10px;display:flex;align-items:center;gap:8px;
+}
+.section-h .count{background:var(--hcs-red);color:#fff;border-radius:999px;font-size:.78rem;padding:1px 9px;}
+.section-h.alert-h{color:var(--hcs-red);}
+
+.board-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
+.board-col{min-width:0;}
+.board-empty{color:var(--hcs-muted);font-size:.9rem;padding:14px;border:1px dashed var(--hcs-line);border-radius:12px;text-align:center;}
+.quiet-card{
+  border:1px dashed var(--hcs-line);border-radius:var(--hcs-radius-lg);background:var(--hcs-surface);
+  color:var(--hcs-muted);font-size:1.02rem;font-weight:600;text-align:center;padding:46px 20px;margin-top:22px;
+}
+.board-footer{color:var(--hcs-muted);font-size:.82rem;text-align:center;margin-top:26px;}
+
+/* ---- alert cards: red = open pickup flag, amber = pending follow-up ---- */
+.flag-card{
+  background:var(--hcs-red-soft);border:1px solid #f2c7c7;border-left:5px solid var(--hcs-red);
+  border-radius:12px;padding:12px 14px;margin-bottom:12px;
+}
+.flag-card .flag-kind{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hcs-red);}
+.flag-card .who{font-weight:800;font-size:1.02rem;}
+.flag-card .meta{font-size:.84rem;color:#4b4f57;margin:3px 0 8px;}
+.flag-card .hint{font-size:.76rem;color:var(--hcs-muted);margin:8px 0 0;}
+.flag-card input.form-control{min-height:38px;font-size:.88rem;padding:7px 10px;margin-bottom:8px;background:#fff;}
+.flag-card .actions{display:flex;gap:8px;flex-wrap:wrap;}
+.flag-card .actions .btn{min-height:38px;padding:6px 12px;font-size:.85rem;border-radius:9px;}
+
+.pend-card{
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-left:5px solid var(--hcs-warn);
+  border-radius:12px;padding:12px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.pend-card .pend-body{flex:1;min-width:220px;}
+.pend-card .pend-kind{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hcs-warn);}
+.pend-card .who{font-weight:800;}
+.pend-card .meta{font-size:.82rem;color:#4b4f57;margin-top:2px;}
+.pend-card .btn{flex:none;}
+.pend-card.page{background:var(--hcs-red-soft);border-color:#f2c7c7;border-left-color:var(--hcs-red);}
+.pend-card.page .pend-kind{color:var(--hcs-red);}
+.pend-card.page .who{font-size:1.25rem;font-weight:800;}
+.busy{opacity:.5;pointer-events:none;}
+
+/* ---- visitors ---- */
+.vis-chip{
+  display:flex;align-items:center;gap:12px;background:var(--hcs-surface);
+  border:1px solid var(--hcs-line);border-left:4px solid var(--hcs-gold);
+  border-radius:12px;padding:10px 14px;margin-bottom:10px;
+}
+.vis-chip .badge-no{
+  background:var(--hcs-gold);color:#3a2c00;font-weight:800;border-radius:9px;
+  min-width:48px;text-align:center;padding:6px 8px;font-size:1.05rem;flex:none;
+}
+.vis-chip .vis-body{flex:1;min-width:0;}
+.vis-chip .who{font-weight:700;}
+.vis-chip .meta{font-size:.78rem;color:var(--hcs-muted);}
+.warn-row{
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-radius:10px;
+  color:var(--hcs-warn);font-size:.82rem;font-weight:700;padding:8px 12px;margin-bottom:10px;
+}
+
+/* ---- student exceptions ---- */
+.group-h{font-size:.76rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--hcs-muted);margin:14px 0 8px;}
+.group-h:first-child{margin-top:0;}
+.exc-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-radius:12px;
+  padding:10px 14px;margin-bottom:10px;border-left:4px solid var(--hcs-closed);
+}
+.exc-card.off{border-left-color:var(--hcs-red);}
+.exc-card.late{border-left-color:var(--hcs-ok);}
+.exc-card.transit{border-left-color:var(--hcs-warn);}
+.exc-card .who{font-weight:700;}
+.exc-card .meta{font-size:.78rem;color:var(--hcs-muted);}
+.exc-tag{font-size:.66rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:2px 7px;display:inline-block;margin-left:8px;vertical-align:1px;}
+.exc-tag.off{background:var(--hcs-red-soft);color:var(--hcs-red);}
+.exc-tag.late{background:var(--hcs-ok-bg);color:var(--hcs-ok);}
+.exc-tag.transit{background:var(--hcs-warn-bg);color:var(--hcs-warn);}
+
+/* ---- per-building count strip ---- */
+.count-strip{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 4px;}
+.count-cell{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-radius:12px;
+  padding:8px 14px;font-size:.82rem;color:var(--hcs-muted);
+}
+.count-cell b{display:block;color:var(--hcs-ink);font-size:.88rem;margin-bottom:1px;}
+.count-cell .n{font-weight:800;color:var(--hcs-ink);}
+
+/* =====================================================================
+   5. Muster report (screen + print)
+   ===================================================================== */
+.muster-banner{
+  background:var(--hcs-surface);border:2px solid var(--hcs-ink);border-radius:12px;
+  padding:16px 20px;margin:0 0 18px;
+}
+.muster-banner h1{font-size:1.7rem;margin:0;letter-spacing:.01em;}
+.muster-banner p{margin:4px 0 0;color:var(--hcs-muted);font-size:.85rem;}
+.muster-table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:.95rem;background:var(--hcs-surface);}
+.muster-table th,.muster-table td{border:1px solid var(--hcs-line);padding:8px 10px;text-align:left;}
+.muster-table th{background:var(--hcs-surface-2);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--hcs-muted);}
+.muster-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+.muster-table tr.total td{font-weight:800;background:var(--hcs-surface-2);}
+.muster-h{font-weight:800;font-size:1.05rem;margin:22px 0 6px;}
+.muster-list{margin:6px 0 14px;padding-left:18px;font-size:.92rem;}
+.muster-list li{margin:0 0 4px;}
+.muster-flag-box{
+  background:var(--hcs-red-soft);border:1px solid #f2c7c7;border-radius:10px;
+  padding:10px 14px;margin:8px 0 14px;font-size:.92rem;
+}
+.roster-block{margin:0 0 18px;break-inside:avoid;}
+.roster-block h3{font-weight:800;font-size:.98rem;margin:14px 0 6px;border-bottom:2px solid var(--hcs-ink);padding-bottom:3px;}
+.roster-cols{column-count:3;column-gap:26px;margin:0;padding:0;list-style:none;font-size:.85rem;line-height:1.55;}
+.roster-cols li{break-inside:avoid;}
+.off-strike{text-decoration:line-through;color:var(--hcs-red);}
+.off-tag{font-size:.66rem;font-weight:800;color:var(--hcs-red);margin-left:6px;}
+.muster-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 18px;}
+
+/* =====================================================================
+   6. Settings forms
+   ===================================================================== */
+.set-group{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-left:4px solid var(--hcs-gold);
+  border-radius:var(--hcs-radius-lg);box-shadow:0 1px 2px rgba(20,20,40,.04);
+  padding:var(--hcs-pad);margin:0 0 18px;
+}
+.set-group h3{margin:0 0 4px;font-size:1.05rem;font-weight:800;}
+.set-group .group-sub{color:var(--hcs-muted);font-size:.82rem;margin:0 0 12px;}
+.set-row{margin:0 0 14px;}
+.set-row label.f-label{display:block;font-size:.78rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--hcs-muted);margin:0 0 5px;}
+.set-hint{font-size:.78rem;color:var(--hcs-muted);margin:4px 0 0;}
+.set-err{font-size:.8rem;color:var(--hcs-red);font-weight:700;margin:4px 0 0;min-height:0;}
+.radio-row{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1.5px solid var(--hcs-line);border-radius:10px;margin:0 0 8px;cursor:pointer;}
+.radio-row:hover{border-color:var(--hcs-gold);}
+.radio-row input{margin-top:3px;accent-color:var(--hcs-red);cursor:pointer;flex:none;}
+.radio-row .r-name{font-weight:800;font-size:.9rem;}
+.radio-row .r-desc{font-size:.8rem;color:var(--hcs-muted);margin-top:1px;}
+.ro-value{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;
+  background:var(--hcs-surface-2);border:1.5px dashed var(--hcs-line);border-radius:10px;padding:9px 12px;
+}
+.save-row{display:flex;gap:12px;align-items:center;margin-top:4px;}
+.save-status{font-size:.85rem;font-weight:700;}
+.save-status.ok{color:var(--hcs-ok);}
+.save-status.err{color:var(--hcs-red);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* =====================================================================
+   7. Responsive + print
+   ===================================================================== */
+@media (max-width:760px){
+  .board-grid{grid-template-columns:1fr;}
+  .grid-2{grid-template-columns:1fr;}
+  .office-wrap{padding:14px 12px 50px;}
+  .head-actions{margin-left:0;}
+  .roster-cols{column-count:2;}
+}
+
+@media print{
+  body.hcs-app{background:#fff;color:#000;}
+  .no-print,.office-header,.conn-banner,.toast{display:none !important;}
+  .office-wrap{max-width:none;padding:0;}
+  .muster-banner{border-color:#000;border-radius:0;}
+  .muster-banner p,.muted{color:#333;}
+  .muster-table th,.muster-table td{border-color:#000;}
+  .muster-table th{background:#eee;color:#000;}
+  .muster-flag-box{border-color:#000;background:#fff;}
+  .roster-block h3{border-color:#000;}
+  .roster-cols{column-count:3;}
+  .off-strike,.off-tag{color:#000;}
+  a{text-decoration:none;color:#000;}
+}
+</style>
+
+<style>
+/* Full-roster filter bar (this page only — OfficeStyles is shared by 4 pages).
+   Screen-only chrome: the bar is .no-print, but the FILTERED roster and the
+   filter description in the heading are what print, so a printed page says
+   what it is. */
+.roster-filter{
+  display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:0 0 10px;
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-radius:var(--hcs-radius);padding:10px 12px;
+}
+.roster-filter label{
+  display:block;margin:0 0 4px;font-size:.72rem;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--hcs-muted);
+}
+.roster-filter .rf-field{flex:0 1 auto;min-width:0;}
+.roster-filter .rf-narrow{width:140px;}
+.roster-filter .rf-search{flex:1 1 220px;min-width:180px;}
+.roster-filter select.form-control,
+.roster-filter input.form-control{min-height:36px;padding:7px 10px;font-size:.9rem;}
+.roster-filter .rf-clear{min-height:36px;padding:7px 14px;flex:none;}
+@media (max-width:520px){
+  .roster-filter .rf-field,.roster-filter .rf-narrow{width:100%;flex:1 1 100%;}
+}
+
+/* Match highlighting — same convention as FACTS Finder:
+   green = exact token hit, gold = close spelling. */
+mark.ex{background:#8FE39B;color:#0d3a17;border-radius:3px;padding:0 1px;}
+mark.cl{background:var(--hcs-gold);color:#3a2c05;border-radius:3px;padding:0 1px;}
+
+/* Roster names deep-link into FACTS Finder. Underlined only on hover so a long
+   roster doesn't read as a wall of links. */
+.finder-link{color:inherit;text-decoration:none;border-bottom:1px dotted var(--hcs-muted);}
+.finder-link:hover,.finder-link:focus{text-decoration:none;border-bottom-color:currentColor;background:rgba(0,0,0,.04);}
+
+@media print{
+  /* Highlights must stay legible in greyscale: drop the fill, underline instead. */
+  mark.ex,mark.cl{
+    background:transparent !important;color:#000 !important;
+    text-decoration:underline;padding:0;
+  }
+  /* A printed muster is paper — links must read as plain names. */
+  .finder-link{color:#000 !important;border-bottom:0 !important;background:none !important;}
+  #rfCount{color:#333;}
+}
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Campus Presence — Muster" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body class="hcs-app office">
+
+<header class="office-header no-print">
+  <div class="hcs-brand">CP</div>
+  <div>
+    <p class="hcs-title">Campus Presence — Muster</p>
+    <p class="hcs-subtitle">Signed in as <b>demo.staff@example.edu</b></p>
+  </div>
+  <div class="head-actions">
+    <nav class="head-nav">
+      <a data-nav="board" href="board.html">Board</a>
+      <a data-nav="muster" class="current" href="muster.html">Muster</a>
+      <!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->
+      <a data-nav="metrics" href="metrics.html">Metrics</a>
+      <span id="navSettings" hidden><!-- Settings: not part of this demo --></span>
+    </nav>
+  </div>
+</header>
+
+<main class="office-wrap">
+
+  <div class="muster-ctl no-print">
+    <button type="button" class="btn btn-hcs" id="printBtn" disabled>Print</button>
+    <div class="hcs-seg" id="modeSeg">
+      <button type="button" data-mode="counts">Quick counts</button>
+      <button type="button" data-mode="full">Full roster</button>
+    </div>
+    <button type="button" class="btn btn-plain" id="refreshBtn" disabled>Refresh</button>
+    <a class="btn btn-plain" data-nav="board" href="board.html">Back to board</a>
+    <span class="muted small" id="ctlStatus"></span>
+  </div>
+
+  <div class="page-loading" id="pageLoading"><span class="spin"></span> Building the muster report&hellip;</div>
+
+  <div class="hidden" id="report">
+
+    <div class="muster-banner">
+      <h1>MUSTER — <span id="mAt">&mdash;</span></h1>
+      <p><span id="mTotals">&mdash;</span></p>
+      <p>Counts assume every enrolled student is present in their homeroom building per FACTS
+        (roster as of <span id="mGenAt">&mdash;</span>) unless listed as an exception below.
+        Mode: <b id="mMode">&mdash;</b>.</p>
+    </div>
+
+    <table class="muster-table">
+      <thead>
+        <tr><th>Building</th><th>Visitors</th><th>Students off campus</th><th>Late arrivals</th><th>Moved in</th></tr>
+      </thead>
+      <tbody id="mRows"></tbody>
+    </table>
+    <p class="muted small" id="mBadges" style="margin:6px 0 0;"></p>
+
+    <div id="mFlags"></div>
+
+    <div class="muster-h">Visitors on campus (<span id="mVisCount">0</span>)</div>
+    <ul class="muster-list" id="mVisList"></ul>
+
+    <div class="muster-h">Student exceptions</div>
+    <ul class="muster-list" id="mExcList"></ul>
+
+    <!-- Full roster (mode=full only). The heading carries the active filter so a
+         printed page is self-describing; the filter bar itself never prints. -->
+    <div class="hidden" id="rosterSection">
+      <div class="muster-h" id="rosterHead">Full roster</div>
+      <p class="muted small" style="margin:0 0 8px;">Struck-through names are OFF CAMPUS per a signed early dismissal. Everyone else is assumed present per FACTS.</p>
+
+      <div class="roster-filter no-print" id="rosterFilter">
+        <div class="rf-field">
+          <label for="rfBuilding">Building</label>
+          <select class="form-control" id="rfBuilding"><option value="">All buildings</option></select>
+        </div>
+        <div class="rf-field rf-narrow">
+          <label for="rfGrade">Grade</label>
+          <select class="form-control" id="rfGrade"><option value="">All grades</option></select>
+        </div>
+        <div class="rf-field rf-search">
+          <label for="rfSearch">Search name</label>
+          <input class="form-control" id="rfSearch" type="search" placeholder="Type a name&hellip;" autocomplete="off">
+        </div>
+        <button type="button" class="btn btn-plain rf-clear" id="rfClear">Clear</button>
+      </div>
+
+      <p class="muted small" id="rfCount" style="margin:0 0 10px;"></p>
+
+      <div id="mRosters"></div>
+    </div>
+
+  </div>
+
+</main>
+
+<div class="gate-cover hidden" id="gateCover">
+  <div class="hcs-brand" style="width:52px;height:52px;font-size:1.3rem;">CP</div>
+  <h1>Access removed</h1>
+  <p>Your account is no longer on the front-office Permissions list. Reload the page to sign in again, or ask Josh to re-add you.</p>
+  <button type="button" class="btn btn-hcs" onclick="location.reload()">Reload</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- GENERATED by tools/wrap.js — DO NOT EDIT -->
+<script>
+'use strict';
+/**
+ * fuzzy.js — edit-distance matching primitives shared by search.js (student
+ * lookup) and pickup.js (authorized-pickup hard check).
+ * Lifted verbatim from FACTS\facts-directory-search\Search.gs (2026-08-04).
+ */
+
+var Fuzzy = (function () {
+  /** Optimal-string-alignment distance (Levenshtein + adjacent transposition = 1). */
+  function editDistance(a, b) {
+    var la = a.length, lb = b.length;
+    var d = [];
+    for (var i = 0; i <= la; i++) { d[i] = [i]; }
+    for (var j = 0; j <= lb; j++) { d[0][j] = j; }
+    for (i = 1; i <= la; i++) {
+      for (j = 1; j <= lb; j++) {
+        var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+        }
+      }
+    }
+    return d[la][lb];
+  }
+
+  /** Edit-distance budget for a fuzzy token, scaled by its length (0 = no fuzzing). */
+  function budget(token) {
+    if (token.length < 3 || !/^[a-z'-]+$/.test(token)) return 0; // IDs/emails: exact only
+    return token.length <= 4 ? 1 : token.length <= 7 ? 2 : 3;
+  }
+
+  return { editDistance: editDistance, budget: budget };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Fuzzy;
+
+'use strict';
+/**
+ * search.js — kiosk student search: fuzzy name matching with a deliberately
+ * MINIMAL projection. Adapted from facts-directory-search Search.gs
+ * searchPeople (2026-08-04) with the kiosk privacy constraints baked in:
+ *   - query must be ≥ MIN_QUERY_CHARS after trimming
+ *   - matches ONLY against the student's own name (+grade token) — never
+ *     guardians, never teachers, never IDs/emails (roster-fishing surface)
+ *   - returns at most MAX_RESULTS of {id, name, grade} — nothing else, ever
+ */
+
+/* global Fuzzy */
+
+var Search = (function () {
+  var MIN_QUERY_CHARS = 3;
+  var MAX_RESULTS = 8;
+
+  function ref_() {
+    if (typeof module !== 'undefined') return require('./fuzzy.js');
+    return Fuzzy; // GAS global, assigned by the time any endpoint runs
+  }
+
+  /** One matching pass. fuzzySets=null ⇒ exact substring only (the fast path).
+   *  Records which name words matched by close spelling so a caller can
+   *  highlight them differently from exact hits (FACTS Finder convention). */
+  function matchPass_(students, tokens, fuzzySets) {
+    var matches = [];
+    (students || []).forEach(function (p) {
+      var own = (p.name + ' | ' + p.grade).toLowerCase();
+      var words = fuzzySets ? p.name.toLowerCase().split(/[\s,]+/) : null;
+      var exactCount = 0;
+      var fuzzyWords = {};
+      var ok = tokens.every(function (t, i) {
+        if (own.indexOf(t) !== -1) { exactCount++; return true; }
+        if (!fuzzySets) return false;
+        var hit = words.filter(function (w) { return fuzzySets[i][w]; });
+        hit.forEach(function (w) { fuzzyWords[w] = true; });
+        return hit.length > 0;
+      });
+      if (!ok) return;
+      var nameLower = p.name.toLowerCase();
+      var nameHits = tokens.filter(function (t) { return nameLower.indexOf(t) !== -1; }).length;
+      matches.push({ p: p, allExact: exactCount === tokens.length, nameHits: nameHits,
+                     fuzzyWords: Object.keys(fuzzyWords) });
+    });
+    return matches;
+  }
+
+  /** Close-spelling sets per token, built from the student-name vocabulary. */
+  function buildFuzzySets_(F, students, tokens) {
+    var vocab = {};
+    (students || []).forEach(function (p) {
+      p.name.split(/[\s,]+/).forEach(function (w) {
+        if (w.length >= 2) vocab[w.toLowerCase()] = true;
+      });
+    });
+    var vocabWords = Object.keys(vocab);
+    return tokens.map(function (t) {
+      var budget = F.budget(t);
+      var set = {};
+      if (budget) {
+        vocabWords.forEach(function (w) {
+          if (Math.abs(w.length - t.length) > budget) return;
+          if (F.editDistance(t, w) <= budget) set[w] = true;
+        });
+      }
+      return set;
+    });
+  }
+
+  /**
+   * @param {Array} students from Directory.buildStudents (enrolled only)
+   * @param {string} query
+   * @return {{query, ok:boolean, reason?:string, total:number, truncated:boolean,
+   *           results:Array<{id,name,grade,close:boolean}>}}
+   */
+  function searchStudents(students, query) {
+    var F = ref_();
+    var q = String(query || '').trim();
+    var out = { query: q, ok: false, total: 0, truncated: false, results: [] };
+    if (q.replace(/\s+/g, '').length < MIN_QUERY_CHARS) {
+      out.reason = 'short';
+      return out;
+    }
+    out.ok = true;
+    var tokens = q.toLowerCase().split(/\s+/).filter(function (t) { return t; });
+
+    // FAST PATH: try exact substring matching first. Correctly-spelled names —
+    // the overwhelming majority of kiosk searches — never pay for the
+    // vocabulary build + edit-distance sweep, which only runs on a miss.
+    var matches = matchPass_(students, tokens, null);
+    if (!matches.length) {
+      matches = matchPass_(students, tokens, buildFuzzySets_(F, students, tokens));
+    }
+    matches.sort(function (a, b) {
+      return (b.allExact - a.allExact) || (b.nameHits - a.nameHits) ||
+             (a.p.name < b.p.name ? -1 : a.p.name > b.p.name ? 1 : 0);
+    });
+
+    out.total = matches.length;
+    out.truncated = matches.length > MAX_RESULTS;
+    out.results = matches.slice(0, MAX_RESULTS).map(function (m) {
+      return { id: m.p.id, name: m.p.name, grade: m.p.grade, close: !m.allExact };
+    });
+    return out;
+  }
+
+  /**
+   * STAFF-SIDE filter (the muster roster), as opposed to searchStudents' kiosk
+   * projection: no result cap, no 3-char floor, and it hands back the tokens and
+   * close-spelling words so the page can mark exact hits green and close ones
+   * yellow — the same convention as FACTS Finder. An empty query returns
+   * everyone, so it doubles as the "no filter" path.
+   * @param {Array} people any objects carrying {name, grade}
+   * @return {{ok, query, tokens, total, results:Array}} results keep every
+   *   original field, plus close:boolean and fuzzyWords:string[]
+   */
+  function filterPeople(people, query) {
+    var F = ref_();
+    var q = String(query || '').trim();
+    var list = people || [];
+    var out = { ok: true, query: q, tokens: [], total: list.length, results: list.slice() };
+    if (!q) return out;
+
+    var tokens = q.toLowerCase().split(/\s+/).filter(function (t) { return t; });
+    out.tokens = tokens;
+    var matches = matchPass_(list, tokens, null);          // exact first
+    if (!matches.length) {                                  // then close spellings
+      matches = matchPass_(list, tokens, buildFuzzySets_(F, list, tokens));
+    }
+    matches.sort(function (a, b) {
+      return (b.allExact - a.allExact) || (b.nameHits - a.nameHits) ||
+             (a.p.name < b.p.name ? -1 : a.p.name > b.p.name ? 1 : 0);
+    });
+    out.results = matches.map(function (m) {
+      var row = {};
+      for (var k in m.p) row[k] = m.p[k];
+      row.close = !m.allExact;
+      row.fuzzyWords = m.fuzzyWords;
+      return row;
+    });
+    out.total = out.results.length;
+    return out;
+  }
+
+  return { searchStudents: searchStudents, filterPeople: filterPeople,
+           MIN_QUERY_CHARS: MIN_QUERY_CHARS, MAX_RESULTS: MAX_RESULTS };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Search;
+
+</script>
+
+<script>
+'use strict';
+(function () {
+
+  var ME = 'demo.staff@example.edu';
+  var EXEC_URL = '';
+  var IS_ADMIN = '1' === '1';
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function tOf(ts) {
+    var s = String(ts || '');
+    var m = /\d{4}-\d{2}-\d{2} (\d{2}:\d{2})/.exec(s);
+    return m ? m[1] : s;
+  }
+
+  var STATION_KIOSK = { hs: 'HS kiosk', el: 'EL kiosk', office: 'office', mobile: 'mobile' };
+  var BUILDING_ORDER = ['High School', 'Elementary', 'Kindergarten', '6th Grade', 'Modular', 'Bus Barn', 'Other'];
+  var GRADE_ORDER = ['K4', 'K5', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+
+  var toastTimer = null;
+  function toast(msg, warn) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (warn ? ' warn' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = 'toast'; }, 4000);
+  }
+
+  (function wireNav() {
+    // Pages run inside a sandboxed googleusercontent.com iframe, so a relative
+    // '?page=x' href resolves against the sandbox and loads nothing. EXEC_URL is
+    // handed down by Router.js (officeExecUrl_); document.referrer is only a
+    // fallback for the rare case the server cannot resolve its own URL.
+    var base = EXEC_URL;
+    if (!base) {
+      var r = document.referrer || '';
+      base = /\/macros\/.+\/(exec|dev)\b/.test(r) ? r.split('?')[0] : '';
+    }
+    if (!base) return;
+    var links = document.querySelectorAll('[data-nav]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].setAttribute('href', base + '?page=' + links[i].getAttribute('data-nav'));
+      links[i].setAttribute('target', '_top'); // navigate the window, not the sandbox frame
+    }
+  })();
+  if (IS_ADMIN) $('navSettings').classList.remove('hidden');
+
+  var stopped = false;
+  function isForbidden(err) {
+    return String((err && err.message) || err || '').indexOf('FORBIDDEN') !== -1;
+  }
+  function showGate() {
+    stopped = true;
+    $('gateCover').classList.remove('hidden');
+  }
+  function api(request, onOk, onFail) {
+    google.script.run
+      .withSuccessHandler(onOk)
+      .withFailureHandler(function (err) {
+        if (isForbidden(err)) { showGate(); return; }
+        if (onFail) onFail(err);
+      })
+      .officeApi(request);
+  }
+
+  // ---- mode + fetch ----
+  var FINDER_URL = '';   // FACTS Finder /exec, from bootstrap; '' disables the roster links
+  var mode = 'counts';
+  var fetching = false;
+
+  function paintSeg() {
+    var btns = $('modeSeg').querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].className = btns[i].getAttribute('data-mode') === mode ? 'active' : '';
+    }
+  }
+  $('modeSeg').addEventListener('click', function (ev) {
+    var btn = ev.target && ev.target.closest ? ev.target.closest('button[data-mode]') : null;
+    if (!btn || fetching) return;
+    mode = btn.getAttribute('data-mode');
+    paintSeg();
+    fetchReport();
+  });
+  $('refreshBtn').addEventListener('click', function () { if (!fetching) fetchReport(); });
+  $('printBtn').addEventListener('click', function () { window.print(); });
+
+  function fetchReport() {
+    if (stopped) return;
+    fetching = true;
+    $('ctlStatus').innerHTML = '<span class="spin"></span> Fetching&hellip;';
+    api({ op: 'getMusterReport', mode: mode }, function (res) {
+      fetching = false;
+      if (!res || res.ok !== true || !res.presence) {
+        $('ctlStatus').textContent = 'Failed — ' + ((res && res.error) || 'try again.');
+        $('pageLoading').textContent = 'Could not build the report. Use Refresh to retry.';
+        toast((res && res.error) || 'Could not build the report.', true);
+        return;
+      }
+      $('ctlStatus').textContent = '';
+      render(res);
+    }, function () {
+      fetching = false;
+      $('ctlStatus').textContent = 'Server error — try again.';
+      $('pageLoading').textContent = 'Could not build the report. Use Refresh to retry.';
+      toast('Server error — try again.', true);
+    });
+  }
+
+  // ---- rendering ----
+  function gradeIdx(g) {
+    var i = GRADE_ORDER.indexOf(String(g));
+    return i === -1 ? 99 : i;
+  }
+  function orderedBuildings(present) {
+    var names = [];
+    var i;
+    for (i = 0; i < BUILDING_ORDER.length; i++) if (present[BUILDING_ORDER[i]]) names.push(BUILDING_ORDER[i]);
+    var extra = [];
+    for (var k in present) if (names.indexOf(k) === -1) extra.push(k);
+    extra.sort();
+    return names.concat(extra);
+  }
+
+  function renderTable(p) {
+    var by = (p.counts && p.counts.byBuilding) || {};
+    var lateBy = {};
+    var present = {};
+    var i, k;
+    for (k in by) present[k] = true;
+    for (i = 0; i < p.late.length; i++) {
+      var bld = p.late[i].building || 'Other';
+      lateBy[bld] = (lateBy[bld] || 0) + 1;
+      present[bld] = true;
+    }
+    var names = orderedBuildings(present);
+    var html = '';
+    var tot = { v: 0, o: 0, l: 0, m: 0 };
+    for (i = 0; i < names.length; i++) {
+      var c = by[names[i]] || { visitors: 0, off: 0, moved: 0 };
+      var late = lateBy[names[i]] || 0;
+      tot.v += c.visitors || 0; tot.o += c.off || 0; tot.l += late; tot.m += c.moved || 0;
+      html += '<tr><td>' + esc(names[i]) + '</td>' +
+        '<td class="num">' + (c.visitors || 0) + '</td>' +
+        '<td class="num">' + (c.off || 0) + '</td>' +
+        '<td class="num">' + late + '</td>' +
+        '<td class="num">' + (c.moved || 0) + '</td></tr>';
+    }
+    if (!names.length) {
+      html = '<tr><td>&mdash;</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>';
+    }
+    html += '<tr class="total"><td>TOTAL</td>' +
+      '<td class="num">' + tot.v + '</td><td class="num">' + tot.o + '</td>' +
+      '<td class="num">' + tot.l + '</td><td class="num">' + tot.m + '</td></tr>';
+    $('mRows').innerHTML = html;
+  }
+
+  // ---- full roster + client-side filter -------------------------------
+  // Every roster row from the last mode=full fetch, flattened with .building.
+  // Filtering never touches the server: it is a re-render of data already here.
+  var rosterAll = [];
+  var fBuilding = '';   // '' = all
+  var fGrade = '';      // '' = all
+  var fQuery = '';
+  var searchTimer = null;
+
+  // Highlight query tokens inside an ALREADY-ESCAPED string (FACTS Finder
+  // convention): cls 'ex' = green exact hit, 'cl' = gold close spelling.
+  function highlight(escaped, tokens, cls) {
+    var out = escaped;
+    (tokens || []).forEach(function (t) {
+      var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp('(' + safe + ')', 'gi'),
+        '<mark class="' + (cls || 'ex') + '">$1</mark>');
+    });
+    return out;
+  }
+  // Exact token hits green first, then close-spelling name words (whole words) gold.
+  function nameHtml(name, tokens, fuzzyWords) {
+    var out = highlight(esc(name), tokens, 'ex');
+    (fuzzyWords || []).forEach(function (w) {
+      var safe = esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp('\\b(' + safe + ')\\b', 'gi'), '<mark class="cl">$1</mark>');
+    });
+    return out;
+  }
+
+  /** Repopulate a filter <select>, keeping the current choice when it survives. */
+  function fillSelect(sel, values, allLabel, keep) {
+    var html = '<option value="">' + esc(allLabel) + '</option>';
+    var found = false;
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] === keep) found = true;
+      html += '<option value="' + esc(values[i]) + '">' + esc(values[i]) + '</option>';
+    }
+    sel.innerHTML = html;
+    sel.value = found ? keep : '';
+    return sel.value;
+  }
+
+  function filterDesc() {
+    var parts = [];
+    if (fBuilding) parts.push(fBuilding);
+    if (fGrade) parts.push('grade ' + fGrade);
+    if (fQuery) parts.push('matching “' + fQuery + '”');
+    return parts.length ? ' — ' + parts.join(' · ') : '';
+  }
+
+  function paintRoster() {
+    var i, j;
+    // Building/grade narrow the pool; the text box is Search.filterPeople's job
+    // (shared fuzzy matcher — an empty query returns everyone).
+    var base = [];
+    for (i = 0; i < rosterAll.length; i++) {
+      var r = rosterAll[i];
+      if (fBuilding && r.building !== fBuilding) continue;
+      if (fGrade && r.grade !== fGrade) continue;
+      base.push(r);
+    }
+    var found = Search.filterPeople(base, fQuery);
+    var tokens = found.tokens || [];
+    var shown = found.results || [];
+
+    $('rosterHead').textContent = 'Full roster' + filterDesc();
+    $('rfCount').textContent = 'Showing ' + shown.length + ' of ' + rosterAll.length +
+      (rosterAll.length === 1 ? ' student' : ' students');
+
+    if (!shown.length) {
+      $('mRosters').innerHTML =
+        '<div class="board-empty">No students match &mdash; clear the filter.</div>';
+      return;
+    }
+
+    // Regroup by building (filterPeople sorts by match quality, not building)
+    // and drop any group the filter emptied.
+    var groups = {};
+    for (i = 0; i < shown.length; i++) {
+      var b = shown[i].building || 'Other';
+      if (!groups[b]) groups[b] = [];
+      groups[b].push(shown[i]);
+    }
+    var names = orderedBuildings(groups);
+    var html = '';
+    for (i = 0; i < names.length; i++) {
+      var rows = groups[names[i]];
+      rows.sort(function (a, b2) {
+        var d = gradeIdx(a.grade) - gradeIdx(b2.grade);
+        if (d) return d;
+        return String(a.name).localeCompare(String(b2.name));
+      });
+      var off = 0;
+      var lis = '';
+      for (j = 0; j < rows.length; j++) {
+        if (rows[j].off) off++;
+        // The name deep-links into FACTS Finder (schedule, contacts, attendance)
+        // when we have both a URL and an id. FACTS Finder applies its OWN staff
+        // allowlist, so this opens a door we are allowed to point at, not one we
+        // open ourselves. Prints as plain text (see the print CSS).
+        var nm = nameHtml(rows[j].name, tokens, rows[j].fuzzyWords);
+        if (FINDER_URL && rows[j].id) {
+          nm = '<a class="finder-link" target="_blank" rel="noopener noreferrer" href="' +
+            esc(FINDER_URL + '?id=' + encodeURIComponent(rows[j].id) +
+                '&n=' + encodeURIComponent(rows[j].name)) +
+            '" title="Open ' + esc(rows[j].name) + ' in FACTS Finder">' + nm + '</a>';
+        }
+        lis += '<li' + (rows[j].off ? ' class="off-strike"' : '') + '>' + nm +
+          ' (' + highlight(esc(rows[j].grade), tokens, 'ex') + ')' +
+          (rows[j].off ? '<span class="off-tag">OFF</span>' : '') + '</li>';
+      }
+      html += '<div class="roster-block"><h3>' + esc(names[i]) +
+        ' &middot; ' + rows.length + ' students &middot; ' + off + ' off campus</h3>' +
+        '<ul class="roster-cols">' + lis + '</ul></div>';
+    }
+    $('mRosters').innerHTML = html;
+  }
+
+  function renderRosters(res) {
+    var sec = $('rosterSection');
+    rosterAll = [];
+    if (!res.rosters) {            // quick-counts mode: no roster, no filter bar
+      sec.classList.add('hidden');
+      $('mRosters').innerHTML = '';
+      return;
+    }
+    var names = orderedBuildings(res.rosters);
+    var i, j;
+    for (i = 0; i < names.length; i++) {
+      var rows = res.rosters[names[i]] || [];
+      for (j = 0; j < rows.length; j++) {
+        rosterAll.push({
+          // id must survive the flatten — it is what makes the name a link into
+          // FACTS Finder. (It didn't, at first: this object was written before
+          // the server started sending an id, so every link silently vanished.)
+          id: String(rows[j].id === null || rows[j].id === undefined ? '' : rows[j].id),
+          name: String(rows[j].name === null || rows[j].name === undefined ? '' : rows[j].name),
+          grade: String(rows[j].grade === null || rows[j].grade === undefined ? '' : rows[j].grade),
+          off: !!rows[j].off,
+          building: names[i]
+        });
+      }
+    }
+    var grades = [];
+    for (i = 0; i < rosterAll.length; i++) {
+      if (grades.indexOf(rosterAll[i].grade) === -1) grades.push(rosterAll[i].grade);
+    }
+    grades.sort(function (a, b) {  // school order, not string order (10 after 2)
+      return (gradeIdx(a) - gradeIdx(b)) || String(a).localeCompare(String(b));
+    });
+
+    fBuilding = fillSelect($('rfBuilding'), names, 'All buildings', fBuilding);
+    fGrade = fillSelect($('rfGrade'), grades, 'All grades', fGrade);
+    $('rfSearch').value = fQuery;
+    sec.classList.remove('hidden');
+    paintRoster();
+  }
+
+  $('rfBuilding').addEventListener('change', function () { fBuilding = this.value; paintRoster(); });
+  $('rfGrade').addEventListener('change', function () { fGrade = this.value; paintRoster(); });
+  // These pages run inside a sandboxed googleusercontent.com iframe, where a
+  // plain target="_blank" can be refused silently — a click that does nothing is
+  // the worst outcome. Intercept it: try a new tab, and if the sandbox (or a
+  // popup blocker) refuses, navigate the top window instead so the click always
+  // takes you somewhere.
+  $('mRosters').addEventListener('click', function (ev) {
+    var el = ev.target;
+    while (el && el !== this && !(el.className && String(el.className).indexOf('finder-link') !== -1)) {
+      el = el.parentNode;
+    }
+    if (!el || el === this || !el.href) return;
+    ev.preventDefault();
+    var opened = null;
+    try { opened = window.open(el.href, '_blank', 'noopener'); } catch (e) { opened = null; }
+    if (!opened) {
+      try { window.top.location.href = el.href; }
+      catch (e2) { window.location.href = el.href; }
+    }
+  });
+
+  $('rfSearch').addEventListener('input', function () {
+    var v = this.value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(function () { fQuery = v; paintRoster(); }, 150);
+  });
+  $('rfClear').addEventListener('click', function () {
+    clearTimeout(searchTimer);
+    fBuilding = ''; fGrade = ''; fQuery = '';
+    $('rfBuilding').value = ''; $('rfGrade').value = ''; $('rfSearch').value = '';
+    paintRoster();
+  });
+
+  function render(res) {
+    $('pageLoading').classList.add('hidden');
+    $('report').classList.remove('hidden');
+    $('printBtn').disabled = false;
+    $('refreshBtn').disabled = false;
+
+    var p = res.presence;
+    $('mAt').textContent = res.at || '';
+    $('mGenAt').textContent = res.generatedAt || 'unknown';
+    $('mMode').textContent = res.mode === 'full' ? 'full roster' : 'quick counts';
+    $('mTotals').textContent = p.counts.visitors + ' visitors on campus · ' +
+      p.counts.studentsOff + ' students off campus · ' + p.counts.late + ' late arrivals · ' +
+      p.counts.moved + ' moved between buildings';
+
+    renderTable(p);
+
+    var badgeIds = [];
+    for (var b = 0; b < res.badgesOut.length; b++) badgeIds.push(res.badgesOut[b].badgeId);
+    $('mBadges').textContent = badgeIds.length
+      ? 'Visitor badges out: ' + badgeIds.join(', ')
+      : 'No visitor badges out.';
+
+    // unresolved pickup flags matter at muster time — surface them loudly
+    var fl = '';
+    if (res.openFlags.length) {
+      fl = '<div class="muster-flag-box"><b>Unresolved pickup flags (' + res.openFlags.length + ')</b> — these are NOT sign-outs; the students are counted as present:<ul class="muster-list" style="margin-bottom:0;">';
+      for (var f = 0; f < res.openFlags.length; f++) {
+        var g = res.openFlags[f];
+        fl += '<li>' + esc(g.name) + (g.grade ? ' (' + esc(g.grade) + ')' : '') +
+          ' — &ldquo;' + esc(g.typedName || '(blank)') + '&rdquo; at the ' +
+          esc(STATION_KIOSK[g.station] || g.station) + ', ' + esc(tOf(g.at)) + '</li>';
+      }
+      fl += '</ul></div>';
+    }
+    $('mFlags').innerHTML = fl;
+
+    var vh = '';
+    for (var i = 0; i < p.visitors.length; i++) {
+      var v = p.visitors[i];
+      vh += '<li><b>' + esc(v.name) + '</b> — badge ' + esc(v.badge || '?') +
+        ' — in ' + esc(tOf(v.in)) +
+        (v.building ? ' — ' + esc(v.building) : '') + '</li>';
+    }
+    $('mVisList').innerHTML = vh || '<li class="muted">None.</li>';
+    $('mVisCount').textContent = p.visitors.length;
+
+    var eh = '';
+    var j;
+    for (j = 0; j < p.studentsOff.length; j++) {
+      var s = p.studentsOff[j];
+      eh += '<li><b class="off-strike">' + esc(s.name) + (s.grade ? ' (' + esc(s.grade) + ')' : '') + '</b>' +
+        '<span class="off-tag">OFF CAMPUS</span> — out ' + esc(tOf(s.out)) +
+        (s.with ? ' with ' + esc(s.with) : '') + '</li>';
+    }
+    for (j = 0; j < p.late.length; j++) {
+      var l = p.late[j];
+      eh += '<li>' + esc(l.name) + (l.grade ? ' (' + esc(l.grade) + ')' : '') +
+        ' — late arrival ' + esc(tOf(l.at)) + '</li>';
+    }
+    for (j = 0; j < p.moved.length; j++) {
+      var m = p.moved[j];
+      eh += '<li>' + esc(m.name) + ' — ' + esc(m.from || '?') + ' &rarr; ' + esc(m.to || '?') +
+        ' at ' + esc(tOf(m.at)) + (m.inTransit ? ' — <b>IN TRANSIT</b>' : '') + '</li>';
+    }
+    $('mExcList').innerHTML = eh || '<li class="muted">No student exceptions — everyone is where FACTS expects them.</li>';
+
+    renderRosters(res);
+  }
+
+  // ---- boot: bootstrap for the default roster mode, then fetch once ----
+  function boot() {
+    api({ op: 'bootstrap' }, function (res) {
+      if (!res || res.ok !== true) {
+        $('pageLoading').textContent = 'Could not reach the server — retrying…';
+        setTimeout(boot, 5000);
+        return;
+      }
+      mode = res.musterMode === 'full' ? 'full' : 'counts';
+      FINDER_URL = String(res.factsFinderUrl || '').trim();
+      paintSeg();
+      fetchReport();
+    }, function () {
+      $('pageLoading').textContent = 'Could not reach the server — retrying…';
+      setTimeout(boot, 5000);
+    });
+  }
+  paintSeg();
+  boot();
+})();
+</script>
+</body>
+</html>

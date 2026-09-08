@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<!-- pages/Kiosk.html — the PRODUCTION iPad kiosk page (single page of the kiosk app).
+     Served by server/Router.js doGet as a TEMPLATE after the URL key passes:
+       template.station ('hs'|'el') and template.urlKey become the JS globals
+       STATION / URL_KEY (every kioskApi call re-sends them; the server
+       re-validates on EVERY op and throws DENIED on failure).
+     The viewport + apple-mobile-web-app-capable metas are added server-side
+     (addMetaTag) — do not add them here. Runs standalone (Add to Home Screen
+     + Guided Access): no browser chrome, the page owns the whole viewport.
+     Flows ported from apps/demo/pages/Demo.html (kiosk pane) / prototype/kiosk.html;
+     idle + submit machines follow eagles-landing KioskFlow.html idioms.
+     PRIVACY: this page only ever holds {id, name, grade} for a student and
+     match true/false for pickup — the server never sends more (KioskApi.js). -->
+<html lang="en">
+<head>
+<base target="_self">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Campus Presence — Kiosk</title>
+<script src="logic.js"></script>
+<!-- pages/KioskStyles.html — style partial for the PRODUCTION iPad kiosk.
+     GAS serves no static files, so this inlines:
+       1. the Eagle Eye hcs-ui tokens (campus-control design/system/hcs-ui.css,
+          via the demo's adaptation in apps/demo/pages/DemoStyles.html)
+       2. the kiosk components from the CP1 prototype / demo kiosk pane,
+          scaled UP for a full-screen iPad (no frame chrome, big tap targets)
+       3. the kiosk-only overlays: splash, idle, submit spinner, connection
+          modal, boot cover, and the permanent DENIED gate.
+     -apple-system stack only — NO external fonts or CDNs (offline-safe,
+     ANYONE_ANONYMOUS page). Served standalone (Add to Home Screen), so the
+     layout owns the whole 100dvh viewport incl. safe areas. -->
+<style>
+/* =====================================================================
+   1. HCS tokens (Eagle Eye)
+   ===================================================================== */
+:root{
+  --hcs-red:#B22222;
+  --hcs-red-dark:#8f1b1b;
+  --hcs-red-soft:#fff5f5;
+  --hcs-gold:#D4AF37;
+  --hcs-gold-soft:#fffdf4;
+  --hcs-ink:#23272e;
+  --hcs-muted:#6b7280;
+  --hcs-line:#e7e9ee;
+  --hcs-bg:#f6f7f9;
+  --hcs-surface:#ffffff;
+  --hcs-surface-2:#f7f8fa;
+  --hcs-ok:#1f8a4c;       --hcs-ok-bg:#e9f7ef;     --hcs-ok-line:#bfe6cd;
+  --hcs-warn:#b5751a;     --hcs-warn-bg:#fdf3e2;   --hcs-warn-line:#f1d9a8;
+  --hcs-radius-sm:8px;
+  --hcs-radius:12px;
+  --hcs-radius-lg:16px;
+  --hcs-radius-xl:18px;
+}
+
+/* =====================================================================
+   2. Base — full-screen standalone web app (no Safari chrome)
+   ===================================================================== */
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body.hcs-app{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background:var(--hcs-bg);
+  color:var(--hcs-ink);
+  position:fixed;inset:0;width:100%;
+  height:100vh;height:100dvh;
+  display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  touch-action:manipulation;          /* kills iOS double-tap zoom */
+  overscroll-behavior:none;
+}
+input{-webkit-user-select:text;user-select:text;}
+.hidden{display:none !important;}
+.muted{color:var(--hcs-muted);}
+.small{font-size:.85rem;}
+.w-100{width:100%;}
+
+/* =====================================================================
+   3. Shell: header / scrolling main / footer
+   ===================================================================== */
+.kiosk-head{
+  flex:none;background:var(--hcs-surface);border-bottom:1px solid var(--hcs-line);
+  padding:calc(12px + env(safe-area-inset-top)) 24px 12px;
+  display:flex;align-items:center;gap:14px;
+}
+.hcs-brand{
+  width:48px;height:48px;border-radius:12px;background:var(--hcs-red);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:1.25rem;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);flex:none;
+}
+.hcs-title{font-weight:800;font-size:1.3rem;line-height:1.1;margin:0;}
+.hcs-subtitle{color:var(--hcs-muted);font-size:.85rem;margin:2px 0 0;}
+
+.kiosk-main{
+  flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:26px 24px 44px;
+}
+.kiosk-col{max-width:740px;margin:0 auto;}
+
+.kiosk-foot{
+  flex:none;text-align:center;color:var(--hcs-muted);font-size:.72rem;
+  padding:6px 12px calc(8px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--hcs-line);background:var(--hcs-surface);
+}
+
+/* =====================================================================
+   4. Screens + typography
+   ===================================================================== */
+.kiosk-screen{display:none;}
+.kiosk-screen.is-active{display:block;animation:kfade .18s ease;}
+@keyframes kfade{from{opacity:.4;transform:translateY(4px);}to{opacity:1;transform:none;}}
+
+.kiosk-h1{font-size:clamp(1.7rem,3.2vw,2.2rem);font-weight:800;margin:4px 0 6px;}
+.kiosk-sub{color:var(--hcs-muted);font-size:1.1rem;line-height:1.45;margin:0 0 20px;}
+.section-label{
+  font-size:.82rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--hcs-muted);margin:22px 0 8px;display:block;
+}
+
+/* =====================================================================
+   5. Buttons, inputs, choices — everything >= 44px tap target
+   ===================================================================== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1.5px solid transparent;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-weight:700;font-size:1.15rem;line-height:1.2;
+  padding:14px 22px;min-height:58px;text-decoration:none;color:inherit;
+  background:var(--hcs-surface);transition:.12s;
+}
+.btn:disabled{opacity:.45;cursor:default;}
+.btn:active:not(:disabled){transform:scale(.985);}
+.btn-hcs{background:var(--hcs-red);border-color:var(--hcs-red);color:#fff;}
+.btn-hcs:active:not(:disabled){background:var(--hcs-red-dark);border-color:var(--hcs-red-dark);}
+.btn-plain{border-color:var(--hcs-line);}
+.btn-plain:active:not(:disabled){border-color:var(--hcs-gold);}
+.btn-back{border-color:var(--hcs-line);color:var(--hcs-muted);background:var(--hcs-surface);min-width:120px;}
+.btn-big{min-height:66px;font-size:1.25rem;}
+
+.form-control{
+  font-family:inherit;font-size:1.15rem;color:var(--hcs-ink);
+  border:1.5px solid var(--hcs-line);border-radius:12px;-webkit-appearance:none;appearance:none;
+  padding:14px 16px;min-height:58px;width:100%;background:var(--hcs-surface);
+}
+.form-control:focus{outline:none;border-color:var(--hcs-gold);box-shadow:0 0 0 3px rgba(212,175,55,.25);}
+.big-input{font-size:1.35rem;min-height:66px;}
+
+.nav-row{display:flex;gap:12px;margin-top:26px;}
+.nav-row .grow{flex:1;}
+
+.home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;}
+.home-btn{
+  min-height:clamp(150px,22vh,220px);border-radius:var(--hcs-radius-lg);border:1px solid var(--hcs-line);
+  background:var(--hcs-surface);cursor:pointer;font-family:inherit;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  font-size:1.4rem;font-weight:800;color:var(--hcs-ink);
+  border-left:6px solid var(--hcs-gold);box-shadow:0 1px 2px rgba(20,20,40,.04);transition:.12s;
+}
+.home-btn span{font-size:1.4rem;}
+.home-btn .dir{font-size:.8rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--hcs-muted);margin-top:4px;}
+.home-btn:active{transform:scale(.985);}
+.home-btn.out{border-left-color:var(--hcs-red);}
+
+.choice-grid{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 4px;}
+.choice{
+  flex:1 1 30%;min-width:130px;min-height:60px;border-radius:12px;cursor:pointer;
+  border:1.5px solid var(--hcs-line);background:var(--hcs-surface);
+  font-family:inherit;font-size:1.1rem;font-weight:700;color:var(--hcs-ink);
+  display:flex;align-items:center;justify-content:center;padding:10px 12px;transition:.1s;text-align:center;
+}
+.choice:active{transform:scale(.98);}
+.choice.selected{border-color:var(--hcs-red);background:var(--hcs-red-soft);color:var(--hcs-red);box-shadow:0 0 0 2px rgba(178,34,34,.15);}
+
+.results{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+.result-btn{
+  text-align:left;border:1.5px solid var(--hcs-line);border-radius:12px;background:var(--hcs-surface);
+  font-family:inherit;font-size:1.2rem;font-weight:700;color:var(--hcs-ink);
+  min-height:60px;padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.1s;
+}
+.result-btn:active{border-color:var(--hcs-gold);background:var(--hcs-gold-soft);}
+.result-btn .close-tag{margin-left:auto;font-size:.75rem;font-weight:700;color:var(--hcs-warn);
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-radius:6px;padding:3px 8px;flex:none;}
+.result-btn .result-meta{margin-left:auto;font-size:.9rem;font-weight:700;color:var(--hcs-muted);flex:none;}
+.results-hint{color:var(--hcs-muted);font-size:1rem;margin-top:12px;min-height:24px;}
+
+.kp-error{color:var(--hcs-red);font-weight:700;text-align:center;min-height:26px;margin-top:10px;font-size:1rem;}
+.kp-error.warn{color:var(--hcs-warn);}
+
+/* =====================================================================
+   6. Badge keypad
+   ===================================================================== */
+.badge-display{
+  font-size:2.8rem;font-weight:800;text-align:center;letter-spacing:.06em;
+  border:1.5px solid var(--hcs-line);border-radius:16px;background:var(--hcs-surface);
+  padding:8px;margin:16px auto;max-width:300px;min-height:76px;
+  display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums;
+}
+.badge-display.err{border-color:var(--hcs-red);color:var(--hcs-red);background:var(--hcs-red-soft);}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:360px;margin:0 auto;}
+.key{
+  min-height:74px;border-radius:16px;border:1px solid var(--hcs-line);background:var(--hcs-surface);
+  font-family:inherit;font-size:1.7rem;font-weight:800;color:var(--hcs-ink);cursor:pointer;transition:.08s;
+}
+.key:active{transform:scale(.96);background:var(--hcs-gold-soft);}
+.key.ok{background:var(--hcs-red);border-color:var(--hcs-red);color:#fff;font-size:1.2rem;}
+.key.ok:active{background:var(--hcs-red-dark);}
+
+/* =====================================================================
+   7. Work-Release secondary block + calm info screen
+   ===================================================================== */
+.wr-wrap{margin-top:34px;border-top:1px dashed var(--hcs-line);padding-top:18px;}
+.divider-label{
+  font-size:.82rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--hcs-muted);margin:0 0 10px;
+}
+
+.info-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-left:6px solid var(--hcs-gold);
+  border-radius:var(--hcs-radius-lg);box-shadow:0 1px 2px rgba(20,20,40,.04);
+  padding:36px 30px;text-align:center;max-width:560px;margin:6vh auto 0;
+}
+.info-ico{
+  width:64px;height:64px;border-radius:50%;background:var(--hcs-gold-soft);
+  border:2px solid var(--hcs-gold);color:var(--hcs-ink);
+  font-size:2rem;font-weight:800;line-height:60px;margin:0 auto 14px;
+}
+.info-title{font-size:1.7rem;font-weight:800;margin:0 0 10px;}
+.info-text{font-size:1.15rem;line-height:1.5;color:var(--hcs-ink);margin:0 0 24px;}
+.info-ok{min-width:200px;min-height:64px;font-size:1.25rem;}
+
+/* =====================================================================
+   8. Overlays: splash / idle / submit / connection / boot / DENIED
+   ===================================================================== */
+.overlay{
+  position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+  padding:26px;text-align:center;
+}
+.overlay.show{display:flex;}
+.overlay.dim{background:rgba(20,22,30,.55);}
+.overlay.solid{background:var(--hcs-bg);flex-direction:column;gap:16px;}
+
+#splash{background:rgba(246,247,249,.97);z-index:40;}
+#submitOverlay{background:rgba(246,247,249,.88);z-index:60;}
+#netModal{z-index:70;}
+#idleModal{z-index:75;}   /* above the connection modal so an abandoned one still resets */
+#bootCover{z-index:90;}
+#deniedGate{z-index:100;}
+
+.splash-card{max-width:520px;width:100%;padding:34px 30px;}
+.hcs-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-radius:var(--hcs-radius-lg);box-shadow:0 1px 2px rgba(20,20,40,.04);
+}
+.hcs-card--accent{border-left:5px solid var(--hcs-gold);}
+.big-ico{font-size:3.6rem;line-height:1;}
+#splash h2{font-size:1.8rem;font-weight:800;margin:14px 0 8px;}
+#splash p{font-size:1.2rem;color:var(--hcs-muted);margin:0 0 6px;line-height:1.45;}
+.splash-actions{display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;}
+.splash-actions .btn{min-height:60px;}
+
+.modal-card{
+  background:var(--hcs-surface);border-radius:var(--hcs-radius-xl);
+  box-shadow:0 20px 60px rgba(0,0,0,.3);max-width:520px;width:100%;padding:30px 28px;
+}
+.modal-title{font-size:1.6rem;font-weight:800;margin:0 0 10px;}
+.modal-card p{font-size:1.1rem;line-height:1.45;margin:0 0 6px;}
+.idle-count{font-size:3.4rem;font-weight:800;color:var(--hcs-red);margin:10px 0 16px;font-variant-numeric:tabular-nums;}
+
+.submit-box{display:flex;flex-direction:column;align-items:center;gap:18px;}
+.spinner{
+  width:52px;height:52px;border:5px solid rgba(0,0,0,.12);border-top-color:var(--hcs-red);
+  border-radius:50%;animation:kspin .8s linear infinite;
+}
+@keyframes kspin{to{transform:rotate(360deg);}}
+.submit-msg{font-size:1.2rem;font-weight:700;color:var(--hcs-muted);}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,0,0,.18);
+  border-top-color:var(--hcs-red);border-radius:50%;animation:kspin .7s linear infinite;vertical-align:-3px;}
+
+.boot-brand{width:60px;height:60px;font-size:1.5rem;}
+.boot-msg{color:var(--hcs-muted);font-weight:600;font-size:1.15rem;}
+
+.denied-box h1{font-size:2rem;font-weight:800;margin:0 0 10px;color:var(--hcs-ink);}
+.denied-box p{font-size:1.25rem;color:var(--hcs-muted);margin:0;}
+
+/* =====================================================================
+   9. Narrow / short screens (small iPads, split view)
+   ===================================================================== */
+@media (max-width:560px){
+  .home-grid{grid-template-columns:1fr;}
+  .home-btn{min-height:110px;}
+  .choice{flex-basis:45%;min-width:110px;}
+}
+@media (max-height:560px){
+  .home-btn{min-height:100px;}
+  .kiosk-main{padding-top:14px;}
+}
+</style>
+
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Campus Presence — Kiosk" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body class="hcs-app kiosk">
+
+<header class="kiosk-head">
+  <div class="hcs-brand" id="brandBox">CP</div>
+  <div>
+    <p class="hcs-title" id="hdrStation">Front Office</p>
+    <p class="hcs-subtitle">Campus Presence</p>
+  </div>
+</header>
+
+<main class="kiosk-main" id="kioskMain"><div class="kiosk-col">
+
+  <!-- ============ HOME ============ -->
+  <section class="kiosk-screen is-active" id="scr-home">
+    <h1 class="kiosk-h1">Welcome</h1>
+    <p class="kiosk-sub">Tap what you need to do.</p>
+    <div class="home-grid">
+      <button type="button" class="home-btn" data-action="start" data-flow="vin">Visitor<span>Sign In</span><span class="dir">I just arrived</span></button>
+      <button type="button" class="home-btn out" data-action="start" data-flow="vout">Visitor<span>Sign Out</span><span class="dir">I&rsquo;m leaving</span></button>
+      <button type="button" class="home-btn" data-action="start" data-flow="sin">Student<span>Sign In</span><span class="dir">Late arrival or return</span></button>
+      <button type="button" class="home-btn out" data-action="start" data-flow="sout">Student<span>Sign Out</span><span class="dir">Early dismissal</span></button>
+    </div>
+  </section>
+
+  <!-- ============ VISITOR IN ============ -->
+  <section class="kiosk-screen" id="scr-vin-name">
+    <h1 class="kiosk-h1">Visitor Sign In</h1>
+    <p class="kiosk-sub">Who are you?</p>
+    <label class="section-label" for="vinName">Your name</label>
+    <input id="vinName" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="First and last name">
+    <label class="section-label" for="vinOrg">Company / organization (optional)</label>
+    <input id="vinOrg" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Optional">
+    <div class="kp-error" id="vinNameErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="home">Cancel</button>
+      <button type="button" class="btn btn-hcs grow" data-action="vinNameNext">Next</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-vin-reason">
+    <h1 class="kiosk-h1">Visitor Sign In</h1>
+    <p class="kiosk-sub">Why are you here, and where are you headed?</p>
+    <div class="section-label">Reason</div>
+    <div class="choice-grid" id="vinReasons"></div>
+    <input id="vinReasonOther" class="form-control hidden" type="text" autocomplete="off" placeholder="Tell us more (optional)">
+    <div class="section-label">Destination building</div>
+    <div class="choice-grid" id="vinBuildings"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="vin-name">Back</button>
+      <button type="button" class="btn btn-hcs grow" id="vinReasonNext" data-action="vinReasonNext" disabled>Next</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-vin-badge">
+    <h1 class="kiosk-h1">Take a badge</h1>
+    <p class="kiosk-sub">Take a <b>VISITOR</b> badge from the rack and enter its number.</p>
+    <div class="badge-display" id="vinBadgeDisplay">V&ndash;</div>
+    <div class="keypad" id="vinKeypad"></div>
+    <div class="kp-error" id="vinBadgeErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="vin-reason">Back</button>
+    </div>
+  </section>
+
+  <!-- ============ VISITOR OUT ============ -->
+  <section class="kiosk-screen" id="scr-vout-badge">
+    <h1 class="kiosk-h1">Visitor Sign Out</h1>
+    <p class="kiosk-sub">Type the number on your badge.</p>
+    <div class="badge-display" id="voutBadgeDisplay">V&ndash;</div>
+    <div class="keypad" id="voutKeypad"></div>
+    <div class="kp-error" id="voutBadgeErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="home">Cancel</button>
+      <button type="button" class="btn btn-plain grow" data-action="voutLost">Lost or missing badge?</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-vout-confirm">
+    <h1 class="kiosk-h1">Confirm</h1>
+    <p class="kiosk-sub" id="voutConfirmText">Signing out &hellip;</p>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="vout-badge">Not me</button>
+      <button type="button" class="btn btn-hcs grow" data-action="voutConfirm">Yes, sign me out</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-vout-list">
+    <h1 class="kiosk-h1">Sign out without a badge</h1>
+    <p class="kiosk-sub">Tap your name below to sign out. The office will be notified about the badge.</p>
+    <div class="results" id="voutOpenList"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="vout-badge">Back</button>
+    </div>
+  </section>
+
+  <!-- ============ STUDENT SEARCH (shared: sign in / sign out) ============ -->
+  <section class="kiosk-screen" id="scr-search">
+    <h1 class="kiosk-h1" id="searchTitle">Student Sign In</h1>
+    <p class="kiosk-sub" id="searchSub">Type at least 3 letters of the student&rsquo;s name, then tap it.</p>
+    <input id="searchInput" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Student name&hellip;">
+    <div class="results" id="searchResults"></div>
+    <div class="results-hint" id="searchHint"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="home">Cancel</button>
+    </div>
+  </section>
+
+  <!-- ============ STUDENT IN ============ -->
+  <section class="kiosk-screen" id="scr-sin-adult">
+    <h1 class="kiosk-h1">Who is signing them in?</h1>
+    <p class="kiosk-sub" id="sinAdultSub">&hellip;</p>
+    <label class="section-label" for="sinAdultName">Your name</label>
+    <input id="sinAdultName" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="First and last name">
+    <div class="section-label">Relationship</div>
+    <div class="choice-grid" id="sinRelGrid"></div>
+    <div class="kp-error" id="sinAdultErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="search">Back</button>
+      <button type="button" class="btn btn-hcs grow" data-action="sinAdultNext">Next</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-sin-reason">
+    <h1 class="kiosk-h1">Reason for arrival</h1>
+    <p class="kiosk-sub" id="sinReasonSub">&hellip;</p>
+    <div class="choice-grid" id="sinReasons"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="sinReasonBack">Back</button>
+    </div>
+  </section>
+
+  <!-- ============ STUDENT OUT (one completion screen) ============ -->
+  <section class="kiosk-screen" id="scr-sout-form">
+    <h1 class="kiosk-h1" id="soutTitle">Early dismissal</h1>
+    <p class="kiosk-sub">Type <b>your own</b> first and last name. For student safety the authorized pickup list is never shown.</p>
+    <label class="section-label" for="soutName">Your name</label>
+    <input id="soutName" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Your first and last name">
+    <div class="section-label">Relationship</div>
+    <div class="choice-grid" id="soutRelGrid"></div>
+    <div class="section-label">Reason</div>
+    <div class="choice-grid" id="soutReasons"></div>
+    <div class="section-label">Returning today?</div>
+    <div class="choice-grid" id="soutReturning">
+      <button type="button" class="choice" data-ret="yes">Yes, back later today</button>
+      <button type="button" class="choice" data-ret="no">No, gone for the day</button>
+    </div>
+    <div class="kp-error" id="soutErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="search">Back</button>
+      <button type="button" class="btn btn-hcs grow" data-action="soutComplete">Complete sign-out</button>
+    </div>
+    <div id="soutWrWrap" class="wr-wrap hidden">
+      <div class="divider-label">Student with Work Release?</div>
+      <button type="button" class="btn btn-plain w-100" data-action="soutWorkRelease">Work-Release self sign-out</button>
+      <div class="kp-error warn" id="soutWrErr"></div>
+    </div>
+  </section>
+
+  <!-- calm "see office staff" screen — NOT an error tone -->
+  <section class="kiosk-screen" id="scr-sout-info">
+    <div class="info-card">
+      <div class="info-ico">i</div>
+      <h2 class="info-title" id="infoTitle">Please see office staff</h2>
+      <p class="info-text" id="infoText"></p>
+      <button type="button" class="btn btn-hcs info-ok" data-action="goHome">OK</button>
+    </div>
+  </section>
+
+</div></main>
+
+<footer class="kiosk-foot">Roster as of <span id="genAt">&mdash;</span></footer>
+
+<!-- ============ SPLASH (success / gentle-warn, auto-returns home) ============ -->
+<div class="overlay" id="splash">
+  <div class="hcs-card hcs-card--accent splash-card">
+    <div class="big-ico" id="splashIco" style="color:var(--hcs-ok);">&#10003;</div>
+    <h2 id="splashTitle"></h2>
+    <p id="splashSub"></p>
+    <div class="splash-actions" id="splashActions"></div>
+  </div>
+</div>
+
+<!-- ============ SUBMIT OVERLAY (shared submit machine) ============ -->
+<div class="overlay" id="submitOverlay">
+  <div class="submit-box">
+    <div class="spinner"></div>
+    <div class="submit-msg" id="submitMsg">One moment&hellip;</div>
+  </div>
+</div>
+
+<!-- ============ CONNECTION-TROUBLE MODAL ============ -->
+<div class="overlay dim" id="netModal">
+  <div class="modal-card">
+    <h2 class="modal-title">Connection trouble</h2>
+    <p>The kiosk couldn&rsquo;t reach the server, so nothing has been recorded yet.</p>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back grow" data-action="netCancel">Cancel</button>
+      <button type="button" class="btn btn-hcs grow" data-action="netRetry">Try again</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ IDLE OVERLAY ============ -->
+<div class="overlay dim" id="idleModal">
+  <div class="modal-card">
+    <h2 class="modal-title">Are you still there?</h2>
+    <p class="muted">This screen will reset in</p>
+    <div class="idle-count" id="idleCount">10</div>
+    <button type="button" class="btn btn-hcs btn-big w-100" data-action="idleKeep">I&rsquo;m still here</button>
+  </div>
+</div>
+
+<!-- ============ BOOT COVER ============ -->
+<div class="overlay solid show" id="bootCover">
+  <div class="hcs-brand boot-brand">CP</div>
+  <div class="boot-msg" id="bootMsg">Connecting to the roster&hellip;</div>
+  <button type="button" class="btn btn-hcs hidden" id="bootRetry" data-action="bootRetry">Retry</button>
+</div>
+
+<!-- ============ DENIED GATE (permanent — everything stops) ============ -->
+<div class="overlay solid" id="deniedGate">
+  <div class="denied-box">
+    <h1>Kiosk not authorized</h1>
+    <p>Please see the front office.</p>
+  </div>
+</div>
+
+<!-- GENERATED by tools/wrap.js — DO NOT EDIT -->
+<script>
+
+</script>
+
+
+<script>
+'use strict';
+// Template globals — Router.js validated station+key BEFORE rendering; every
+// kioskApi call re-sends them and the server re-validates (throws DENIED).
+var STATION = (new URLSearchParams(location.search).get('station') === 'el' ? 'el' : 'hs'); // doGet reads ?station= the same way; the demo shim's google.script.url is always empty
+var URL_KEY = 'demo-device-key'; // production: the per-device key from Script Properties, re-checked on every call
+</script>
+
+<script>
+'use strict';
+(function () {
+
+  // ====================================================================
+  // helpers
+  // ====================================================================
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function firstNameOf(lastFirst) {
+    var parts = String(lastFirst || '').split(/[\s,]+/).filter(function (w) { return w; });
+    return parts.length > 1 ? parts[1] : (parts[0] || '');
+  }
+  function gradeNum(token) {
+    var t = String(token || '');
+    if (t === 'K4' || t === 'K5') return 0;
+    var n = parseInt(t, 10);
+    return isNaN(n) ? 0 : n;
+  }
+  function wordCount(s) {
+    return String(s || '').split(/\s+/).filter(function (w) { return w; }).length;
+  }
+  function displayStudent(name, grade) { return name + ' (' + grade + ')'; }
+
+  var STATION_INFO = {
+    hs: { label: 'HS Office', brand: 'HS', building: 'High School' },
+    el: { label: 'EL Entrance', brand: 'EL', building: 'Elementary' }
+  };
+  var ST = STATION_INFO[STATION] || { label: 'Front Office', brand: 'CP', building: 'Other' };
+  var RELATIONSHIPS = ['Mother', 'Father', 'Grandparent', 'Other'];
+
+  // ====================================================================
+  // state
+  // ====================================================================
+  var BOOT = null;          // bootstrap payload
+  var DEAD = false;         // DENIED gate shown — all timers/calls stop
+  var current = 'home';     // active screen name
+  var submitting = false;   // shared submit machine: a call is in flight
+
+  var flow;
+  function resetFlow(keepGuardian) {
+    var g = (keepGuardian && flow) ? flow.guardian : { name: '', relationship: '' };
+    flow = {
+      searchMode: 'in',                                        // 'in' | 'out'
+      visitor: { name: '', org: '', reason: '', reasonOther: '', building: '' },
+      voutPick: null,                                          // {visitKey, name, badge}
+      student: null,                                           // {id, name, grade, parentDriven} — never more
+      guardian: g,
+      guardianKept: !!keepGuardian,
+      forceGuardian: false,                                    // server said guardian-required
+      sinReason: '',                                           // retained across a guardian-required retry
+      sout: { relationship: '', reason: '', returning: null }
+    };
+  }
+  resetFlow(false);
+
+  // ====================================================================
+  // screen router
+  // ====================================================================
+  function go(name) {
+    var screens = document.querySelectorAll('.kiosk-screen');
+    for (var i = 0; i < screens.length; i++) screens[i].classList.remove('is-active');
+    $('scr-' + name).classList.add('is-active');
+    current = name;
+    $('kioskMain').scrollTop = 0;
+    if (name === 'home') stopIdle(); else armIdle();
+  }
+  function goHome() {
+    // Full wipe: any abandoned or finished flow leaves NOTHING behind.
+    hideSplash();
+    hideIdle();
+    hideNetModal();
+    hideSubmitOverlay();
+    clearTimeout(retryTimer);
+    submitting = false;
+    submitCtx = null;
+    resetFlow(false);
+    clearVisitorInputs();
+    clearSearch();
+    clearSinInputs();
+    clearSoutInputs();
+    vinPad.clear();
+    voutPad.clear();
+    go('home');
+    maybeReload();
+  }
+
+  // ====================================================================
+  // server plumbing — every op goes to kioskApi with station+key attached.
+  // DENIED (thrown server-side) reaches the failureHandler → permanent gate.
+  // ====================================================================
+  function isDenied(err) {
+    return /DENIED/.test(String((err && err.message) || err || ''));
+  }
+  function showDenied() {
+    DEAD = true;
+    stopIdle();
+    clearTimeout(retryTimer);
+    clearTimeout(bootTimer);
+    clearTimeout(splashTimer);
+    hideSubmitOverlay();
+    hideNetModal();
+    hideSplash();
+    hideIdle();
+    $('bootCover').classList.remove('show');
+    $('deniedGate').classList.add('show');
+  }
+  function rawCall(request, onOk, onFail) {
+    if (DEAD) return;
+    request.station = STATION;
+    request.key = URL_KEY;
+    google.script.run
+      .withSuccessHandler(function (res) { if (!DEAD) onOk(res); })
+      .withFailureHandler(function (err) {
+        if (DEAD) return;
+        if (isDenied(err)) { showDenied(); return; }
+        onFail(err);
+      })
+      .kioskApi(request);
+  }
+
+  // ---- shared submit machine: spinner overlay, 2 auto-retries (1.5s/3s),
+  //      then the Connection-trouble modal. Idle is suppressed in flight. ----
+  var SUBMIT_RETRY_MS = [1500, 3000];
+  var submitCtx = null;   // {request, onSuccess, attempt}
+  var retryTimer = null;
+  function showSubmitOverlay(msg) {
+    $('submitMsg').textContent = msg || 'One moment…';
+    $('submitOverlay').classList.add('show');
+  }
+  function hideSubmitOverlay() { $('submitOverlay').classList.remove('show'); }
+  function showNetModal() {
+    $('netModal').classList.add('show');
+    // No longer in flight: arm idle so an abandoned modal still resets home.
+    submitting = false;
+    if (current !== 'home') armIdle();
+  }
+  function hideNetModal() { $('netModal').classList.remove('show'); }
+
+  function submitCall(request, onSuccess) {
+    if (submitting || DEAD || !BOOT) return;
+    submitting = true;
+    stopIdle(); // suppressed while in flight
+    submitCtx = { request: request, onSuccess: onSuccess, attempt: 0 };
+    showSubmitOverlay('One moment…');
+    submitAttempt();
+  }
+  function submitAttempt() {
+    if (!submitCtx || DEAD) return;
+    rawCall(submitCtx.request, function (res) {
+      var ctx = submitCtx;
+      submitCtx = null;
+      submitting = false;
+      hideSubmitOverlay();
+      if (current !== 'home') armIdle();
+      ctx.onSuccess(res);
+    }, function () {
+      if (!submitCtx) return;
+      if (submitCtx.attempt < SUBMIT_RETRY_MS.length) {
+        var delay = SUBMIT_RETRY_MS[submitCtx.attempt];
+        submitCtx.attempt++;
+        showSubmitOverlay('Retrying…');
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(submitAttempt, delay);
+      } else {
+        hideSubmitOverlay();
+        showNetModal();
+      }
+    });
+  }
+
+  // ====================================================================
+  // splash (success / gentle-warn card that auto-returns home)
+  // ====================================================================
+  var splashTimer = null;
+  function showSplash(opts) {
+    $('splashIco').innerHTML = opts.warn ? '&#9888;' : '&#10003;';
+    $('splashIco').style.color = opts.warn ? 'var(--hcs-warn)' : 'var(--hcs-ok)';
+    $('splashTitle').textContent = opts.title || '';
+    $('splashSub').textContent = opts.sub || '';
+    var act = $('splashActions');
+    act.innerHTML = '';
+    var actions = opts.actions || [];
+    for (var i = 0; i < actions.length; i++) {
+      (function (a) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ' + (a.primary ? 'btn-hcs' : 'btn-plain');
+        b.textContent = a.label;
+        b.addEventListener('click', function () {
+          clearTimeout(splashTimer);
+          hideSplash();
+          a.cb();
+        });
+        act.appendChild(b);
+      })(actions[i]);
+    }
+    $('splash').classList.add('show');
+    clearTimeout(splashTimer);
+    if (opts.autoMs) splashTimer = setTimeout(goHome, opts.autoMs);
+  }
+  function hideSplash() {
+    clearTimeout(splashTimer);
+    $('splash').classList.remove('show');
+  }
+
+  // ====================================================================
+  // idle machine — any screen EXCEPT home: after idleWarnSeconds of no
+  // touches show "Are you still there?" with a live idleResetSeconds
+  // countdown; 0 → wipe everything → home. Suppressed while submitting.
+  // ====================================================================
+  var idleTimer = null, idleCountdown = null, idleOpen = false;
+  function idleWarnMs() { return ((BOOT && BOOT.idleWarnSeconds) || 45) * 1000; }
+  function idleResetSecs() { return (BOOT && BOOT.idleResetSeconds) || 10; }
+  function armIdle() {
+    if (DEAD || submitting) return;
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(showIdle, idleWarnMs());
+  }
+  function stopIdle() { clearTimeout(idleTimer); clearInterval(idleCountdown); }
+  function showIdle() {
+    if (current === 'home' || submitting || DEAD) return;
+    idleOpen = true;
+    var left = idleResetSecs();
+    $('idleCount').textContent = left;
+    $('idleModal').classList.add('show');
+    clearInterval(idleCountdown);
+    idleCountdown = setInterval(function () {
+      left--;
+      $('idleCount').textContent = left;
+      if (left <= 0) { hideIdle(); goHome(); }
+    }, 1000);
+  }
+  function hideIdle() {
+    idleOpen = false;
+    clearInterval(idleCountdown);
+    $('idleModal').classList.remove('show');
+  }
+  (function wireActivity() {
+    var evts = ['pointerdown', 'keydown'];
+    for (var i = 0; i < evts.length; i++) {
+      document.addEventListener(evts[i], function () {
+        if (DEAD || idleOpen || submitting) return; // the countdown owns its own clock
+        if (current !== 'home') armIdle();
+      }, true);
+    }
+  })();
+
+  // ====================================================================
+  // 4-hour reload safety valve — only fires when the kiosk is safely idle
+  // on the home screen (never mid-flow, never mid-submit, never if DENIED).
+  // ====================================================================
+  var RELOAD_AFTER_MS = 4 * 60 * 60 * 1000;
+  var reloadDue = false;
+  setTimeout(function () { reloadDue = true; }, RELOAD_AFTER_MS);
+  setInterval(maybeReload, 60 * 1000);
+  function maybeReload() {
+    if (!reloadDue || DEAD || submitting || current !== 'home') return;
+    try { window.location.reload(); } catch (e) {}
+  }
+
+  // ====================================================================
+  // choice grids + keypads
+  // ====================================================================
+  function buildChoices(containerId, values, onPick) {
+    var box = $(containerId);
+    box.innerHTML = '';
+    for (var i = 0; i < values.length; i++) {
+      (function (v) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'choice';
+        b.textContent = v;
+        b.addEventListener('click', function () {
+          var all = box.querySelectorAll('.choice');
+          for (var j = 0; j < all.length; j++) all[j].classList.remove('selected');
+          b.classList.add('selected');
+          onPick(v);
+        });
+        box.appendChild(b);
+      })(values[i]);
+    }
+  }
+  function clearChoiceSelection(containerId) {
+    var all = $(containerId).querySelectorAll('.choice');
+    for (var i = 0; i < all.length; i++) all[i].classList.remove('selected');
+  }
+  function setChoiceSelected(containerId, value) {
+    var all = $(containerId).querySelectorAll('.choice');
+    for (var i = 0; i < all.length; i++) {
+      all[i].classList.toggle('selected', all[i].textContent === value);
+    }
+  }
+
+  // Badge keypad: digits only, up to 3; the V prefix is added client-side.
+  function makeKeypad(padId, displayId, onOk) {
+    var buffer = '';
+    var pad = $(padId), display = $(displayId);
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'back', '0', 'ok'];
+    for (var i = 0; i < keys.length; i++) {
+      (function (k) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        if (k === 'back') { b.className = 'key'; b.innerHTML = '&larr;'; }
+        else if (k === 'ok') { b.className = 'key ok'; b.textContent = 'OK'; }
+        else { b.className = 'key'; b.textContent = k; }
+        b.addEventListener('click', function () {
+          if (submitting) return;
+          if (k === 'back') buffer = buffer.slice(0, -1);
+          else if (k === 'ok') { if (buffer) onOk('V' + String(parseInt(buffer, 10))); return; }
+          else if (buffer.length < 3) buffer += k;
+          paint();
+        });
+        pad.appendChild(b);
+      })(keys[i]);
+    }
+    function paint() {
+      display.classList.remove('err');
+      display.textContent = buffer ? 'V' + buffer : 'V–';
+    }
+    return {
+      clear: function () { buffer = ''; paint(); },
+      error: function () { display.classList.add('err'); }
+    };
+  }
+
+  // ====================================================================
+  // input wipes (idle reset / goHome must leave zero residue)
+  // ====================================================================
+  function clearVisitorInputs() {
+    $('vinName').value = ''; $('vinOrg').value = '';
+    $('vinNameErr').textContent = ''; $('vinBadgeErr').textContent = '';
+    $('vinReasonOther').value = ''; $('vinReasonOther').classList.add('hidden');
+    clearChoiceSelection('vinReasons'); clearChoiceSelection('vinBuildings');
+    $('vinReasonNext').disabled = true;
+  }
+  function clearSearch() {
+    searchSeq++; // invalidate any in-flight search response
+    lastGood = null;
+    $('searchInput').value = '';
+    $('searchResults').innerHTML = '';
+    $('searchHint').textContent = '';
+  }
+  function clearSinInputs() {
+    $('sinAdultName').value = ''; $('sinAdultErr').textContent = '';
+    clearChoiceSelection('sinRelGrid'); clearChoiceSelection('sinReasons');
+  }
+  function clearSoutInputs() {
+    $('soutName').value = ''; $('soutErr').textContent = ''; $('soutWrErr').textContent = '';
+    clearChoiceSelection('soutRelGrid'); clearChoiceSelection('soutReasons');
+    clearChoiceSelection('soutReturning');
+  }
+
+  // ====================================================================
+  // VISITOR IN
+  // ====================================================================
+  function vinMaybeEnableNext() {
+    $('vinReasonNext').disabled = !(flow.visitor.reason && flow.visitor.building);
+  }
+
+  var vinPad = makeKeypad('vinKeypad', 'vinBadgeDisplay', function (badge) {
+    var reason = flow.visitor.reason;
+    if (flow.visitor.reasonOther) reason += ' — ' + flow.visitor.reasonOther;
+    submitCall({
+      op: 'visitorIn',
+      name: flow.visitor.name,
+      org: flow.visitor.org,
+      reason: reason,
+      destination: flow.visitor.building,
+      badge: badge
+    }, function (res) {
+      if (res && res.ok) {
+        showSplash({
+          title: 'Welcome!',
+          sub: 'Please wear badge ' + (res.badge || badge) + ' while on campus.',
+          autoMs: 2500
+        });
+        return;
+      }
+      var code = res && res.badge;
+      var msg;
+      if (code === 'in-use') msg = 'Badge ' + badge + ' is already out — pick another.';
+      else if (code === 'unknown' || code === 'inactive') msg = 'That badge isn’t in service — pick another.';
+      else msg = (res && res.error) || 'Something went wrong — please try again.';
+      $('vinBadgeErr').textContent = msg;
+      vinPad.error();
+    });
+  });
+
+  // ====================================================================
+  // VISITOR OUT
+  // ====================================================================
+  var voutPad = makeKeypad('voutKeypad', 'voutBadgeDisplay', function (badge) {
+    submitCall({ op: 'visitorLookupBadge', badge: badge }, function (res) {
+      if (res && res.ok && res.open) {
+        flow.voutPick = { visitKey: res.visitKey, name: res.name, badge: badge };
+        $('voutConfirmText').innerHTML = 'Signing out <b>' + esc(res.name) +
+          '</b> (badge ' + esc(badge) + ') — correct?';
+        go('vout-confirm');
+        return;
+      }
+      $('voutBadgeErr').textContent = (res && res.ok === false && res.error)
+        ? res.error
+        : 'Badge ' + badge + ' isn’t signed out right now — check the number, or tap “Lost or missing badge?”';
+      voutPad.error();
+    });
+  });
+
+  function submitVisitorOut(pick, lostBadge) {
+    submitCall({ op: 'visitorOut', visitKey: pick.visitKey, lostBadge: !!lostBadge }, function (res) {
+      if (res && res.ok) {
+        showSplash({
+          title: 'Thanks for visiting!',
+          sub: lostBadge
+            ? 'You’re signed out — the office has been notified about the badge.'
+            : 'Please drop the badge in the basket.',
+          autoMs: 2500
+        });
+        return;
+      }
+      $('voutBadgeErr').textContent = 'That visit is already closed — see office staff if something looks wrong.';
+      voutPad.clear();
+      go('vout-badge');
+    });
+  }
+
+  // ====================================================================
+  // STUDENT SEARCH (shared by sign in / sign out)
+  // ====================================================================
+  var searchSeq = 0, searchDebounce = null;
+  // Last COMPLETE, all-exact server result set — the basis for instant local
+  // narrowing (see tryNarrowLocally).
+  var lastGood = null;
+
+  function studentIsParentDriven(grade) {
+    var max = (BOOT && typeof BOOT.parentDrivenMaxGrade === 'number') ? BOOT.parentDrivenMaxGrade : 5;
+    return gradeNum(grade) <= max;
+  }
+
+  function renderResults(results, total, truncated) {
+    var box = $('searchResults');
+    box.innerHTML = '';
+    for (var i = 0; i < results.length; i++) {
+      (function (r) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'result-btn';
+        b.innerHTML = esc(displayStudent(r.name, r.grade)) +
+          (r.close ? '<span class="close-tag">close match?</span>' : '');
+        b.addEventListener('click', function () { pickStudent(r); });
+        box.appendChild(b);
+      })(results[i]);
+    }
+    $('searchHint').textContent = truncated
+      ? 'Showing the first ' + results.length + ' of ' + total + ' — keep typing to narrow down.'
+      : '';
+  }
+
+  /**
+   * Narrow the previous result set in the browser — no server round trip.
+   * Sound only when the previous set was COMPLETE (not truncated) and contained
+   * no fuzzy "close" matches: then every student matching the longer query was
+   * necessarily in that set, so filtering locally cannot hide anyone. Returns
+   * false whenever that can't be guaranteed, and the server call proceeds.
+   */
+  function tryNarrowLocally() {
+    if (!lastGood || lastGood.truncated) return false;
+    var q = $('searchInput').value.trim().toLowerCase();
+    if (q.length <= lastGood.q.length || q.indexOf(lastGood.q) !== 0) return false;
+    var tokens = q.split(/\s+/).filter(function (t) { return t; });
+    var hits = lastGood.results.filter(function (r) {
+      var blob = (r.name + ' | ' + r.grade).toLowerCase();
+      return tokens.every(function (t) { return blob.indexOf(t) !== -1; });
+    });
+    if (!hits.length) return false; // a fuzzy match may still exist — ask the server
+    renderResults(hits, hits.length, false);
+    lastGood = { q: q, results: hits, truncated: false };
+    return true;
+  }
+  function enterSearch(mode) {
+    flow.searchMode = mode;
+    flow.student = null;
+    $('searchTitle').textContent = mode === 'in' ? 'Student Sign In' : 'Student Sign Out';
+    $('searchSub').textContent = (mode === 'in'
+      ? 'Late arrival or returning from an appointment. '
+      : 'Early dismissal. ') + 'Type at least 3 letters of the student’s name, then tap it.';
+    clearSearch();
+    go('search');
+    $('searchInput').focus();
+  }
+  function runSearch() {
+    var q = $('searchInput').value;
+    var seq = ++searchSeq;
+    if (q.replace(/\s+/g, '').length < 3) {
+      $('searchResults').innerHTML = '';
+      $('searchHint').textContent = q.trim() ? 'Keep typing…' : '';
+      return;
+    }
+    $('searchHint').innerHTML = '<span class="spin"></span> Searching the roster…';
+    rawCall({ op: 'searchStudents', q: q }, function (res) {
+      if (seq !== searchSeq) return; // stale response
+      if (res && res.ok === false && res.reason === 'limited') {
+        $('searchHint').textContent = 'One moment — please pause a few seconds, then keep typing.';
+        return;
+      }
+      if (!res || !res.ok || !res.results || !res.results.length) {
+        $('searchResults').innerHTML = '';
+        lastGood = null;
+        $('searchHint').textContent = 'No matches — check the spelling or see office staff.';
+        return;
+      }
+      renderResults(res.results, res.total, res.truncated);
+      var anyClose = res.results.some(function (r) { return r.close; });
+      lastGood = (res.truncated || anyClose) ? null
+        : { q: q.trim().toLowerCase(), results: res.results, truncated: false };
+    }, function () {
+      if (seq !== searchSeq) return;
+      $('searchHint').textContent = 'Connection trouble — keep typing to try again.';
+    });
+  }
+
+  function pickStudent(r) {
+    // Minimal projection only — never more than {id, name, grade}. parentDriven
+    // is derived here from the boundary delivered at bootstrap (the server keeps
+    // enforcing the guardian requirement in lateIn regardless).
+    flow.student = { id: r.id, name: r.name, grade: r.grade, parentDriven: studentIsParentDriven(r.grade) };
+    if (flow.searchMode === 'out') { enterSoutForm(); return; }
+    // sign IN — the server auto-detects an open early-out and converts to return-in
+    if (flow.student.parentDriven) {
+      if (flow.guardianKept && flow.guardian.name) { enterSinReason(); return; }
+      $('sinAdultSub').textContent = 'Signing in ' + displayStudent(r.name, r.grade) + '.';
+      $('sinAdultName').value = flow.guardian.name || '';
+      $('sinAdultErr').textContent = '';
+      clearChoiceSelection('sinRelGrid');
+      go('sin-adult');
+      if (!flow.guardian.name) $('sinAdultName').focus();
+    } else {
+      flow.guardian = { name: '', relationship: '' };
+      enterSinReason();
+    }
+  }
+
+  // ====================================================================
+  // STUDENT IN
+  // ====================================================================
+  function enterSinReason() {
+    var s = flow.student;
+    $('sinReasonSub').textContent = flow.guardian.name
+      ? 'Signing in ' + displayStudent(s.name, s.grade) + ' with ' + flow.guardian.name +
+        (flow.guardian.relationship ? ' (' + flow.guardian.relationship + ')' : '') + '. Tap a reason to finish.'
+      : 'Signing in ' + displayStudent(s.name, s.grade) + '. Tap a reason to finish.';
+    clearChoiceSelection('sinReasons');
+    go('sin-reason');
+  }
+
+  function submitLateIn(reason) {
+    var s = flow.student;
+    if (!s) return;
+    flow.sinReason = reason; // kept so a guardian-required retry skips the reason screen
+    submitCall({
+      op: 'lateIn',
+      studentId: s.id,
+      guardianName: flow.guardian.name || '',
+      relationship: flow.guardian.relationship || '',
+      reason: reason
+    }, function (res) {
+      if (res && res.ok) {
+        flow.sinReason = '';
+        var first = firstNameOf(res.name || s.name);
+        var opts = res.welcomeBack
+          ? { title: 'Welcome back, ' + first + '!', sub: 'The earlier sign-out has been closed.' }
+          : { title: 'You’re signed in — head to class', sub: '' };
+        if ((s.parentDriven || flow.forceGuardian) && flow.guardian.name) {
+          opts.sub = (opts.sub ? opts.sub + '  ' : '') + 'Signing in another child?';
+          opts.actions = [
+            { label: 'Sign in another child', primary: true, cb: function () {
+                var g = flow.guardian;
+                resetFlow(true);
+                flow.guardian = g;
+                enterSearch('in');
+              } },
+            { label: 'Done', cb: goHome }
+          ];
+          opts.autoMs = 10000;
+        } else {
+          opts.autoMs = 2500;
+        }
+        showSplash(opts);
+        return;
+      }
+      if (res && res.error === 'guardian-required') {
+        // Server enforces the parent-driven boundary — collect the adult now.
+        flow.forceGuardian = true;
+        $('sinAdultSub').textContent = 'An adult needs to sign in ' +
+          displayStudent(s.name, s.grade) + '. Please type your name.';
+        $('sinAdultErr').textContent = '';
+        go('sin-adult');
+        $('sinAdultName').focus();
+        return;
+      }
+      showSplash({
+        warn: true,
+        title: 'Please see office staff',
+        sub: (res && res.error) || 'The sign-in could not be completed at the kiosk.',
+        autoMs: 4000
+      });
+    });
+  }
+
+  // ====================================================================
+  // STUDENT OUT — one completion screen; the hard pickup check runs
+  // server-side inside earlyOut (this page only ever learns match yes/no)
+  // ====================================================================
+  function enterSoutForm() {
+    var s = flow.student;
+    $('soutTitle').textContent = 'Signing out ' + displayStudent(s.name, s.grade);
+    $('soutName').value = '';
+    $('soutErr').textContent = '';
+    $('soutWrErr').textContent = '';
+    flow.sout = { relationship: '', reason: '', returning: null };
+    clearChoiceSelection('soutRelGrid');
+    clearChoiceSelection('soutReasons');
+    clearChoiceSelection('soutReturning');
+    $('soutWrWrap').classList.toggle('hidden', gradeNum(s.grade) < 7);
+    go('sout-form');
+    $('soutName').focus();
+  }
+
+  // Audible cue at the kiosk itself, so the desk beside it looks up when a
+  // sign-out is stopped. Only fires on the "see office staff" screen — never on
+  // a normal, successful flow. Audio is already unlocked because this always
+  // follows the parent's own tap on [Complete sign-out].
+  var kioskAudioCtx = null;
+  function kioskAlertTone() {
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!kioskAudioCtx) kioskAudioCtx = new Ctx();
+      if (kioskAudioCtx.state === 'suspended') kioskAudioCtx.resume();
+      if (kioskAudioCtx.state !== 'running') return;
+      var t0 = kioskAudioCtx.currentTime;
+      [[660, 0, 0.3], [520, 0.35, 0.45]].forEach(function (n) {
+        var osc = kioskAudioCtx.createOscillator();
+        var gain = kioskAudioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = n[0];
+        gain.gain.setValueAtTime(0.0001, t0 + n[1]);
+        gain.gain.exponentialRampToValueAtTime(0.25, t0 + n[1] + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + n[1] + n[2]);
+        osc.connect(gain);
+        gain.connect(kioskAudioCtx.destination);
+        osc.start(t0 + n[1]);
+        osc.stop(t0 + n[1] + n[2] + 0.02);
+      });
+    } catch (e) { /* silent is an acceptable degradation */ }
+  }
+
+  function showInfo(title, text) {
+    $('infoTitle').textContent = title;
+    $('infoText').textContent = text;
+    go('sout-info');
+    kioskAlertTone();
+  }
+
+  // ====================================================================
+  // delegated static actions (data-action) — dynamic buttons (choices,
+  // results, keypad, splash actions) wire their own listeners above.
+  // ====================================================================
+  var ACTIONS = {
+    start: function (el) {
+      if (!BOOT || DEAD) return;
+      var which = el.getAttribute('data-flow');
+      if (which === 'vin') {
+        clearVisitorInputs();
+        flow.visitor.building = ST.building; // default destination = this station's building
+        setChoiceSelected('vinBuildings', ST.building);
+        go('vin-name');
+        $('vinName').focus();
+      } else if (which === 'vout') {
+        voutPad.clear();
+        $('voutBadgeErr').textContent = '';
+        go('vout-badge');
+      } else if (which === 'sin') {
+        enterSearch('in');
+      } else if (which === 'sout') {
+        enterSearch('out');
+      }
+    },
+
+    back: function (el) {
+      var t = el.getAttribute('data-target');
+      if (t === 'home') { goHome(); return; }
+      if (t === 'search') { enterSearch(flow.searchMode); return; }
+      go(t);
+    },
+
+    goHome: function () { goHome(); },
+
+    vinNameNext: function () {
+      var name = $('vinName').value.trim();
+      if (!name) { $('vinNameErr').textContent = 'Please type your name.'; return; }
+      flow.visitor.name = name;
+      flow.visitor.org = $('vinOrg').value.trim();
+      $('vinNameErr').textContent = '';
+      go('vin-reason');
+    },
+
+    vinReasonNext: function () {
+      flow.visitor.reasonOther = $('vinReasonOther').value.trim();
+      vinPad.clear();
+      $('vinBadgeErr').textContent = '';
+      go('vin-badge');
+    },
+
+    voutConfirm: function () {
+      if (!flow.voutPick) return;
+      submitVisitorOut(flow.voutPick, false);
+    },
+
+    voutLost: function () {
+      submitCall({ op: 'visitorOpenList' }, function (res) {
+        var box = $('voutOpenList');
+        box.innerHTML = '';
+        var list = (res && res.visitors) || [];
+        if (!list.length) {
+          box.innerHTML = '<div class="results-hint">No visitors are signed in right now.</div>';
+        }
+        for (var i = 0; i < list.length; i++) {
+          (function (v) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'result-btn';
+            b.innerHTML = esc(v.name) + '<span class="result-meta">badge ' + esc(v.badge) + '</span>';
+            b.addEventListener('click', function () {
+              submitVisitorOut({ visitKey: v.visitKey, name: v.name, badge: v.badge }, true);
+            });
+            box.appendChild(b);
+          })(list[i]);
+        }
+        go('vout-list');
+      });
+    },
+
+    sinAdultNext: function () {
+      var name = $('sinAdultName').value.trim();
+      if (!name) { $('sinAdultErr').textContent = 'Please type your name.'; return; }
+      if (!flow.guardian.relationship) { $('sinAdultErr').textContent = 'Please tap your relationship.'; return; }
+      flow.guardian.name = name;
+      $('sinAdultErr').textContent = '';
+      // guardian-required retry: the reason was already picked — resubmit now
+      if (flow.forceGuardian && flow.sinReason) { submitLateIn(flow.sinReason); return; }
+      enterSinReason();
+    },
+
+    sinReasonBack: function () {
+      if (flow.student && (flow.student.parentDriven || flow.forceGuardian) && !flow.guardianKept) {
+        go('sin-adult');
+      } else {
+        enterSearch('in');
+      }
+    },
+
+    soutComplete: function () {
+      var s = flow.student;
+      if (!s) return;
+      var typed = $('soutName').value.trim();
+      if (wordCount(typed) < 2) { $('soutErr').textContent = 'Please type your first AND last name.'; return; }
+      if (!flow.sout.relationship) { $('soutErr').textContent = 'Please tap your relationship.'; return; }
+      if (!flow.sout.reason) { $('soutErr').textContent = 'Please tap a reason.'; return; }
+      if (flow.sout.returning === null) { $('soutErr').textContent = 'Returning today? Please tap yes or no.'; return; }
+      $('soutErr').textContent = '';
+      submitCall({
+        op: 'earlyOut',
+        studentId: s.id,
+        mode: 'pickup',
+        typedName: typed,
+        relationship: flow.sout.relationship,
+        reason: flow.sout.reason,
+        returning: flow.sout.returning === 'yes'
+      }, function (res) {
+        if (res && res.ok && res.match) {
+          showSplash({
+            title: 'The office has been notified',
+            sub: firstNameOf(s.name) + ' will meet you here at the ' + ST.label + '.',
+            autoMs: 3500
+          });
+          return;
+        }
+        if (res && res.ok && !res.match) {
+          if (res.limited) {
+            showInfo('One moment', 'Please see office staff to complete this sign-out.');
+          } else {
+            showInfo('Please see office staff',
+              'We couldn’t verify that name for ' + s.name + '. The sign-out isn’t complete — ' +
+              'office staff at the window can finish it right away.');
+          }
+          return;
+        }
+        showInfo('Please see office staff',
+          (res && res.error) || 'The sign-out could not be completed at the kiosk.');
+      });
+    },
+
+    soutWorkRelease: function () {
+      var s = flow.student;
+      if (!s) return;
+      $('soutWrErr').textContent = '';
+      submitCall({
+        op: 'earlyOut',
+        studentId: s.id,
+        mode: 'workrelease',
+        typedName: '',
+        relationship: '',
+        reason: '',
+        returning: flow.sout.returning === 'yes'
+      }, function (res) {
+        if (res && res.ok) {
+          showSplash({
+            title: 'Signed out — your guardians have been notified',
+            sub: 'Have a good shift!',
+            autoMs: 2500
+          });
+          return;
+        }
+        if (res && res.denied === 'workrelease') {
+          $('soutWrErr').textContent = 'Work Release isn’t on file for you — see the office.';
+          return;
+        }
+        $('soutWrErr').textContent = (res && res.error) || 'Something went wrong — please see the office.';
+      });
+    },
+
+    idleKeep: function () { hideIdle(); armIdle(); },
+
+    netRetry: function () {
+      if (!submitCtx) { hideNetModal(); return; }
+      hideNetModal();
+      submitting = true;
+      stopIdle();
+      submitCtx.attempt = 0;
+      showSubmitOverlay('One moment…');
+      submitAttempt();
+    },
+
+    netCancel: function () {
+      submitCtx = null;
+      submitting = false;
+      hideNetModal();
+      if (current !== 'home') armIdle(); // stay on the screen, form intact
+    },
+
+    bootRetry: function () {
+      clearTimeout(bootTimer);
+      boot();
+    }
+  };
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    while (t && t !== document && !(t.getAttribute && t.getAttribute('data-action'))) {
+      t = t.parentNode;
+    }
+    if (!t || t === document) return;
+    var fn = ACTIONS[t.getAttribute('data-action')];
+    if (fn) fn(t);
+  });
+
+  // ====================================================================
+  // static input wiring
+  // ====================================================================
+  $('searchInput').addEventListener('input', function () {
+    clearTimeout(searchDebounce);
+    // Narrowing an existing complete result set is instant and provably safe —
+    // skip the round trip entirely. Otherwise fall back to a debounced call.
+    if (tryNarrowLocally()) return;
+    searchDebounce = setTimeout(runSearch, 250);
+  });
+  $('vinName').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); ACTIONS.vinNameNext(); }
+  });
+  $('sinAdultName').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); ACTIONS.sinAdultNext(); }
+  });
+  $('searchInput').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); $('searchInput').blur(); }
+  });
+  $('soutName').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); $('soutName').blur(); }
+  });
+  (function wireReturning() {
+    var btns = $('soutReturning').querySelectorAll('[data-ret]');
+    for (var i = 0; i < btns.length; i++) {
+      (function (b) {
+        b.addEventListener('click', function () {
+          clearChoiceSelection('soutReturning');
+          b.classList.add('selected');
+          flow.sout.returning = b.getAttribute('data-ret');
+        });
+      })(btns[i]);
+    }
+  })();
+
+  // ====================================================================
+  // boot — the one required round-trip before the kiosk unlocks
+  // ====================================================================
+  var bootTimer = null;
+  function applyBoot() {
+    buildChoices('vinReasons', BOOT.reasons.visitor || [], function (v) {
+      flow.visitor.reason = v;
+      $('vinReasonOther').classList.toggle('hidden', v !== 'Other');
+      vinMaybeEnableNext();
+    });
+    buildChoices('vinBuildings', BOOT.buildings || [], function (v) {
+      flow.visitor.building = v;
+      vinMaybeEnableNext();
+    });
+    buildChoices('sinRelGrid', RELATIONSHIPS, function (v) { flow.guardian.relationship = v; });
+    buildChoices('sinReasons', BOOT.reasons.late || [], function (v) { submitLateIn(v); });
+    buildChoices('soutRelGrid', RELATIONSHIPS, function (v) { flow.sout.relationship = v; });
+    buildChoices('soutReasons', BOOT.reasons.dismissal || [], function (v) { flow.sout.reason = v; });
+    $('genAt').textContent = BOOT.generatedAt || 'unknown';
+  }
+  function boot() {
+    if (DEAD) return;
+    $('bootMsg').textContent = 'Connecting to the roster…';
+    $('bootRetry').classList.add('hidden');
+    rawCall({ op: 'bootstrap' }, function (res) {
+      if (!res || res.ok === false) { bootFail(); return; }
+      BOOT = res;
+      applyBoot();
+      $('bootCover').classList.remove('show');
+    }, function () { bootFail(); });
+  }
+  function bootFail() {
+    if (DEAD) return;
+    $('bootMsg').textContent = 'Can’t reach the server — retrying automatically…';
+    $('bootRetry').classList.remove('hidden');
+    clearTimeout(bootTimer);
+    bootTimer = setTimeout(boot, 5000);
+  }
+
+  // header identity + first boot
+  $('brandBox').textContent = ST.brand;
+  $('hdrStation').textContent = ST.label;
+  boot();
+})();
+</script>
+</body>
+</html>

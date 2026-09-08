@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<!-- pages/Metrics.html — the sign-in/out history dashboard (?page=metrics).
+     Served by server/Router.js as a TEMPLATE after the Permissions gate
+     (`me` / `isAdmin` become the JS globals ME / IS_ADMIN); the viewport meta
+     is added server-side (addMetaTag) — do not add one here.
+
+     Server contract: officeApi({op:'getMetrics', preset, from, to, types})
+     -> OfficeApi.js officeMetrics_ -> logic/metrics.js Metrics.build.
+     Everything on this page is folded server-side; the page only draws. A
+     client memo keyed by preset|from|to|types makes going BACK to a range
+     instant, and Refresh clears it.
+
+     Chart rules (deliberate, not taste):
+       * one fixed 4-colour series order, never cycled; single-measure charts
+         use ONE blue hue, so colour never becomes decoration;
+       * NEVER a dual-axis chart — two scales in one frame is a lie. Two
+         measures = two charts;
+       * every chart has a paired data table and an explicit empty sentence,
+         and "Tables only" swaps the whole page to tables (also the fallback
+         when the Chart.js CDN is unreachable).
+     Drill-down (reason / building / grade / weekday) is CLIENT-side only —
+     it filters the event log already in the page, never a refetch. -->
+<html lang="en">
+<head>
+<base target="_self">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Presence — Metrics</title>
+<script src="logic.js"></script>
+<!-- pages/OfficeStyles.html — shared style partial for the office app
+     (?page=board | muster | flags | settings). GAS serves no static files,
+     so this inlines the Eagle Eye hcs-ui tokens (source: campus-control
+     design/system/hcs-ui.css, via the apps/demo adaptation) plus the office
+     desktop components: header/nav, live-board cards and chips, alert cards
+     (red flags / amber pending), muster report + print CSS, settings forms.
+     Desktop-first: staff use this on office machines, not the iPads. -->
+<style>
+/* =====================================================================
+   1. HCS tokens (Eagle Eye family — keep in sync with hcs-ui.css)
+   ===================================================================== */
+:root{
+  --hcs-red:#B22222;
+  --hcs-red-dark:#8f1b1b;
+  --hcs-red-soft:#fff5f5;
+  --hcs-gold:#D4AF37;
+  --hcs-gold-soft:#fffdf4;
+  --hcs-ink:#23272e;
+  --hcs-muted:#6b7280;
+  --hcs-line:#e7e9ee;
+  --hcs-bg:#f6f7f9;
+  --hcs-surface:#ffffff;
+  --hcs-surface-2:#f7f8fa;
+  --hcs-ok:#1f8a4c;       --hcs-ok-bg:#e9f7ef;     --hcs-ok-line:#bfe6cd;
+  --hcs-warn:#b5751a;     --hcs-warn-bg:#fdf3e2;   --hcs-warn-line:#f1d9a8;
+  --hcs-closed:#8a8f98;   --hcs-closed-bg:#f1f0ee;
+  --hcs-radius-sm:8px;
+  --hcs-radius:12px;
+  --hcs-radius-lg:16px;
+  --hcs-gap:14px;
+  --hcs-pad:18px 20px;
+}
+body.hcs-app{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  background:var(--hcs-bg);
+  color:var(--hcs-ink);
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+body.hcs-app *{box-sizing:border-box;}
+.hidden{display:none !important;}
+.muted{color:var(--hcs-muted);}
+.small{font-size:.82rem;}
+
+/* =====================================================================
+   2. Buttons + form controls (Bootstrap stand-in, CDN-free)
+   ===================================================================== */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:1.5px solid transparent;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-weight:700;font-size:.95rem;line-height:1.2;
+  padding:9px 16px;min-height:40px;text-decoration:none;color:inherit;
+  background:var(--hcs-surface);transition:.12s;
+}
+.btn:disabled{opacity:.45;cursor:default;}
+.btn-plain{border-color:var(--hcs-line);}
+.btn-plain:hover:not(:disabled){border-color:var(--hcs-gold);}
+.btn-hcs{background:var(--hcs-red);border-color:var(--hcs-red);color:#fff;}
+.btn-hcs:hover:not(:disabled){background:var(--hcs-red-dark);border-color:var(--hcs-red-dark);color:#fff;}
+.btn-outline-hcs{color:var(--hcs-red);border:1.5px solid var(--hcs-red);background:#fff;}
+.btn-outline-hcs:hover:not(:disabled){background:var(--hcs-red-soft);color:var(--hcs-red);}
+.btn-sm{min-height:32px;padding:5px 12px;font-size:.82rem;border-radius:9px;}
+.form-control{
+  font-family:inherit;font-size:.95rem;color:var(--hcs-ink);
+  border:1.5px solid var(--hcs-line);border-radius:10px;
+  padding:9px 12px;min-height:40px;width:100%;background:var(--hcs-surface);
+}
+.form-control:focus{outline:none;border-color:var(--hcs-gold);box-shadow:0 0 0 3px rgba(212,175,55,.25);}
+textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;line-height:1.45;resize:vertical;}
+.hcs-seg{display:inline-flex;background:#ece9e2;border-radius:12px;padding:4px;gap:2px;}
+.hcs-seg button{border:0;background:transparent;font-weight:700;font-size:.85rem;padding:7px 18px;border-radius:9px;color:var(--hcs-muted);cursor:pointer;font-family:inherit;}
+.hcs-seg button.active{background:#fff;color:var(--hcs-red);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+
+/* =====================================================================
+   3. Page shell: header, nav, banners, wrap, toast, denied gate
+   ===================================================================== */
+.office-header{
+  position:sticky;top:0;z-index:100;
+  background:var(--hcs-surface);border-bottom:1px solid var(--hcs-line);
+  padding:12px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.hcs-brand{
+  width:40px;height:40px;border-radius:11px;background:var(--hcs-red);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:1.05rem;box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);flex:none;
+}
+.hcs-title{font-weight:800;font-size:1.12rem;line-height:1.1;margin:0;}
+.hcs-subtitle{color:var(--hcs-muted);font-size:.8rem;margin:2px 0 0;}
+.head-actions{margin-left:auto;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.head-nav{display:flex;gap:4px;align-items:center;}
+.head-nav a{
+  font-weight:700;font-size:.88rem;color:var(--hcs-muted);text-decoration:none;
+  padding:7px 12px;border-radius:9px;
+}
+.head-nav a:hover{color:var(--hcs-red);background:var(--hcs-red-soft);}
+.head-nav a.current{color:var(--hcs-red);background:var(--hcs-red-soft);}
+.snd-btn.armed{border-color:var(--hcs-ok);color:var(--hcs-ok);background:var(--hcs-ok-bg);}
+
+.conn-banner{
+  position:sticky;top:64px;z-index:99;
+  background:var(--hcs-red);color:#fff;font-weight:700;font-size:.9rem;
+  padding:9px 22px;text-align:center;
+}
+.office-wrap{max-width:1100px;margin:0 auto;padding:18px 20px 60px;}
+.page-loading{color:var(--hcs-muted);font-weight:600;text-align:center;padding:60px 0;}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.18);
+  border-top-color:var(--hcs-red);border-radius:50%;animation:ospin .7s linear infinite;vertical-align:-2px;}
+@keyframes ospin{to{transform:rotate(360deg);}}
+
+.toast{
+  position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);
+  background:#23272e;color:#fff;padding:10px 18px;border-radius:10px;
+  font-size:.9rem;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:2000;max-width:90vw;
+}
+.toast.show{opacity:1;transform:translateX(-50%);}
+.toast.warn{background:var(--hcs-red);}
+
+.gate-cover{
+  position:fixed;inset:0;background:var(--hcs-bg);z-index:3000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  text-align:center;padding:24px;
+}
+.gate-cover h1{font-size:1.3rem;margin:0;}
+.gate-cover p{color:var(--hcs-muted);margin:0;max-width:34em;}
+
+/* =====================================================================
+   4. Live board: sections, alert cards, visitor chips, exception cards
+   ===================================================================== */
+.section-h{
+  font-size:.85rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--hcs-muted);margin:22px 0 10px;display:flex;align-items:center;gap:8px;
+}
+.section-h .count{background:var(--hcs-red);color:#fff;border-radius:999px;font-size:.78rem;padding:1px 9px;}
+.section-h.alert-h{color:var(--hcs-red);}
+
+.board-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;}
+.board-col{min-width:0;}
+.board-empty{color:var(--hcs-muted);font-size:.9rem;padding:14px;border:1px dashed var(--hcs-line);border-radius:12px;text-align:center;}
+.quiet-card{
+  border:1px dashed var(--hcs-line);border-radius:var(--hcs-radius-lg);background:var(--hcs-surface);
+  color:var(--hcs-muted);font-size:1.02rem;font-weight:600;text-align:center;padding:46px 20px;margin-top:22px;
+}
+.board-footer{color:var(--hcs-muted);font-size:.82rem;text-align:center;margin-top:26px;}
+
+/* ---- alert cards: red = open pickup flag, amber = pending follow-up ---- */
+.flag-card{
+  background:var(--hcs-red-soft);border:1px solid #f2c7c7;border-left:5px solid var(--hcs-red);
+  border-radius:12px;padding:12px 14px;margin-bottom:12px;
+}
+.flag-card .flag-kind{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hcs-red);}
+.flag-card .who{font-weight:800;font-size:1.02rem;}
+.flag-card .meta{font-size:.84rem;color:#4b4f57;margin:3px 0 8px;}
+.flag-card .hint{font-size:.76rem;color:var(--hcs-muted);margin:8px 0 0;}
+.flag-card input.form-control{min-height:38px;font-size:.88rem;padding:7px 10px;margin-bottom:8px;background:#fff;}
+.flag-card .actions{display:flex;gap:8px;flex-wrap:wrap;}
+.flag-card .actions .btn{min-height:38px;padding:6px 12px;font-size:.85rem;border-radius:9px;}
+
+.pend-card{
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-left:5px solid var(--hcs-warn);
+  border-radius:12px;padding:12px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.pend-card .pend-body{flex:1;min-width:220px;}
+.pend-card .pend-kind{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hcs-warn);}
+.pend-card .who{font-weight:800;}
+.pend-card .meta{font-size:.82rem;color:#4b4f57;margin-top:2px;}
+.pend-card .btn{flex:none;}
+.pend-card.page{background:var(--hcs-red-soft);border-color:#f2c7c7;border-left-color:var(--hcs-red);}
+.pend-card.page .pend-kind{color:var(--hcs-red);}
+.pend-card.page .who{font-size:1.25rem;font-weight:800;}
+.busy{opacity:.5;pointer-events:none;}
+
+/* ---- visitors ---- */
+.vis-chip{
+  display:flex;align-items:center;gap:12px;background:var(--hcs-surface);
+  border:1px solid var(--hcs-line);border-left:4px solid var(--hcs-gold);
+  border-radius:12px;padding:10px 14px;margin-bottom:10px;
+}
+.vis-chip .badge-no{
+  background:var(--hcs-gold);color:#3a2c00;font-weight:800;border-radius:9px;
+  min-width:48px;text-align:center;padding:6px 8px;font-size:1.05rem;flex:none;
+}
+.vis-chip .vis-body{flex:1;min-width:0;}
+.vis-chip .who{font-weight:700;}
+.vis-chip .meta{font-size:.78rem;color:var(--hcs-muted);}
+.warn-row{
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-radius:10px;
+  color:var(--hcs-warn);font-size:.82rem;font-weight:700;padding:8px 12px;margin-bottom:10px;
+}
+
+/* ---- student exceptions ---- */
+.group-h{font-size:.76rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--hcs-muted);margin:14px 0 8px;}
+.group-h:first-child{margin-top:0;}
+.exc-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-radius:12px;
+  padding:10px 14px;margin-bottom:10px;border-left:4px solid var(--hcs-closed);
+}
+.exc-card.off{border-left-color:var(--hcs-red);}
+.exc-card.late{border-left-color:var(--hcs-ok);}
+.exc-card.transit{border-left-color:var(--hcs-warn);}
+.exc-card .who{font-weight:700;}
+.exc-card .meta{font-size:.78rem;color:var(--hcs-muted);}
+.exc-tag{font-size:.66rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:2px 7px;display:inline-block;margin-left:8px;vertical-align:1px;}
+.exc-tag.off{background:var(--hcs-red-soft);color:var(--hcs-red);}
+.exc-tag.late{background:var(--hcs-ok-bg);color:var(--hcs-ok);}
+.exc-tag.transit{background:var(--hcs-warn-bg);color:var(--hcs-warn);}
+
+/* ---- per-building count strip ---- */
+.count-strip{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 4px;}
+.count-cell{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-radius:12px;
+  padding:8px 14px;font-size:.82rem;color:var(--hcs-muted);
+}
+.count-cell b{display:block;color:var(--hcs-ink);font-size:.88rem;margin-bottom:1px;}
+.count-cell .n{font-weight:800;color:var(--hcs-ink);}
+
+/* =====================================================================
+   5. Muster report (screen + print)
+   ===================================================================== */
+.muster-banner{
+  background:var(--hcs-surface);border:2px solid var(--hcs-ink);border-radius:12px;
+  padding:16px 20px;margin:0 0 18px;
+}
+.muster-banner h1{font-size:1.7rem;margin:0;letter-spacing:.01em;}
+.muster-banner p{margin:4px 0 0;color:var(--hcs-muted);font-size:.85rem;}
+.muster-table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:.95rem;background:var(--hcs-surface);}
+.muster-table th,.muster-table td{border:1px solid var(--hcs-line);padding:8px 10px;text-align:left;}
+.muster-table th{background:var(--hcs-surface-2);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;color:var(--hcs-muted);}
+.muster-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+.muster-table tr.total td{font-weight:800;background:var(--hcs-surface-2);}
+.muster-h{font-weight:800;font-size:1.05rem;margin:22px 0 6px;}
+.muster-list{margin:6px 0 14px;padding-left:18px;font-size:.92rem;}
+.muster-list li{margin:0 0 4px;}
+.muster-flag-box{
+  background:var(--hcs-red-soft);border:1px solid #f2c7c7;border-radius:10px;
+  padding:10px 14px;margin:8px 0 14px;font-size:.92rem;
+}
+.roster-block{margin:0 0 18px;break-inside:avoid;}
+.roster-block h3{font-weight:800;font-size:.98rem;margin:14px 0 6px;border-bottom:2px solid var(--hcs-ink);padding-bottom:3px;}
+.roster-cols{column-count:3;column-gap:26px;margin:0;padding:0;list-style:none;font-size:.85rem;line-height:1.55;}
+.roster-cols li{break-inside:avoid;}
+.off-strike{text-decoration:line-through;color:var(--hcs-red);}
+.off-tag{font-size:.66rem;font-weight:800;color:var(--hcs-red);margin-left:6px;}
+.muster-ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 18px;}
+
+/* =====================================================================
+   6. Settings forms
+   ===================================================================== */
+.set-group{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);border-left:4px solid var(--hcs-gold);
+  border-radius:var(--hcs-radius-lg);box-shadow:0 1px 2px rgba(20,20,40,.04);
+  padding:var(--hcs-pad);margin:0 0 18px;
+}
+.set-group h3{margin:0 0 4px;font-size:1.05rem;font-weight:800;}
+.set-group .group-sub{color:var(--hcs-muted);font-size:.82rem;margin:0 0 12px;}
+.set-row{margin:0 0 14px;}
+.set-row label.f-label{display:block;font-size:.78rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--hcs-muted);margin:0 0 5px;}
+.set-hint{font-size:.78rem;color:var(--hcs-muted);margin:4px 0 0;}
+.set-err{font-size:.8rem;color:var(--hcs-red);font-weight:700;margin:4px 0 0;min-height:0;}
+.radio-row{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1.5px solid var(--hcs-line);border-radius:10px;margin:0 0 8px;cursor:pointer;}
+.radio-row:hover{border-color:var(--hcs-gold);}
+.radio-row input{margin-top:3px;accent-color:var(--hcs-red);cursor:pointer;flex:none;}
+.radio-row .r-name{font-weight:800;font-size:.9rem;}
+.radio-row .r-desc{font-size:.8rem;color:var(--hcs-muted);margin-top:1px;}
+.ro-value{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;
+  background:var(--hcs-surface-2);border:1.5px dashed var(--hcs-line);border-radius:10px;padding:9px 12px;
+}
+.save-row{display:flex;gap:12px;align-items:center;margin-top:4px;}
+.save-status{font-size:.85rem;font-weight:700;}
+.save-status.ok{color:var(--hcs-ok);}
+.save-status.err{color:var(--hcs-red);}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* =====================================================================
+   7. Responsive + print
+   ===================================================================== */
+@media (max-width:760px){
+  .board-grid{grid-template-columns:1fr;}
+  .grid-2{grid-template-columns:1fr;}
+  .office-wrap{padding:14px 12px 50px;}
+  .head-actions{margin-left:0;}
+  .roster-cols{column-count:2;}
+}
+
+@media print{
+  body.hcs-app{background:#fff;color:#000;}
+  .no-print,.office-header,.conn-banner,.toast{display:none !important;}
+  .office-wrap{max-width:none;padding:0;}
+  .muster-banner{border-color:#000;border-radius:0;}
+  .muster-banner p,.muted{color:#333;}
+  .muster-table th,.muster-table td{border-color:#000;}
+  .muster-table th{background:#eee;color:#000;}
+  .muster-flag-box{border-color:#000;background:#fff;}
+  .roster-block h3{border-color:#000;}
+  .roster-cols{column-count:3;}
+  .off-strike,.off-tag{color:#000;}
+  a{text-decoration:none;color:#000;}
+}
+</style>
+
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<style>
+/* Metrics-only chrome. OfficeStyles is shared by five pages — nothing here
+   leaks into the board, muster, flags or settings. */
+:root{
+  /* Categorical series — FIXED order, assigned per event type, never cycled. */
+  --series-1:#2a78d6;   /* blue   */
+  --series-2:#eb6834;   /* orange */
+  --series-3:#1baf7a;   /* aqua   */
+  --series-4:#eda100;   /* yellow */
+  --series-other:#6b7280;
+  --seq-strong:#2a78d6; /* single-measure magnitude bars */
+  --stat-critical:#d03b3b;
+  --chart-grid:#e7e9ee;
+  --chart-axis:#6b7280;
+}
+
+/* ---- filter bar (screen only; the breadcrumb below it is what prints) ---- */
+.mx-filter{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-radius:var(--hcs-radius);padding:12px 14px;margin:0 0 10px;
+  display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;
+}
+.mx-filter .mx-fgroup{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.mx-filter label.mx-flab{
+  font-size:.72rem;font-weight:800;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--hcs-muted);margin:0;
+}
+.mx-presets{display:flex;gap:6px;flex-wrap:wrap;}
+.mx-preset{
+  border:1.5px solid var(--hcs-line);background:var(--hcs-surface);
+  border-radius:999px;padding:6px 14px;font-family:inherit;font-size:.84rem;
+  font-weight:700;color:var(--hcs-muted);cursor:pointer;line-height:1.2;
+}
+.mx-preset:hover{border-color:var(--hcs-gold);color:var(--hcs-ink);}
+.mx-preset.active{background:var(--hcs-red);border-color:var(--hcs-red);color:#fff;}
+.mx-dates{display:flex;gap:8px;align-items:center;}
+.mx-dates input.form-control{min-height:36px;padding:6px 10px;font-size:.88rem;width:150px;}
+.mx-types{display:flex;gap:4px 14px;flex-wrap:wrap;}
+.mx-types label{
+  display:inline-flex;align-items:center;gap:6px;font-size:.86rem;
+  font-weight:600;cursor:pointer;white-space:nowrap;
+}
+.mx-types input{accent-color:var(--hcs-red);cursor:pointer;margin:0;}
+.mx-toggle{display:inline-flex;align-items:center;gap:6px;font-size:.86rem;font-weight:600;cursor:pointer;white-space:nowrap;}
+.mx-toggle input{accent-color:var(--hcs-red);cursor:pointer;margin:0;}
+.mx-filter .mx-actions{display:flex;gap:8px;align-items:center;margin-left:auto;}
+.mx-filter .mx-actions .btn{min-height:36px;padding:6px 14px;font-size:.86rem;}
+
+/* ---- breadcrumb: the one line that makes a printed page self-describing ---- */
+.mx-crumb{
+  font-size:.86rem;color:var(--hcs-ink);font-weight:600;
+  margin:0 0 6px;line-height:1.5;
+}
+.mx-crumb .mx-dim{color:var(--hcs-muted);font-weight:500;}
+.mx-cached{
+  display:inline-block;background:var(--hcs-surface-2);border:1px solid var(--hcs-line);
+  border-radius:999px;font-size:.7rem;font-weight:700;color:var(--hcs-muted);
+  padding:1px 8px;margin-left:6px;vertical-align:1px;
+}
+.mx-err{
+  background:var(--hcs-red-soft);border:1px solid #f2c7c7;border-left:5px solid var(--hcs-red);
+  border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:.9rem;font-weight:600;
+}
+
+/* ---- KPI tiles ---- */
+.kpi-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:12px;margin:12px 0 20px;
+}
+.kpi-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-left:4px solid var(--hcs-gold);border-radius:var(--hcs-radius);
+  padding:12px 14px;box-shadow:0 1px 2px rgba(20,20,40,.04);break-inside:avoid;
+}
+.kpi-label{
+  font-size:.7rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--hcs-muted);margin:0 0 4px;
+}
+.kpi-value{font-size:1.6rem;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums;}
+.kpi-sub{font-size:.74rem;color:var(--hcs-muted);margin-top:3px;}
+/* Flags tile: never colour alone — the icon and the word "flags" carry it too. */
+.kpi-card.kpi-flag-hot{border-left-color:var(--stat-critical);}
+.kpi-card.kpi-flag-hot .kpi-value{color:var(--stat-critical);}
+.kpi-card.kpi-flag-hot .kpi-label{color:var(--stat-critical);}
+.kpi-warn-ico{font-weight:800;margin-right:4px;}
+
+/* ---- chart cards ---- */
+.mx-charts{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:0 0 20px;}
+.chart-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-radius:var(--hcs-radius-lg);padding:14px 16px 16px;
+  box-shadow:0 1px 2px rgba(20,20,40,.04);min-width:0;break-inside:avoid;
+}
+.chart-card.mx-wide{grid-column:1 / -1;}
+.chart-card h3{margin:0 0 2px;font-size:1rem;font-weight:800;}
+.chart-card .mx-cap{font-size:.78rem;color:var(--hcs-muted);margin:0 0 10px;}
+/* Chart.js with maintainAspectRatio:false sizes the canvas to its PARENT, so
+   the parent has to have a height of its own — a bare canvas in a
+   content-height card collapses to nothing. */
+.mx-cwrap{position:relative;height:290px;}
+.chart-card.mx-wide .mx-cwrap{height:320px;}
+.chart-card canvas{max-height:320px;}
+.mx-empty{
+  padding:34px 12px;text-align:center;color:var(--hcs-muted);
+  font-size:.9rem;border:1px dashed var(--hcs-line);border-radius:10px;
+}
+/* Paired data table — the relief for any hue that reads light on white, and
+   the whole page when "Tables only" is on. */
+details.mx-data{margin-top:10px;}
+details.mx-data > summary{
+  cursor:pointer;font-size:.78rem;font-weight:800;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--hcs-muted);list-style:revert;
+}
+details.mx-data > summary:hover{color:var(--hcs-red);}
+details.mx-data .mx-scroll{max-height:300px;overflow:auto;margin-top:8px;}
+.mx-mini{width:100%;border-collapse:collapse;font-size:.84rem;}
+.mx-mini th,.mx-mini td{border:1px solid var(--hcs-line);padding:5px 8px;text-align:left;}
+.mx-mini th{
+  background:var(--hcs-surface-2);position:sticky;top:0;
+  font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--hcs-muted);
+}
+.mx-mini td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+.mx-swatch{
+  display:inline-block;width:9px;height:9px;border-radius:2px;
+  margin-right:6px;vertical-align:0;
+}
+
+/* ---- drill-down chips ---- */
+.mx-chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;}
+.mx-chip{
+  display:inline-flex;align-items:center;gap:8px;background:var(--hcs-gold-soft);
+  border:1px solid var(--hcs-gold);border-radius:999px;
+  padding:4px 6px 4px 12px;font-size:.82rem;font-weight:700;
+}
+.mx-chip button{
+  border:0;background:rgba(0,0,0,.06);border-radius:999px;width:20px;height:20px;
+  line-height:1;cursor:pointer;font-family:inherit;font-size:.8rem;color:var(--hcs-ink);
+}
+.mx-chip button:hover{background:var(--hcs-red);color:#fff;}
+
+/* ---- sortable tables ---- */
+.mx-tbl-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:22px 0 8px;}
+.mx-tbl-head h2{margin:0;}
+.mx-tbl-head .mx-tbl-note{font-size:.8rem;color:var(--hcs-muted);}
+.mx-tbl-head .btn{min-height:32px;padding:5px 12px;font-size:.8rem;margin-left:auto;}
+.mx-tblwrap{overflow-x:auto;background:var(--hcs-surface);border-radius:var(--hcs-radius);}
+.mx-tblwrap .muster-table{margin:0;font-size:.86rem;}
+.mx-tblwrap .muster-table th{cursor:pointer;user-select:none;white-space:nowrap;}
+.mx-tblwrap .muster-table th:hover{color:var(--hcs-red);}
+.mx-tblwrap .muster-table th .mx-arrow{color:var(--hcs-red);}
+.mx-trunc{
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-radius:10px;
+  color:var(--hcs-warn);font-size:.82rem;font-weight:700;padding:8px 12px;margin:0 0 8px;
+}
+
+@media (max-width:900px){
+  .mx-charts{grid-template-columns:1fr;}
+  .mx-filter .mx-actions{margin-left:0;}
+}
+
+@media print{
+  /* Keep the numbers, drop the controls. The breadcrumb is NOT .no-print, so a
+     printed sheet always says which range and filters produced it. */
+  .mx-filter,.mx-chips{display:none !important;}
+  .mx-crumb{color:#000;font-weight:700;border-bottom:1px solid #000;padding-bottom:6px;}
+  .mx-crumb .mx-dim,.mx-cached{color:#333;}
+  .kpi-grid{grid-template-columns:repeat(4,1fr);gap:8px;}
+  .kpi-card,.chart-card{border-color:#000;box-shadow:none;}
+  .kpi-card.kpi-flag-hot .kpi-value,.kpi-card.kpi-flag-hot .kpi-label{color:#000;}
+  .mx-charts{grid-template-columns:1fr 1fr;gap:10px;}
+  details.mx-data{display:none !important;}   /* the chart itself prints */
+  .mx-tbl-head .btn{display:none !important;}
+  .mx-mini th,.mx-mini td,.mx-tblwrap .muster-table th,.mx-tblwrap .muster-table td{border-color:#000;}
+  .mx-trunc{border-color:#000;color:#000;background:#fff;}
+}
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Campus Presence — Metrics" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body class="hcs-app office">
+
+<header class="office-header no-print">
+  <div class="hcs-brand">CP</div>
+  <div>
+    <p class="hcs-title">Campus Presence — Metrics</p>
+    <p class="hcs-subtitle">Signed in as <b>demo.staff@example.edu</b></p>
+  </div>
+  <div class="head-actions">
+    <nav class="head-nav">
+      <a data-nav="board" href="board.html">Board</a>
+      <a data-nav="muster" href="muster.html">Muster</a>
+      <!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->
+      <a data-nav="metrics" class="current" href="metrics.html">Metrics</a>
+      <span id="navSettings" hidden><!-- Settings: not part of this demo --></span>
+    </nav>
+  </div>
+</header>
+
+<main class="office-wrap">
+
+  <div class="mx-filter no-print" id="mxFilter">
+    <div class="mx-fgroup">
+      <label class="mx-flab">Range</label>
+      <div class="mx-presets" id="mxPresets">
+        <button type="button" class="mx-preset" data-preset="week">This week</button>
+        <button type="button" class="mx-preset" data-preset="month">This month</button>
+        <button type="button" class="mx-preset" data-preset="year">This school year</button>
+        <button type="button" class="mx-preset" data-preset="lastyear">Last school year</button>
+        <button type="button" class="mx-preset" data-preset="all">All time</button>
+        <button type="button" class="mx-preset" data-preset="custom">Custom</button>
+      </div>
+    </div>
+
+    <div class="mx-fgroup hidden" id="mxCustomWrap">
+      <label class="mx-flab" for="mxFrom">Custom dates</label>
+      <div class="mx-dates">
+        <input class="form-control" type="date" id="mxFrom" aria-label="From date">
+        <span class="muted small">&rarr;</span>
+        <input class="form-control" type="date" id="mxTo" aria-label="To date">
+        <button type="button" class="btn btn-plain" id="mxApply">Apply</button>
+      </div>
+    </div>
+
+    <div class="mx-fgroup">
+      <label class="mx-flab">Event types</label>
+      <div class="mx-types" id="mxTypes"></div>
+    </div>
+
+    <div class="mx-actions">
+      <label class="mx-toggle" title="Hide every chart and read the numbers straight from the paired data tables.">
+        <input type="checkbox" id="mxTablesOnly"> <span>Tables only</span>
+      </label>
+      <button type="button" class="btn btn-plain" id="mxRefresh">Refresh</button>
+      <button type="button" class="btn btn-plain" id="mxPrint">Print</button>
+    </div>
+  </div>
+
+  <p class="mx-crumb" id="mxCrumb">&hellip;</p>
+
+  <div class="mx-err hidden" id="mxError"></div>
+
+  <div class="page-loading" id="pageLoading"><span class="spin"></span> Building the metrics&hellip;</div>
+
+  <div class="hidden" id="mxRoot">
+
+    <!-- ============ KPI TILES ============ -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <p class="kpi-label">Total events</p>
+        <div class="kpi-value" id="kpiTotal">0</div>
+        <div class="kpi-sub" id="kpiTotalSub">&nbsp;</div>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">Late arrivals</p>
+        <div class="kpi-value" id="kpiLate">0</div>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">Early dismissals</p>
+        <div class="kpi-value" id="kpiEarly">0</div>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">Visitors</p>
+        <div class="kpi-value" id="kpiVisitors">0</div>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">Students involved</p>
+        <div class="kpi-value" id="kpiStudents">0</div>
+      </div>
+      <div class="kpi-card">
+        <p class="kpi-label">School days</p>
+        <div class="kpi-value" id="kpiDays">0</div>
+      </div>
+      <div class="kpi-card" id="kpiFlagCard">
+        <p class="kpi-label">Pickup mismatch flags</p>
+        <div class="kpi-value" id="kpiFlags">0</div>
+        <div class="kpi-sub" id="kpiFlagsSub">Never counted as sign-outs.</div>
+      </div>
+    </div>
+
+    <!-- ============ CHARTS ============ -->
+    <div class="mx-charts">
+
+      <div class="chart-card mx-wide">
+        <h3>Activity over time</h3>
+        <p class="mx-cap" id="cTrendCap">Events per day, stacked by type.</p>
+        <div class="mx-empty hidden" id="cTrend-empty">No events in this period.</div>
+        <div class="mx-cwrap" id="cTrend-wrap"><canvas id="cTrend"></canvas></div>
+        <details class="mx-data" id="cTrend-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cTrend-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>By reason</h3>
+        <p class="mx-cap">Why students came late or left early. Click a bar to filter the event log.</p>
+        <div class="mx-empty hidden" id="cReason-empty">No reasons recorded in this period.</div>
+        <div class="mx-cwrap" id="cReason-wrap"><canvas id="cReason"></canvas></div>
+        <details class="mx-data" id="cReason-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cReason-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>Time of day</h3>
+        <p class="mx-cap">Events by clock hour — where the desk queue actually forms.</p>
+        <div class="mx-empty hidden" id="cHour-empty">No timed events in this period.</div>
+        <div class="mx-cwrap" id="cHour-wrap"><canvas id="cHour"></canvas></div>
+        <details class="mx-data" id="cHour-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cHour-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>Day of week</h3>
+        <p class="mx-cap">Click a bar to filter the event log to that weekday.</p>
+        <div class="mx-empty hidden" id="cDow-empty">No events in this period.</div>
+        <div class="mx-cwrap" id="cDow-wrap"><canvas id="cDow"></canvas></div>
+        <details class="mx-data" id="cDow-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cDow-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>By building</h3>
+        <p class="mx-cap">Home building (or destination for a movement). Click a bar to filter the log.</p>
+        <div class="mx-empty hidden" id="cBuilding-empty">No building recorded in this period.</div>
+        <div class="mx-cwrap" id="cBuilding-wrap"><canvas id="cBuilding"></canvas></div>
+        <details class="mx-data" id="cBuilding-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cBuilding-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>By grade</h3>
+        <p class="mx-cap">School order, K4 through 12. Click a bar to filter the log.</p>
+        <div class="mx-empty hidden" id="cGrade-empty">No student events in this period.</div>
+        <div class="mx-cwrap" id="cGrade-wrap"><canvas id="cGrade"></canvas></div>
+        <details class="mx-data" id="cGrade-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cGrade-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>By station</h3>
+        <p class="mx-cap">Which kiosk or desk recorded the event.</p>
+        <div class="mx-empty hidden" id="cStation-empty">No station recorded in this period.</div>
+        <div class="mx-cwrap" id="cStation-wrap"><canvas id="cStation"></canvas></div>
+        <details class="mx-data" id="cStation-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cStation-tbl"></div>
+        </details>
+      </div>
+
+      <div class="chart-card">
+        <h3>By event type</h3>
+        <p class="mx-cap">Totals for the range, one bar per counted type.</p>
+        <div class="mx-empty hidden" id="cType-empty">No events in this period.</div>
+        <div class="mx-cwrap" id="cType-wrap"><canvas id="cType"></canvas></div>
+        <details class="mx-data" id="cType-det">
+          <summary>Data table</summary>
+          <div class="mx-scroll" id="cType-tbl"></div>
+        </details>
+      </div>
+
+    </div>
+
+    <!-- ============ STUDENTS ============ -->
+    <div class="mx-tbl-head">
+      <h2 class="section-h" style="margin:0;">Students in this range</h2>
+      <span class="mx-tbl-note" id="mxStuNote"></span>
+      <button type="button" class="btn btn-plain no-print" data-csv="mxStudents">Download CSV</button>
+    </div>
+    <div class="mx-tblwrap" id="mxStudents"></div>
+
+    <!-- ============ EVENT LOG ============ -->
+    <div class="mx-tbl-head" id="mxLogHead">
+      <h2 class="section-h" style="margin:0;">Event log</h2>
+      <span class="mx-tbl-note" id="mxLogNote"></span>
+      <button type="button" class="btn btn-plain no-print" data-csv="mxLog">Download CSV</button>
+    </div>
+    <div class="mx-chips no-print hidden" id="mxChips"></div>
+    <div class="mx-trunc hidden" id="mxTrunc"></div>
+    <div class="mx-tblwrap" id="mxLog"></div>
+
+    <p class="board-footer">A pickup mismatch flag is a safety signal, not a dismissal — it is counted
+      on its own tile and never inflates the early-dismissal numbers.
+      &middot; built <span id="mxBuiltAt">&mdash;</span></p>
+  </div>
+
+</main>
+
+<div class="gate-cover hidden" id="gateCover">
+  <div class="hcs-brand" style="width:52px;height:52px;font-size:1.3rem;">CP</div>
+  <h1>Access removed</h1>
+  <p>Your account is no longer on the front-office Permissions list. Reload the page to sign in again, or ask Josh to re-add you.</p>
+  <button type="button" class="btn btn-hcs" onclick="location.reload()">Reload</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- GENERATED by tools/wrap.js — DO NOT EDIT -->
+<script>
+'use strict';
+/**
+ * fuzzy.js — edit-distance matching primitives shared by search.js (student
+ * lookup) and pickup.js (authorized-pickup hard check).
+ * Lifted verbatim from FACTS\facts-directory-search\Search.gs (2026-08-04).
+ */
+
+var Fuzzy = (function () {
+  /** Optimal-string-alignment distance (Levenshtein + adjacent transposition = 1). */
+  function editDistance(a, b) {
+    var la = a.length, lb = b.length;
+    var d = [];
+    for (var i = 0; i <= la; i++) { d[i] = [i]; }
+    for (var j = 0; j <= lb; j++) { d[0][j] = j; }
+    for (i = 1; i <= la; i++) {
+      for (j = 1; j <= lb; j++) {
+        var cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+          d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+        }
+      }
+    }
+    return d[la][lb];
+  }
+
+  /** Edit-distance budget for a fuzzy token, scaled by its length (0 = no fuzzing). */
+  function budget(token) {
+    if (token.length < 3 || !/^[a-z'-]+$/.test(token)) return 0; // IDs/emails: exact only
+    return token.length <= 4 ? 1 : token.length <= 7 ? 2 : 3;
+  }
+
+  return { editDistance: editDistance, budget: budget };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Fuzzy;
+
+'use strict';
+/**
+ * search.js — kiosk student search: fuzzy name matching with a deliberately
+ * MINIMAL projection. Adapted from facts-directory-search Search.gs
+ * searchPeople (2026-08-04) with the kiosk privacy constraints baked in:
+ *   - query must be ≥ MIN_QUERY_CHARS after trimming
+ *   - matches ONLY against the student's own name (+grade token) — never
+ *     guardians, never teachers, never IDs/emails (roster-fishing surface)
+ *   - returns at most MAX_RESULTS of {id, name, grade} — nothing else, ever
+ */
+
+/* global Fuzzy */
+
+var Search = (function () {
+  var MIN_QUERY_CHARS = 3;
+  var MAX_RESULTS = 8;
+
+  function ref_() {
+    if (typeof module !== 'undefined') return require('./fuzzy.js');
+    return Fuzzy; // GAS global, assigned by the time any endpoint runs
+  }
+
+  /** One matching pass. fuzzySets=null ⇒ exact substring only (the fast path).
+   *  Records which name words matched by close spelling so a caller can
+   *  highlight them differently from exact hits (FACTS Finder convention). */
+  function matchPass_(students, tokens, fuzzySets) {
+    var matches = [];
+    (students || []).forEach(function (p) {
+      var own = (p.name + ' | ' + p.grade).toLowerCase();
+      var words = fuzzySets ? p.name.toLowerCase().split(/[\s,]+/) : null;
+      var exactCount = 0;
+      var fuzzyWords = {};
+      var ok = tokens.every(function (t, i) {
+        if (own.indexOf(t) !== -1) { exactCount++; return true; }
+        if (!fuzzySets) return false;
+        var hit = words.filter(function (w) { return fuzzySets[i][w]; });
+        hit.forEach(function (w) { fuzzyWords[w] = true; });
+        return hit.length > 0;
+      });
+      if (!ok) return;
+      var nameLower = p.name.toLowerCase();
+      var nameHits = tokens.filter(function (t) { return nameLower.indexOf(t) !== -1; }).length;
+      matches.push({ p: p, allExact: exactCount === tokens.length, nameHits: nameHits,
+                     fuzzyWords: Object.keys(fuzzyWords) });
+    });
+    return matches;
+  }
+
+  /** Close-spelling sets per token, built from the student-name vocabulary. */
+  function buildFuzzySets_(F, students, tokens) {
+    var vocab = {};
+    (students || []).forEach(function (p) {
+      p.name.split(/[\s,]+/).forEach(function (w) {
+        if (w.length >= 2) vocab[w.toLowerCase()] = true;
+      });
+    });
+    var vocabWords = Object.keys(vocab);
+    return tokens.map(function (t) {
+      var budget = F.budget(t);
+      var set = {};
+      if (budget) {
+        vocabWords.forEach(function (w) {
+          if (Math.abs(w.length - t.length) > budget) return;
+          if (F.editDistance(t, w) <= budget) set[w] = true;
+        });
+      }
+      return set;
+    });
+  }
+
+  /**
+   * @param {Array} students from Directory.buildStudents (enrolled only)
+   * @param {string} query
+   * @return {{query, ok:boolean, reason?:string, total:number, truncated:boolean,
+   *           results:Array<{id,name,grade,close:boolean}>}}
+   */
+  function searchStudents(students, query) {
+    var F = ref_();
+    var q = String(query || '').trim();
+    var out = { query: q, ok: false, total: 0, truncated: false, results: [] };
+    if (q.replace(/\s+/g, '').length < MIN_QUERY_CHARS) {
+      out.reason = 'short';
+      return out;
+    }
+    out.ok = true;
+    var tokens = q.toLowerCase().split(/\s+/).filter(function (t) { return t; });
+
+    // FAST PATH: try exact substring matching first. Correctly-spelled names —
+    // the overwhelming majority of kiosk searches — never pay for the
+    // vocabulary build + edit-distance sweep, which only runs on a miss.
+    var matches = matchPass_(students, tokens, null);
+    if (!matches.length) {
+      matches = matchPass_(students, tokens, buildFuzzySets_(F, students, tokens));
+    }
+    matches.sort(function (a, b) {
+      return (b.allExact - a.allExact) || (b.nameHits - a.nameHits) ||
+             (a.p.name < b.p.name ? -1 : a.p.name > b.p.name ? 1 : 0);
+    });
+
+    out.total = matches.length;
+    out.truncated = matches.length > MAX_RESULTS;
+    out.results = matches.slice(0, MAX_RESULTS).map(function (m) {
+      return { id: m.p.id, name: m.p.name, grade: m.p.grade, close: !m.allExact };
+    });
+    return out;
+  }
+
+  /**
+   * STAFF-SIDE filter (the muster roster), as opposed to searchStudents' kiosk
+   * projection: no result cap, no 3-char floor, and it hands back the tokens and
+   * close-spelling words so the page can mark exact hits green and close ones
+   * yellow — the same convention as FACTS Finder. An empty query returns
+   * everyone, so it doubles as the "no filter" path.
+   * @param {Array} people any objects carrying {name, grade}
+   * @return {{ok, query, tokens, total, results:Array}} results keep every
+   *   original field, plus close:boolean and fuzzyWords:string[]
+   */
+  function filterPeople(people, query) {
+    var F = ref_();
+    var q = String(query || '').trim();
+    var list = people || [];
+    var out = { ok: true, query: q, tokens: [], total: list.length, results: list.slice() };
+    if (!q) return out;
+
+    var tokens = q.toLowerCase().split(/\s+/).filter(function (t) { return t; });
+    out.tokens = tokens;
+    var matches = matchPass_(list, tokens, null);          // exact first
+    if (!matches.length) {                                  // then close spellings
+      matches = matchPass_(list, tokens, buildFuzzySets_(F, list, tokens));
+    }
+    matches.sort(function (a, b) {
+      return (b.allExact - a.allExact) || (b.nameHits - a.nameHits) ||
+             (a.p.name < b.p.name ? -1 : a.p.name > b.p.name ? 1 : 0);
+    });
+    out.results = matches.map(function (m) {
+      var row = {};
+      for (var k in m.p) row[k] = m.p[k];
+      row.close = !m.allExact;
+      row.fuzzyWords = m.fuzzyWords;
+      return row;
+    });
+    out.total = out.results.length;
+    return out;
+  }
+
+  return { searchStudents: searchStudents, filterPeople: filterPeople,
+           MIN_QUERY_CHARS: MIN_QUERY_CHARS, MAX_RESULTS: MAX_RESULTS };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Search;
+
+</script>
+
+<script>
+'use strict';
+(function () {
+
+  var ME = 'demo.staff@example.edu';
+  var EXEC_URL = '';
+  var IS_ADMIN = '1' === '1';
+
+  // ---- tiny helpers (same idioms as Board/Muster) ----
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function fmtN(n) { return Number(n || 0).toLocaleString(); }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  var toastTimer = null;
+  function toast(msg, warn) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (warn ? ' warn' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = 'toast'; }, 4000);
+  }
+
+  // ---- nav links: GAS serves pages inside a sandboxed iframe, so relative
+  // ?page= links resolve against googleusercontent.com. When the browser
+  // exposes the /exec referrer we rebuild absolute links from it; otherwise
+  // the relative href stays as the fallback. ----
+  (function wireNav() {
+    // Pages run inside a sandboxed googleusercontent.com iframe, so a relative
+    // '?page=x' href resolves against the sandbox and loads nothing. EXEC_URL is
+    // handed down by Router.js (officeExecUrl_); document.referrer is only a
+    // fallback for the rare case the server cannot resolve its own URL.
+    var base = EXEC_URL;
+    if (!base) {
+      var r = document.referrer || '';
+      base = /\/macros\/.+\/(exec|dev)\b/.test(r) ? r.split('?')[0] : '';
+    }
+    if (!base) return;
+    var links = document.querySelectorAll('[data-nav]');
+    for (var i = 0; i < links.length; i++) {
+      links[i].setAttribute('href', base + '?page=' + links[i].getAttribute('data-nav'));
+      links[i].setAttribute('target', '_top'); // navigate the window, not the sandbox frame
+    }
+  })();
+  if (IS_ADMIN) $('navSettings').classList.remove('hidden');
+
+  // ---- officeApi wrapper: a thrown FORBIDDEN = permanent denied gate ----
+  var stopped = false;
+  function isForbidden(err) {
+    return String((err && err.message) || err || '').indexOf('FORBIDDEN') !== -1;
+  }
+  function showGate() {
+    stopped = true;
+    $('gateCover').classList.remove('hidden');
+  }
+  function api(request, onOk, onFail) {
+    google.script.run
+      .withSuccessHandler(onOk)
+      .withFailureHandler(function (err) {
+        if (isForbidden(err)) { showGate(); return; }
+        if (onFail) onFail(err);
+      })
+      .officeApi(request);
+  }
+
+  // =====================================================================
+  // Palette + chart conventions
+  // =====================================================================
+  // FIXED order. A type keeps its slot when a filter removes another type, so
+  // colour means "which type", not "which position in today's list".
+  var SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100'];
+  var OTHER_COLOR = '#6b7280';
+  var SEQ_STRONG = '#2a78d6';      // single-measure magnitude bars
+  var INK = '#23272e';
+  var AXIS = '#6b7280';
+  var GRID = '#e7e9ee';
+  // The critical status colour (#d03b3b) is reserved for the flags tile and
+  // lives in CSS as --stat-critical — it is never a chart series.
+
+  // visitor_in and movement SHARE slot 4: whichever is present takes it, and if
+  // both are, movement is the one folded into "Other" (grey is reserved for the
+  // fold, never for a named series).
+  var SLOT = {
+    student_late_in: 0, student_early_out: 1, student_return_in: 2,
+    visitor_in: 3, movement: 3
+  };
+  function typeColor(t) {
+    var i = SLOT[t];
+    return (i === undefined) ? OTHER_COLOR : SERIES[i];
+  }
+
+  var TYPE_LABEL_FALLBACK = {
+    student_late_in: 'Late arrivals', student_early_out: 'Early dismissals',
+    student_return_in: 'Returns', visitor_in: 'Visitors', visitor_out: 'Visitor out',
+    movement: 'Movements', pickup_flag: 'Pickup mismatch flag'
+  };
+  var GRADE_ORDER = ['K4', 'K5', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  var DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  var payload = null;      // last good getMetrics response
+  function labelOf(t) {
+    var l = payload && payload.labels ? payload.labels[t] : null;
+    return l || TYPE_LABEL_FALLBACK[t] || t;
+  }
+
+  // =====================================================================
+  // Filter state
+  // =====================================================================
+  var LS_TABLES = 'cp-metrics-tables-only';
+  var preset = 'month';
+  var from = '';
+  var to = '';
+  var selTypes = {};       // type -> bool (all true until the first fetch)
+  var allTypes = [];       // countedTypes from the server (order is authoritative)
+  var tablesOnly = false;
+  var chartsBroken = false; // Chart.js never arrived — tables are the whole page
+  var chartsWarned = false; // ...and say so exactly once
+  var fetching = false;
+  var memo = {};           // preset|from|to|types -> payload
+  var lastKey = '';        // the memo key on screen, so a range change clears the drill
+
+  try { tablesOnly = window.localStorage.getItem(LS_TABLES) === '1'; } catch (e) {}
+  $('mxTablesOnly').checked = tablesOnly;
+
+  /** The types to SEND: [] (= "all", server-side null) when nothing is excluded. */
+  function typesParam() {
+    if (!allTypes.length) return [];
+    var picked = [];
+    for (var i = 0; i < allTypes.length; i++) if (selTypes[allTypes[i]]) picked.push(allTypes[i]);
+    return (picked.length === allTypes.length) ? [] : picked;
+  }
+  function memoKey(p, f, t, types) {
+    return [p, f || '', t || '', types.join(',') || 'all'].join('|');
+  }
+
+  function paintPresets() {
+    var btns = $('mxPresets').querySelectorAll('.mx-preset');
+    for (var i = 0; i < btns.length; i++) {
+      var on = btns[i].getAttribute('data-preset') === preset;
+      btns[i].className = 'mx-preset' + (on ? ' active' : '');
+    }
+    $('mxCustomWrap').classList.toggle('hidden', preset !== 'custom');
+  }
+
+  function paintTypeBoxes() {
+    var html = '';
+    for (var i = 0; i < allTypes.length; i++) {
+      var t = allTypes[i];
+      html += '<label><input type="checkbox" data-type="' + esc(t) + '"' +
+        (selTypes[t] ? ' checked' : '') + '> <span>' + esc(labelOf(t)) + '</span></label>';
+    }
+    $('mxTypes').innerHTML = html ||
+      '<span class="muted small">Loading types&hellip;</span>';
+  }
+
+  // =====================================================================
+  // Chart registry — ONE map, not one global per chart. Chart.getChart finds
+  // any instance still bound to the canvas (e.g. after a re-render), so a
+  // stale chart can never sit under a new one.
+  // =====================================================================
+  var charts = {};
+  function killChart(id) {
+    var cv = $(id);
+    // typeof guard: the CDN may never have arrived, and this runs before any
+    // draw attempt on every repaint.
+    if (cv && typeof Chart !== 'undefined') Chart.getChart(cv)?.destroy();
+    delete charts[id];
+  }
+  /** Show the canvas or the specific empty sentence; returns true to draw. */
+  function showOrEmpty(id, hasData) {
+    var cv = $(id + '-wrap');
+    var empty = $(id + '-empty');
+    var det = $(id + '-det');
+    var wantCanvas = hasData && !tablesOnly && !chartsBroken;
+    if (cv) cv.classList.toggle('hidden', !wantCanvas);
+    if (empty) empty.classList.toggle('hidden', hasData);
+    if (det) {
+      det.classList.toggle('hidden', !hasData);
+      // Tables-only (or a dead CDN) opens every paired table and leaves it open.
+      if (hasData && (tablesOnly || chartsBroken)) det.open = true;
+    }
+    return wantCanvas;
+  }
+
+  // Value labels drawn in INK (never the series colour) at the end of each bar.
+  // Registered per-chart, so it never leaks onto the stacked trend.
+  var barValues = {
+    id: 'mxBarValues',
+    afterDatasetsDraw: function (chart) {
+      var horiz = chart.options && chart.options.indexAxis === 'y';
+      var ds = chart.data.datasets[0];
+      var meta = chart.getDatasetMeta(0);
+      if (!ds || !meta || !meta.data) return;
+      var ctx = chart.ctx;
+      ctx.save();
+      ctx.fillStyle = INK;
+      ctx.font = '700 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif';
+      ctx.textAlign = horiz ? 'left' : 'center';
+      ctx.textBaseline = horiz ? 'middle' : 'bottom';
+      for (var i = 0; i < meta.data.length; i++) {
+        var v = Number(ds.data[i] || 0);
+        if (!v) continue;
+        var el = meta.data[i];
+        ctx.fillText(String(v), horiz ? el.x + 6 : el.x, horiz ? el.y : el.y - 4);
+      }
+      ctx.restore();
+    }
+  };
+
+  function catScale() {   // category axis: no gridlines, no axis border
+    return { grid: { display: false }, border: { display: false }, ticks: { color: AXIS } };
+  }
+  function valScale() {   // value axis: recessive grid, integer ticks
+    return {
+      beginAtZero: true, grid: { color: GRID }, border: { display: false },
+      ticks: { color: AXIS, precision: 0 }
+    };
+  }
+
+  // =====================================================================
+  // Paired data tables (the relief obligation, and the Tables-only view)
+  // =====================================================================
+  /**
+   * @param {string} containerId
+   * @param {Array<string>} headers
+   * @param {Array<Array>} rows cell 0 is pre-escaped HTML, the rest are numbers
+   * @param {Array<string>=} headColors swatch per column — ties the table back
+   *   to the chart so the colour is never the only way to read a series.
+   */
+  function miniTable(containerId, headers, rows, headColors) {
+    var html = '<table class="mx-mini"><thead><tr>';
+    for (var h = 0; h < headers.length; h++) {
+      html += '<th' + (h ? ' class="num"' : '') + '>' +
+        ((headColors && headColors[h]) ? swatch(headColors[h]) : '') +
+        esc(headers[h]) + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    if (!rows.length) {
+      html += '<tr><td colspan="' + headers.length + '" class="muted">No rows.</td></tr>';
+    }
+    for (var i = 0; i < rows.length; i++) {
+      html += '<tr>';
+      for (var c = 0; c < rows[i].length; c++) {
+        // Cell 0 may carry a pre-escaped swatch + label; the rest are numbers.
+        html += c === 0
+          ? '<td>' + rows[i][0] + '</td>'
+          : '<td class="num">' + esc(rows[i][c]) + '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    $(containerId).innerHTML = html;
+  }
+  function swatch(color) {
+    return '<span class="mx-swatch" style="background:' + color + ';"></span>';
+  }
+
+  // =====================================================================
+  // Single-measure horizontal / vertical bar charts (ONE blue hue, no rainbow)
+  // =====================================================================
+  /**
+   * @param {string} id canvas id (its -empty / -det / -tbl siblings follow)
+   * @param {Array} pairs [{label, value, key}] already in display order
+   * @param {Object} opts {horizontal, measure, drillField}
+   */
+  function drawBars(id, pairs, opts) {
+    opts = opts || {};
+    killChart(id);
+    var rows = pairs.map(function (p) { return [esc(p.label), p.value]; });
+    miniTable(id + '-tbl', [opts.dim || 'Value', opts.measure || 'Events'], rows,
+      [null, SEQ_STRONG]);
+    if (!showOrEmpty(id, pairs.length > 0)) return;
+
+    var horiz = !!opts.horizontal;
+    charts[id] = new Chart($(id).getContext('2d'), {
+      type: 'bar',
+      plugins: [barValues],
+      data: {
+        labels: pairs.map(function (p) { return p.label; }),
+        datasets: [{
+          label: opts.measure || 'Events',
+          data: pairs.map(function (p) { return p.value; }),
+          backgroundColor: SEQ_STRONG,
+          borderRadius: 4,          // default borderSkipped:'start' = the DATA end only
+          maxBarThickness: horiz ? 26 : 46
+        }]
+      },
+      options: {
+        indexAxis: horiz ? 'y' : 'x',
+        responsive: true, maintainAspectRatio: false,
+        // room for the value label at the end of the bar
+        layout: { padding: horiz ? { right: 30 } : { top: 18 } },
+        plugins: { legend: { display: false } },   // single series — the <h3> names it
+        scales: horiz ? { x: valScale(), y: catScale() } : { x: catScale(), y: valScale() },
+        onClick: opts.drillField ? function (ev, els, chart) {
+          var hit = chart.getElementsAtEventForMode(ev, 'nearest', { intersect: true }, true);
+          if (!hit.length) return;
+          toggleDrill(opts.drillField, pairs[hit[0].index].key);
+        } : undefined
+      }
+    });
+    if (opts.drillField) $(id).style.cursor = 'pointer';
+  }
+
+  // =====================================================================
+  // Activity over time — the ONE multi-series chart on the page
+  // =====================================================================
+  function isoMonday(dateStr) {
+    var p = String(dateStr).split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));   // Mon=0
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+  function weekLabel(mondayKey) {
+    var p = mondayKey.split('-');
+    return 'week of ' + MON[Number(p[1]) - 1] + ' ' + Number(p[2]);
+  }
+  function dayLabel(dateStr) {
+    var p = String(dateStr).split('-');
+    return MON[Number(p[1]) - 1] + ' ' + Number(p[2]);
+  }
+
+  /**
+   * Decide which types get their own dataset. Rules, in order:
+   *   1. visitor_in and movement share slot 4 — with both present, movement folds.
+   *   2. never more than 4 datasets on screen: fold the smallest until it fits.
+   * The fold is a single grey "Other (…)" dataset that NAMES what it contains,
+   * so nothing silently disappears from the total.
+   */
+  function trendSeries(daily, visible) {
+    var totals = {};
+    visible.forEach(function (t) { totals[t] = 0; });
+    daily.forEach(function (d) {
+      visible.forEach(function (t) { totals[t] += Number(d[t] || 0); });
+    });
+
+    var keep = visible.slice();
+    var folded = [];
+    function fold(t) {
+      var i = keep.indexOf(t);
+      if (i !== -1) { keep.splice(i, 1); folded.push(t); }
+    }
+    if (keep.indexOf('visitor_in') !== -1 && keep.indexOf('movement') !== -1) fold('movement');
+    var guard = 0;
+    while (keep.length + (folded.length ? 1 : 0) > 4 && keep.length && guard++ < 10) {
+      var smallest = keep[0];
+      keep.forEach(function (t) { if (totals[t] < totals[smallest]) smallest = t; });
+      fold(smallest);
+    }
+
+    var sets = keep.map(function (t) {
+      return {
+        key: t, label: labelOf(t), color: typeColor(t),
+        data: daily.map(function (d) { return Number(d[t] || 0); })
+      };
+    });
+    if (folded.length) {
+      sets.push({
+        key: '_other',
+        label: 'Other (' + folded.map(labelOf).join(', ') + ')',
+        color: OTHER_COLOR,
+        data: daily.map(function (d) {
+          var n = 0;
+          folded.forEach(function (t) { n += Number(d[t] || 0); });
+          return n;
+        })
+      });
+    }
+    return sets;
+  }
+
+  function drawTrend(res) {
+    var id = 'cTrend';
+    killChart(id);
+
+    var visible = [];
+    for (var i = 0; i < allTypes.length; i++) if (selTypes[allTypes[i]]) visible.push(allTypes[i]);
+
+    // >70 days of bars is a smear — aggregate to ISO weeks instead.
+    var daily = res.daily || [];
+    var weekly = daily.length > 70;
+    var buckets = daily;
+    if (weekly) {
+      var byWeek = {};
+      var order = [];
+      daily.forEach(function (d) {
+        var k = isoMonday(d.date);
+        if (!byWeek[k]) { byWeek[k] = { date: k }; order.push(k); }
+        visible.forEach(function (t) { byWeek[k][t] = Number(byWeek[k][t] || 0) + Number(d[t] || 0); });
+      });
+      buckets = order.map(function (k) { return byWeek[k]; });
+    }
+    var labels = buckets.map(function (b) { return weekly ? weekLabel(b.date) : dayLabel(b.date); });
+    var sets = trendSeries(buckets, visible);
+
+    $('cTrendCap').textContent = weekly
+      ? 'Events per week (the range is longer than 70 days), stacked by type.'
+      : 'Events per day, stacked by type.';
+
+    // Paired table: one row per bucket, one column per dataset.
+    var heads = [weekly ? 'Week' : 'Date'].concat(sets.map(function (s) { return s.label; }));
+    var rows = buckets.map(function (b, bi) {
+      return [esc(b.date)].concat(sets.map(function (s) { return s.data[bi]; }));
+    });
+    miniTable(id + '-tbl', heads, rows,
+      [null].concat(sets.map(function (s) { return s.color; })));
+
+    var any = false;
+    sets.forEach(function (s) { s.data.forEach(function (v) { if (v) any = true; }); });
+    if (!showOrEmpty(id, buckets.length > 0 && any)) return;
+
+    charts[id] = new Chart($(id).getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: sets.map(function (s) {
+          return {
+            label: s.label, data: s.data, backgroundColor: s.color,
+            // ~2px of white between stacked segments so the stack reads as parts
+            borderColor: '#ffffff', borderWidth: 1,
+            borderRadius: 4, maxBarThickness: 34
+          };
+        })
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },   // crosshair feel
+        plugins: {
+          legend: {                                          // >=2 series: legend on
+            display: sets.length > 1, position: 'bottom',
+            labels: { color: INK, boxWidth: 12, boxHeight: 12, usePointStyle: false }
+          }
+        },
+        scales: {
+          x: { stacked: true, grid: { display: false }, border: { display: false },
+               ticks: { color: AXIS, autoSkip: true, maxRotation: 0 } },
+          y: { stacked: true, beginAtZero: true, grid: { color: GRID },
+               border: { display: false }, ticks: { color: AXIS, precision: 0 } }
+        }
+      }
+    });
+  }
+
+  // =====================================================================
+  // Sortable / exportable tables (ported from the purchasing system, with two
+  // fixes: the CSV exports the CURRENTLY SORTED rows, and the header click is
+  // event-delegated instead of an inline onclick reaching for a global.)
+  // =====================================================================
+  var tables = {};
+  function renderSortableTable(containerId, columns, rows, opts) {
+    opts = opts || {};
+    var prev = tables[containerId];
+    tables[containerId] = {
+      columns: columns,
+      rows: rows || [],
+      sorted: [],
+      // A re-render (drill-down) keeps the sort the operator chose.
+      sortKey: (prev && prev.sortKey) || opts.sortKey || columns[0].key,
+      sortDir: (prev && prev.sortDir) || opts.sortDir || 'desc',
+      csvName: opts.csvName || 'export'
+    };
+    drawSortableTable(containerId);
+  }
+  function sortTableBy(containerId, key) {
+    var st = tables[containerId];
+    if (!st) return;
+    if (st.sortKey === key) st.sortDir = (st.sortDir === 'asc') ? 'desc' : 'asc';
+    else { st.sortKey = key; st.sortDir = 'desc'; }
+    drawSortableTable(containerId);
+  }
+  function drawSortableTable(containerId) {
+    var st = tables[containerId];
+    var el = $(containerId);
+    if (!st || !el) return;
+    var col = null;
+    for (var c = 0; c < st.columns.length; c++) if (st.columns[c].key === st.sortKey) col = st.columns[c];
+    if (!col) col = st.columns[0];
+    var dir = st.sortDir === 'asc' ? 1 : -1;
+
+    st.sorted = st.rows.slice().sort(function (a, b) {
+      var av = a[col.key], bv = b[col.key];
+      if (col.type === 'num') return ((Number(av) || 0) - (Number(bv) || 0)) * dir;
+      if (col.type === 'grade') return (gradeIdx(av) - gradeIdx(bv)) * dir;
+      av = (av === null || av === undefined ? '' : av).toString().toLowerCase();
+      bv = (bv === null || bv === undefined ? '' : bv).toString().toLowerCase();
+      return (av < bv ? -1 : av > bv ? 1 : 0) * dir;
+    });
+
+    var html = '<table class="muster-table"><thead><tr>';
+    for (var i = 0; i < st.columns.length; i++) {
+      var k = st.columns[i];
+      var arrow = st.sortKey === k.key
+        ? '<span class="mx-arrow">' + (st.sortDir === 'asc' ? ' ▲' : ' ▼') + '</span>' : '';
+      html += '<th data-sort="' + esc(k.key) + '" style="text-align:' + (k.align || 'left') + ';">' +
+        esc(k.label) + arrow + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    if (!st.sorted.length) {
+      html += '<tr><td colspan="' + st.columns.length + '" class="muted">No rows in this range.</td></tr>';
+    }
+    for (var r = 0; r < st.sorted.length; r++) {
+      html += '<tr>';
+      for (var j = 0; j < st.columns.length; j++) {
+        var cc = st.columns[j];
+        var v = st.sorted[r][cc.key];
+        if (cc.type === 'num') v = (v === null || v === undefined || v === '') ? '0' : String(v);
+        else if (v === null || v === undefined) v = '';
+        html += '<td' + (cc.type === 'num' ? ' class="num"' : '') +
+          ' style="text-align:' + (cc.align || 'left') + ';">' + esc(v) + '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+  /** Exports what you SEE: st.sorted, not the source order. */
+  function downloadTableCsv(containerId) {
+    var st = tables[containerId];
+    if (!st) return;
+    function q(v) {
+      v = (v === null || v === undefined ? '' : v).toString();
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    var lines = [st.columns.map(function (c) { return q(c.label); }).join(',')];
+    var src = st.sorted.length ? st.sorted : st.rows;
+    for (var i = 0; i < src.length; i++) {
+      lines.push(st.columns.map(function (c) { return q(src[i][c.key]); }).join(','));
+    }
+    try {
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+      a.download = (st.csvName || 'export') + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    } catch (e) {
+      toast('This browser blocked the download — copy from the table instead.', true);
+    }
+  }
+  function gradeIdx(g) {
+    var i = GRADE_ORDER.indexOf(String(g === null || g === undefined ? '' : g));
+    return i === -1 ? 99 : i;
+  }
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var th = t.closest('.mx-tblwrap th[data-sort]');
+    if (th) {
+      var wrap = th.closest('.mx-tblwrap');
+      sortTableBy(wrap.id, th.getAttribute('data-sort'));
+      return;
+    }
+    var csv = t.closest('[data-csv]');
+    if (csv) downloadTableCsv(csv.getAttribute('data-csv'));
+  });
+
+  // =====================================================================
+  // Drill-down — CLIENT-side only. One active value per field; clicking the
+  // same bar again clears it.
+  // =====================================================================
+  var drill = {};   // field -> value
+  var DRILL_LABEL = { reason: 'Reason', building: 'Building', grade: 'Grade', weekday: 'Day' };
+
+  function weekdayOfRow(row) {
+    var p = String(row.date || '').split('-');
+    if (p.length !== 3) return '';
+    return String(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay());
+  }
+  function rowFieldValue(row, field) {
+    if (field === 'reason') return String(row.reason || '').split(' — ')[0];
+    if (field === 'building') return String(row.building || '');
+    if (field === 'grade') return String(row.grade === null || row.grade === undefined ? '' : row.grade);
+    if (field === 'weekday') return weekdayOfRow(row);
+    return '';
+  }
+  function drillDisplay(field, value) {
+    return field === 'weekday' ? (DOW[Number(value)] || value) : (value || '(blank)');
+  }
+  function toggleDrill(field, value) {
+    value = String(value === null || value === undefined ? '' : value);
+    if (drill[field] === value) delete drill[field];
+    else drill[field] = value;
+    paintChips();
+    paintLog();
+    var head = $('mxLogHead');
+    if (head && head.scrollIntoView) {
+      try { head.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      catch (e) { head.scrollIntoView(); }
+    }
+  }
+  function paintChips() {
+    var keys = Object.keys(drill);
+    var html = '';
+    for (var i = 0; i < keys.length; i++) {
+      html += '<span class="mx-chip">' + esc(DRILL_LABEL[keys[i]] || keys[i]) + ': ' +
+        esc(drillDisplay(keys[i], drill[keys[i]])) +
+        ' <button type="button" data-drill-off="' + esc(keys[i]) +
+        '" title="Remove this filter" aria-label="Remove this filter">✕</button></span>';
+    }
+    $('mxChips').innerHTML = html;
+    $('mxChips').classList.toggle('hidden', keys.length === 0);
+  }
+  $('mxChips').addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('[data-drill-off]') : null;
+    if (!b) return;
+    delete drill[b.getAttribute('data-drill-off')];
+    paintChips();
+    paintLog();
+  });
+
+  // =====================================================================
+  // Rendering
+  // =====================================================================
+  function countOf(list, key) {
+    for (var i = 0; i < (list || []).length; i++) if (list[i].key === key) return list[i].count;
+    return 0;
+  }
+  function hourLabel(h) {
+    h = Number(h);
+    var ampm = h < 12 ? 'am' : 'pm';
+    var hh = h % 12;
+    if (hh === 0) hh = 12;
+    return hh + ampm;
+  }
+  function stationLabel(s) {
+    var m = { hs: 'HS kiosk', el: 'EL kiosk', office: 'Office', mobile: 'Mobile' };
+    return m[String(s).toLowerCase()] || String(s);
+  }
+
+  function rangeText(res) {
+    var f = res.range && res.range.from, t = res.range && res.range.to;
+    // "All time" comes back as 0000-01-01 -> 9999-12-31; show the observed span.
+    if (f === '0000-01-01' || t === '9999-12-31') {
+      var d = res.daily || [];
+      if (!d.length) return 'no events recorded yet';
+      return d[0].date + ' → ' + d[d.length - 1].date;
+    }
+    return f + ' → ' + t;
+  }
+  function paintCrumb(res) {
+    var picked = typesParam();
+    var typeTxt = picked.length
+      ? ' &middot; <span class="mx-dim">types:</span> ' + picked.map(labelOf).map(esc).join(', ')
+      : '';
+    var drillKeys = Object.keys(drill);
+    var drillTxt = drillKeys.length
+      ? ' &middot; <span class="mx-dim">log filtered:</span> ' + drillKeys.map(function (k) {
+          return esc((DRILL_LABEL[k] || k) + ' = ' + drillDisplay(k, drill[k]));
+        }).join(', ')
+      : '';
+    $('mxCrumb').innerHTML =
+      esc(res.rangeLabel || preset) +
+      ' <span class="mx-dim">&middot;</span> ' + esc(rangeText(res)) +
+      ' <span class="mx-dim">&middot;</span> ' + fmtN(res.kpi.total) + ' events' +
+      typeTxt + drillTxt +
+      (res.cached ? '<span class="mx-cached">cached</span>' : '');
+  }
+
+  function paintKpis(res) {
+    var k = res.kpi;
+    $('kpiTotal').textContent = fmtN(k.total);
+    $('kpiTotalSub').innerHTML = k.autoClosed
+      ? fmtN(k.autoClosed) + ' closed automatically at end of day'
+      : '&nbsp;';
+    $('kpiLate').textContent = fmtN(countOf(res.byType, 'student_late_in'));
+    $('kpiEarly').textContent = fmtN(countOf(res.byType, 'student_early_out'));
+    $('kpiVisitors').textContent = fmtN(k.visitors);
+    $('kpiStudents').textContent = fmtN(k.students);
+    $('kpiDays').textContent = fmtN(k.days);
+
+    // Status colour is never the only signal: the icon and the word "flags" go
+    // with it, so it survives greyscale printing and colour-blind readers.
+    var hot = Number(k.flags) > 0;
+    $('kpiFlagCard').className = 'kpi-card' + (hot ? ' kpi-flag-hot' : '');
+    $('kpiFlags').innerHTML = hot
+      ? '<span class="kpi-warn-ico">⚠</span>' + fmtN(k.flags) + ' flags'
+      : '0';
+    $('kpiFlagsSub').textContent = hot
+      ? 'Unmatched pickup attempts — never counted as sign-outs.'
+      : 'No mismatches. Never counted as sign-outs.';
+  }
+
+  function paintCharts(res) {
+    // Re-checked on every repaint (never latched): the CDN script is `defer`,
+    // so a very early paint could legitimately precede it.
+    chartsBroken = (typeof Chart === 'undefined');
+    if (chartsBroken && !chartsWarned) {
+      chartsWarned = true;
+      toast('Charts could not load (CDN blocked) — showing the data tables instead.', true);
+    }
+
+    drawTrend(res);
+
+    drawBars('cReason', (res.byReason || []).map(function (r) {
+      return { label: r.key, value: r.count, key: r.key };
+    }), { horizontal: true, dim: 'Reason', measure: 'Events', drillField: 'reason' });
+
+    // Hour: gap-fill from the earliest to the latest observed hour, so a quiet
+    // 11am reads as zero instead of vanishing between 10am and noon.
+    var hours = res.byHour || [];
+    var hourPairs = [];
+    if (hours.length) {
+      var lo = Number(hours[0].key), hi = Number(hours[hours.length - 1].key);
+      for (var h = lo; h <= hi; h++) {
+        hourPairs.push({ label: hourLabel(h), value: countOf(hours, pad2(h)), key: pad2(h) });
+      }
+    }
+    drawBars('cHour', hourPairs, { dim: 'Hour', measure: 'Events' });
+
+    var dowPairs = [];
+    for (var d = 0; d < 7; d++) {
+      dowPairs.push({ label: DOW[d].slice(0, 3), value: countOf(res.byWeekday, String(d)), key: String(d) });
+    }
+    var anyDow = false;
+    dowPairs.forEach(function (p) { if (p.value) anyDow = true; });
+    drawBars('cDow', anyDow ? dowPairs : [], { dim: 'Day', measure: 'Events', drillField: 'weekday' });
+
+    drawBars('cBuilding', (res.byBuilding || []).map(function (r) {
+      return { label: r.key, value: r.count, key: r.key };
+    }), { horizontal: true, dim: 'Building', measure: 'Events', drillField: 'building' });
+
+    // Grade in SCHOOL order (K4, K5, 1…12), not alphabetical — "10" is not
+    // between "1" and "2" to anybody who works at a school.
+    var grades = (res.byGrade || []).slice().sort(function (a, b) {
+      return (gradeIdx(a.key) - gradeIdx(b.key)) || String(a.key).localeCompare(String(b.key));
+    });
+    drawBars('cGrade', grades.map(function (r) {
+      return { label: r.key, value: r.count, key: r.key };
+    }), { horizontal: true, dim: 'Grade', measure: 'Events', drillField: 'grade' });
+
+    drawBars('cStation', (res.byStation || []).map(function (r) {
+      return { label: stationLabel(r.key), value: r.count, key: r.key };
+    }), { horizontal: true, dim: 'Station', measure: 'Events' });
+
+    drawBars('cType', (res.byType || []).map(function (r) {
+      return { label: labelOf(r.key), value: r.count, key: r.key };
+    }), { horizontal: true, dim: 'Event type', measure: 'Events' });
+  }
+
+  function paintStudents(res) {
+    var rows = res.students || [];
+    $('mxStuNote').textContent = rows.length
+      ? rows.length + (rows.length === 1 ? ' student' : ' students') + ' had at least one event in this range'
+      : 'No student events in this range.';
+    renderSortableTable('mxStudents', [
+      { key: 'name', label: 'Student', type: 'text' },
+      { key: 'grade', label: 'Grade', type: 'grade', align: 'center' },
+      { key: 'lateIn', label: 'Late arrivals', type: 'num', align: 'right' },
+      { key: 'earlyOut', label: 'Early dismissals', type: 'num', align: 'right' },
+      { key: 'total', label: 'Total events', type: 'num', align: 'right' }
+    ], rows, { sortKey: 'total', sortDir: 'desc', csvName: 'campus-presence-students' });
+  }
+
+  function paintLog() {
+    if (!payload) return;
+    var src = payload.rows || [];
+    var fields = Object.keys(drill);
+    var rows = [];
+    for (var i = 0; i < src.length; i++) {
+      var keep = true;
+      for (var f = 0; f < fields.length; f++) {
+        if (rowFieldValue(src[i], fields[f]) !== drill[fields[f]]) { keep = false; break; }
+      }
+      if (keep) rows.push(src[i]);
+    }
+    // Present the type label, not the raw key, and keep the raw key out of CSV
+    // confusion by mapping once here.
+    var view = rows.map(function (r) {
+      return {
+        date: r.date, time: r.time, type: labelOf(r.type), name: r.name,
+        grade: (r.grade === null || r.grade === undefined) ? '' : r.grade,
+        building: r.building, station: stationLabel(r.station),
+        reason: r.reason, withWhom: r.withWhom, match: r.match
+      };
+    });
+
+    $('mxLogNote').textContent = fields.length
+      ? view.length + ' of ' + src.length + ' events match the chart filter'
+      : view.length + (view.length === 1 ? ' event' : ' events');
+
+    renderSortableTable('mxLog', [
+      { key: 'date', label: 'Date', type: 'text' },
+      { key: 'time', label: 'Time', type: 'text' },
+      { key: 'type', label: 'Type', type: 'text' },
+      { key: 'name', label: 'Name', type: 'text' },
+      { key: 'grade', label: 'Grade', type: 'grade', align: 'center' },
+      { key: 'building', label: 'Building', type: 'text' },
+      { key: 'station', label: 'Station', type: 'text' },
+      { key: 'reason', label: 'Reason', type: 'text' },
+      { key: 'withWhom', label: 'With whom', type: 'text' },
+      { key: 'match', label: 'Match', type: 'text' }
+    ], view, { sortKey: 'date', sortDir: 'desc', csvName: 'campus-presence-event-log' });
+
+    paintCrumb(payload);
+  }
+
+  function render(res) {
+    payload = res;
+    $('pageLoading').classList.add('hidden');
+    $('mxError').classList.add('hidden');
+    $('mxRoot').classList.remove('hidden');
+
+    paintCrumb(res);
+    paintKpis(res);
+    paintCharts(res);
+    paintStudents(res);
+    paintLog();
+
+    $('mxTrunc').classList.toggle('hidden', !res.truncated);
+    if (res.truncated) {
+      $('mxTrunc').textContent = 'Showing the first ' + fmtN((res.rows || []).length) +
+        ' events in range; narrow the range for the full list. ' +
+        '(The event log holds ' + fmtN(res.eventLogRows) + ' rows in total.)';
+    }
+    $('mxBuiltAt').textContent = (res.builtAt || 'unknown') + (res.cached ? ' (cached)' : '');
+  }
+
+  function failLoud(msg) {
+    // Never render zeros on failure — an empty dashboard reads as "a quiet week"
+    // and that is the most expensive lie this page could tell.
+    $('pageLoading').classList.add('hidden');
+    var box = $('mxError');
+    box.textContent = msg + ' Nothing below has been updated — use Refresh to try again.';
+    box.classList.remove('hidden');
+    toast(msg, true);
+  }
+
+  // =====================================================================
+  // Fetch
+  // =====================================================================
+  function setBusy(on) {
+    fetching = on;
+    $('mxRefresh').disabled = on;
+    $('mxRefresh').textContent = on ? 'Loading…' : 'Refresh';
+  }
+
+  function fetchMetrics() {
+    if (stopped || fetching) return;
+    if (preset === 'custom') {
+      from = $('mxFrom').value;
+      to = $('mxTo').value;
+      if (!from || !to) { toast('Pick both a from and a to date.', true); return; }
+      if (from > to) { toast('The from date is after the to date.', true); return; }
+    }
+    var types = typesParam();
+    var key = memoKey(preset, preset === 'custom' ? from : '', preset === 'custom' ? to : '', types);
+    // A different range/type set invalidates any drill-down value — "Reason =
+    // Homeschool" from last September means nothing in this week's log.
+    if (key !== lastKey) { drill = {}; paintChips(); }
+    lastKey = key;
+    if (memo[key]) { render(memo[key]); return; }
+
+    setBusy(true);
+    if (!payload) $('pageLoading').classList.remove('hidden');
+    var req = { op: 'getMetrics', preset: preset };
+    if (preset === 'custom') { req.from = from; req.to = to; }
+    if (types.length) req.types = types;
+
+    api(req, function (res) {
+      setBusy(false);
+      if (!res || res.ok !== true || !res.kpi) {
+        failLoud((res && res.error) || 'The server could not build the metrics.');
+        return;
+      }
+      allTypes = (res.countedTypes || []).slice();
+      // First response defines the type checkboxes; later ones keep the choice.
+      var known = false;
+      for (var i = 0; i < allTypes.length; i++) if (allTypes[i] in selTypes) known = true;
+      if (!known) allTypes.forEach(function (t) { selTypes[t] = true; });
+      paintTypeBoxes();
+      memo[key] = res;
+      render(res);
+    }, function (err) {
+      setBusy(false);
+      failLoud('Server error: ' + String((err && err.message) || err || 'unknown') + '.');
+    });
+  }
+
+  // =====================================================================
+  // Controls
+  // =====================================================================
+  $('mxPresets').addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('.mx-preset') : null;
+    if (!b || fetching) return;
+    preset = b.getAttribute('data-preset');
+    paintPresets();
+    if (preset === 'custom') {
+      // Seed the pickers from the range on screen so Apply is one click away.
+      if (!$('mxFrom').value && payload && payload.range) {
+        var f = payload.range.from, t = payload.range.to;
+        if (f && f !== '0000-01-01') $('mxFrom').value = f;
+        if (t && t !== '9999-12-31') $('mxTo').value = t;
+      }
+      $('mxFrom').focus();
+      return;                  // wait for Apply — don't fetch a half-typed range
+    }
+    fetchMetrics();
+  });
+  $('mxApply').addEventListener('click', function () { fetchMetrics(); });
+  $('mxTo').addEventListener('change', function () { if (preset === 'custom' && $('mxFrom').value) fetchMetrics(); });
+
+  $('mxTypes').addEventListener('change', function (ev) {
+    var cb = ev.target;
+    if (!cb || !cb.getAttribute || !cb.getAttribute('data-type')) return;
+    var t = cb.getAttribute('data-type');
+    var picked = 0;
+    allTypes.forEach(function (x) { if (selTypes[x]) picked++; });
+    if (!cb.checked && picked <= 1) {   // never leave the page with nothing to show
+      cb.checked = true;
+      toast('Keep at least one event type selected.', true);
+      return;
+    }
+    selTypes[t] = cb.checked;
+    fetchMetrics();                     // the type filter changes the SERVER fold
+  });
+
+  $('mxRefresh').addEventListener('click', function () {
+    memo = {};                          // Refresh means "go ask again"
+    payload = null;
+    fetchMetrics();
+  });
+  $('mxPrint').addEventListener('click', function () { window.print(); });
+
+  $('mxTablesOnly').addEventListener('change', function () {
+    tablesOnly = this.checked;
+    try { window.localStorage.setItem(LS_TABLES, tablesOnly ? '1' : '0'); } catch (e) {}
+    if (payload) paintCharts(payload);
+  });
+
+  // =====================================================================
+  // Boot: straight into one getMetrics. Unlike the board and muster there is
+  // no bootstrap round-trip — everything this page needs (countedTypes,
+  // labels, the school-year start month) rides on the metrics payload itself,
+  // and getMetrics re-checks the Permissions gate exactly the same way, so a
+  // second call would only add latency to the slowest query in the app.
+  // =====================================================================
+  paintPresets();
+  paintTypeBoxes();
+  fetchMetrics();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "_note": "Config for tools/build-demo.mjs — one config per built surface, as demos/pos and demos/lunch-inventory do, because the builder takes a single page at a time. Run from the repo root, and run build-logic.mjs FIRST: node demos/campus-presence/build-logic.mjs && node tools/build-demo.mjs demos/campus-presence/build.kiosk.json && node tools/build-demo.mjs demos/campus-presence/build.board.json && node tools/build-demo.mjs demos/campus-presence/build.muster.json && node tools/build-demo.mjs demos/campus-presence/build.metrics.json. The source page is a COMPLETE template document, so no head/body wrapper is needed; includeDir inlines pages/OfficeStyles and pages/ClientLogic (which is the browser copy of logic/fuzzy.js + logic/search.js — the muster's roster filter runs the app's own fuzzy matcher). Each replacement below reproduces something Router.js doGet supplies at runtime: me/isAdmin/execUrl come from the Permissions gate, and the <title> and the viewport meta are set server-side by setTitle/addMetaTag. Four deliberate demo-only edits, all markup, never the app's JavaScript: (1) base target becomes _self, because in production the page is the top document of the Apps Script sandbox and _top is what breaks it out of googleusercontent's iframe, whereas here the switcher's iframe IS the intended home; (2) logic.js is pulled in so the mock can run the app's real pure modules in the browser; (3) execUrl is empty, exactly as it is when the server cannot resolve its own URL, so the page's own wireNav() returns early and leaves the hrefs alone — they are rewritten here to the built filenames instead, which keeps the real cross-page nav working inside the switcher; (4) the Flags and Settings links are dropped, because those two surfaces are not part of this demo (an open flag already renders as an alert card on this board, and a settings screen is a config form, not a story). The Settings anchor is replaced by an empty hidden span that KEEPS its id, because the page does $('navSettings').classList.remove('hidden') when isAdmin is set and must not hit null.",
+  "src": "../campus-sign-in-out-system/apps/office/pages/Board.html",
+  "dst": "demos/campus-presence/board.html",
+  "includeDir": "../campus-sign-in-out-system/apps/office",
+  "demoName": "Campus Presence — Live Board",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Campus Presence — Live Board</title>\n<script src=\"logic.js\"></script>"],
+    ["<?= me ?>", "demo.staff@example.edu"],
+    ["<?= isAdmin ?>", "1"],
+    ["<?= execUrl ?>", ""],
+    ["href=\"?page=board\"", "href=\"board.html\""],
+    ["href=\"?page=muster\"", "href=\"muster.html\""],
+    ["href=\"?page=metrics\"", "href=\"metrics.html\""],
+    ["<a data-nav=\"flags\" href=\"?page=flags\">Flags</a>", "<!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on this board -->"],
+    ["<a data-nav=\"settings\" id=\"navSettings\" class=\"hidden\" href=\"?page=settings\">Settings</a>", "<span id=\"navSettings\" hidden><!-- Settings: not part of this demo --></span>"]
+  ]
+}

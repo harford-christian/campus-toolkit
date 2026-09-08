@@ -205,6 +205,26 @@
         "FACTS/transportation/DismissalClient.html"
       ],
       "buildMethod": "build-demo.mjs (includeDir=project root, inlines DismissalClient; head/body wrapper, sim + userEmail tokens and name scrubs via the replace list — config committed at demos/transportation/build.json) + hand data/mock"
+    },
+    "campus-presence": {
+      "title": "Campus Presence",
+      "demoFolder": "demos/campus-presence",
+      "launch": "demos/campus-presence/index.html",
+      "sourceProject": [
+        "campus-sign-in-out-system/apps/kiosk",
+        "campus-sign-in-out-system/apps/office"
+      ],
+      "builtFrom": [
+        "campus-sign-in-out-system/apps/kiosk/pages/Kiosk.html",
+        "campus-sign-in-out-system/apps/kiosk/pages/KioskStyles.html",
+        "campus-sign-in-out-system/apps/kiosk/pages/ClientLogic.html",
+        "campus-sign-in-out-system/apps/office/pages/Board.html",
+        "campus-sign-in-out-system/apps/office/pages/Muster.html",
+        "campus-sign-in-out-system/apps/office/pages/Metrics.html",
+        "campus-sign-in-out-system/apps/office/pages/OfficeStyles.html",
+        "campus-sign-in-out-system/apps/office/pages/ClientLogic.html"
+      ],
+      "buildMethod": "demos/campus-presence/build-logic.mjs (vendors the source project's logic/*.js into logic.js, scrubbing the FACTS-Finder /exec default out of SETTINGS_DEFAULTS) + build-demo.mjs once per surface, configs committed at demos/campus-presence/build.{kiosk,board,muster,metrics}.json + hand switcher/data/mock. The two kiosk surfaces are ONE built page read with ?station=hs|el, as the two iPads are. Settings and Flags are intentionally not built. demos/campus-presence/verify.mjs re-checks the dataset, the mock's op contract and the vendored logic bundle against the source modules"
     }
   },
   "coveredProjects": [
@@ -223,6 +243,9 @@
     "campus-control/event-requests",
     "campus-control/lockdown",
     "campus-control/monitoring",
+    "campus-sign-in-out-system/apps/demo",
+    "campus-sign-in-out-system/apps/kiosk",
+    "campus-sign-in-out-system/apps/office",
     "custom-forms",
     "hcs-library-portal/library-management",
     "hcs-library-portal/library-portal",

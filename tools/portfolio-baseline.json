@@ -293,5 +293,23 @@
       "setOverride"
     ],
     "hash": "8ecf30d75391adf5"
+  },
+  "campus-presence": {
+    "files": [
+      "campus-sign-in-out-system/apps/kiosk/pages/ClientLogic.html",
+      "campus-sign-in-out-system/apps/kiosk/pages/Kiosk.html",
+      "campus-sign-in-out-system/apps/kiosk/pages/KioskStyles.html",
+      "campus-sign-in-out-system/apps/office/pages/Board.html",
+      "campus-sign-in-out-system/apps/office/pages/ClientLogic.html",
+      "campus-sign-in-out-system/apps/office/pages/Metrics.html",
+      "campus-sign-in-out-system/apps/office/pages/Muster.html",
+      "campus-sign-in-out-system/apps/office/pages/OfficeStyles.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "kioskApi",
+      "officeApi"
+    ],
+    "hash": "bd4cbd9733ef57d5"
   }
 }

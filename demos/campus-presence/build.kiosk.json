@@ -1,0 +1,12 @@
+{
+  "_note": "Config for tools/build-demo.mjs — the iPad kiosk, the anonymous half of the system. Run from the repo root; see build.board.json's note for the shared doctrine. The source page is a COMPLETE template document; includeDir inlines pages/KioskStyles and pages/ClientLogic (empty for this app on purpose — the anonymous kiosk ships NO staff code, which is the defence against google.script.run being able to call any global). Replacements reproduce what Router.js doGet supplies: the viewport and apple-mobile-web-app-capable metas are added server-side by addMetaTag and are carried over verbatim, so the built page still behaves as an Add-to-Home-Screen kiosk; the title is set by setTitle. STATION is read from the URL exactly as doGet reads ?station=, so BOTH iPads are demoable from one built file — the switcher frames kiosk.html and kiosk.html?station=el. It is read via location.search rather than google.script.url.getLocation because the demo shim always reports an empty parameter bag. URL_KEY becomes a non-empty placeholder: in production it is the per-device key from Script Properties, re-validated on EVERY kioskApi call, and any mismatch throws DENIED and drops the permanent 'Kiosk not authorized' gate over the page — a real, live behaviour that a demo cannot show without a server, so the demo simply passes the gate. base target becomes _self so the demo stays inside the switcher's iframe.",
+  "src": "../campus-sign-in-out-system/apps/kiosk/pages/Kiosk.html",
+  "dst": "demos/campus-presence/kiosk.html",
+  "includeDir": "../campus-sign-in-out-system/apps/kiosk",
+  "demoName": "Campus Presence — Kiosk",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n<title>Campus Presence — Kiosk</title>\n<script src=\"logic.js\"></script>"],
+    ["var STATION = '<?= station ?>';", "var STATION = (new URLSearchParams(location.search).get('station') === 'el' ? 'el' : 'hs'); // doGet reads ?station= the same way; the demo shim's google.script.url is always empty"],
+    ["var URL_KEY = '<?= urlKey ?>';", "var URL_KEY = 'demo-device-key'; // production: the per-device key from Script Properties, re-checked on every call"]
+  ]
+}
