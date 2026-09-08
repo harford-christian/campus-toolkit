@@ -108,10 +108,27 @@
   .att.absent { background: #C62828; color: #fff; }
   .att.late { background: var(--gold); color: var(--gold-ink); }
   .att.left { background: #6b7280; color: #fff; }
+  .att.out { background: #6d28d9; color: #fff; }   /* signed out — not in the building */
+  .att.back { background: #0e7490; color: #fff; }  /* signed out and came back */
+  .attbar.out { background: #F3EEFF; color: #4c1d95; }
+  .attbar.back { background: #ECFEFF; color: #155e75; }
+  .assumed { color: var(--dt); font-style: italic; }
+  /* favourites: a quiet outline button, gold once set. 44px tap target per the house rule. */
+  .favrow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .favbtn { background: none; border: 1px solid var(--input-border); color: var(--red);
+            font-size: .85rem; font-weight: 600; min-height: 44px; padding: .4rem .8rem; }
+  .favbtn.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+  .favrow .assumed { font-size: .75rem; }
   .attbar { padding: .5rem .9rem; font-size: .85rem; background: #FDECEA;
             border-bottom: 1px solid var(--line); color: #7f1d1d; }
   .attbar.late { background: #FFF3CD; color: #6b5400; }
   .attbar.left { background: #EEF0F2; color: #374151; }
+  /* A game today: green like the NOW tag — a scheduled leave, not a problem. Once the
+     dismissal has passed the child is actually OUT of the building, so it takes the same
+     purple as a sign-out (.attbar.out) — the page should read the same way for "gone at a
+     coach's dismissal" as for "gone because the office signed them out". */
+  .attbar.game { background: #E7F6EC; color: #14532d; }
+  .attbar.game.gone { background: #F3EEFF; color: #4c1d95; }
   .attbar b { font-weight: 700; }
   .clstime { float: right; color: var(--dt); font-size: .78rem; font-weight: 600; white-space: nowrap;
              margin-left: .5rem; }
@@ -159,7 +176,7 @@
   <div class="top">
     <header>
       <h1><b>HCS</b> Directory Search</h1>
-      <span class="who">demo.staff@harfordchristian.org</span>
+      <span class="who">demo.staff@example.edu</span>
     </header>
     <div class="searchbar">
       <input id="q" type="search" placeholder="Student name, ID, parent email, homeroom…"
@@ -295,6 +312,8 @@ var SEARCH_MAX_CLASSES = 25;
 var PERIOD_TIMES_TAB = 'Period Times';
 var EMERGENCY_TAB_NAME = 'Emergency Contacts';
 var ATTENDANCE_TAB_NAME = 'Attendance Today';
+var PICKUP_TAB_NAME = 'PickupContacts';
+var ROSTER_TAB_NAME = 'Roster';
 var DIRECTORY_TAB_NAMES = ['Directory', 'Sheet1'];
 var SCHEDULES_TAB_NAME = 'Student Schedules';
 var TEACHERS_TAB_NAME = 'Teachers';
@@ -351,6 +370,7 @@ function buildPeople(tabs) {
         status: cell('Status'),
         email: cell('Email'),
         gender: cell('Gender'),
+        locker: cell('Locker'), // appended to the directory contract 2026-09-06; '' on old exports
         guardians: []
       };
       order.push(p);
@@ -509,8 +529,10 @@ function classGradesLabel_(gradesObj) {
 function searchPeople(tabs, query, opts) {
   opts = opts || {};
   var cap = opts.maxPeople || SEARCH_MAX_PEOPLE;
-  // opts.today ('YYYY-MM-DD') switches on today's absent/late badge in the result list
+  // opts.today ('YYYY-MM-DD') switches on today's absent/late badge in the result list;
+  // opts.presence adds the signed-out pill, so "not in the building" is visible before you tap
   var attendance = opts.today === undefined ? {} : buildAttendance(tabs, opts.today);
+  var presence = opts.presence || {};
   var tokens = String(query || '').toLowerCase().split(/\s+/).filter(function (t) { return t; });
   var out = { query: String(query || ''), tokens: tokens, total: 0, truncated: false, hasClose: false, people: [] };
   if (!tokens.length) return out;
@@ -584,7 +606,8 @@ function searchPeople(tabs, query, opts) {
     return { id: m.p.id, name: m.p.name, grade: m.p.grade, homeroom: m.p.homeroom,
              homeroomTeacher: m.p.homeroomTeacher, close: !m.allExact, via: m.via,
              fuzzyWords: m.fuzzyWords,
-             attendance: attendance[m.p.id] || null }; // absent/late shows in the list itself
+             attendance: attendance[m.p.id] || null, // absent/late shows in the list itself
+             status: studentStatus(attendance[m.p.id], presence[m.p.id]) };
   });
 
   // teachers: same exact-or-fuzzy-name matching against the Teachers tab
@@ -796,6 +819,227 @@ function buildAttendance(tabs, today) {
 }
 
 /**
+ * Drop reference rows for students who are not in this export.
+ *
+ * `PickupContacts` is produced with NO enrolment filter — 5,564 rows covering 1,456 students
+ * against 655 enrolled (measured 2026-09-06) — because campus-sign-in-out-system consumes that
+ * same tab and may want the wider set. Roughly 800 of those students have left the school, and
+ * without this every staff browser would receive withdrawn and graduated families' phone
+ * numbers. Pruning HERE fixes it for this app without changing a tab another project depends on.
+ *
+ * Emergency Contacts needs no pruning: its producer already restricts to enrolled students.
+ *
+ * @return {Array} the same tab list, with pruned copies substituted (input is not mutated)
+ */
+function pruneToEnrolled(tabs) {
+  var dir = searchTabByName_(tabs, DIRECTORY_TAB_NAMES);
+  if (!dir || (dir.values || []).length < 2) return tabs;
+  var enrolled = {};
+  for (var r = 1; r < dir.values.length; r++) {
+    var id = searchCellToString_(dir.values[r][0]).trim();
+    if (id) enrolled[id] = true;
+  }
+  return (tabs || []).map(function (t) {
+    if (t.name !== PICKUP_TAB_NAME || (t.values || []).length < 2) return t;
+    var h = searchHeaderMap_(t.values[0]);
+    var col = h['studentId'] !== undefined ? h['studentId'] : h['Student ID'];
+    if (col === undefined) return t;
+    var kept = [t.values[0]];
+    for (var i = 1; i < t.values.length; i++) {
+      if (enrolled[searchCellToString_(t.values[i][col]).trim()]) kept.push(t.values[i]);
+    }
+    return { name: t.name, values: kept };
+  });
+}
+
+/**
+ * Who may COLLECT a child, from the `PickupContacts` tab. Distinct from both the directory's
+ * guardians (who the parents are) and the emergency list (who to call). Already produced into
+ * the staging sheet by facts-api-sync — this app simply had never loaded it.
+ *
+ * NEVER surface a pickup id: Campus Presence tiers `PickupContactID` as SYSTEM, i.e. custody
+ * adjacent and raw-sheet-only. Names and numbers only.
+ *
+ * @return {Object} studentId -> [{name, relationship, cell, home, work, email}]
+ */
+function buildPickupContacts(tabs) {
+  var t = searchTabByName_(tabs, [PICKUP_TAB_NAME]);
+  var out = {};
+  if (!t || (t.values || []).length < 2) return out;
+  var h = searchHeaderMap_(t.values[0]);
+  for (var r = 1; r < t.values.length; r++) {
+    var row = t.values[r];
+    var cell = function (n) { return h[n] === undefined ? '' : searchCellToString_(row[h[n]]).trim(); };
+    var sid = cell('studentId') || cell('Student ID');
+    if (!sid) continue;
+    var name = [cell('firstName') || cell('First Name'), cell('lastName') || cell('Last Name')]
+      .filter(String).join(' ').trim();
+    if (!name) continue;
+    (out[sid] = out[sid] || []).push({
+      name: name,
+      relationship: cell('relationship') || cell('Relationship'),
+      cell: cell('cellPhone') || cell('Cell Phone'),
+      home: cell('homePhone') || cell('Home Phone'),
+      work: cell('workPhone') || cell('Work Phone'),
+      email: cell('email') || cell('Email')
+    });
+  }
+  return out;
+}
+
+/**
+ * How a student gets home, from the dismissal `Roster` tab (facts-api-sync/Transportation.gs,
+ * rebuilt 04:00). Parsed by header NAME — that producer notes its column order was only ever
+ * safe to reorder "because no consumer exists yet", and this app is now the second one.
+ *
+ * `Source === 'residual-default'` means Car was ASSUMED, not recorded; the UI must say so
+ * rather than present a guess as fact. `Building` (physical) is not `Pickup` (where the parent
+ * goes) — they are separate columns for a reason.
+ *
+ * @return {Object} studentId -> {type, routeCode, routeName, vehicle, split, building, pickup,
+ *                                pickupBasis, walkTo, familyId, assumed, note}
+ */
+function buildTransportation(tabs) {
+  var t = searchTabByName_(tabs, [ROSTER_TAB_NAME]);
+  var out = {};
+  if (!t || (t.values || []).length < 2) return out;
+  var h = searchHeaderMap_(t.values[0]);
+  for (var r = 1; r < t.values.length; r++) {
+    var row = t.values[r];
+    var cell = function (n) { return h[n] === undefined ? '' : searchCellToString_(row[h[n]]).trim(); };
+    var sid = cell('Student ID');
+    if (!sid) continue;
+    var entry = {
+      type: cell('Type'), routeCode: cell('Route Code'), routeName: cell('Route Name'),
+      vehicle: cell('Vehicle'), split: cell('Split'), building: cell('Building'),
+      pickup: cell('Pickup'), pickupBasis: cell('Pickup Basis'), walkTo: cell('Walk To'),
+      familyId: cell('Family ID'), note: cell('Note'),
+      assumed: /residual/i.test(cell('Source'))
+    };
+    // Split-custody students legitimately ride BOTH routes — keep every row, don't pick one.
+    if (out[sid]) {
+      out[sid].extra = (out[sid].extra || []).concat([entry]);
+    } else {
+      out[sid] = entry;
+    }
+  }
+  return out;
+}
+
+/**
+ * Siblings, from the roster's `Family ID` — authoritative in FACTS, unlike matching guardian
+ * emails, which splits families that don't share an address.
+ * @return {Object} studentId -> [{id, name}] (never includes the student themselves)
+ */
+function buildSiblings(tabs) {
+  var t = searchTabByName_(tabs, [ROSTER_TAB_NAME]);
+  var out = {};
+  if (!t || (t.values || []).length < 2) return out;
+  var h = searchHeaderMap_(t.values[0]);
+  if (h['Family ID'] === undefined) return out;
+  var byFamily = {}, nameById = {};
+  for (var r = 1; r < t.values.length; r++) {
+    var row = t.values[r];
+    var cell = function (n) { return h[n] === undefined ? '' : searchCellToString_(row[h[n]]).trim(); };
+    var sid = cell('Student ID'), fam = cell('Family ID');
+    if (!sid || !fam) continue;
+    nameById[sid] = cell('Student Name');
+    (byFamily[fam] = byFamily[fam] || {})[sid] = true; // dedupe: split-custody rows repeat a student
+  }
+  Object.keys(byFamily).forEach(function (fam) {
+    var ids = Object.keys(byFamily[fam]);
+    if (ids.length < 2) return;
+    ids.forEach(function (sid) {
+      out[sid] = ids.filter(function (o) { return o !== sid; })
+        .map(function (o) { return { id: o, name: nameById[o] || o }; })
+        .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    });
+  });
+  return out;
+}
+
+/**
+ * Today's sign-in/out, folded from Campus Presence `EVENTS` rows — STATUS AND TIME ONLY.
+ *
+ * Campus Presence tiers GuardianName / Relationship / Reason / PickupMatch as OFFICE, and this
+ * app is open to the whole staff OU, so none of those are carried out of this function
+ * (Josh, 2026-09-06). Mirrors dsBuildSignedOut in FACTS/transportation/Dismissal.gs, which is
+ * already tested against Campus Presence's real schema — including the rule that matters most:
+ * a `PickupMatch === 'mismatch'` early-out is an OPEN FLAG, not a sign-out, and must never
+ * remove a child.
+ *
+ * @return {Object} studentId -> {out, back, late}  ('' when that thing didn't happen)
+ */
+function buildPresence(values, todayKey) {
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = searchHeaderMap_(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : searchCellToString_(row[i]).trim();
+  };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (todayKey && get(row, 'Date').slice(0, 10) !== String(todayKey).slice(0, 10)) continue;
+    var sid = get(row, 'PersonKey');
+    if (!sid) continue;
+    var type = get(row, 'Type');
+    var hhmm = get(row, 'Timestamp').slice(11, 16);
+    var rec = out[sid] || (out[sid] = { out: '', back: '', late: '' });
+    if (type === 'student_early_out') {
+      if (get(row, 'PickupMatch') === 'mismatch') continue; // an open flag, NOT a departure
+      rec.out = hhmm;
+      rec.back = '';                       // a later return clears it again
+    } else if (type === 'student_return_in') {
+      if (rec.out) rec.back = hhmm;
+    } else if (type === 'student_late_in') {
+      rec.late = hhmm;
+    }
+  }
+  return out;
+}
+
+/**
+ * One verdict for "is this child here?", from attendance + presence.
+ *
+ * Precedence copied from the dismissal board, where it is already tested: a sign-out beats a
+ * late arrival, and an override never suppresses an absence. Above all — AN UNKNOWN READS AS
+ * PRESENT. A child not waited for who is still here is far worse than one waited for who has
+ * gone home, so this never invents an absence.
+ *
+ * @return {?{state, label, detail}} null when there is nothing to say (i.e. present as normal)
+ */
+function studentStatus(attendance, presence) {
+  var p = presence || {};
+  if (p.out && !p.back) {
+    return { state: 'out', label: 'Not in building',
+             detail: 'signed out ' + searchTimeLabel_(p.out + ':00') };
+  }
+  if (attendance && attendance.status) {
+    var d = [];
+    if (attendance.detail && attendance.detail !== attendance.status) d.push(attendance.detail);
+    if (attendance.reason) d.push(attendance.reason);
+    if (p.out && p.back) {
+      d.push('signed out ' + searchTimeLabel_(p.out + ':00') +
+             ', returned ' + searchTimeLabel_(p.back + ':00'));
+    }
+    return { state: /absent/i.test(attendance.status) ? 'absent'
+                  : /late/i.test(attendance.status) ? 'late' : 'left',
+             label: attendance.status, detail: d.join(' · ') };
+  }
+  if (p.out && p.back) {
+    return { state: 'back', label: 'Back in building',
+             detail: 'signed out ' + searchTimeLabel_(p.out + ':00') +
+                     ', returned ' + searchTimeLabel_(p.back + ':00') };
+  }
+  if (p.late) {
+    return { state: 'late', label: 'Late arrival',
+             detail: 'signed in ' + searchTimeLabel_(p.late + ':00') };
+  }
+  return null; // nothing recorded -> present, and we do not claim otherwise
+}
+
+/**
  * Emergency call list from the `Emergency Contacts` tab, indexed by student id.
  * A DIFFERENT list from the directory's guardians (who to call vs. who the parents are),
  * and separate again from FACTS' pickup-authorisation list.
@@ -824,7 +1068,7 @@ function buildEmergencyContacts(tabs) {
  * One person's full record: directory profile + guardians + their schedule rows.
  * @return {?{profile:Object, guardians:Array, classes:Array}} null if id unknown.
  */
-function personDetail(tabs, id, today) {
+function personDetail(tabs, id, today, presence) {
   var people = buildPeople(tabs);
   var p = null;
   for (var i = 0; i < people.length; i++) if (people[i].id === String(id)) { p = people[i]; break; }
@@ -860,10 +1104,14 @@ function personDetail(tabs, id, today) {
   return {
     profile: { id: p.id, name: p.name, grade: p.grade, homeroom: p.homeroom,
                homeroomTeacher: p.homeroomTeacher, status: p.status, email: p.email,
-               gender: p.gender },
+               gender: p.gender, locker: p.locker },
     guardians: p.guardians,
     emergency: buildEmergencyContacts(tabs)[p.id] || [],
+    pickups: buildPickupContacts(tabs)[p.id] || [],
+    transportation: buildTransportation(tabs)[p.id] || null,
+    siblings: buildSiblings(tabs)[p.id] || [],
     attendance: (today === undefined ? {} : buildAttendance(tabs, today))[p.id] || null,
+    presence: (presence && presence[p.id]) || null,
     // teams/clubs are split out of the academic schedule (structural `activity` flag)
     classes: classes.filter(function (c) { return !c.activity; }),
     activities: classes.filter(function (c) { return c.activity; })
@@ -988,6 +1236,24 @@ function bellTimeForSlot_(bells, slotLabel) {
  * @return {Array} same rows + {slotLabel, begin, end, beginLabel, endLabel, timeSource,
  *                 meetsToday, current}; today's classes first in clock order.
  */
+/**
+ * The `Period Times` cell for a class on one weekday column, or null.
+ * Same pattern/homeroom lookup the main annotate path uses, factored out so a day OTHER than
+ * the one being viewed can be resolved — which is what gives the weekend view a sensible
+ * order and period labels instead of blanks.
+ */
+function schedSlotCell_(c, periodTimes, day) {
+  var byDay = c.pattern ? ((periodTimes || {}).byPattern || {})[String(c.pattern)] : null;
+  var cell = (byDay && day) ? byDay[String(day)] : null;
+  if (!cell && day && isHomeroomClass_(c)) {
+    var hr = ((periodTimes || {}).bySlot || {})['Homeroom'];
+    cell = (hr && hr[String(day)]) || null;
+  }
+  return cell || null;
+}
+
+var SCHED_MONDAY_COL = '1'; // Mon-Thu all run the same period ORDER; Monday represents them
+
 function annotateSchedule(classes, periodTimes, ctx) {
   ctx = ctx || {};
   periodTimes = periodTimes || { byPattern: {} };
@@ -1032,6 +1298,29 @@ function annotateSchedule(classes, periodTimes, ctx) {
     }
     o.beginLabel = searchTimeLabel_(o.begin);
     o.endLabel = searchTimeLabel_(o.end);
+
+    /* Row ORDER. The clock time for the day being viewed IS the order — which is what makes
+       HCS's reverse Friday come out right (Period 8 at 8:36am first, Period 1 at 2:37pm last)
+       with no special case for it anywhere. Sorting on period NUMBER instead would put Friday
+       exactly backwards.
+
+       When this day yields no time — a weekend, a student with no patterns, a part-week class
+       that doesn't meet today — fall back to the MON-THU order read off the Monday column of
+       the same grid, so the list still reads top-to-bottom like a school day instead of
+       alphabetically. Last resort is the period number parsed from the label, offset so those
+       rows land after every row that has a real time rather than interleaving with them. */
+    var todayMin = o.meetsToday ? searchTimeToMin_(o.begin) : -1;
+    var monday = schedSlotCell_(c, periodTimes, SCHED_MONDAY_COL);
+    var mondayMin = monday ? searchTimeToMin_(monday.begin) : -1;
+    var pnum = parseInt((String(o.period).match(/(\d+)/) || [])[1], 10);
+    o.orderMin = todayMin >= 0 ? todayMin
+      : mondayMin >= 0 ? mondayMin
+        : !isNaN(pnum) ? (10000 + pnum)
+          : 20000;
+    // Homeroom carries no Period in FACTS, so its label came from today's slot row — leaving
+    // it BLANK whenever today has no row (a weekend, an unpatterned day). The Mon-Thu row
+    // names the same slot, so use it rather than render an unlabelled row.
+    if (!o.period && monday && monday.period) o.period = monday.period;
     return o;
   });
 
@@ -1048,12 +1337,12 @@ function annotateSchedule(classes, periodTimes, ctx) {
   var live = out.filter(function (o) { return o.current; });
   if (live.length > 1) live.forEach(function (o) { o.sharedSlot = true; });
 
+  // Classes meeting today lead; both groups are then in school-day order (see o.orderMin).
+  // Description only breaks a genuine tie — two classes sharing one slot.
   out.sort(function (a, b) {
     if (a.meetsToday !== b.meetsToday) return a.meetsToday ? -1 : 1;
-    if (a.meetsToday) {
-      var d = searchTimeToMin_(a.begin) - searchTimeToMin_(b.begin);
-      if (d) return d;
-    }
+    var d = a.orderMin - b.orderMin;
+    if (d) return d;
     return a.description < b.description ? -1 : a.description > b.description ? 1 : 0;
   });
   return out;
@@ -1124,6 +1413,333 @@ function parseSimClock(s) {
   };
 }
 
+/* ====================================================================
+   ATHLETICS — game-day dismissal from the team Google Calendars.
+
+   Coaches type the dismissal into the calendar event's DESCRIPTION by hand,
+   and nothing in any project parsed it before this. A corpus of all 688
+   non-empty descriptions across the 21 team calendars (pulled 2026-09-06)
+   showed 37 distinct phrasings of the same two facts:
+
+     Dismiss 1:15 / Depart 1:30            dismissal time 2:15
+     dismissal 2:00 / departure 2:15       Dismissal: 3pm
+     Depart school at 2:20 pm              Dismiss Class at 2:50 pm
+     Dismiss - 2:20                        Depart HCS at 5:30pm
+     dismissal time 1:30<br>departure...   Dismiss1:50 pm   (no space)
+     2:00 dismissal                        3:20 Awards and Departure  (reversed)
+
+   So the parser is deliberately loose about what sits BETWEEN the keyword and
+   the clock, and strict about the clock itself. Anything it cannot read is
+   left blank — a missing dismissal reads as "not posted", never as a guess.
+   ==================================================================== */
+
+/**
+ * Flatten one ICS/Calendar description to plain lines. Descriptions arrive
+ * either ICS-escaped (`\n`, `\,`) or as pasted Gmail HTML (`<br>`, `<table>`),
+ * sometimes both in the same calendar.
+ */
+function athleticsNormalizeDesc_(s) {
+  return String(s || '')
+    .replace(/\\n/g, '\n')                       // ICS escaped newline
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')                    // strip the rest of the markup
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\\([,;\\])/g, '$1')                // ICS escaped , ; \
+    .replace(/[ \t]+/g, ' ');
+}
+
+/**
+ * "2:15" + optional am/pm -> "14:15" (the 24h shape searchTimeLabel_ renders).
+ * Coaches almost never type am/pm, so a bare hour needs a school-day rule:
+ * 1-7 are afternoon (every bare dismissal in the corpus fell 1:15-6:10),
+ * 8-12 stay morning (Saturday tournaments: "Depart school 9:00 am").
+ * An explicit am/pm always wins over the heuristic.
+ */
+function athleticsTimeTo24_(clock, ampm) {
+  var m = /^(\d{1,2})(?::(\d{2}))?$/.exec(String(clock || '').trim());
+  if (!m) return '';
+  var h = +m[1], mi = m[2] === undefined ? 0 : +m[2];
+  if (h > 23 || mi > 59) return '';
+  var ap = String(ampm || '').replace(/\./g, '').toLowerCase();
+  if (ap === 'pm') { if (h < 12) h += 12; }
+  else if (ap === 'am') { if (h === 12) h = 0; }
+  else if (h >= 1 && h <= 7) { h += 12; }
+  return ('0' + h).slice(-2) + ':' + ('0' + mi).slice(-2);
+}
+
+var ATH_KEYWORD = '(dismiss(?:al|ed|es)?|depart(?:ure|ed|s|ing)?)';
+var ATH_CLOCK = '(\\d{1,2}(?::\\d{2})?)\\s*(a\\.?m\\.?|p\\.?m\\.?)?';
+
+/**
+ * Pull the dismissal and departure times out of a calendar event description.
+ * @return {{dismiss:string, depart:string}} 24h "HH:MM" each, '' when not posted.
+ */
+function parseAthleticsTimes(desc) {
+  var text = athleticsNormalizeDesc_(desc);
+  var out = { dismiss: '', depart: '' };
+  var kind = function (word) { return /^dismiss/i.test(word) ? 'dismiss' : 'depart'; };
+
+  // Forward: "Dismiss 1:15", "departure time 3:50", "Depart school at 2:20 pm".
+  // The gap is capped at 18 non-digit chars so the scan cannot leap a sentence
+  // and bind the keyword to an unrelated number further down the line.
+  var fwd = new RegExp('\\b' + ATH_KEYWORD + '[^0-9\\n]{0,18}?' + ATH_CLOCK, 'gi');
+  var m;
+  while ((m = fwd.exec(text)) !== null) {
+    var k = kind(m[1]);
+    if (!out[k]) out[k] = athleticsTimeTo24_(m[2], m[3]);
+  }
+
+  // Reversed: "2:00 dismissal", "3:20 Awards and Departure". Rare (6 of 688),
+  // and only consulted for a kind the forward pass did not already fill.
+  if (!out.dismiss || !out.depart) {
+    var rev = new RegExp(ATH_CLOCK + '[^0-9\\n]{0,18}?\\b' + ATH_KEYWORD + '\\b', 'gi');
+    while ((m = rev.exec(text)) !== null) {
+      var rk = kind(m[3]);
+      if (!out[rk]) out[rk] = athleticsTimeTo24_(m[1], m[2]);
+    }
+  }
+
+  // You are dismissed from class BEFORE the bus leaves, always. An inversion
+  // means the two lines describe different days — real case, a multi-day
+  // tournament carrying "Friday ... Dismiss at 3:45 pm / Saturday ... Depart
+  // school at 8:30 am" in one event. Keep the dismissal (the thing staff act
+  // on) and drop the departure rather than pair two unrelated days.
+  if (out.dismiss && out.depart &&
+      searchTimeToMin_(out.depart) < searchTimeToMin_(out.dismiss)) {
+    out.depart = '';
+  }
+  return out;
+}
+
+/**
+ * Pull the VEVENTs falling on `dateStr` out of one .ics body.
+ *
+ * Deliberately a narrow reader, not a full ICS implementation: it takes DTSTART/SUMMARY/
+ * LOCATION/DESCRIPTION off each VEVENT and nothing else. Lives here rather than beside the
+ * fetch so it can be tested in Node against real calendar bodies.
+ *
+ * RECURRENCE IS NOT EXPANDED — an RRULE event is only reported on its own DTSTART date. Games
+ * are one-offs, so this costs nothing real; a recurring practice simply won't appear, which is
+ * the safe direction to be wrong in (we under-report rather than invent a game).
+ */
+function athleticsParseIcs(body, teamId, dateStr) {
+  var out = [];
+  if (!body) return out;
+  // RFC 5545 folds long lines with CRLF + a space/tab; unfold before anything else or a
+  // DESCRIPTION will be cut mid-word and the dismissal lost.
+  var text = String(body).replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '');
+  var compact = String(dateStr || '').replace(/-/g, ''); // ICS dates are YYYYMMDD
+  if (compact.length !== 8) return out;
+
+  var blocks = text.split('BEGIN:VEVENT');
+  for (var i = 1; i < blocks.length; i++) {
+    var block = blocks[i].split('END:VEVENT')[0];
+    var field = function (name) {
+      var m = new RegExp('^' + name + '(;[^:\\n]*)?:(.*)$', 'm').exec(block);
+      return m ? m[2].trim() : '';
+    };
+    var dtstart = field('DTSTART');
+    if (dtstart.slice(0, 8) !== compact) continue;
+
+    // "20260911T143000" (floating/local) or "...Z" (UTC), or "20260911" for an all-day entry.
+    var tm = /^\d{8}T(\d{2})(\d{2})/.exec(dtstart);
+    var start = tm ? (tm[1] + ':' + tm[2]) : '';
+    // A UTC stamp has to be shifted into school time or a 4:00pm game reads as 8:00pm.
+    // These calendars publish floating local times, so this only fires if that ever changes.
+    if (start && /Z$/.test(dtstart)) start = athleticsShiftFromUtc_(compact, start);
+
+    var times = parseAthleticsTimes(field('DESCRIPTION'));
+    out.push({
+      teamId: teamId,
+      date: dateStr,
+      title: athleticsNormalizeDesc_(field('SUMMARY')).trim(),
+      start: start,
+      allDay: !tm,
+      location: athleticsNormalizeDesc_(field('LOCATION')).trim(),
+      dismiss: times.dismiss,
+      depart: times.depart
+    });
+  }
+  return out;
+}
+
+/**
+ * UTC "HH:MM" -> school-time "HH:MM". Eastern is UTC-4 in DST, UTC-5 otherwise; the sports
+ * seasons sit either side of both switchovers. Approximated by the US rule (DST = Mar 8 -> Nov 1
+ * inclusive-ish) because being an hour out on a game START is cosmetic — the DISMISSAL, which
+ * is what staff act on, is hand-typed local text and never passes through here.
+ */
+function athleticsShiftFromUtc_(compactDate, hhmm) {
+  var mo = +compactDate.slice(4, 6), day = +compactDate.slice(6, 8);
+  var dst = (mo > 3 && mo < 11) || (mo === 3 && day >= 8) || (mo === 11 && day <= 1);
+  var mins = searchTimeToMin_(hhmm) - (dst ? 240 : 300);
+  if (mins < 0) mins += 1440; // wrapped to the previous local day
+  return ('0' + Math.floor(mins / 60)).slice(-2) + ':' + ('0' + (mins % 60)).slice(-2);
+}
+
+/**
+ * Which team calendars a FACTS activity enrolment corresponds to.
+ *
+ * FACTS names teams on the COURSE ("MS Cross Country", "Junior Varsity &
+ * Varsity Basketball") and codes them structurally ("MSCCTRY", "BJVVBB").
+ * Neither reliably states gender — "Junior Varsity & Varsity Basketball" says
+ * nothing, and one course legitimately spans TWO calendars (JV *and* Varsity).
+ * So: resolve sport + level(s) from the class, and take gender from the
+ * STUDENT's own directory record, which FACTS always has. A class that
+ * resolves no sport matches nothing rather than guessing.
+ *
+ * @param activity {{code:string, description:string}} one Activity=Y class
+ * @param gender   the student's Gender cell ('M'/'F'/'Male'/...); '' = unknown
+ * @param teams    the ATHLETICS_TEAMS table (id, sport, gender, level)
+ * @return {Array} matching team records
+ */
+function athleticsMatchTeams(activity, gender, teams) {
+  var hay = ((activity && activity.description) || '') + ' ' + ((activity && activity.code) || '');
+  var l = hay.toLowerCase();
+
+  var sport =
+    /cross.?country|cctry|\bxc\b/.test(l) ? 'Cross-Country' :
+    /volleyball|\bvb\b/.test(l) ? 'Volleyball' :
+    /basketball|\bbb\b/.test(l) ? 'Basketball' :
+    /softball|\bsb\b/.test(l) ? 'Softball' :
+    /baseball/.test(l) ? 'Baseball' :
+    /flag.?football/.test(l) ? 'Flag Football' :
+    /soccer|\bsc\b/.test(l) ? 'Soccer' :
+    /golf/.test(l) ? 'Golf' : '';
+
+  /* Fall back to the CODE's structure when the words found nothing. Necessary because every
+     Activity=Y class in the live export has a BLANK Class Description, so the only thing left
+     is a code like "GMSVB" — and no word-boundary test can see "vb" inside it.
+
+     Read positionally, never by substring: strip the optional gender letter and level prefix,
+     then require the REMAINDER TO START with a sport token. That is what keeps "SPVB" (a bus
+     route) from matching volleyball on the "vb" buried in it. */
+  if (!sport) {
+    /* Match the WHOLE code as one shape — optional gender letter, any number of level tokens,
+       then the sport — rather than stripping a prefix and inspecting the remainder.
+
+       Stripping one level token is wrong for a double-level code: "BJVVBB" (Boys JV+Varsity
+       BasketBall) leaves "vbb", which starts with "vb", so a basketball player was matched to
+       volleyball. Anchoring both ends also refuses the bus routes ("SP-AM", "CCAM", "IXL") and
+       anything else that merely CONTAINS a sport token, which prefix-matching could not. */
+    var codeSport = (/^(?:[bg])?(?:jv|v|ms)*(cctry|xc|volley|vb|basket|bb|soft|sb|base|bsb|flag|ff|soccer|soc|sc|golf)$/
+      .exec(String((activity && activity.code) || '').toLowerCase()) || [])[1] || '';
+    sport =
+      /^(cctry|xc)$/.test(codeSport) ? 'Cross-Country' :
+      /^(vb|volley)$/.test(codeSport) ? 'Volleyball' :
+      /^(bb|basket)$/.test(codeSport) ? 'Basketball' :
+      /^(sb|soft)$/.test(codeSport) ? 'Softball' :
+      /^(base|bsb)$/.test(codeSport) ? 'Baseball' :
+      /^(ff|flag)$/.test(codeSport) ? 'Flag Football' :
+      /^(sc|soc|soccer)$/.test(codeSport) ? 'Soccer' :
+      codeSport === 'golf' ? 'Golf' : '';
+  }
+  if (!sport) return [];
+
+  /* A course may name more than one level; collect every level it claims, from TWO sources.
+
+     1. The DESCRIPTION's words, as whole tokens only. "Junior Varsity" is stripped before the
+        bare "Varsity" test, so "Junior Varsity & Varsity Basketball" yields BOTH levels while
+        "Junior Varsity Basketball" yields only JV.
+     2. The CODE's level prefix, read ANCHORED: an optional B/G gender letter, then jv|v|ms.
+        Real codes are built that way ("BVSOC", "GMSVB", "BJVVBB", "MSCCTRY").
+
+     Anchoring the code matters. An earlier version searched the whole string for a bare "v"
+     followed by letters, to catch "VSOC" — and the "v" in **v**olleyball matched it, so every
+     "MS Girls Volleyball" enrolment also claimed Varsity and picked up the Varsity team's away
+     games. Showing an MS player the varsity bus time is exactly the failure this feature exists
+     to prevent, so level is now read positionally or not at all. */
+  var levels = {};
+  var noJv = l.replace(/junior\s+varsity/g, ' jv ');
+  if (/middle\s*school|\bms\b/.test(l)) levels.MS = true;
+  if (/\bjv\b/.test(noJv)) levels.JV = true;
+  if (/\bvarsity\b/.test(noJv)) levels.Varsity = true;
+
+  var codeLevel = /^(?:[bg])?(jv|v|ms)(?=[a-z])/.exec(
+    String((activity && activity.code) || '').toLowerCase());
+  if (codeLevel) {
+    levels[codeLevel[1] === 'v' ? 'Varsity' : codeLevel[1] === 'jv' ? 'JV' : 'MS'] = true;
+  }
+  var wantLevel = Object.keys(levels);
+
+  var g = String(gender || '').trim().toLowerCase().charAt(0);
+  var wantGender = g === 'm' ? 'Boys' : g === 'f' ? 'Girls' : '';
+
+  var candidates = (teams || []).filter(function (t) {
+    if (t.sport !== sport) return false;
+    // Coed teams (Cross-Country, Golf, Flag Football) take either gender.
+    if (t.gender !== 'Coed' && wantGender && t.gender !== wantGender) return false;
+    return true;
+  });
+
+  // Level narrows only when that sport actually HAS separate level calendars. Real case:
+  // FACTS carries a course called "MS Cross Country", but HCS runs a single cross-country
+  // calendar (Varsity/Coed) that middle-schoolers' meets are posted on — filtering by MS
+  // there would silently hide every runner's dismissal. Same for Golf, Softball and Flag
+  // Football, which each have one calendar for all levels.
+  if (wantLevel.length) {
+    var byLevel = candidates.filter(function (t) { return wantLevel.indexOf(t.level) !== -1; });
+    if (byLevel.length) return byLevel;
+  }
+  return candidates;
+}
+
+/**
+ * Join a student's activity enrolments to today's team events.
+ * @param activities the student's Activity=Y classes
+ * @param gender     the student's Gender cell
+ * @param teams      ATHLETICS_TEAMS
+ * @param events     [{teamId, date:'YYYY-MM-DD', title, start:'HH:MM', location,
+ *                    dismiss:'HH:MM', depart:'HH:MM'}]
+ * @param isoDate    the date to report on
+ * @return {Array} one entry per team event today, most urgent dismissal first
+ */
+function athleticsForStudent(activities, gender, teams, events, isoDate) {
+  var mine = {};
+  (activities || []).forEach(function (a) {
+    athleticsMatchTeams(a, gender, teams).forEach(function (t) { mine[t.id] = t; });
+  });
+  var byId = {};
+  (teams || []).forEach(function (t) { byId[t.id] = t; });
+
+  var out = [];
+  (events || []).forEach(function (ev) {
+    if (ev.date !== isoDate) return;      // never let another day's game read as today's
+    if (!mine[ev.teamId]) return;
+    var t = byId[ev.teamId] || {};
+    out.push({
+      teamId: ev.teamId,
+      // "Soccer - V (Boys)" reads better here as "Varsity Boys Soccer"
+      team: [t.level === 'Varsity' ? 'Varsity' : t.level, t.gender === 'Coed' ? '' : t.gender, t.sport]
+        .filter(String).join(' '),
+      sport: t.sport || '',
+      title: ev.title || '',
+      start: ev.start || '',
+      location: ev.location || '',
+      dismiss: ev.dismiss || '',
+      depart: ev.depart || '',
+      // Does this event take the student OUT OF CLASS? Only a posted dismissal/departure does.
+      // After-school practices and home games fill most of these calendars and change nothing
+      // about the school day, so surfacing them at the top of a record would be pure noise —
+      // and "Cross-Country today, dismissal not posted" on a 3:30 practice is worse than noise,
+      // it invites someone to go looking for a dismissal that was never meant to exist.
+      leavesEarly: !!(ev.dismiss || ev.depart)
+    });
+  });
+  out.sort(function (a, b) {
+    var am = searchTimeToMin_(a.dismiss || a.depart || a.start);
+    var bm = searchTimeToMin_(b.dismiss || b.depart || b.start);
+    if (am < 0) am = 9999;
+    if (bm < 0) bm = 9999;
+    return am - bm;
+  });
+  return out;
+}
+
 /** Optimal-string-alignment distance (Levenshtein + adjacent transposition = 1). */
 function searchEditDistance_(a, b) {
   var la = a.length, lb = b.length;
@@ -1159,10 +1775,21 @@ if (typeof module !== 'undefined' && module.exports) {
     buildPeriodTimes: buildPeriodTimes,
     buildEmergencyContacts: buildEmergencyContacts,
     buildAttendance: buildAttendance,
+    buildPickupContacts: buildPickupContacts,
+    pruneToEnrolled: pruneToEnrolled,
+    buildTransportation: buildTransportation,
+    buildSiblings: buildSiblings,
+    buildPresence: buildPresence,
+    studentStatus: studentStatus,
     bellSlotTimes: bellSlotTimes,
     annotateSchedule: annotateSchedule,
     parseSimClock: parseSimClock,
     isHomeroomClass_: isHomeroomClass_,
+    parseAthleticsTimes: parseAthleticsTimes,
+    athleticsNormalizeDesc_: athleticsNormalizeDesc_,
+    athleticsParseIcs: athleticsParseIcs,
+    athleticsMatchTeams: athleticsMatchTeams,
+    athleticsForStudent: athleticsForStudent,
     parseQuarterRanges: parseQuarterRanges,
     quarterForDate: quarterForDate,
     searchTimeToMin_: searchTimeToMin_,
@@ -1185,16 +1812,89 @@ if (typeof module !== 'undefined' && module.exports) {
   var lastPersonDetail = null; // open student's record, for the 60s NOW re-render
   var IDLE_MSG = 'Type a name — pick a student to see their full record.';
 
+  /* ---------- favourites ----------
+     The handful of students one person checks repeatedly (their own kids, a caseload, a
+     homeroom). Stored server-side keyed by the signed-in user, so they follow that person from
+     phone to desk — see the warning in Code.gs about why this cannot use UserProperties.
+     Only IDs are stored; the rows are rendered from the dataset already in the page, which is
+     what keeps a favourite from ever showing stale data. */
+  var favIds = [];
+  var favBusy = false;
+
+  function isFav_(id) { return favIds.indexOf(String(id)) !== -1; }
+
+  function loadFavorites_() {
+    google.script.run
+      .withSuccessHandler(function (ids) {
+        favIds = ids || [];
+        if (!q.value.trim()) renderIdle_();   // show them as soon as they arrive
+        rerenderIfPerson_();                  // and light the star on an open record
+      })
+      .withFailureHandler(function () { /* favourites are a convenience; never block search */ })
+      .favoritesApi();
+  }
+
+  function toggleFav_(id, on) {
+    if (favBusy) return;
+    favBusy = true;
+    // Optimistic: flip locally so the tap feels instant, then reconcile with the server's
+    // authoritative list (which also tells us if the cap refused the add).
+    if (on && !isFav_(id)) favIds.push(String(id));
+    else if (!on) favIds = favIds.filter(function (x) { return x !== String(id); });
+    rerenderIfPerson_();
+    google.script.run
+      .withSuccessHandler(function (res) {
+        favBusy = false;
+        favIds = res.ids || [];
+        // Re-render BEFORE writing the status line: renderPerson and renderIdle_ both reset
+        // statusEl, so setting the message first would have silently wiped it.
+        rerenderIfPerson_();
+        if (!q.value.trim()) renderIdle_();
+        if (res.full) {
+          statusEl.textContent = 'Favourites are full (' + favIds.length + ' of ' + favIds.length +
+            ') — remove one before adding another.';
+        }
+      })
+      .withFailureHandler(function (err) {
+        favBusy = false;
+        statusEl.textContent = 'Could not save that favourite: ' + err.message;
+        loadFavorites_(); // resync rather than leave the optimistic flip lying
+      })
+      .favoriteToggleApi(String(id), !!on);
+  }
+
   /* Full dataset, fetched ONCE at page load. Until it arrives, searches fall back to
      the server; after that every keystroke runs searchPeople() (SearchClient) locally —
      instant, no debounce, works from the first character. */
   var tabsData = null;
   var periodTimes = null;      // buildPeriodTimes() index, from the Period Times tab
+
+  /* The two phone-heavy contact tabs feed only COLLAPSED sections, so they arrive in a second
+     call once the page is already usable (Josh, 2026-09-06). `extrasState` is what keeps that
+     honest: until the tabs land, those sections must read "Loading…" rather than "None on
+     file" — the builders return {} for a missing tab, so without this a student with three
+     pickup contacts would briefly be reported as having none. On failure we say so and offer
+     a retry instead of silently claiming the lists are empty. */
+  var extrasState = 'loading';   // 'loading' | 'ready' | 'failed'
+  function loadExtras_() {
+    extrasState = 'loading';
+    google.script.run
+      .withSuccessHandler(function (extra) {
+        if (extra && extra.length && tabsData) tabsData = tabsData.concat(extra);
+        extrasState = 'ready';
+        rerenderIfPerson_();
+      })
+      .withFailureHandler(function () { extrasState = 'failed'; rerenderIfPerson_(); })
+      .tabsExtrasApi();
+  }
+
   google.script.run
     .withSuccessHandler(function (tabs) {
       tabsData = tabs;
       periodTimes = buildPeriodTimes(tabs);
       if (q.value.trim()) run(); // rerun whatever's typed through the instant engine
+      else renderIdle_();        // favourites can only render once the dataset is here
+      loadExtras_();             // only now — the first call owns the critical path
     })
     .withFailureHandler(function () { /* server-search fallback keeps working */ })
     .tabsApi();
@@ -1203,13 +1903,68 @@ if (typeof module !== 'undefined' && module.exports) {
      if the hub is unreachable we fall back to the FACTS grid's normal-day times. */
   var bellToday = null;
   var clockSkewMs = 0;         // server(school) time - device time, so a wrong phone clock can't mislead
+
+  /* Today's sign-in/out + dismissal overrides. Deliberately NOT part of the bundled dataset:
+     both change during the day, and a record opened at 10:00 and read at 13:30 must not still
+     claim a child is in the building. Small payload, refreshed on a timer. */
+  var presenceData = null;
+  function loadPresence_(then) {
+    google.script.run
+      .withSuccessHandler(function (p) { presenceData = p; if (then) then(); })
+      .withFailureHandler(function () { presenceData = presenceData || { presence: {}, overrides: {} }; })
+      .presenceApi();
+  }
+  loadFavorites_(); // small and independent of the dataset — fire it with presence
+  loadPresence_(function () {
+    rerenderIfPerson_();
+    // an empty box means the favourites view is showing: refresh its status pills too
+    if (q.value.trim()) run(); else renderIdle_();
+  });
+  // 2 minutes: matches the server-side cache, so this costs a call only when it can differ.
+  setInterval(function () {
+    loadPresence_(function () {
+    rerenderIfPerson_();
+    // an empty box means the favourites view is showing: refresh its status pills too
+    if (q.value.trim()) run(); else renderIdle_();
+  });
+  }, 120000);
+
+  /** Today's presence for one student, '' -> null. */
+  function presenceFor_(id) {
+    return (presenceData && presenceData.presence && presenceData.presence[id]) || null;
+  }
   // ?sim=YYYY-MM-DD[ HH:MM] pins the clock AND pulls that date's bells, so the NOW highlight
   // can be exercised out of session (or replayed against a past delay day).
-  var SIM = parseSimClock(new URLSearchParams(location.search).get('sim') || '');
+  var SIM = parseSimClock((new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\- T]/g, '').slice(0, 16));
   google.script.run
     .withSuccessHandler(function (b) { bellToday = b; rerenderIfPerson_(); })
     .withFailureHandler(function () { bellToday = { ok: false, closed: false, periods: [] }; })
     [SIM ? 'bellForDateApi' : 'bellTodayApi'](SIM ? SIM.date : undefined);
+  /* Today's games + the dismissal times coaches typed into the team calendars. Same posture as
+     the bells: if it fails, athleticsData stays a harmless empty payload and the record simply
+     lists no games — a missing dismissal must never read as "no game today". */
+  /* PAUSED by default (Josh, 2026-09-07) until the athletics rosters are loaded into FACTS —
+     Script Property ATHLETICS_ENABLED, flipped by RUN_enableAthletics in Config.gs with no
+     redeploy. While paused the page makes NO call at all, so the 21 calendar fetches stop
+     rather than running every 30 minutes to produce nothing. */
+  var ATHLETICS_ON = true; // demo: always on (production gates this on ATHLETICS_ENABLED)
+  var athleticsData = null;
+  if (ATHLETICS_ON) {
+    google.script.run
+      .withSuccessHandler(function (a) { athleticsData = a; rerenderIfPerson_(); })
+      .withFailureHandler(function () { athleticsData = { events: [], teams: [], ok: false }; })
+      .athleticsApi(SIM ? SIM.date : undefined);
+  }
+
+  /** Today's games for one student, matched off their activity enrolments + gender. */
+  function gamesFor_(d) {
+    if (!ATHLETICS_ON || !athleticsData || !d) return [];
+    var date = (SIM && SIM.date) || serverDate;
+    if (!date) return [];
+    return athleticsForStudent(d.activities || [], (d.profile || {}).gender,
+      athleticsData.teams || [], athleticsData.events || [], date);
+  }
+
   google.script.run
     .withSuccessHandler(function (n) {
       var parts = String(n.time || '').split(':');
@@ -1287,11 +2042,66 @@ if (typeof module !== 'undefined' && module.exports) {
     return serverDate || '';
   }
 
-  /** Attendance pill for a student who is not present today ('' when they are). */
-  function attTag_(a) {
-    if (!a || !a.status) return '';
-    var cls = /absent/i.test(a.status) ? 'absent' : /late/i.test(a.status) ? 'late' : 'left';
-    return '<span class="att ' + cls + '">' + esc(a.status.toUpperCase()) + '</span>';
+  /**
+   * Status pill. Driven by studentStatus(), which resolves attendance + today's sign-in/out
+   * into ONE verdict — a sign-out beats a late arrival, an absence is never suppressed, and
+   * an unknown reads as present (no pill) rather than inventing an absence.
+   */
+  function attTag_(a, st) {
+    var s = st || (a && a.status ? { state: /absent/i.test(a.status) ? 'absent'
+                                          : /late/i.test(a.status) ? 'late' : 'left',
+                                     label: a.status } : null);
+    if (!s) return '';
+    var text = s.state === 'out' ? 'OUT' : s.state === 'back' ? 'BACK' : s.label.toUpperCase();
+    return '<span class="att ' + s.state + '">' + esc(text) + '</span>';
+  }
+
+  /**
+   * The empty-search screen. Shows the user's favourites WITH today's status, so opening the
+   * app answers "is any of my five out today?" before anyone types anything — which is the
+   * whole point of the feature. Falls back to the idle prompt when there are none.
+   */
+  var favPeople = [];
+  function renderIdle_() {
+    if (!favIds.length || !tabsData) {
+      resultsEl.innerHTML = '';
+      statusEl.textContent = IDLE_MSG;
+      return;
+    }
+    var people = buildPeople(tabsData);
+    var byId = {};
+    people.forEach(function (p) { byId[p.id] = p; });
+    var att = buildAttendance(tabsData, attendanceDate_());
+    var pres = (presenceData || {}).presence || {};
+
+    // Keep the user's own order, and silently drop an id that is no longer in the export
+    // (a withdrawn student) rather than rendering a blank row.
+    favPeople = favIds.map(function (id) { return byId[id]; }).filter(Boolean);
+
+    if (!favPeople.length) {
+      resultsEl.innerHTML = '';
+      statusEl.textContent = IDLE_MSG;
+      return;
+    }
+
+    var rows = favPeople.map(function (p, i) {
+      var a = att[p.id] || null;
+      var st = studentStatus(a, pres[p.id] || null);
+      var meta = ['Grade ' + dispGrade(p.grade), p.homeroom, p.homeroomTeacher]
+        .filter(function (x) { return x && x !== 'Grade '; }).join(' · ');
+      return '<button class="person" data-fav="' + i + '">' +
+        '<span class="pname">' + esc(p.name) + attTag_(a, st) + '</span>' +
+        '<span class="pmeta">' + esc(meta) + '</span></button>';
+    }).join('');
+
+    resultsEl.innerHTML = '<div class="grouplabel">★ Favourites</div>' +
+      '<div class="people">' + rows + '</div>';
+    statusEl.textContent = IDLE_MSG;
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-fav]'), function (btn) {
+      btn.addEventListener('click', function () {
+        openPerson(favPeople[Number(btn.getAttribute('data-fav'))]);
+      });
+    });
   }
 
   /* ---------- navigation trail ----------
@@ -1313,7 +2123,7 @@ if (typeof module !== 'undefined' && module.exports) {
     currentView = d;
     if (d.type === 'list') {
       if (lastList) { renderList(lastList); statusEl.innerHTML = lastListStatus; }
-      else { resultsEl.innerHTML = ''; statusEl.textContent = IDLE_MSG; }
+      else renderIdle_();
     }
     else if (d.type === 'person') openPerson(d.ref, false);
     else if (d.type === 'teacher') openTeacher(d.ref, false);
@@ -1383,7 +2193,7 @@ if (typeof module !== 'undefined' && module.exports) {
           if (p.close) meta = (meta ? meta + ' · ' : '') + 'similar spelling';
           return '<button class="person" data-i="' + i + '">' +
             '<span class="pname">' + nameHtml(p.name, res.tokens, p.fuzzyWords) +
-            attTag_(p.attendance) + '</span>' +
+            attTag_(p.attendance, p.status) + '</span>' +
             '<span class="pmeta">' + esc(meta) + '</span></button>';
         }).join('') + '</div>';
     }
@@ -1400,7 +2210,7 @@ if (typeof module !== 'undefined' && module.exports) {
   /* ---------- person detail ---------- */
   function openPerson(p, push) {
     if (push !== false) navPush_({ type: 'person', ref: p });
-    if (tabsData) { reqSeq++; renderPerson(personDetail(tabsData, p.id, attendanceDate_()), p); return; }
+    if (tabsData) { reqSeq++; renderPerson(personDetail(tabsData, p.id, attendanceDate_(), (presenceData||{}).presence), p); return; }
     var seq = ++reqSeq;
     statusEl.textContent = 'Loading ' + p.name + '…';
     google.script.run
@@ -1419,9 +2229,17 @@ if (typeof module !== 'undefined' && module.exports) {
      Records are getting long (schedule + guardians + emergency contacts + transportation),
      so each block is a <details>. Open/closed is remembered per section in localStorage —
      which also survives the 60s NOW re-render, since that rebuilds the DOM. */
+  /* The key prefix is VERSIONED. A remembered choice beats the default, so changing the
+     default order/open-state alone would leave anyone who had ever toggled a section — Josh
+     included — looking at the old layout and reporting it as broken. Bumping the prefix
+     retires the old remembered state once; from then on each staff member's own toggles
+     persist again under the new prefix. Bump it whenever the defaults change meaningfully.
+     sec2: = 2026-09-06, record reordered to Student / Schedule / Transportation first. */
+  var SECTION_STORE = 'sec2:';
+
   function sectionOpen_(key, dflt) {
     try {
-      var v = localStorage.getItem('sec:' + key);
+      var v = localStorage.getItem(SECTION_STORE + key);
       return v === null ? dflt : v === '1';
     } catch (e) { return dflt; } // private mode / storage blocked
   }
@@ -1435,7 +2253,7 @@ if (typeof module !== 'undefined' && module.exports) {
   function bindSections_() {
     Array.prototype.forEach.call(resultsEl.querySelectorAll('details[data-sec]'), function (d) {
       d.addEventListener('toggle', function () {
-        try { localStorage.setItem('sec:' + d.getAttribute('data-sec'), d.open ? '1' : '0'); } catch (e) {}
+        try { localStorage.setItem(SECTION_STORE + d.getAttribute('data-sec'), d.open ? '1' : '0'); } catch (e) {}
       });
     });
   }
@@ -1449,18 +2267,59 @@ if (typeof module !== 'undefined' && module.exports) {
     // Today's attendance goes at the very top of the record and in the section header —
     // if a student isn't in the building, that outranks everything else on the page.
     var att = d.attendance;
+    var st = studentStatus(att, d.presence);
     var attBar = '';
-    if (att && att.status) {
-      var acls = /absent/i.test(att.status) ? '' : /late/i.test(att.status) ? ' late' : ' left';
-      attBar = '<div class="attbar' + acls + '"><b>' + esc(att.status) + ' today</b>' +
-        (att.detail && att.detail !== att.status ? ' — ' + esc(att.detail) : '') +
-        (att.reason ? ' · ' + esc(att.reason) : '') + '</div>';
+    if (st) {
+      var acls = st.state === 'absent' ? '' : ' ' + st.state;
+      attBar = '<div class="attbar' + acls + '"><b>' + esc(st.label) +
+        (st.state === 'out' || st.state === 'back' ? '' : ' today') + '</b>' +
+        (st.detail ? ' — ' + esc(st.detail) : '') + '</div>';
     }
 
-    html += section_('student', esc(d.profile.name) + attTag_(att), '— Student',
-      attBar + '<div class="hit"><dl>' +
+    // A game today changes when this child leaves the building, which is the same question
+    // attendance answers — so it sits at the top of the record, not buried in the activities
+    // list. The dismissal is whatever the coach typed into the calendar; when they typed
+    // nothing, say so rather than imply the student stays all day.
+    var games = gamesFor_(d);
+    // Only events that pull the child out of class earn a place at the top; the rest of the
+    // team calendar (practices, home games) is after-school and changes nothing here.
+    var leaving = games.filter(function (g) { return g.leavesEarly; });
+    var gameBar = leaving.map(function (g) {
+      /* TENSE MATTERS (Josh, 2026-09-07): the whole point is answering "is this child gone, or
+         about to be?". A bar that reads "Dismissed 2:00 PM" at 9am implies they have already
+         left; the same words at 3pm are correct. So compare the dismissal against the school
+         clock and say which side of it we are on. Falls back to the neutral wording if the
+         clock is unknown. */
+      var when = g.dismiss || g.depart;
+      var mins = searchTimeToMin_(when);
+      var nowMin = schoolNow_().nowMin;
+      var gone = (mins >= 0 && nowMin >= 0) ? (nowMin >= mins) : null;
+      var verb = g.dismiss ? 'dismissed' : 'leaves';
+      var lead = gone === null ? (g.dismiss ? 'Dismissed ' : 'Leaves ') + searchTimeLabel_(when)
+        : gone ? (g.dismiss ? 'LEFT — dismissed ' : 'LEFT at ') + searchTimeLabel_(when)
+          : 'Leaving today — ' + verb + ' ' + searchTimeLabel_(when);
+      return '<div class="attbar game' + (gone ? ' gone' : '') + '"><b>' + esc(g.team) +
+        ' today</b> — ' + esc(lead) +
+        (g.dismiss && g.depart ? ' · departs ' + esc(searchTimeLabel_(g.depart)) : '') +
+        (g.start ? ' · game ' + esc(searchTimeLabel_(g.start)) : '') +
+        (g.location ? ' <span class="assumed">' + esc(g.location) + '</span>' : '') +
+        '</div>';
+    }).join('');
+
+    // Favourite toggle. Lives in the record body rather than the section header, because a
+    // button inside a <summary> fights the collapse on every tap.
+    var faved = isFav_(d.profile.id);
+    var favRow = '<div class="hit favrow"><button class="favbtn' + (faved ? ' on' : '') +
+      '" data-favtoggle="' + esc(d.profile.id) + '" data-on="' + (faved ? '0' : '1') + '">' +
+      (faved ? '★ In your Favourites' : '☆ Add to Favourites') + '</button>' +
+      (faved ? '<span class="assumed">shows on your home screen with today\'s status</span>' : '') +
+      '</div>';
+
+    html += section_('student', esc(d.profile.name) + attTag_(att, st), '— Student',
+      attBar + gameBar + favRow + '<div class="hit"><dl>' +
       dlRow('Student ID', d.profile.id) +
       dlRow('Grade', dispGrade(d.profile.grade)) +
+      dlRow('Locker', d.profile.locker) +
       dlRow('Homeroom', d.profile.homeroom) +
       dlRow('Homeroom Teacher', d.profile.homeroomTeacher) +
       dlRow('Student Email', d.profile.email) +
@@ -1468,37 +2327,17 @@ if (typeof module !== 'undefined' && module.exports) {
       dlRow('Gender', d.profile.gender) +
       '</dl></div>', true);
 
-    html += section_('guardians', 'Parents / Guardians', '(' + d.guardians.length + ')',
-      (d.guardians.length ? d.guardians.map(function (g) {
-        return '<div class="hit"><dl>' +
-          dlRow('Name', g.name) +
-          g.emails.map(function (e, i) { return dlRow(i ? 'Email ' + (i + 1) : 'Email', e); }).join('') +
-          '</dl></div>';
-      }).join('') : '<div class="hit">None on file.</div>'), true);
-
-    // Emergency call list — a separate FACTS list from the guardians above. Collapsed by
-    // default: it carries phone numbers and most lookups don't need it.
-    var em = d.emergency || [];
-    html += section_('emergency', 'Emergency Contacts', '(' + em.length + ')',
-      (em.length ? em.map(function (c) {
-        return '<div class="hit"><dl>' +
-          dlRow('Name', c.name + (c.relationship ? ' — ' + c.relationship : '')) +
-          dlRow('Cell', c.cell) +
-          dlRow('Home', c.home) +
-          dlRow('Work', c.work) +
-          dlRow('Email', c.email) +
-          dlRow('Note', c.note) +
-          '</dl></div>';
-      }).join('')
-        : '<div class="hit">None on file in FACTS.</div>'), false);
+    /* SECTION ORDER (Josh, 2026-09-06): Student, Schedule, Transportation expanded, then
+       Siblings, Authorised Pickup, Emergency Contacts collapsed. The first three answer
+       "where is this child and how do they leave"; the collapsed three are phone-number
+       heavy and only wanted once you're already looking for a person to call. */
 
     // today's schedule: period + room + real clock times, with the current class bolded
     var ctx = scheduleCtx_();
-    var sched = periodTimes ? annotateSchedule(d.classes, periodTimes, ctx) : d.classes.map(function (c) {
-      return { code: c.code, key: c.key, description: c.description, category: c.category,
-               teacher: c.teacher, quarters: c.quarters, period: c.period, room: c.room,
-               meetsToday: false, current: false, beginLabel: '', endLabel: '', timeSource: '' };
-    });
+    // annotateSchedule tolerates a missing grid (no times resolve, nothing is "now"), and it
+    // still orders the rows by period — so it handles the not-yet-loaded case too. A separate
+    // fallback here would be a second code path that quietly ordered the schedule differently.
+    var sched = annotateSchedule(d.classes, periodTimes, ctx);
     var anyTimes = sched.some(function (c) { return c.beginLabel; });
 
     html += section_('schedule', 'Schedule', '(' + d.classes.length + ')',
@@ -1517,15 +2356,120 @@ if (typeof module !== 'undefined' && module.exports) {
           '<div class="t">' + esc(meta) + '</div></button>';
       }).join('') : '<div class="hit">No classes on file.</div>'), true);
 
+    // How the child gets home. `assumed` means the producer defaulted them to Car as the
+    // residual rather than recording it — say so, don't present a guess as fact. An override
+    // is TODAY's truth and replaces the standing assignment.
+    var tr = d.transportation;
+    var ov = (presenceData && presenceData.overrides) ? presenceData.overrides[d.profile.id] : null;
+    if (tr || ov) {
+      var trBody = '';
+      if (ov) {
+        trBody += '<div class="attbar late"><b>' + esc(ov.type || 'Changed') + ' today</b>' +
+          (ov.destination ? ' — ' + esc(ov.destination) : '') +
+          (ov.note ? ' · ' + esc(ov.note) : '') +
+          (ov.by ? ' <span class="assumed">(' + esc(ov.by) + ')</span>' : '') + '</div>';
+      }
+      trBody += '<div class="hit"><dl>' +
+        (tr ? dlRow('Normally', tr.type + (tr.assumed ? ' (assumed — not recorded)' : '')) : '') +
+        (tr ? dlRow('Route', [tr.routeCode, tr.routeName].filter(String).join(' — ')) : '') +
+        (tr ? dlRow('Vehicle', tr.vehicle) : '') +
+        (tr ? dlRow('Pickup point', tr.pickup) : '') +
+        (tr ? dlRow('Building', tr.building) : '') +
+        (tr ? dlRow('Walk to', tr.walkTo) : '') +
+        (tr ? dlRow('Note', tr.note) : '') +
+        '</dl></div>';
+      if (tr && tr.extra && tr.extra.length) {
+        trBody += '<div class="hit"><b>Also rides:</b> ' +
+          tr.extra.map(function (x) {
+            return esc([x.routeCode, x.routeName].filter(String).join(' — ') || x.type);
+          }).join(', ') + ' <span class="assumed">(split custody)</span></div>';
+      }
+      html += section_('transport', 'Transportation',
+        esc(ov ? (ov.type || 'changed today') : (tr ? tr.type : '')), trBody, true);
+    }
+
+    html += section_('guardians', 'Parents / Guardians', '(' + d.guardians.length + ')',
+      (d.guardians.length ? d.guardians.map(function (g) {
+        return '<div class="hit"><dl>' +
+          dlRow('Name', g.name) +
+          g.emails.map(function (e, i) { return dlRow(i ? 'Email ' + (i + 1) : 'Email', e); }).join('') +
+          '</dl></div>';
+      }).join('') : '<div class="hit">None on file.</div>'), true);
+
+    // Other enrolled children in the same family (FACTS Family ID), tappable.
+    var sibs = d.siblings || [];
+    if (sibs.length) {
+      html += section_('siblings', 'Siblings', '(' + sibs.length + ')',
+        sibs.map(function (s, i) {
+          return '<button class="person" data-sib="' + i + '">' +
+            '<span class="pname">' + esc(s.name) + '</span>' +
+            '<span class="pmeta">tap for their record</span></button>';
+        }).join(''), false);
+    }
+
+    /* The two deferred sections. `emptyMsg` is only ever shown once the contact tabs have
+       actually arrived — while they are in flight the builders legitimately return nothing,
+       and reporting that as "none on file" would be a confident lie about a child's
+       emergency contacts. Count stays '…' for the same reason: '(0)' asserts a fact. */
+    function deferredSection_(key, title, rows, rowHtml, emptyMsg) {
+      // Rows win over state: on the server fallback path (personApi, used before the bundle
+      // lands) the record already carries these contacts, and hiding real data behind a
+      // "Loading…" that will never resolve would be worse than the empty-list problem.
+      if (rows.length) {
+        return section_(key, title, '(' + rows.length + ')', rows.map(rowHtml).join(''), false);
+      }
+      if (extrasState === 'loading') {
+        return section_(key, title, '…', '<div class="hit assumed">Loading…</div>', false);
+      }
+      if (extrasState === 'failed') {
+        return section_(key, title, '',
+          '<div class="hit">Could not load — <a href="#" data-retry="1">try again</a>.</div>', false);
+      }
+      return section_(key, title, '(0)', '<div class="hit">' + emptyMsg + '</div>', false);
+    }
+
+    // Who may COLLECT the child — distinct from guardians and from the emergency call list.
+    html += deferredSection_('pickups', 'Authorised Pickup', d.pickups || [], function (c) {
+      return '<div class="hit"><dl>' +
+        dlRow('Name', c.name + (c.relationship ? ' — ' + c.relationship : '')) +
+        dlRow('Cell', c.cell) + dlRow('Home', c.home) + dlRow('Work', c.work) +
+        dlRow('Email', c.email) + '</dl></div>';
+    }, 'No pickup contacts recorded in FACTS for this student.');
+
+    // Emergency call list — a separate FACTS list from the guardians above. Collapsed by
+    // default: it carries phone numbers and most lookups don't need it.
+    html += deferredSection_('emergency', 'Emergency Contacts', d.emergency || [], function (c) {
+      return '<div class="hit"><dl>' +
+        dlRow('Name', c.name + (c.relationship ? ' — ' + c.relationship : '')) +
+        dlRow('Cell', c.cell) +
+        dlRow('Home', c.home) +
+        dlRow('Work', c.work) +
+        dlRow('Email', c.email) +
+        dlRow('Note', c.note) +
+        '</dl></div>';
+    }, 'None on file in FACTS.');
+
     // Teams and clubs, kept out of the period-by-period schedule above. Most carry no
     // period in FACTS (they meet after school), so they'd otherwise clutter it as "not today".
     var acts = d.activities || [];
+    // Which of today's games belongs to which enrolment, so the row that has a game says so.
+    var gameByTeam = {};
+    leaving.forEach(function (g) { gameByTeam[g.teamId] = g; });
     html += section_('activities', 'Sports &amp; Activities', '(' + acts.length + ')',
       (acts.length ? acts.map(function (c, i) {
         var meta = [/athletic/i.test(c.dept || '') ? 'Athletics' : (c.dept || 'Activity'),
           c.teacher, c.period, c.room ? 'Room ' + c.room : '', c.quarters]
           .filter(String).join(' · ');
-        return '<button class="cls" data-act="' + i + '">' + esc(c.description || c.code) +
+        var g = null;
+        if (athleticsData) {
+          athleticsMatchTeams(c, d.profile.gender, athleticsData.teams || [])
+            .forEach(function (t) { g = g || gameByTeam[t.id]; });
+        }
+        var tag = g
+          ? '<span class="nowtag">' + esc(searchTimeLabel_(g.dismiss || g.depart)) + '</span>'
+          : '';
+        return '<button class="cls' + (g ? ' now' : '') + '" data-act="' + i + '">' +
+          esc(c.description || c.code) + tag +
           '<div class="t">' + esc(meta) + '</div></button>';
       }).join('')
         : '<div class="hit">Not on a team or club roster in FACTS.</div>'), false);
@@ -1533,6 +2477,15 @@ if (typeof module !== 'undefined' && module.exports) {
     resultsEl.innerHTML = html;
     bindBack_();
     bindSections_();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-favtoggle]'), function (btn) {
+      btn.addEventListener('click', function () {
+        toggleFav_(btn.getAttribute('data-favtoggle'), btn.getAttribute('data-on') === '1');
+      });
+    });
+    // Retry link shown on a deferred section whose background fetch failed.
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-retry]'), function (a) {
+      a.addEventListener('click', function (ev) { ev.preventDefault(); loadExtras_(); });
+    });
     Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-cl]'), function (btn) {
       btn.addEventListener('click', function () {
         openClass(sched[Number(btn.getAttribute('data-cl'))]);
@@ -1541,6 +2494,11 @@ if (typeof module !== 'undefined' && module.exports) {
     Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-act]'), function (btn) {
       btn.addEventListener('click', function () {
         openClass(acts[Number(btn.getAttribute('data-act'))]);
+      });
+    });
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-sib]'), function (btn) {
+      btn.addEventListener('click', function () {
+        openPerson(sibs[Number(btn.getAttribute('data-sib'))]); // {id, name} is all openPerson needs
       });
     });
     window.scrollTo(0, 0);
@@ -1607,7 +2565,16 @@ if (typeof module !== 'undefined' && module.exports) {
   function rerenderIfPerson_() {
     if (currentView.type === 'person' && lastPersonDetail) {
       var scrollY = window.scrollY;
-      renderPerson(lastPersonDetail, currentView.ref);
+      /* REBUILD from the current dataset, don't just re-render the cached object. The deferred
+         contact tabs — and a fresher presence fold — arrive AFTER the record was first built,
+         so re-rendering what was computed at open time would leave Authorised Pickup and
+         Emergency Contacts permanently empty once they finally loaded. */
+      var d = lastPersonDetail;
+      if (tabsData) {
+        var fresh = personDetail(tabsData, d.profile.id, attendanceDate_(), (presenceData || {}).presence);
+        if (fresh) d = fresh;
+      }
+      renderPerson(d, currentView.ref);
       window.scrollTo(0, scrollY);
     }
   }
@@ -1733,8 +2700,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var query = q.value.trim();
     if (tabsData) {
       reqSeq++; // cancel any in-flight server render
-      if (!query) { resultsEl.innerHTML = ''; statusEl.textContent = IDLE_MSG; return; }
-      renderList(searchPeople(tabsData, query, { today: attendanceDate_() }));
+      if (!query) { renderIdle_(); return; }
+      renderList(searchPeople(tabsData, query, { today: attendanceDate_(), presence: (presenceData||{}).presence }));
       return;
     }
     if (query.length < 2) return; // server fallback keeps the old floor
@@ -1758,6 +2725,18 @@ if (typeof module !== 'undefined' && module.exports) {
   });
   go.addEventListener('click', runNow);
   q.addEventListener('keydown', function (e) { if (e.key === 'Enter') runNow(); });
+
+  /* ---------- deep link (?id=…&n=…) ----------
+     Campus Presence's muster roster links straight to a student's record, so a
+     front-office question ('where is Noah May right now?') lands on the answer
+     instead of a search box. openPerson falls back to the personApi server call
+     because tabsData is still loading at this point; push=false keeps the entry
+     out of the back stack, so Back returns to an empty search rather than here. */
+  var DEEP_ID = (new URLSearchParams(location.search).get('id') || '').replace(/[^0-9A-Za-z._-]/g, '').slice(0, 32);
+  var DEEP_NAME = (new URLSearchParams(location.search).get('n') || '').replace(/[^A-Za-z ,.'\-]/g, '').slice(0, 60);
+  if (DEEP_ID) {
+    openPerson({ id: DEEP_ID, name: DEEP_NAME || 'that student' }, false);
+  }
 </script>
 </body>
 </html>

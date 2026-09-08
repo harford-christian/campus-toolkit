@@ -30,9 +30,9 @@ let fail = 0;
 const check = (l, c) => { console.log((c ? 'PASS' : 'FAIL') + '  ' + l); if (!c) fail++; };
 
 /* ---------- the dataset the browser receives ---------- */
-check('6 tabs, including the three the newer features need',
+check('8 tabs, including the four the newer features need',
   tabs.map(t => t.name).join(',') ===
-  'Sheet1,Student Schedules,Teachers,Period Times,Emergency Contacts,Attendance Today');
+  'Sheet1,Student Schedules,Teachers,Period Times,Roster,Emergency Contacts,Attendance Today,PickupContacts');
 check('14 students built from the LONG directory rows', S.buildPeople(tabs).length === 14);
 check('siblings share a guardian email', S.searchPeople(tabs, 'greta.fairbanks@example.com').total === 2);
 check('typo-tolerant name search still works',
@@ -101,6 +101,89 @@ check('a stale feed is ignored rather than shown as today',
   Object.keys(S.buildAttendance(tabs, '2026-09-09')).length === 0);
 check('a present student carries no badge',
   S.personDetail(tabs, '400101', TODAY).attendance === null);
+
+/* ---------- transportation, siblings, pickup (the dismissal Roster) ---------- */
+const tr = S.buildTransportation(tabs);
+check('a recorded bus rider reads as a FACT, not an assumption',
+  tr['400102'].type === 'Bus' && tr['400102'].routeCode === 'HDG' &&
+  tr['400102'].routeName === 'Havre de Grace' && tr['400102'].assumed === false);
+check('a residual-default Car is flagged as ASSUMED so the UI can say so',
+  tr['400101'].type === 'Car' && tr['400101'].assumed === true);
+check('split custody keeps BOTH rows instead of picking one',
+  (tr['400109'].extra || []).length === 1 &&
+  tr['400109'].type === 'Bus' && tr['400109'].extra[0].type === 'Car');
+check('Building and Pickup stay separate columns (physical vs where the parent goes)',
+  tr['400107'].building === 'MS' && tr['400107'].pickup === 'HS');
+
+const sibs = S.buildSiblings(tabs);
+check('siblings come from Family ID, and never include the student themselves',
+  sibs['400106'].length === 1 && sibs['400106'][0].id === '400107' &&
+  sibs['400112'][0].id === '400113' && sibs['400101'] === undefined);
+
+const pk = S.buildPickupContacts(tabs);
+check('authorised pickup indexes by student',
+  pk['400101'].length === 3 && pk['400101'][0].relationship === 'Mother' &&
+  pk['400101'][0].cell === '555-0101');
+check('a student with NO pickup contacts is genuinely absent from the index',
+  pk['400104'] === undefined); // renders "none recorded", which must differ from "loading"
+
+/* ---------- today's presence (status and time only) ---------- */
+check('presence carries NO guardian name, relationship or reason',
+  Object.keys(D.presence).every(id =>
+    Object.keys(D.presence[id]).sort().join() === 'back,late,out'));
+check('a student signed out and not back reads as OUT',
+  (() => { const s = S.studentStatus(null, D.presence['400114']); return s && s.state === 'out'; })());
+check('signed out and returned reads as BACK',
+  (() => { const s = S.studentStatus(null, D.presence['400104']); return s && s.state === 'back'; })());
+check('an unknown student reads as PRESENT — never an invented absence',
+  S.studentStatus(null, null) === null);
+check('today-only dismissal override is present, and stamped with who made it',
+  D.overrides['400103'].type === 'CAR' && !!D.overrides['400103'].by);
+
+/* ---------- the deferred (second-call) split ---------- */
+const DEFERRED = D.deferredTabs;
+check('the deferred list names exactly the two collapsed-only contact tabs',
+  DEFERRED.slice().sort().join() === 'Emergency Contacts,PickupContacts');
+const core = tabs.filter(t => DEFERRED.indexOf(t.name) === -1);
+check('every EXPANDED section is identical without the deferred tabs',
+  (() => {
+    const a = S.personDetail(core, '400101', TODAY), b = S.personDetail(tabs, '400101', TODAY);
+    return JSON.stringify(a.profile) === JSON.stringify(b.profile) &&
+           JSON.stringify(a.classes) === JSON.stringify(b.classes) &&
+           JSON.stringify(a.transportation) === JSON.stringify(b.transportation) &&
+           JSON.stringify(a.siblings) === JSON.stringify(b.siblings);
+  })());
+check('and the deferred lists come back EMPTY rather than throwing',
+  (() => {
+    const a = S.personDetail(core, '400101', TODAY);
+    return a.pickups.length === 0 && a.emergency.length === 0;
+  })());
+
+/* ---------- game-day dismissal ---------- */
+const nora2 = S.personDetail(tabs, '400101', TODAY);
+check('the student\'s Varsity Girls Soccer enrolment resolves to that team\'s calendar',
+  S.athleticsMatchTeams(nora2.activities.find(a => a.code === 'VGSC'),
+    nora2.profile.gender, D.athleticsTeams).map(t => t.id).join() === 'soccer-v-girls');
+const gd = S.athleticsForStudent(nora2.activities, nora2.profile.gender,
+  D.athleticsTeams, D.athleticsEvents, TODAY);
+check('today\'s away game surfaces with the dismissal the coach posted',
+  gd.length === 1 && gd[0].team === 'Varsity Girls Soccer' &&
+  gd[0].dismiss === '14:00' && gd[0].depart === '14:15' && gd[0].leavesEarly === true);
+check('the HOME game with no posted dismissal is not treated as an early leave',
+  D.athleticsEvents.filter(e => !e.dismiss && !e.depart).length === 1 &&
+  gd.every(g => g.leavesEarly));
+check('a student on no team gets no game',
+  S.athleticsForStudent(S.personDetail(tabs, '400102', TODAY).activities, 'Male',
+    D.athleticsTeams, D.athleticsEvents, TODAY).length === 0);
+
+/* ---------- favourites ---------- */
+check('the demo opens with favourites seeded, so the feature is visible on load',
+  D.favorites.length === 3);
+check('every seeded favourite is a real student in the dataset',
+  (() => {
+    const ids = S.buildPeople(tabs).map(p => p.id);
+    return D.favorites.every(f => ids.indexOf(f) !== -1);
+  })());
 
 /* ---------- the page itself ---------- */
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');

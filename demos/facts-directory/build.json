@@ -1,0 +1,14 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/facts-directory/build.json. Previously this demo had no checked-in config, so a rebuild was guesswork — that is why it drifted behind the app. The source Index.html is a COMPLETE document (unlike transportation's fragment), so no wrapper replacement is needed; build-demo.mjs injects the demo shim before </head> and inlines SearchClient (the browser copy of Search.gs) via includeDir. Each replacement below reproduces what doGet supplies at runtime. ATHLETICS_ON is forced on: the feature is paused in production only because no athletics rosters are loaded in FACTS yet, and a showcase should demonstrate the code, not mirror a data gap.",
+  "src": "../FACTS/facts-directory-search/Index.html",
+  "dst": "demos/facts-directory/index.html",
+  "includeDir": "../FACTS/facts-directory-search",
+  "demoName": "Directory Search",
+  "replace": [
+    ["<?= userEmail ?>", "demo.staff@example.edu"],
+    ["var SIM = parseSimClock('<?= sim ?>');", "var SIM = parseSimClock((new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\\- T]/g, '').slice(0, 16));"],
+    ["var ATHLETICS_ON = '<?= athleticsOn ?>' === '1';", "var ATHLETICS_ON = true; // demo: always on (production gates this on ATHLETICS_ENABLED)"],
+    ["var DEEP_ID = '<?= personId ?>';", "var DEEP_ID = (new URLSearchParams(location.search).get('id') || '').replace(/[^0-9A-Za-z._-]/g, '').slice(0, 32);"],
+    ["var DEEP_NAME = '<?= personName ?>';", "var DEEP_NAME = (new URLSearchParams(location.search).get('n') || '').replace(/[^A-Za-z ,.'\\-]/g, '').slice(0, 60);"]
+  ]
+}

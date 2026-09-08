@@ -357,21 +357,145 @@ window.DIRECTORY_DATA = (function () {
   // semester-split pair resolve to a single answer instead of two maybes.
   var DEMO_NOW = { date: '2026-09-08', time: '10:30', dayOfWeek: 2 };
 
+  /* ---------- transportation + siblings (the dismissal Roster) ----------
+     In production this tab lives in ANOTHER spreadsheet, written daily at 04:00 by
+     facts-api-sync/Transportation.gs, and it is the authority on two separate things: how a
+     child gets home, and — via Family ID — who their siblings are. Deliberately exercises the
+     three cases the UI has to distinguish:
+       · a recorded bus rider (Source=route-class) — a fact
+       · a residual-default Car (Source=residual-default) — an ASSUMPTION the UI must label
+       · a split-custody student with TWO rows, who really does ride both routes
+     Family IDs link the two Fairbanks siblings and the two Kirkwoods. */
+  var ROSTER_HEADER = ['Student ID', 'Student Name', 'Grade', 'Session', 'Type', 'Route Code',
+    'Route Name', 'Vehicle', 'Split', 'Building', 'Pickup', 'Pickup Basis', 'Walk To',
+    'Family ID', 'Homeroom', 'Homeroom Teacher', 'Source', 'Note'];
+
+  // [id, type, routeCode, routeName, vehicle, split, building, pickup, walkTo, familyId, source, note]
+  var ROSTER = [
+    [400101, 'Car',        '',    '',                 '',      '',   'HS', 'HS', '',        'F-1001', 'residual-default', ''],
+    [400102, 'Bus',        'HDG', 'Havre de Grace',   'Bus 7', '',   'HS', 'HS', '',        'F-1002', 'route-class',      ''],
+    [400103, 'Bus',        'ABD', 'Aberdeen',         'Bus 3', '',   'HS', 'HS', '',        'F-1003', 'route-class',      ''],
+    [400104, 'Staff Kid',  '',    '',                 '',      '',   'HS', 'HS', '',        'F-1004', 'family-rule',      'parent teaches 4th'],
+    [400105, 'Car',        '',    '',                 '',      '',   'HS', 'HS', '',        'F-1005', 'residual-default', ''],
+    [400106, 'Bus',        'JRV', 'Jarrettsville',    'Bus 2', '',   'HS', 'HS', '',        'F-1006', 'route-class',      ''],
+    [400107, 'Bus',        'JRV', 'Jarrettsville',    'Bus 2', '',   'MS', 'HS', 'HS lobby','F-1006', 'route-class',      'rides with older brother'],
+    [400108, 'Early Bird', '',    '',                 '',      '',   'HS', 'EL', '',        'F-1008', 'family-rule',      ''],
+    [400109, 'Bus',        'BLA', 'Bel Air',          'Bus 5', 'Y',  'MS', 'MS', '',        'F-1009', 'route-class',      'split custody — Mon/Wed'],
+    [400109, 'Car',        '',    '',                 '',      'Y',  'MS', 'MS', '',        'F-1009', 'override-family',  'split custody — Tue/Thu/Fri'],
+    [400110, 'Car',        '',    '',                 '',      '',   'MS', 'MS', '',        'F-1010', 'residual-default', ''],
+    [400111, 'Bus',        'ABD', 'Aberdeen',         'Bus 3', '',   'MS', 'MS', '',        'F-1011', 'route-class',      ''],
+    [400112, 'Car',        '',    '',                 '',      '',   'EL', 'EL', '',        'F-1012', 'residual-default', 'K5 — parent collects at the EL door'],
+    [400113, 'Car',        '',    '',                 '',      '',   'EL', 'EL', '',        'F-1012', 'residual-default', ''],
+    [400114, 'Bus',        'HDG', 'Havre de Grace',   'Bus 7', '',   'HS', 'HS', '',        'F-1014', 'route-class',      '']
+  ];
+
+  function rosterValues() {
+    var byId = {};
+    STUDENTS.forEach(function (s) { byId[s[0]] = s; });
+    var rows = [ROSTER_HEADER.slice()];
+    ROSTER.forEach(function (r) {
+      var s = byId[r[0]] || [];
+      rows.push([r[0], s[1] || '', s[3] || '', 'PM', r[1], r[2], r[3], r[4], r[5],
+                 r[6], r[7], 'grade', r[8], r[9], s[4] || '', s[5] || '', r[10], r[11]]);
+    });
+    return rows;
+  }
+
+  /* ---------- authorised pickup ----------
+     A separate FACTS list from the guardians and from the emergency call list: who may
+     physically COLLECT the child. Phone-number heavy, which is why the real app defers this
+     tab to a second call and keeps the section collapsed. One student is deliberately absent
+     from the list so the demo shows "no pickup contacts recorded" — the honest empty state,
+     which must read differently from "still loading". */
+  var PICKUP_HEADER = ['pickupId', 'studentId', 'firstName', 'lastName', 'relationship',
+                       'email', 'cellPhone', 'homePhone', 'workPhone'];
+  var PICKUPS = [
+    [1,  400101, 'Priya',   'Alderman',   'Mother',      'priya.alderman@example.com', '555-0101', '555-0102', ''],
+    [2,  400101, 'Ross',    'Alderman',   'Father',      'ross.alderman@example.com',  '555-0103', '',         '555-0104'],
+    [3,  400101, 'Dorothy', 'Alderman',   'Grandparent', '',                           '555-0105', '',         ''],
+    [4,  400102, 'Trina',   'Boyette',    'Mother',      'trina.boyette@example.com',  '555-0111', '',         ''],
+    [5,  400103, 'June',    'Castellano', 'Mother',      'june.castellano@example.com','555-0121', '',         ''],
+    [6,  400105, 'Dolores', 'Enriquez',   'Mother',      'dolores.enriquez@example.com','555-0131','',         ''],
+    [7,  400106, 'Greta',   'Fairbanks',  'Mother',      'greta.fairbanks@example.com','555-0141', '555-0142', ''],
+    [8,  400107, 'Greta',   'Fairbanks',  'Mother',      'greta.fairbanks@example.com','555-0141', '555-0142', ''],
+    [9,  400107, 'Neil',    'Fairbanks',  'Father',      'neil.fairbanks@example.com', '555-0143', '',         ''],
+    [10, 400112, 'Helena',  'Kirkwood',   'Mother',      'helena.kirkwood@example.com','555-0151', '',         ''],
+    [11, 400113, 'Helena',  'Kirkwood',   'Mother',      'helena.kirkwood@example.com','555-0151', '',         ''],
+    [12, 400114, 'Suvi',    'Lindqvist',  'Mother',      'suvi.lindqvist@example.com', '555-0161', '',         '']
+  ];
+  function pickupValues() {
+    return [PICKUP_HEADER.slice()].concat(PICKUPS.map(function (p) { return p.slice(); }));
+  }
+
+  /* ---------- today's sign-in/out (Campus Presence) ----------
+     STATUS AND TIME ONLY — the real app deliberately drops guardian name, relationship and
+     reason, because Campus Presence tiers those as OFFICE while this tool is open to the whole
+     staff OU. Shape matches buildPresence's output so the mock can serve it directly.
+       400114 left at 12:40 and has NOT come back  -> OUT (not in the building)
+       400104 left at 09:15 and returned at 11:05  -> BACK
+       400105 arrived late at 08:43                -> LATE (also in the attendance feed) */
+  var PRESENCE = {
+    '400114': { out: '12:40', back: '', late: '' },
+    '400104': { out: '09:15', back: '11:05', late: '' },
+    '400105': { out: '', back: '', late: '08:43' }
+  };
+
+  /* Today-only dismissal changes, which OVERRIDE the standing assignment above. */
+  var OVERRIDES = {
+    '400103': { type: 'CAR', routeCode: '', destination: 'front office', note: 'aunt collecting',
+                by: 'office@example.edu' }
+  };
+
+  /* ---------- athletics (game-day dismissal) ----------
+     The real app reads these off the 21 public team calendars and parses the dismissal out of
+     whatever prose the coach typed into the event description. Here they are pre-parsed, since
+     the demo has no calendars to fetch — the matching, ordering and tense logic below is the
+     app's own untouched code. Nora (400101) is on Varsity Girls Soccer, which plays away today. */
+  var ATHLETICS_TEAMS = [
+    { id: 'soccer-v-girls', sport: 'Soccer', gender: 'Girls', level: 'Varsity' },
+    { id: 'soccer-v-boys', sport: 'Soccer', gender: 'Boys', level: 'Varsity' },
+    { id: 'volleyball-v-girls', sport: 'Volleyball', gender: 'Girls', level: 'Varsity' },
+    { id: 'basketball-v-boys', sport: 'Basketball', gender: 'Boys', level: 'Varsity' }
+  ];
+  var ATHLETICS_EVENTS = [
+    { teamId: 'soccer-v-girls', date: DEMO_NOW.date, title: 'Varsity Girls Soccer @ Rising Sun',
+      start: '16:30', allDay: false, location: 'Rising Sun High School',
+      dismiss: '14:00', depart: '14:15' },
+    // A home game with no posted dismissal: nothing about the school day changes, so the app
+    // deliberately shows NOTHING for it rather than "dismissal not posted".
+    { teamId: 'volleyball-v-girls', date: DEMO_NOW.date, title: 'Varsity Volleyball vs Tome',
+      start: '18:30', allDay: false, location: 'Harford Christian School', dismiss: '', depart: '' }
+  ];
+
+  /* Favourites the demo opens with, so the home screen shows the feature immediately: a
+     sibling pair plus the student who is currently signed out. */
+  var FAVORITES = ['400106', '400107', '400114'];
+
   return {
     tabs: [
       { name: 'Sheet1',             values: directoryValues() },
       { name: 'Student Schedules',  values: scheduleValues() },
       { name: 'Teachers',           values: teacherValues() },
       { name: 'Period Times',       values: periodTimesValues() },
+      { name: 'Roster',             values: rosterValues() },
       { name: 'Emergency Contacts', values: emergencyValues() },
-      { name: 'Attendance Today',   values: attendanceValues(DEMO_NOW.date) }
+      { name: 'Attendance Today',   values: attendanceValues(DEMO_NOW.date) },
+      { name: 'PickupContacts',     values: pickupValues() }
     ],
+    // The two tabs the real app fetches in a SECOND call, after first paint — they feed only
+    // collapsed sections. Named here so the mock can reproduce that split faithfully.
+    deferredTabs: ['Emergency Contacts', 'PickupContacts'],
+    presence: PRESENCE,
+    overrides: OVERRIDES,
+    favorites: FAVORITES,
+    athleticsTeams: ATHLETICS_TEAMS,
+    athleticsEvents: ATHLETICS_EVENTS,
     bellPeriods: BELL_PERIODS,
     demoNow: DEMO_NOW,
     // Quarter ranges: a class marked Q1,2 vs Q3,4 can share a period, and only the one whose
     // quarter contains today is really meeting. Without these the app says so rather than
     // guessing; with them it gives one definite answer.
     quarterDates: '1:2026-09-08..2026-11-08,2:2026-11-09..2027-01-31,' +
-                  '3:2027-02-01..2027-04-11,4:2027-04-12..2027-06-30'
+                  '3:2027-02-01..2027-04-11,4:2027-04-12..2027-06-18'
   };
 })();
