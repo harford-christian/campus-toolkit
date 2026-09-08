@@ -1,4 +1,24 @@
 {
+  "facts-directory": {
+    "files": [
+      "FACTS/facts-directory-search/Index.html",
+      "FACTS/facts-directory-search/SearchClient.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "athleticsApi",
+      "classApi",
+      "favoriteToggleApi",
+      "favoritesApi",
+      "nowApi",
+      "personApi",
+      "presenceApi",
+      "searchApi",
+      "tabsExtrasApi",
+      "teacherApi"
+    ],
+    "hash": "4b844fc3ffc92048"
+  },
   "library": {
     "files": [
       "hcs-library-portal/library-portal/BrowseCatalog.html"
@@ -7,9 +27,11 @@
     "gsr": [
       "getBookDetail",
       "getInventoryPage",
-      "getStaffPicks"
+      "getStaffPicks",
+      "recommendBook",
+      "reserveBook"
     ],
-    "hash": "fe07587dd720848b"
+    "hash": "a1171e34dd059424"
   },
   "campus-control": {
     "files": [
@@ -33,7 +55,7 @@
       "getMonitorSnapshotForClient",
       "processPost"
     ],
-    "hash": "23cc3447d39d9f2f"
+    "hash": "bb31f5b1239c8455"
   },
   "athletics": {
     "files": [
@@ -47,7 +69,7 @@
     "gsr": [
       "api"
     ],
-    "hash": "0836675139be5411"
+    "hash": "091123689f09d7c0"
   },
   "purchasing": {
     "files": [
@@ -56,9 +78,14 @@
     ],
     "missing": [],
     "gsr": [
+      "addDelegation",
       "addOrderComment",
+      "adjustOrderCost",
       "approveCancellation",
+      "approveOnBehalf",
       "beckyPublishRejection",
+      "beckyRejectRequest",
+      "beckySendBack",
       "beckyUpdateOrder",
       "bryanHoldOrder",
       "bryanRejectOrder",
@@ -68,41 +95,59 @@
       "denyCancellation",
       "editOrder",
       "generateAnalyticsReportPDF",
+      "generateOrderPacket",
       "generatePOPDF",
       "getActiveStaffForPicker",
       "getAnalytics",
+      "getAnalyticsScope",
       "getApproverSettings",
+      "getBootstrapData",
+      "getBuyByVendor",
       "getCatalogItems",
+      "getDelegations",
       "getDepartmentStats",
       "getDepartments",
       "getEmailRulesList",
       "getFullCatalog",
       "getMasterQueue",
+      "getOrderAudit",
       "getOrderComments",
       "getOrderDocuments",
-      "getProcessingMetrics",
+      "getOrderTimeline",
+      "getReturns",
       "getSavedViews",
       "getTeamOrders",
-      "getTrendsMetrics",
       "getUserAvailableDepts",
       "getUserList",
       "getUserOrderHistory",
       "getVendorList",
+      "markItemsOrdered",
       "markOrderClosed",
+      "markOrderFulfilled",
+      "markWizardSeen",
+      "mergeOrders",
+      "recordReturn",
+      "reopenUnderReview",
       "requestCancellation",
+      "resubmitOrder",
+      "revokeDelegation",
+      "routeToBackupApprover",
       "saveDepartment",
       "saveView",
       "scanDriveForNewSlips",
+      "searchOrders",
       "setDepartmentActive",
+      "splitOrder",
       "syncFromGoogleAdmin",
       "updateApproverPIN",
       "updateApproverSettings",
       "updateEmailRules",
+      "updateItemStatuses",
       "updateSheetData",
       "uploadOrderDocument",
       "verifyApproverPin"
     ],
-    "hash": "8cdba37d1351daf0"
+    "hash": "3c8f7c2a1ec79f39"
   },
   "leave-sub": {
     "files": [
@@ -157,7 +202,7 @@
       "uploadImage",
       "uploadPowerPoint"
     ],
-    "hash": "6fa3f64a2db47729"
+    "hash": "ad9b1422258009d8"
   },
   "custom-forms": {
     "files": [
@@ -171,7 +216,7 @@
       "authVerifyOtp",
       "withdrawSubmission"
     ],
-    "hash": "f7d6e96306822157"
+    "hash": "41170028c9cb765b"
   },
   "gym-tv": {
     "files": [
@@ -234,21 +279,6 @@
     ],
     "hash": "b30fe2f4d282a7ca"
   },
-  "facts-directory": {
-    "files": [
-      "FACTS/facts-directory-search/Index.html",
-      "FACTS/facts-directory-search/SearchClient.html"
-    ],
-    "missing": [],
-    "gsr": [
-      "classApi",
-      "nowApi",
-      "personApi",
-      "searchApi",
-      "teacherApi"
-    ],
-    "hash": "f9fc08991cddeacd"
-  },
   "transportation": {
     "files": [
       "FACTS/transportation/DismissalClient.html",
@@ -262,6 +292,6 @@
       "saveView",
       "setOverride"
     ],
-    "hash": "a5f764607b2eb14e"
+    "hash": "8ecf30d75391adf5"
   }
 }
