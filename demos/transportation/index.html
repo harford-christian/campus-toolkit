@@ -151,6 +151,14 @@
             border-radius: .5rem; margin: 0 0 .6rem; }
   .warn { background: #FFF3CD; color: #7a5b00; padding: .5rem .9rem; border-radius: .5rem;
           margin: 0 0 .6rem; font-size: .85rem; }
+  /* the red one: the board on screen is NOT live. Loud on purpose — at 3:10 it changes what every
+     row means. */
+  .alert { background: #FDECEA; color: #7f1d1d; border: 2px solid #e57373; padding: .6rem .9rem;
+           border-radius: .5rem; margin: 0 0 .6rem; font-size: .9rem; line-height: 1.4; }
+  .alert a, .alert button { display: inline-block; margin: .35rem .5rem 0 0; padding: .45rem .8rem;
+           border-radius: .45rem; border: 1px solid #7f1d1d; background: #7f1d1d; color: #fff;
+           font: inherit; font-weight: 700; text-decoration: none; min-height: 44px; }
+  .alert button.ghost2 { background: #fff; color: #7f1d1d; }
 
   dialog { border: 1px solid var(--card-border); border-radius: .6rem; padding: 0; width: 24rem;
            max-width: calc(100vw - 1.5rem); }
@@ -1507,7 +1515,11 @@ if (typeof module !== 'undefined' && module.exports) {
   // 'SIMULATED — showing ""' (Josh, 2026-09-05). JSON.stringify produces exactly one literal, and
   // `sim` is already sanitised server-side to [0-9:\- T], so raw output is safe.
   var SIM = (new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\- T]/g, '').slice(0, 16);
+  var APP_URL = location.href.split('?')[0];   // for the Reload link (top window)
   var raw = null, flat = [], pickups = null, reqSeq = 0, mode = 'ramp';
+  var liveOk = false;           // has a LIVE payload rendered in this page's lifetime?
+  var retries = 0;              // failed attempts before any live payload
+  var degraded = null;          // { at, why, cached, refreshing } when what is on screen is not live
   var viewApplied = false;      // the saved view is applied ONCE, on the first successful load
   var lastGoodAt = '';          // server time of the last payload that rendered
   var GRADES = ['K4','K5','1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -1797,7 +1809,9 @@ if (typeof module !== 'undefined' && module.exports) {
     menuSummary();                         // the button reflects mode + chips whether open or shut
     if (!raw || !raw.ok) {
       $('board').innerHTML = '<div class="list"><div class="empty">' +
-        esc((raw && raw.error) || 'Could not load the board.') + '</div></div>';
+        '<b>Could not load the board.</b> ' + esc((raw && raw.error) || 'the server did not answer') +
+        '.<br>' + hintFor((raw && raw.error) || '') + '</div>' +
+        '<div class="alert" style="margin:.6rem .9rem">' + reloadLinks() + '</div></div>';
       $('tally').textContent = '';
       return;
     }
@@ -2263,6 +2277,18 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function banners() {
     var b = '';
+    // FIRST OF ALL: is what is on screen live? Everything below assumes it is.
+    if (degraded && degraded.refreshing) {
+      b += '<div class="warn">Showing the board this device saved at <b>' + esc(degraded.at) +
+           '</b> while today\'s loads…</div>';
+    } else if (degraded) {
+      b += '<div class="alert"><b>LIVE DATA UNAVAILABLE.</b> This is the board as of <b>' +
+           esc(degraded.at || '?') + '</b>' + (degraded.cached ? ' (saved on this device)' : '') +
+           '. Anything recorded since — an absence, a sign-out, a change to a car ride — is <b>not</b> ' +
+           'here. Check the paper list for changes after that time.<br>' +
+           '<span class="muted">Reason: ' + esc(degraded.why) + '.</span> ' + hintFor(degraded.why) +
+           '<br>' + reloadLinks() + '</div>';
+    }
     // Only the DATE is simulated — it decides the weekday (drivers, walk-up exceptions) and which
     // today-only changes count. Roster, routes, roles and attendance are always the real, current
     // data. The first wording said "not live data", which read as a demo mode with a switch.
@@ -2290,6 +2316,69 @@ if (typeof module !== 'undefined' && module.exports) {
     $('banners').innerHTML = b;
   }
 
+  /* ---------------------------- the last good board, kept on the device ----------------------------
+   *
+   * 2026-09-08, the first dismissal. Two phones inside the Identity app's web view lost their Google
+   * session mid-dismissal: google.script.run answered "NetworkError: Connection failure due to HTTP
+   * 401", the page showed nothing but that sentence, and it happened while a bus was being called
+   * back. A board from ten minutes ago with a loud banner beats a blank page at 3:21pm. So the last
+   * good payload is kept in localStorage, keyed to its DAY and to the signed-in person, and
+   *   (a) painted first on every open, marked "while today's loads", so the page is never empty, and
+   *   (b) painted again with the red LIVE DATA UNAVAILABLE banner when the live call fails after
+   *       two retries.
+   * Never for a simulated date, never across days, never another person's board. */
+  var ME = ((document.querySelector('.who') || {}).textContent || '').trim().toLowerCase();
+  var CACHE_KEY = 'hcs_dismissal_last_board_v1:' + ME;
+  function todayKeyLocal() {
+    var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  function cachePut(res) {
+    if (SIM || !res || !res.ok) return;
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ dayKey: res.dayKey, at: res.serverNow, res: res })); }
+    catch (e) { /* private mode, full, or blocked — the cache is a comfort, never a requirement */ }
+  }
+  function cacheGet() {
+    if (SIM) return null;
+    try {
+      var c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      return (c && c.res && c.res.ok && c.dayKey === todayKeyLocal()) ? c : null;
+    } catch (e) { return null; }
+  }
+  function paintCached(c, why) {
+    myPerm = c.res.perm || myPerm;
+    applyPayload(c.res);
+    if (!viewApplied) {
+      viewApplied = true;
+      if (c.res.savedView) applyView(c.res.savedView);
+      setMenuOpen(!c.res.savedView);
+    }
+    degraded = { at: c.at, why: why || '', cached: true, refreshing: !why };
+    banners(); render(); renderFreshness(c.res.freshness || {});
+  }
+  /** What a person can DO about a failure, in their words. */
+  function hintFor(msg) {
+    if (/401/.test(msg || '')) {
+      return 'Your Google sign-in was not accepted by this browser (HTTP 401). This happens inside an ' +
+             'app\'s built-in web view and when cross-site tracking is blocked. Reload; if it repeats, ' +
+             'open this page in Safari or Chrome instead of the Identity app.';
+    }
+    if (/timed? ?out|exceeded/i.test(msg || '')) return 'The server took too long. Try again in a moment.';
+    return 'Reload the page. If it keeps failing, tell Josh — the paper list is the fallback.';
+  }
+  function reloadLinks() {
+    return (APP_URL ? '<a href="' + esc(APP_URL) + '" target="_top">Reload</a>' : '') +
+           '<button type="button" class="ghost2" data-act="retry">Try again</button>';
+  }
+  $('banners').addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute('data-act') === 'retry') { retries = 0; load(); }
+  });
+  $('board').addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute('data-act') === 'retry') { retries = 0; load(); }
+  });
+
   function load() {
     var seq = ++reqSeq;
     $('tally').textContent = 'Loading…';
@@ -2297,8 +2386,10 @@ if (typeof module !== 'undefined' && module.exports) {
       .withSuccessHandler(function (res) {
         if (seq !== reqSeq) return;              // a newer request already answered
         if (res.ok) {
+          liveOk = true; retries = 0; degraded = null;
           myPerm = res.perm || myPerm;
           applyPayload(res);
+          cachePut(res);
           // The saved view is applied ONCE. Every later load — the five-minute tick, the refresh
           // button, a save — keeps whatever the person has set since. The first version re-applied
           // it on every load, so a filter narrowed to find one child snapped back mid-search, and
@@ -2328,12 +2419,26 @@ if (typeof module !== 'undefined' && module.exports) {
       })
       .withFailureHandler(function (err) {
         if (seq !== reqSeq) return;
-        var msg = err && err.message ? err.message : String(err);
-        if (raw && raw.ok) {
-          // same rule: a working board is never replaced by an error from a background tick
-          $('freshness').textContent = 'Refresh failed — showing data from ' + lastGoodAt + '. ' + msg;
+        var msg = err && err.message ? err.message : (err ? String(err) : '');
+        if (!msg || msg === '[object Object]') msg = 'the server did not answer';
+        // 2026-09-08, first dismissal: two phones in the Identity app's web view got HTTP 401 on the
+        // very first call and saw nothing but the error. Retry first — a fresh session token often
+        // clears a 401 — then fall back to the board this device last saw, with a red banner.
+        if (!liveOk && retries < 2) {
+          retries++;
+          $('tally').textContent = 'Retrying… (' + retries + ' of 2)';
+          setTimeout(load, retries === 1 ? 2000 : 6000);
           return;
         }
+        if (raw && raw.ok) {
+          // A board is on screen — live from earlier, or the device's saved copy. Never replace it
+          // with an error; say loudly that it is not current, and since when.
+          degraded = { at: lastGoodAt, why: msg, cached: !liveOk, refreshing: false };
+          banners(); render();
+          return;
+        }
+        var c = cacheGet();
+        if (c) { paintCached(c, msg); return; }
         raw = { ok: false, error: msg };
         banners(); render();
       })
@@ -2444,6 +2549,9 @@ if (typeof module !== 'undefined' && module.exports) {
 
   buildTypes(); buildGrades();
   load();
+  // Paint the device's saved board under the live request so the page is never empty; the live
+  // payload replaces it in a few seconds, or the red banner explains why it did not.
+  (function () { var c0 = cacheGet(); if (c0) paintCached(c0, ''); })();
   // Attendance refreshes every 15 min upstream; re-pull so a board left open on a cart goes stale
   // slowly rather than silently.
   setInterval(load, 5 * 60 * 1000);

@@ -8,6 +8,7 @@
     ["<!--\n  HCS Dismissal.", "<!DOCTYPE html>\n<html>\n<head>\n<base target=\"_top\">\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>HCS Dismissal</title>\n</head>\n<body>\n<!--\n  HCS Dismissal."],
     ["  setInterval(load, 5 * 60 * 1000);\n</script>\n", "  setInterval(load, 5 * 60 * 1000);\n</script>\n</body>\n</html>\n"],
     ["<?= userEmail ?>", "demo.staff@example.edu"],
+    ["var APP_URL = <?!= JSON.stringify(appUrl || '') ?>;", "var APP_URL = location.href.split('?')[0];"],
     ["var SIM = <?!= JSON.stringify(sim || '') ?>;", "var SIM = (new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\\- T]/g, '').slice(0, 16);"],
     ["\"angela\", \"burge ang\" and \"Angela Burge\" all find \"Burge Angela\"", "\"gina\", \"sowell gi\" and \"Gina Sowell\" all find \"Sowell Gina\""],
     ["Burge Angela", "Sowell Gina"],
