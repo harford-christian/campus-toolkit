@@ -1570,9 +1570,10 @@ function dsDriverLists(board, routes, dayName, only) {
  *   { name, grade, type, lanes:[{label,colour,vehicle}], expected, reason, detail,
  *     split, today, handedTo, walkUp }
  */
-function dsRampSlice(board, routes, opts) {
+function dsRampSlice(board, routes, opts, pickups) {
   opts = opts || {};
   routes = routes || {};
+  pickups = pickups || {};
   // FACTS zero-pads grades ('01'..'09'); the roster may carry either form. Normalise both the
   // filter set and the emitted value so '01' matches '1' and never shows as "01" on the kiosk.
   var norm = function (g) {
@@ -1582,7 +1583,10 @@ function dsRampSlice(board, routes, opts) {
   var gradeSet = {};
   (opts.grades || ['K4', 'K5', '1', '2', '3', '4', '5']).forEach(function (x) { gradeSet[norm(x)] = true; });
   var typeSet = {};
-  (opts.types || ['Bus', 'Car']).forEach(function (x) { typeSet[x] = true; });
+  // Bus, Car AND Early Bird are ALL ramp dismissals — early birds just come out earlier (the ramp lead,
+  // 2026-09-10). Staff Kids are NOT here: they walk up to the HS and the walk-up chaperone handles
+  // them, so their pickups belong on that list, not this one.
+  (opts.types || ['Bus', 'Car', 'Early Bird']).forEach(function (x) { typeSet[x] = true; });
 
   return dsFlatList(board).filter(function (r) {
     return typeSet[r.type] && gradeSet[norm(r.grade)];
@@ -1598,13 +1602,16 @@ function dsRampSlice(board, routes, opts) {
     } else {
       lanes = [{ label: r.type, colour: '', vehicle: '' }];    // Car, and any non-bus residual
     }
-    // EXPLICIT field list — never a spread of r. That is what keeps id, contacts, homeroom, family
-    // and notes out of an anonymous file. The forbidden-field test guards it.
+    // EXPLICIT field list — never a spread of r. That is what keeps id, homeroom, family and notes
+    // out of an anonymous file. The forbidden-field test guards it. `pickups` is the ONE contact
+    // field allowed, and only NAME + RELATIONSHIP (positional [name, rel]) — never a phone or email
+    // — enough for the ramp to confirm the adult at the door (Josh, 2026-09-10). The student id is
+    // used to look up pickups but is still NOT emitted.
     return {
       name: r.name, grade: norm(r.grade), type: r.type, lanes: lanes,
       expected: r.expected, reason: r.reason || '', detail: r.detail || '',
       split: !!r.split, today: !!r.overridden, handedTo: r.overrideDestination || '',
-      walkUp: !!r.walkUp
+      walkUp: !!r.walkUp, pickups: pickups[r.id] || []
     };
   });
 }
@@ -1783,8 +1790,12 @@ if (typeof module !== 'undefined' && module.exports) {
     // The approved walk-up list outranks whatever the roster derived: a child on it is walked up,
     // whether FACTS calls them Car (Evelyn, walking to her brother) or Staff Kid.
     if (r.walkUp) {
-      return r.walkUpWalking ? 'walks up' + (r.walkUpTo ? ' → ' + r.walkUpTo : ' to the HS')
-                             : 'walk-up · ' + (r.walkUpWhy || 'not today');
+      if (r.walkUpWalking) return 'walks up' + (r.walkUpTo ? ' → ' + r.walkUpTo : ' to the HS');
+      // NOT walking today: the LANE first, then why the walk-up is off. "walk-up · occasional" alone
+      // read as a destination when the Siverds showed as Car on a Friday (Josh, 2026-09-10) —
+      // "Car · walk-up · occasional — only when the office confirms" says where they actually go.
+      var lane = (r.type && r.type !== 'Staff Kid') ? r.type + ' · ' : '';
+      return lane + 'walk-up · ' + (r.walkUpWhy || 'not today');
     }
     if (r.type === 'Staff Kid' && r.walkTo && r.walkTo !== 'Unresolved') return 'walk to ' + r.walkTo;
     return r.type;
