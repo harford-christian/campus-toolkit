@@ -90,7 +90,7 @@ window.MOCK_BACKEND = (function () {
     var attendance = dsBuildAttendance(T['Attendance Today']);
     var todayOverrides = dsBuildOverrides(state.overrides, dayKey);
     // The office's STANDING answers sit under today's call-ins (today wins) — mirrors dismissalApi.
-    var overrides = dsMergeOverrides(dsBuildStanding(T.Standing), todayOverrides);
+    var overrides = dsMergeOverrides(dsBuildStanding(T.Standing, dayName), todayOverrides);
     var signedOut = dsBuildSignedOut(T.EVENTS, dayKey);     // the app's own fold, real kiosk columns
     var walkers = dsBuildWalkers(T.Walkers);
     var routes = dsBuildRoutes(T.Routes);

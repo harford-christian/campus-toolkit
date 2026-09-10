@@ -428,8 +428,19 @@ function dsBuildRoster(values) {
  * 'Attendance Today' -> {studentId: {code, status, detail, reason, excused}}.
  * The tab holds ONLY exceptions — a student absent from it was not marked anything, which is not
  * the same as being present. See dsClassify.
+ *
+ * ROWS ARE DATED, AND THE TAB IS ONLY REWRITTEN INSIDE THE PULL WINDOW (Mon-Fri 08:00-18:30). At
+ * 06:23 on 2026-09-09 it still held the 8th's seven exceptions, and the board marked five children
+ * ABSENT for a day that had not started — the one failure this app must never produce, since a
+ * child marked absent is a child nobody waits for. When `todayKey` is given, rows dated any other
+ * day are dropped; a tab with no Date column is taken whole (defensive). The pull's date is the
+ * REAL day, so callers pass the real today even under ?sim — the sim banner promises real
+ * attendance, not attendance for a pretend date.
+ *
+ * @param {Array} values      the tab, serialised
+ * @param {string} [todayKey] 'yyyy-MM-dd'; omitted = keep every row (older callers, readiness)
  */
-function dsBuildAttendance(values) {
+function dsBuildAttendance(values, todayKey) {
   var out = {};
   if (!values || values.length < 2) return out;
   var h = dsHeaderMap(values[0]);
@@ -437,9 +448,12 @@ function dsBuildAttendance(values) {
     var i = h[name];
     return i === undefined ? '' : dsCellToString(row[i]).trim();
   };
+  var today = String(todayKey || '').slice(0, 10);
+  var dated = h['Date'] !== undefined;
   for (var r = 1; r < values.length; r++) {
     var id = get(values[r], 'Student ID');
     if (!id) continue;
+    if (today && dated && get(values[r], 'Date').slice(0, 10) !== today) continue;
     out[id] = {
       code: get(values[r], 'Code').toUpperCase(),
       status: get(values[r], 'Status'),
@@ -449,6 +463,23 @@ function dsBuildAttendance(values) {
     };
   }
   return out;
+}
+
+/**
+ * The distinct Date values in 'Attendance Today', sorted — so the board can say which day the
+ * attendance it holds is FOR, rather than implying it is today's. [] when there is no Date column
+ * or no rows.
+ */
+function dsAttendanceDates(values) {
+  if (!values || values.length < 2) return [];
+  var h = dsHeaderMap(values[0]);
+  if (h['Date'] === undefined) return [];
+  var seen = {};
+  for (var r = 1; r < values.length; r++) {
+    var d = dsCellToString(values[r][h['Date']]).trim().slice(0, 10);
+    if (d) seen[d] = true;
+  }
+  return Object.keys(seen).sort();
 }
 
 /**
@@ -495,7 +526,27 @@ function dsBuildOverrides(values, todayKey) {
  * RUN_readiness rather than guessed at.
  */
 var DS_STANDING_TYPES = ['Bus', 'Car', 'Early Bird', 'Staff Kid'];
-function dsBuildStanding(values) {
+/**
+ * Does a Days list cover this weekday? Blank means every school day; tokens are tolerant
+ * ("Fri", "Friday", "fri"). Shared by drivers (Routes tab) and standing answers (Standing tab).
+ */
+function dsDaysInclude(days, dayName) {
+  if (!days || !days.length) return true;
+  var d = String(dayName || '').slice(0, 3).toLowerCase();
+  if (!d) return true;
+  for (var i = 0; i < days.length; i++) {
+    if (String(days[i]).slice(0, 3).toLowerCase() === d) return true;
+  }
+  return false;
+}
+
+/**
+ * @param values  the Standing tab
+ * @param dayName 'Mon'..'Fri' — rows with a Days list apply on those days only (the Siverd girls
+ *                ride the South Eastern bus Mon-Thu and are car riders on Friday; Lois, 2026-09-10).
+ *                Omit it to keep every row, as the readiness count does.
+ */
+function dsBuildStanding(values, dayName) {
   var out = {};
   if (!values || values.length < 2) return out;
   var h = dsHeaderMap(values[0]);
@@ -507,9 +558,12 @@ function dsBuildStanding(values) {
     var row = values[r];
     var id = get(row, 'Student ID'), type = get(row, 'Type');
     if (!id || DS_STANDING_TYPES.indexOf(type) === -1) continue;
+    var days = get(row, 'Days').split(/[,\s]+/).filter(String);
+    if (dayName && !dsDaysInclude(days, dayName)) continue;   // not one of this child's days
     out[id] = {
       type: type, routeCode: get(row, 'Route Code'), destination: get(row, 'Destination'),
-      note: get(row, 'Note'), by: get(row, 'By'), at: get(row, 'Since'), standing: true
+      note: get(row, 'Note'), by: get(row, 'By'), at: get(row, 'Since'), standing: true,
+      days: days
     };
   }
   return out;
@@ -933,14 +987,9 @@ function dsRouteFor(routes, code, label) {
  */
 function dsDriversFor(route, session, dayName) {
   if (!route) return [];
-  var d = String(dayName || '').slice(0, 3).toLowerCase();
   return (route.drivers || []).filter(function (x) {
     if (String(x.session).toUpperCase() !== String(session).toUpperCase()) return false;
-    if (!x.days.length) return true;
-    for (var i = 0; i < x.days.length; i++) {
-      if (String(x.days[i]).slice(0, 3).toLowerCase() === d) return true;
-    }
-    return false;
+    return dsDaysInclude(x.days, dayName);
   });
 }
 
@@ -1412,14 +1461,15 @@ function dsFilterBoard(board, f) {
  * @param board   dsBuildBoard output
  * @param routes  dsBuildRoutes output — colour, vehicle, who drives which day
  * @param dayName 'Mon'..'Fri'
- * @param only    optional route code or name — just that route's list, for a one-bus reprint
+ * @param only    optional route code, table name or LANE KEY (the roster's route name — the value
+ *                the page's route dropdown carries) — just that route's list, for a one-bus reprint
  * @return [{ code, name, colour, vehicle, drivers: [{name, phone}],
  *            riding:    [{ id, name, grade, building, flags: ['also on …', 'added today — …', 'standing — …'] }],
  *            notRiding: [{ id, name, grade, reason, detail }] }]  alphabetical, riders alphabetical
  */
 function dsDriverLists(board, routes, dayName, only) {
   routes = routes || {};
-  var lists = {}, routesOf = {}, rows = [];
+  var lists = {}, aliases = {}, routesOf = {}, rows = [];
   ((board && board.groups) || []).forEach(function (g) {
     (g.rows || []).forEach(function (r) { rows.push(r); });
   });
@@ -1439,7 +1489,14 @@ function dsDriverLists(board, routes, dayName, only) {
         }),
         riding: [], notRiding: []
       };
+      aliases[key] = {};
     }
+    // Every name this list is reached by: the code, the table's short name AND the roster's route
+    // name, which is the lane key. The page's route dropdown carries the lane key ("Jarrettsville
+    // Bus Route") while the list is named from the table ("Jarrettsville"), so a code-or-name match
+    // found nothing and the one-bus reprint always alerted "No riders listed" (found 2026-09-09).
+    if (code) aliases[key][String(code).trim().toLowerCase()] = true;
+    if (label) aliases[key][String(label).trim().toLowerCase()] = true;
     return lists[key];
   }
 
@@ -1476,30 +1533,95 @@ function dsDriverLists(board, routes, dayName, only) {
   });
 
   var byName = function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; };
-  var out = Object.keys(lists).map(function (k) { return lists[k]; });
-  out.forEach(function (L) { L.riding.sort(byName); L.notRiding.sort(byName); });
-  out.sort(byName);
+  var keys = Object.keys(lists);
   if (only) {
     var o = String(only).trim().toLowerCase();
-    out = out.filter(function (L) {
-      return L.code.toLowerCase() === o || L.name.toLowerCase() === o;
+    keys = keys.filter(function (k) {
+      var L = lists[k];
+      return L.code.toLowerCase() === o || L.name.toLowerCase() === o || aliases[k][o] === true;
     });
   }
+  var out = keys.map(function (k) { return lists[k]; });
+  out.forEach(function (L) { L.riding.sort(byName); L.notRiding.sort(byName); });
+  out.sort(byName);
   return out;
+}
+
+/**
+ * THE RAMP SLICE — the minimal, read-only board the transportation-kiosk renders from a published
+ * JSON file, and the smallest thing that answers "who is in the ramp line, and who is NOT". A
+ * deliberate SUBSET: the ramp watches the little ones collected by car or bus, so the default is
+ * grades K4-5, types Bus and Car — the ramp lead's saved Ramp view. Early Bird, Staff Kid and grades 6-12
+ * are dropped. A walk-up child of a kept type stays IN, flagged, so a name on the ramp lead's ramp is
+ * never silently absent from the kiosk.
+ *
+ * PII IS MINIMISED ON PURPOSE. The kiosk device signs into no Google account (a token in the URL
+ * gates it), so the file it reads carries as little as the job allows: a name, a grade, where the
+ * child goes with its stick colour, and whether to wait for them. NO student id, NO pickup contacts
+ * or phone, NO homeroom or teacher, NO family id, NO free-text note, NO who-changed-it. The test
+ * suite asserts none of those leak — a field added here without thinking crosses that line. The
+ * stick colour and vehicle are baked in from the routes table so the kiosk needs no routes of its
+ * own.
+ *
+ * @param {Object} board  dsBuildBoard output, AFTER dsApplyWalkUps so walk-up flags are present
+ * @param {Object} routes dsBuildRoutes output (keyed by code)
+ * @param {Object} [opts] {grades:['K4'..'5'], types:['Bus','Car']} — defaults to the ramp view
+ * @return {Array<Object>} one row per child, alphabetical by name:
+ *   { name, grade, type, lanes:[{label,colour,vehicle}], expected, reason, detail,
+ *     split, today, handedTo, walkUp }
+ */
+function dsRampSlice(board, routes, opts) {
+  opts = opts || {};
+  routes = routes || {};
+  // FACTS zero-pads grades ('01'..'09'); the roster may carry either form. Normalise both the
+  // filter set and the emitted value so '01' matches '1' and never shows as "01" on the kiosk.
+  var norm = function (g) {
+    var s = String(g == null ? '' : g).trim().toUpperCase();
+    return /^0\d$/.test(s) ? s.replace(/^0+/, '') : s;
+  };
+  var gradeSet = {};
+  (opts.grades || ['K4', 'K5', '1', '2', '3', '4', '5']).forEach(function (x) { gradeSet[norm(x)] = true; });
+  var typeSet = {};
+  (opts.types || ['Bus', 'Car']).forEach(function (x) { typeSet[x] = true; });
+
+  return dsFlatList(board).filter(function (r) {
+    return typeSet[r.type] && gradeSet[norm(r.grade)];
+  }).map(function (r) {
+    var lanes;
+    if (r.routes && r.routes.length) {
+      lanes = r.routes.map(function (label, i) {
+        var rt = dsRouteFor(routes, (r.routeCodes || [])[i] || '', label);
+        return { label: (rt && rt.name) || label,
+                 colour: (rt && rt.colour) || '',
+                 vehicle: (rt && rt.vehicle) || r.vehicle || '' };
+      });
+    } else {
+      lanes = [{ label: r.type, colour: '', vehicle: '' }];    // Car, and any non-bus residual
+    }
+    // EXPLICIT field list — never a spread of r. That is what keeps id, contacts, homeroom, family
+    // and notes out of an anonymous file. The forbidden-field test guards it.
+    return {
+      name: r.name, grade: norm(r.grade), type: r.type, lanes: lanes,
+      expected: r.expected, reason: r.reason || '', detail: r.detail || '',
+      split: !!r.split, today: !!r.overridden, handedTo: r.overrideDestination || '',
+      walkUp: !!r.walkUp
+    };
+  });
 }
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     dsCellToString: dsCellToString, dsHeaderMap: dsHeaderMap, dsSerializeTab: dsSerializeTab,
     dsBuildRoster: dsBuildRoster, dsBuildAttendance: dsBuildAttendance,
+    dsAttendanceDates: dsAttendanceDates,
     dsBuildOverrides: dsBuildOverrides, dsBuildSignedOut: dsBuildSignedOut, dsClassify: dsClassify,
     dsBuildStanding: dsBuildStanding, dsMergeOverrides: dsMergeOverrides, dsApplyWalkUps: dsApplyWalkUps,
     DS_STANDING_TYPES: DS_STANDING_TYPES,
     dsBuildBoard: dsBuildBoard, dsFilterBoard: dsFilterBoard,
     dsBuildPickups: dsBuildPickups, dsFlatList: dsFlatList, dsStudentCard: dsStudentCard,
     dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
-    dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor,
-    dsDriverLists: dsDriverLists,
+    dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor, dsDaysInclude: dsDaysInclude,
+    dsDriverLists: dsDriverLists, dsRampSlice: dsRampSlice,
     DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
     dsCanChange: dsCanChange, dsBuildStaffNames: dsBuildStaffNames, dsScopeRows: dsScopeRows,
     dsResolveStaff: dsResolveStaff, dsBuildStaffDirectory: dsBuildStaffDirectory,
@@ -1516,7 +1638,19 @@ if (typeof module !== 'undefined' && module.exports) {
   // `sim` is already sanitised server-side to [0-9:\- T], so raw output is safe.
   var SIM = (new URLSearchParams(location.search).get('sim') || '').replace(/[^0-9:\- T]/g, '').slice(0, 16);
   var APP_URL = location.href.split('?')[0];   // for the Reload link (top window)
-  var raw = null, flat = [], pickups = null, reqSeq = 0, mode = 'ramp';
+  // SAFETY NET. An uncaught error in this script leaves whatever was half-painted and says nothing:
+  // in Apps Script the message lands only in the browser console, which nobody at the ramp has
+  // open. Say so on the page, with the same Reload / Try again the other failures offer. Registered
+  // first so an error during start-up is caught too; esc and reloadLinks are hoisted declarations.
+  window.addEventListener('error', function (ev) {
+    try {
+      var el = document.getElementById('banners');
+      if (!el || el.querySelector('[data-jserr]')) return;
+      el.insertAdjacentHTML('afterbegin', '<div class="alert" data-jserr="1"><b>Something went wrong ' +
+        'on this page.</b> ' + esc((ev && ev.message) || 'script error') + '<br>' + reloadLinks() + '</div>');
+    } catch (e) { /* the safety net itself must never throw */ }
+  });
+  var raw = null, flat = [], pickups = null, pickupsFailed = false, reqSeq = 0, mode = 'ramp';
   var liveOk = false;           // has a LIVE payload rendered in this page's lifetime?
   var retries = 0;              // failed attempts before any live payload
   var degraded = null;          // { at, why, cached, refreshing } when what is on screen is not live
@@ -1939,7 +2073,13 @@ if (typeof module !== 'undefined' && module.exports) {
     }
     h += '<div class="sect"><h4>Authorized to collect</h4>';
     if (!c.pickupsLoaded) {
-      h += '<div class="muted">Loading contacts…</div>';   // phase 2 still in flight
+      // Phase 2 still in flight — or it FAILED. The first version set pickups = {} on failure, so
+      // every card then read "None recorded in FACTS" for the rest of the page's life: a true
+      // sentence about the wrong thing. Say what happened; the next load retries.
+      h += pickupsFailed
+        ? '<div class="muted" style="color:#C62828;font-weight:700">Contacts could not be loaded — ' +
+          'tap &#8635; to retry, or ask the office.</div>'
+        : '<div class="muted">Loading contacts…</div>';
     } else if (!c.hasPickups) {
       h += '<div class="muted">None recorded in FACTS for this student.</div>';
     } else {
@@ -2018,7 +2158,14 @@ if (typeof module !== 'undefined' && module.exports) {
     google.script.run
       .withSuccessHandler(function (res) {
         b.disabled = false; b.textContent = 'Save for today';
-        if (res && res.ok) { applyPayload(res); renderFreshness(res.freshness || {}); }
+        if (res && res.ok) {
+          // This payload was built AFTER the row was written, so it outranks any five-minute poll
+          // still in flight: bump the sequence so a slower, pre-save answer cannot paint over it
+          // and make the change look lost until the next tick. A save that succeeded also proves
+          // the connection is live, so any red banner comes down.
+          reqSeq++; liveOk = true; retries = 0; degraded = null;
+          applyPayload(res); cachePut(res); renderFreshness(res.freshness || {});
+        }
         $('ovr').close(); banners(); render();
       })
       .withFailureHandler(function (err) {
@@ -2308,7 +2455,15 @@ if (typeof module !== 'undefined' && module.exports) {
         b += '<div class="warn">Mid-day sign-outs are not connected yet, so a student collected ' +
              'during the day still shows as expected. Absences come from FACTS attendance.</div>';
       }
-      if (raw.freshness && raw.freshness.attendanceRows === 0) {
+      if (fr.attendanceOffDay) {
+        // The tab still holds another day's rows: it is only rewritten 08:00-18:30 Mon-Fri, and a
+        // dead trigger looks the same. Those rows were dropped server-side so nobody reads absent
+        // from them — say so, rather than letting "0 exceptions" pass for a full house.
+        b += '<div class="warn"><b>Today\'s attendance has not been pulled yet.</b> The attendance tab ' +
+             'is dated ' + esc((fr.attendanceDates || []).join(', ')) + ', so nobody on this board is ' +
+             'marked absent from today\'s attendance. The pull runs 08:00–18:30 on school days; if this ' +
+             'is showing after 08:30, tell Josh.</div>';
+      } else if (fr.attendanceRows === 0) {
         b += '<div class="warn">No attendance exceptions recorded today — either nobody is out, ' +
              'or attendance has not been entered yet.</div>';
       }
@@ -2456,15 +2611,24 @@ if (typeof module !== 'undefined' && module.exports) {
       (f.syncedAgeMin != null ? ' (' + f.syncedAgeMin + ' min ago)' : '') +
       ' · ' + (f.attendanceRows || 0) + ' attendance exception(s)' +
       (f.signOutActive ? ' · ' + (f.signOutCount || 0) + ' signed out today' : '') +
-      ' · roster ' + (f.rosterAt || '?');
+      ' · roster ' + (f.rosterAt || '?') +
+      // how old the precomputed board is: the minute publisher keeps this a few seconds during
+      // dismissal, and a growing number is the first sign the publisher has stalled.
+      (f.boardAgeSec != null
+        ? ' · board ' + (f.boardAgeSec < 90 ? 'just now' : Math.round(f.boardAgeSec / 60) + 'm ago')
+        : '') +
+      // how long the server took to answer THIS request: a cache hit reads well under a second.
+      (f.serverMs != null ? ' · server ' + (Math.round(f.serverMs / 100) / 10) + 's' : '');
   }
 
   // Phase 2. The list is scannable and searchable without contacts, so this never blocks a paint.
   // If it fails, the board keeps working and a tapped card says contacts are unavailable.
   function loadPickups() {
     google.script.run
-      .withSuccessHandler(function (p) { pickups = p || {}; })
-      .withFailureHandler(function () { pickups = {}; })
+      .withSuccessHandler(function (p) { pickups = p || {}; pickupsFailed = false; })
+      // pickups stays null: the card says contacts are unavailable rather than "none recorded",
+      // and the next successful load() asks again.
+      .withFailureHandler(function () { pickupsFailed = true; })
       .pickupsApi();
   }
 
