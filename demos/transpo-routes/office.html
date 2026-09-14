@@ -1,0 +1,580 @@
+<!doctype html>
+<html>
+<head>
+<base target="_self">
+<script src="logic.js"></script>
+<style>
+:root {
+  color-scheme: only light;
+  --ink:#1c1c1e; --muted:#6b6b70; --line:#e3e3e6; --bg:#f7f7f8; --card:#fff;
+  --red:#b22222; --redbg:#fdecec; --green:#1a7f37; --greenbg:#e8f5ec;
+  --amber:#9a6700; --amberbg:#fff8e6; --slate:#5a6270; --slatebg:#eef0f3;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100dvh;background:var(--bg);color:var(--ink);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",sans-serif;
+  touch-action:manipulation;-webkit-text-size-adjust:100%}
+.hide{display:none!important}
+header{position:sticky;top:0;z-index:10;background:var(--card);border-bottom:1px solid var(--line)}
+.hin{max-width:64rem;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:1.05rem;margin:0;flex:1;min-width:0}
+.who{font-size:.8rem;color:var(--muted)}
+nav{max-width:64rem;margin:0 auto;padding:0 16px;display:flex;gap:4px;overflow-x:auto}
+nav button{min-height:44px;border:none;background:none;font:inherit;color:var(--muted);
+  padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--ink)}
+main{max-width:64rem;margin:0 auto;padding:16px 16px calc(40px + env(safe-area-inset-bottom))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+h2{font-size:.82rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:22px 0 8px}
+.dot{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.25);flex:none;display:inline-block;vertical-align:-2px}
+.pill{display:inline-block;font-size:.75rem;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.p-none{background:var(--slatebg);color:var(--slate)}
+.p-part{background:var(--amberbg);color:var(--amber)}
+.p-done{background:var(--greenbg);color:var(--green)}
+.p-off{background:var(--redbg);color:var(--red)}
+button.act{min-height:40px;font:inherit;border:1px solid var(--line);background:var(--card);
+  border-radius:9px;padding:8px 12px;cursor:pointer}
+button.act:active{background:#f0f0f2}
+button.primary{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600}
+button.danger{color:var(--red);border-color:#f0cccc}
+input,select,textarea{font:inherit;font-size:1rem;min-height:40px;padding:8px 10px;
+  border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);max-width:100%}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+  padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600}
+td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+.banner{border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:.88rem}
+.b-warn{background:var(--amberbg);color:var(--amber);border:1px solid #f0dda8}
+.b-info{background:var(--slatebg);color:var(--slate);border:1px solid #dfe3e8}
+.b-good{background:var(--greenbg);color:var(--green);border:1px solid #bfe3cb}
+.empty{color:var(--muted);text-align:center;padding:28px 8px}
+dialog{border:none;border-radius:14px;padding:0;max-width:32rem;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(0,0,0,.4)}
+.dlg{padding:18px}
+.secret{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#f4f4f6;
+  border:1px solid var(--line);border-radius:8px;padding:10px;word-break:break-all;font-size:.85rem}
+.stopcard{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fcfcfd}
+@media (max-width:640px){
+  main{padding-left:12px;padding-right:12px}
+  .hin{padding:10px 12px}
+  h2{margin-top:18px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Transportation Office" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="hin">
+    <h1 id="title">Transportation</h1>
+    <span class="who" id="who"></span>
+    <button class="act" id="refresh">Refresh</button>
+  </div>
+  <nav>
+    <button data-tab="today" aria-selected="true">Today</button>
+    <button data-tab="drivers" aria-selected="false">Drivers</button>
+    <button data-tab="stops" aria-selected="false">Stops</button>
+    <button data-tab="activity" aria-selected="false">Activity</button>
+  </nav>
+</header>
+
+<main>
+  <div id="err" class="banner b-warn hide"></div>
+  <section id="tab-today"></section>
+  <section id="tab-drivers" class="hide"></section>
+  <section id="tab-stops" class="hide"></section>
+  <section id="tab-activity" class="hide"></section>
+</main>
+
+<dialog id="dlg"><div class="dlg" id="dlgBody"></div></dialog>
+
+<script>
+(function () {
+  'use strict';
+
+  var WHO = 'transportation@example.edu';
+  var state = { tab: 'today', dashboard: null, drivers: null, activity: null, stops: null };
+
+  function $(id) {
+    var el = document.getElementById(id);
+    if (!el) throw new Error('missing element: ' + id);
+    return el;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+    });
+  }
+  function api(req, cb) {
+    google.script.run
+      .withSuccessHandler(function (r) { cb(r || { ok:false, reason:'error' }); })
+      .withFailureHandler(function (e) { cb({ ok:false, reason:'offline', message:String(e && e.message || e) }); })
+      .officeApi(req);
+  }
+  function fail(res) {
+    var el = $('err');
+    if (!res || res.ok) { el.classList.add('hide'); return false; }
+    el.textContent = res.reason === 'denied' ? 'You do not have access to this.'
+      : res.reason === 'offline' ? 'Lost connection — try Refresh.'
+      : ('Something went wrong' + (res.message ? ': ' + res.message : '.'));
+    el.classList.remove('hide');
+    return true;
+  }
+  function swatch(name) {
+    var m = { purple:'#7a3fa8', pink:'#e0679a', white:'#ffffff', orange:'#e8862a',
+              red:'#c0392b', green:'#2e8b57', blue:'#2f6fb5' };
+    return m[String(name||'').trim().toLowerCase()] || '#d8d8dc';
+  }
+  function when(iso) {
+    if (!iso) return '—';
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+    if (!m) return String(iso);
+    var h = Number(m[4]), ap = h >= 12 ? 'pm' : 'am';
+    return m[2] + '/' + m[3] + ' ' + ((h % 12) || 12) + ':' + m[5] + ap;
+  }
+  function ago(iso) {
+    if (!iso) return 'never';
+    var t = Date.parse(String(iso).replace(' ', 'T'));
+    if (!t) return when(iso);
+    var d = Math.floor((Date.now() - t) / 86400000);
+    return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago';
+  }
+
+  /* ------------------------------ tabs ------------------------------ */
+
+  function show(tab) {
+    state.tab = tab;
+    ['today','drivers','stops','activity'].forEach(function (t) {
+      $('tab-' + t).classList.toggle('hide', t !== tab);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) {
+      b.setAttribute('aria-selected', String(b.getAttribute('data-tab') === tab));
+    });
+    load(tab);
+  }
+
+  function load(tab, force) {
+    if (tab === 'today')    return (!state.dashboard || force) ? loadToday() : null;
+    if (tab === 'drivers')  return (!state.drivers || force) ? loadDrivers() : null;
+    if (tab === 'activity') return (!state.activity || force) ? loadActivity() : null;
+    if (tab === 'stops')    return (!state.stops || force) ? loadStops() : null;
+  }
+
+  /* ------------------------------ today ------------------------------ */
+
+  function loadToday() {
+    $('tab-today').innerHTML = '<p class="empty">Loading…</p>';
+    api({ op:'dashboard' }, function (res) {
+      if (fail(res)) { $('tab-today').innerHTML = ''; return; }
+      state.dashboard = res;
+      renderToday(res);
+    });
+  }
+
+  function renderToday(d) {
+    var checked = d.routes.filter(function (r) { return r.state !== 'not_checked'; }).length;
+    var h = [];
+
+    h.push('<div class="banner b-info"><b>' + esc(d.dayName) + '</b> ' +
+      (d.session === 'AM' ? 'morning' : 'afternoon') + ' run · ' + d.routes.length + ' routes · ' +
+      d.totalExpected + ' riders expected · list built ' + esc(when(d.builtAt)) + '</div>');
+
+    if (d.session === 'PM' && !d.signOutActive) {
+      h.push('<div class="banner b-warn">Mid-day sign-outs are not connected, so a child collected ' +
+        'at lunchtime will still show as riding.</div>');
+    }
+    if (d.attendanceOffDay) {
+      h.push('<div class="banner b-warn">Attendance has not been pulled for today yet — nobody is ' +
+        'flagged absent.</div>');
+    }
+
+    // The honesty banner. This is the whole reason the dashboard exists in this shape.
+    h.push('<div class="banner ' + (checked ? 'b-info' : 'b-warn') + '">' +
+      '<b>' + checked + ' of ' + d.routes.length + ' routes checked in today.</b> ' +
+      'A route marked <span class="pill p-none">Not checked</span> means nobody recorded anything — ' +
+      'it does <b>not</b> mean the children did not board. Drivers use the tick list by choice.</div>');
+
+    h.push('<div class="scroll"><table><thead><tr>' +
+      '<th>Route</th><th>Colour</th><th>Driver today</th><th>Expected</th>' +
+      '<th>Not riding</th><th>Check-off</th></tr></thead><tbody>');
+
+    d.routes.forEach(function (r) {
+      var cls = r.state === 'not_checked' ? 'p-none' : r.state === 'complete' ? 'p-done' : 'p-part';
+      var word = r.state === 'not_checked' ? 'Not checked'
+               : r.state === 'complete' ? 'All recorded' : 'Partly recorded';
+      h.push('<tr>' +
+        '<td><b>' + esc(r.name) + '</b><br><span class="muted small">' + esc(r.code) + '</span></td>' +
+        '<td><span class="dot" style="background:' + swatch(r.colour) + '"></span> ' +
+          (r.colour ? esc(r.colour) : '<span class="muted">none</span>') + '</td>' +
+        '<td>' + (r.drivers.length ? esc(r.drivers.join(', '))
+                                   : '<span class="p-off pill">none listed</span>') + '</td>' +
+        '<td>' + r.expected + '</td>' +
+        '<td>' + (r.notRiding ? '<b>' + r.notRiding + '</b>' : '0') + '</td>' +
+        '<td><span class="pill ' + cls + '">' + word + '</span><br>' +
+          '<span class="muted small">' + esc(r.label) + '</span></td>' +
+      '</tr>');
+    });
+    h.push('</tbody></table></div>');
+
+    var g = d.gaps || {};
+    if ((g.noDriver || []).length) {
+      h.push('<h2>Driver coverage</h2><div class="card">' +
+        (g.isSchoolDay
+          ? '<b>No driver listed for ' + esc(g.dayName) + ':</b> ' + esc(g.noDriver.join(', ')) +
+            '<div class="small muted">This is a school day, so each of these is a real gap. ' +
+            'Check the Days column in the dismissal app\'s Routes tab.</div>'
+          : '<b>' + esc(g.dayName || 'Today') + ' is not a school day</b>, so drivers who only run ' +
+            'certain weekdays correctly show none. Re-check on a weekday.') + '</div>');
+    }
+    if ((g.noColour || []).length) {
+      h.push('<h2>No stick colour</h2><div class="card">' + esc(g.noColour.join(', ')) +
+        '<div class="small muted">RL and SE are outside district buses and carry no HCS colour — ' +
+        'expected. Any other code here has no row in the dismissal app\'s Routes tab.</div></div>');
+    }
+
+    $('tab-today').innerHTML = h.join('');
+  }
+
+  /* ------------------------------ drivers ------------------------------ */
+
+  function loadDrivers() {
+    $('tab-drivers').innerHTML = '<p class="empty">Loading…</p>';
+    api({ op:'drivers' }, function (res) {
+      if (fail(res)) { $('tab-drivers').innerHTML = ''; return; }
+      state.drivers = res;
+      renderDrivers(res);
+    });
+  }
+
+  function renderDrivers(d) {
+    var h = [];
+    if (!d.execUrl) {
+      h.push('<div class="banner b-warn">The driver app link is not configured, so new drivers ' +
+        'cannot be given a working link. Ask Josh to set <code>OFFICE_DRIVER_URL</code>.</div>');
+    }
+    h.push('<div class="row" style="margin-bottom:12px">' +
+      '<div class="grow"></div><button class="act primary" id="addDriver">Add a driver</button></div>');
+
+    h.push('<div class="scroll"><table><thead><tr><th>Driver</th><th>Routes</th><th>Phones</th>' +
+      '<th>Last opened</th><th>Tick days</th><th></th></tr></thead><tbody>');
+
+    if (!d.drivers.length) {
+      h.push('<tr><td colspan="6"><span class="muted">Nobody enrolled yet.</span></td></tr>');
+    }
+    d.drivers.forEach(function (x) {
+      var warn = [];
+      if (!x.hasPin) warn.push('<span class="pill p-off">no PIN</span>');
+      if (!x.devices) warn.push('<span class="pill p-off">no phone</span>');
+      if (x.lockouts) warn.push('<span class="pill p-part">locked out ' + x.lockouts + '×</span>');
+      h.push('<tr' + (x.active ? '' : ' style="opacity:.55"') + '>' +
+        '<td><b>' + esc(x.name) + '</b>' + (x.active ? '' : ' <span class="pill p-off">off</span>') +
+          (warn.length ? '<br>' + warn.join(' ') : '') + '</td>' +
+        '<td>' + (x.routes === '*' ? '<span class="muted">all</span>' : esc(x.routes)) + '</td>' +
+        '<td>' + x.devices + '</td>' +
+        '<td>' + esc(ago(x.lastLogin)) + '<br><span class="muted small">' + x.logins + ' opens</span></td>' +
+        '<td>' + (x.boardingDays ? x.boardingDays : '<span class="muted">—</span>') + '</td>' +
+        '<td style="white-space:nowrap">' +
+          '<button class="act" data-pin="' + esc(x.driverId) + '">Reset PIN</button> ' +
+          '<button class="act" data-link="' + esc(x.driverId) + '">New link</button> ' +
+          '<button class="act ' + (x.active ? 'danger' : '') + '" data-active="' + esc(x.driverId) +
+            '" data-on="' + (x.active ? '0' : '1') + '">' + (x.active ? 'Turn off' : 'Turn on') +
+          '</button>' +
+        '</td></tr>');
+    });
+    h.push('</tbody></table></div>');
+
+    h.push('<h2>Phones</h2><div class="scroll"><table><thead><tr><th>Device</th><th>Driver</th>' +
+      '<th>Added</th><th></th></tr></thead><tbody>');
+    var nameOf = {};
+    d.drivers.forEach(function (x) { nameOf[x.driverId] = x.name; });
+    if (!d.devices.length) h.push('<tr><td colspan="4"><span class="muted">None.</span></td></tr>');
+    d.devices.forEach(function (v) {
+      h.push('<tr' + (v.active ? '' : ' style="opacity:.55"') + '><td>' + esc(v.device) +
+        (v.active ? '' : ' <span class="pill p-off">revoked</span>') + '</td>' +
+        '<td>' + esc(nameOf[v.driverId] || v.driverId) + '</td><td>' + esc(v.added) + '</td>' +
+        '<td><button class="act ' + (v.active ? 'danger' : '') + '" data-revoke="' + esc(v.token) +
+          '" data-on="' + (v.active ? '0' : '1') + '">' +
+          (v.active ? 'Revoke' : 'Restore') + '</button></td></tr>');
+    });
+    h.push('</tbody></table></div>');
+    h.push('<p class="small muted">Revoking a phone takes effect the next time it asks for ' +
+      'anything — no waiting. The PIN is stored scrambled and can never be read back, so a ' +
+      'forgotten one is reset, not looked up.</p>');
+
+    $('tab-drivers').innerHTML = h.join('');
+    wireDrivers();
+  }
+
+  function wireDrivers() {
+    var root = $('tab-drivers');
+    var on = function (attr, fn) {
+      Array.prototype.forEach.call(root.querySelectorAll('[' + attr + ']'), function (b) {
+        b.addEventListener('click', function () { fn(b); });
+      });
+    };
+    var add = root.querySelector('#addDriver');
+    if (add) add.addEventListener('click', addDriverDialog);
+
+    on('data-pin', function (b) {
+      var id = b.getAttribute('data-pin');
+      askPin('Reset PIN', 'Leave blank for a random one.', function (pin) {
+        api({ op:'resetPin', driverId:id, pin:pin }, function (res) {
+          if (fail(res)) return;
+          showSecret('New PIN', '<p>Tell them this in person or by phone — it is not shown again.</p>' +
+            '<div class="secret">' + esc(res.pin) + '</div>');
+          loadDrivers();
+        });
+      });
+    });
+    on('data-link', function (b) {
+      var id = b.getAttribute('data-link');
+      api({ op:'addDevice', driverId:id, device:'replacement phone' }, function (res) {
+        if (fail(res)) return;
+        showSecret('New link', res.link
+          ? '<p>Send this to the driver. Their PIN is unchanged.</p><div class="secret">' +
+            esc(res.link) + '</div><p class="small muted">On the phone: open in Safari or Chrome, ' +
+            'then Share &rsaquo; Add to Home Screen.</p>'
+          : '<p>Device added, but the driver app URL is not configured so no link could be built.</p>');
+        loadDrivers();
+      });
+    });
+    on('data-active', function (b) {
+      api({ op:'setActive', driverId:b.getAttribute('data-active'),
+            active:b.getAttribute('data-on') === '1' }, function (res) {
+        if (!fail(res)) loadDrivers();
+      });
+    });
+    on('data-revoke', function (b) {
+      api({ op:'revokeDevice', token:b.getAttribute('data-revoke'),
+            active:b.getAttribute('data-on') === '1' }, function (res) {
+        if (!fail(res)) loadDrivers();
+      });
+    });
+  }
+
+  function addDriverDialog() {
+    $('dlgBody').innerHTML =
+      '<h3 style="margin:0 0 12px">Add a driver</h3>' +
+      // Generic placeholder on purpose: a real driver's name here reads as though that person is
+      // already enrolled, and it leaks a real individual into the public showcase build.
+      '<p><label>Name<br><input id="nName" style="width:100%" placeholder="First Last"></label></p>' +
+      '<p><label>Routes<br><input id="nRoutes" style="width:100%" value="*"></label>' +
+        '<span class="small muted">* means every route. Or a list like J,Ab</span></p>' +
+      '<p><label>PIN<br><input id="nPin" inputmode="numeric" maxlength="6" placeholder="random"></label></p>' +
+      '<div class="row" style="justify-content:flex-end;margin-top:14px">' +
+        '<button class="act" id="nCancel">Cancel</button>' +
+        '<button class="act primary" id="nSave">Add</button></div>';
+    $('dlg').showModal();
+    $('nCancel').addEventListener('click', function () { $('dlg').close(); });
+    $('nSave').addEventListener('click', function () {
+      var name = $('nName').value.trim();
+      if (!name) return $('nName').focus();
+      api({ op:'addDriver', name:name, routes:$('nRoutes').value.trim() || '*',
+            pin:$('nPin').value.trim() }, function (res) {
+        if (fail(res)) { $('dlg').close(); return; }
+        showSecret('Added ' + res.name,
+          '<p><b>Send the link. Say the PIN separately.</b></p>' +
+          (res.link ? '<div class="secret">' + esc(res.link) + '</div>'
+                    : '<p class="muted">No link — the driver app URL is not configured.</p>') +
+          '<p style="margin-top:10px">PIN</p><div class="secret">' + esc(res.pin) + '</div>' +
+          '<p class="small muted">This is the only time the PIN is shown. On the phone: open in ' +
+          'Safari or Chrome, then Share &rsaquo; Add to Home Screen.</p>');
+        loadDrivers();
+      });
+    });
+  }
+
+  function askPin(title, hint, cb) {
+    $('dlgBody').innerHTML = '<h3 style="margin:0 0 8px">' + esc(title) + '</h3>' +
+      '<p class="small muted">' + esc(hint) + '</p>' +
+      '<p><input id="pPin" inputmode="numeric" maxlength="6" placeholder="4-6 digits"></p>' +
+      '<div class="row" style="justify-content:flex-end">' +
+        '<button class="act" id="pCancel">Cancel</button>' +
+        '<button class="act primary" id="pOk">Set PIN</button></div>';
+    $('dlg').showModal();
+    $('pCancel').addEventListener('click', function () { $('dlg').close(); });
+    $('pOk').addEventListener('click', function () {
+      var v = $('pPin').value.trim();
+      $('dlg').close();
+      cb(v);
+    });
+  }
+
+  function showSecret(title, bodyHtml) {
+    $('dlgBody').innerHTML = '<h3 style="margin:0 0 10px">' + esc(title) + '</h3>' + bodyHtml +
+      '<div class="row" style="justify-content:flex-end;margin-top:14px">' +
+      '<button class="act primary" id="sClose">Done</button></div>';
+    $('dlg').showModal();
+    $('sClose').addEventListener('click', function () { $('dlg').close(); });
+  }
+
+  /* ------------------------------ activity ------------------------------ */
+
+  function loadActivity() {
+    $('tab-activity').innerHTML = '<p class="empty">Loading…</p>';
+    api({ op:'activity', limit:200 }, function (res) {
+      if (fail(res)) { $('tab-activity').innerHTML = ''; return; }
+      state.activity = res;
+      var words = { login:'opened the app', login_failed:'wrong PIN',
+                    locked:'locked out', route_open:'looked at a route' };
+      var h = ['<div class="banner b-info">Most recent first. This is how you can tell who is ' +
+        'actually using the app.</div><div class="scroll"><table><thead><tr><th>When</th>' +
+        '<th>Driver</th><th>What</th><th>Detail</th></tr></thead><tbody>'];
+      if (!res.rows.length) {
+        h.push('<tr><td colspan="4"><span class="muted">Nothing yet.</span></td></tr>');
+      }
+      res.rows.forEach(function (r) {
+        var bad = r.event === 'locked' || r.event === 'login_failed';
+        h.push('<tr><td style="white-space:nowrap">' + esc(when(r.at)) + '</td>' +
+          '<td>' + esc(r.name || r.driverId) + '</td>' +
+          '<td' + (bad ? ' style="color:var(--red);font-weight:600"' : '') + '>' +
+            esc(words[r.event] || r.event) + '</td>' +
+          '<td class="muted small">' + esc(r.detail) + '</td></tr>');
+      });
+      h.push('</tbody></table></div>');
+      $('tab-activity').innerHTML = h.join('');
+    });
+  }
+
+  /* ------------------------------ stops ------------------------------ */
+
+  function loadStops() {
+    var d = state.dashboard;
+    if (!d) return api({ op:'dashboard' }, function (res) {
+      if (fail(res)) return; state.dashboard = res; loadStops();
+    });
+    var code = (state.stops && state.stops.code) || d.routes[0] && d.routes[0].code;
+    if (!code) { $('tab-stops').innerHTML = '<p class="empty">No routes.</p>'; return; }
+    fetchStops(code);
+  }
+
+  function fetchStops(code) {
+    $('tab-stops').innerHTML = '<p class="empty">Loading…</p>';
+    api({ op:'stops', code:code, session:'PM' }, function (res) {
+      if (fail(res)) { $('tab-stops').innerHTML = ''; return; }
+      state.stops = res;
+      renderStops(res);
+    });
+  }
+
+  function renderStops(s) {
+    var d = state.dashboard;
+    var h = ['<div class="banner b-info">Build the stop order for a route, then say which child ' +
+      'gets on where. Drivers see the stops in this order. A child you do not place still appears, ' +
+      'under &ldquo;stop not set&rdquo; — nobody is ever dropped.</div>'];
+
+    h.push('<div class="row" style="margin-bottom:12px"><label>Route&nbsp;' +
+      '<select id="sRoute">' + d.routes.map(function (r) {
+        return '<option value="' + esc(r.code) + '"' + (r.code === s.code ? ' selected' : '') +
+               '>' + esc(r.name) + '</option>';
+      }).join('') + '</select></label><div class="grow"></div>' +
+      '<button class="act" id="sAdd">Add a stop</button>' +
+      '<button class="act primary" id="sSave">Save</button></div>');
+
+    h.push('<div id="sList">');
+    (s.stops.length ? s.stops : []).forEach(function (st, i) { h.push(stopCard(st, i)); });
+    h.push('</div>');
+    if (!s.stops.length) {
+      h.push('<p class="empty">No stops yet. Add the first one.</p>');
+    }
+
+    h.push('<h2>Who gets on where</h2><div class="scroll"><table><thead><tr><th>Child</th>' +
+      '<th>Grade</th><th>Stop</th></tr></thead><tbody>');
+    s.riders.forEach(function (r) {
+      h.push('<tr><td>' + esc(r.name) + '</td><td>' + esc(r.grade) + '</td>' +
+        '<td><select data-sid="' + esc(r.id) + '"><option value="">— not set —</option>' +
+        s.stops.map(function (st) {
+          return '<option value="' + esc(st.stopId) + '"' +
+                 (st.stopId === r.stopId ? ' selected' : '') + '>' + esc(st.name) + '</option>';
+        }).join('') + '</select></td></tr>');
+    });
+    if (!s.riders.length) h.push('<tr><td colspan="3"><span class="muted">No riders.</span></td></tr>');
+    h.push('</tbody></table></div>');
+
+    $('tab-stops').innerHTML = h.join('');
+    wireStops();
+  }
+
+  function stopCard(st, i) {
+    return '<div class="stopcard" data-stop="' + esc(st.stopId || '') + '">' +
+      '<div class="row"><b style="min-width:1.6rem">' + (i + 1) + '.</b>' +
+      '<input class="grow" data-f="name" value="' + esc(st.name || '') + '" placeholder="Stop name">' +
+      '<input data-f="time" value="' + esc(st.time || '') + '" placeholder="3:25" style="width:6rem">' +
+      '<button class="act danger" data-del="1">Remove</button></div>' +
+      '<div class="row" style="margin-top:8px">' +
+      '<input class="grow" data-f="landmark" value="' + esc(st.landmark || '') +
+        '" placeholder="Landmark — how a new driver finds it"></div>' +
+      '<div class="row" style="margin-top:8px">' +
+      '<input class="grow" data-f="driverNote" value="' + esc(st.driverNote || '') +
+        '" placeholder="Note for the driver — about the place, never about a child"></div></div>';
+  }
+
+  function wireStops() {
+    var root = $('tab-stops');
+    root.querySelector('#sRoute').addEventListener('change', function (e) {
+      fetchStops(e.target.value);
+    });
+    root.querySelector('#sAdd').addEventListener('click', function () {
+      var list = root.querySelector('#sList');
+      var wrap = document.createElement('div');
+      wrap.innerHTML = stopCard({}, list.children.length);
+      list.appendChild(wrap.firstChild);
+      wireDelete();
+    });
+    root.querySelector('#sSave').addEventListener('click', saveStops);
+    wireDelete();
+    function wireDelete() {
+      Array.prototype.forEach.call(root.querySelectorAll('[data-del]'), function (b) {
+        b.onclick = function () { b.closest('.stopcard').remove(); };
+      });
+    }
+  }
+
+  function saveStops() {
+    var root = $('tab-stops');
+    var stops = Array.prototype.map.call(root.querySelectorAll('.stopcard'), function (c) {
+      var g = function (f) {
+        var el = c.querySelector('[data-f="' + f + '"]');
+        return el ? el.value.trim() : '';
+      };
+      return { stopId: c.getAttribute('data-stop') || '', name: g('name'),
+               landmark: g('landmark'), time: g('time'), driverNote: g('driverNote') };
+    }).filter(function (s) { return !!s.name; });
+
+    var assign = {};
+    Array.prototype.forEach.call(root.querySelectorAll('[data-sid]'), function (sel) {
+      if (sel.value) assign[sel.getAttribute('data-sid')] = sel.value;
+    });
+
+    api({ op:'saveStops', code:state.stops.code, session:'PM', stops:stops, assign:assign },
+      function (res) {
+        if (fail(res)) return;
+        fetchStops(state.stops.code);
+      });
+  }
+
+  /* ------------------------------ wire up ------------------------------ */
+
+  Array.prototype.forEach.call(document.querySelectorAll('nav button'), function (b) {
+    b.addEventListener('click', function () { show(b.getAttribute('data-tab')); });
+  });
+  $('refresh').addEventListener('click', function () { load(state.tab, true); });
+  $('who').textContent = WHO;
+  show('today');
+})();
+</script>
+</body>
+</html>

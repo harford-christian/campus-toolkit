@@ -1,0 +1,10 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/transpo-routes/build-logic.mjs && node tools/build-demo.mjs demos/transpo-routes/build.driver.json && node tools/build-demo.mjs demos/transpo-routes/build.office.json. The source page is a COMPLETE template document, so no head/body wrapper is needed. Two deliberate demo-only edits, both markup, never the app's JavaScript: (1) base target becomes _self, because in production this page is the top document of the Apps Script sandbox and _top is what breaks it out of googleusercontent's iframe, whereas here the switcher's iframe IS the intended home; (2) logic.js is pulled in so the mock can run the app's real pure modules — buildManifest and foldBoarding — in the browser. The ?k= token is replaced with a demo value; the mock accepts any token and gates on the PIN, which is the part of the sign-in worth showing.",
+  "src": "../FACTS/transpo-department/apps/driver/pages/Driver.html",
+  "dst": "demos/transpo-routes/driver.html",
+  "demoName": "Driver Routes",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<script src=\"logic.js\"></script>"],
+    ["<?= token ?>", "demo-tok-1"]
+  ]
+}

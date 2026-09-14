@@ -1,0 +1,449 @@
+<!doctype html>
+<html>
+<head>
+<base target="_self">
+<script src="logic.js"></script>
+<style>
+/* HCS mobile standard. A phone, held one-handed, in a bus, in the rain.
+   - color-scheme: only light, or Chrome's Auto Dark inverts the brand palette and turns the
+     route colour chips into something that no longer matches the stick in the child's hand.
+   - 100dvh not 100vh (mobile browser chrome).
+   - every tap target >= 48px: this is used standing up, in motion, sometimes gloved. */
+:root {
+  color-scheme: only light;
+  --ink: #1c1c1e; --muted: #6b6b70; --line: #e3e3e6; --bg: #f7f7f8; --card: #fff;
+  --red: #b22222; --redbg: #fdecec; --green: #1a7f37; --amber: #9a6700; --amberbg: #fff8e6;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; min-height: 100dvh; background: var(--bg); color: var(--ink);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  touch-action: manipulation; overscroll-behavior-y: contain;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 40rem; margin: 0 auto; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
+.hide { display: none !important; }
+
+/* ---------- header ---------- */
+header {
+  position: sticky; top: 0; z-index: 5; background: var(--card);
+  border-bottom: 1px solid var(--line); padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+}
+.hrow { max-width: 40rem; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
+.htitle { font-weight: 650; font-size: 1.05rem; flex: 1; min-width: 0;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hsub { font-size: .8rem; color: var(--muted); }
+
+/* ---------- buttons ---------- */
+button, .btn {
+  min-height: 48px; font-size: 1rem; font-family: inherit; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  padding: 12px 16px; cursor: pointer; display: inline-flex; align-items: center;
+  gap: 10px; width: 100%; text-align: left;
+}
+button:active { background: #f0f0f2; }
+.primary { background: var(--ink); color: #fff; border-color: var(--ink); justify-content: center; font-weight: 600; }
+.back { min-height: 48px; background: none; border: none; padding: 0 4px 0 0; width: auto;
+        font-size: 1rem; color: var(--muted); }
+
+/* ---------- PIN ---------- */
+#pinView { min-height: 70dvh; display: grid; place-items: center; }
+#pinView .box { width: 100%; max-width: 20rem; text-align: center; }
+/* >=16px or iOS zooms the whole page on focus. inputmode numeric brings up the number pad
+   without blocking a hardware keyboard. */
+#pin {
+  font-size: 2rem; letter-spacing: .5em; text-indent: .5em; text-align: center;
+  width: 100%; min-height: 60px; padding: 8px; border: 2px solid var(--line);
+  border-radius: 12px; background: var(--card); font-family: inherit;
+}
+#pin:focus { outline: none; border-color: var(--ink); }
+
+/* ---------- route list ---------- */
+.routebtn { margin-bottom: 10px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; font-size: .85rem;
+  font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+  background: #fafafa; white-space: nowrap;
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); flex: none; }
+
+/* ---------- stops + riders ---------- */
+.stop { margin: 18px 0 0; }
+.stophead { display: flex; align-items: baseline; gap: 8px; padding: 6px 2px; }
+.stopname { font-weight: 650; }
+.stopmeta { font-size: .82rem; color: var(--muted); }
+.note { font-size: .85rem; color: var(--amber); background: var(--amberbg);
+        border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+ul { list-style: none; margin: 0; padding: 0; }
+li.rider {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  margin-bottom: 8px; display: flex; align-items: stretch; overflow: hidden;
+}
+.rname { flex: 1; min-width: 0; padding: 12px 14px; display: flex; flex-direction: column;
+         justify-content: center; min-height: 56px; }
+.rname b { font-weight: 600; }
+.rgrade { font-size: .8rem; color: var(--muted); }
+.rflag { font-size: .78rem; color: var(--amber); }
+.tick {
+  width: 72px; flex: none; border: none; border-left: 1px solid var(--line);
+  background: #fbfbfc; font-size: 1.4rem; justify-content: center; border-radius: 0;
+}
+.tick[data-on="on"] { background: #e8f5ec; color: var(--green); }
+.tick[data-on="no_show"] { background: var(--redbg); color: var(--red); }
+
+/* not riding — the reason this app exists */
+.notriding { margin-top: 26px; }
+.notriding h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .04em;
+                color: var(--red); margin: 0 0 8px; }
+li.gone { background: var(--redbg); border-color: #f3c9c9; }
+li.gone .rname b { text-decoration: line-through; }
+.reason { font-size: .82rem; color: var(--red); font-weight: 600; }
+.detail { font-size: .8rem; color: var(--muted); }
+
+/* ---------- banners ---------- */
+.banner { border-radius: 10px; padding: 10px 12px; margin: 12px 0; font-size: .87rem; }
+.b-warn { background: var(--amberbg); color: var(--amber); border: 1px solid #f0dda8; }
+.b-stale { background: var(--redbg); color: var(--red); border: 1px solid #f3c9c9; font-weight: 600; }
+.empty { color: var(--muted); text-align: center; padding: 32px 8px; }
+.foot { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line);
+        font-size: .8rem; color: var(--muted); }
+@media (max-width: 380px) {
+  .tick { width: 60px; }
+  .wrap { padding-left: 12px; padding-right: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Driver Routes" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <button id="backBtn" class="back hide" aria-label="Back">&#8249; Back</button>
+    <div style="flex:1;min-width:0">
+      <div class="htitle" id="title">HCS Routes</div>
+      <div class="hsub" id="sub"></div>
+    </div>
+    <span class="chip hide" id="hchip"><span class="dot" id="hdot"></span><span id="hcolour"></span></span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 1. PIN -->
+  <section id="pinView">
+    <div class="box">
+      <p style="color:var(--muted);margin:0 0 18px">Enter your PIN</p>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" aria-label="PIN">
+      <p id="pinMsg" class="banner b-stale hide" role="alert"></p>
+      <button id="pinGo" class="primary" style="margin-top:16px">Open my routes</button>
+    </div>
+  </section>
+
+  <!-- 2. route picker -->
+  <section id="routeView" class="hide">
+    <div id="routeList"></div>
+    <p class="foot" id="routeFoot"></p>
+  </section>
+
+  <!-- 3. the sheet -->
+  <section id="sheetView" class="hide">
+    <div id="sheetBanners"></div>
+    <div id="stopList"></div>
+    <div id="notRiding" class="notriding hide">
+      <h2>Do not wait for</h2>
+      <ul id="notRidingList"></ul>
+    </div>
+    <p class="foot" id="sheetFoot"></p>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var TOKEN = 'demo-tok-1';
+  var session = null;        // never persisted: a lost phone should not stay logged in
+  var state = { routes: [], manifest: null, code: '' };
+
+  function $(id) {
+    var el = document.getElementById(id);
+    if (!el) throw new Error('missing element: ' + id);   // caught by the page-gate test
+    return el;
+  }
+  function show(id) {
+    ['pinView', 'routeView', 'sheetView'].forEach(function (v) {
+      $(v).classList.toggle('hide', v !== id);
+    });
+    $('backBtn').classList.toggle('hide', id !== 'sheetView');
+    window.scrollTo(0, 0);
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  /**
+   * One server call, with the 401 retry the dismissal app had to learn the hard way.
+   *
+   * Inside an in-app web view (the Identity app's browser) the FIRST google.script.run of a fresh
+   * open can fail with "HTTP 401" because the sandbox iframe cannot re-authenticate itself. Two
+   * quiet retries fix it; anything else surfaces honestly rather than blanking the page.
+   */
+  function api(req, cb, tries) {
+    tries = tries || 0;
+    req.token = TOKEN;
+    if (session) req.session = session;
+    google.script.run
+      .withSuccessHandler(function (res) { cb(res || { ok: false, reason: 'error' }); })
+      .withFailureHandler(function (err) {
+        var msg = String((err && err.message) || err || '');
+        if (tries < 2 && msg.indexOf('401') !== -1) {
+          return setTimeout(function () { api(req, cb, tries + 1); }, 400 * (tries + 1));
+        }
+        cb({ ok: false, reason: 'offline', message: msg });
+      })
+      .driverApi(req);
+  }
+
+  /* ---------------------------------- PIN ---------------------------------- */
+
+  function pinError(text) {
+    var el = $('pinMsg');
+    el.textContent = text;
+    el.classList.remove('hide');
+  }
+
+  function login() {
+    var pin = $('pin').value.trim();
+    $('pinMsg').classList.add('hide');
+    if (!/^[0-9]{4,6}$/.test(pin)) return pinError('Your PIN is 4 to 6 digits.');
+    $('pinGo').disabled = true;
+    $('pinGo').textContent = 'Checking…';
+
+    api({ op: 'login', pin: pin }, function (res) {
+      $('pinGo').disabled = false;
+      $('pinGo').textContent = 'Open my routes';
+      $('pin').value = '';
+      if (!res.ok) {
+        if (res.reason === 'locked') {
+          return pinError('Too many tries. Wait 15 minutes, or call the office.');
+        }
+        if (res.reason === 'disabled') return pinError('The route app is switched off right now.');
+        if (res.reason === 'offline') return pinError('No connection. Try again in a moment.');
+        return pinError('That PIN did not work.' +
+          (res.remaining ? ' ' + res.remaining + ' tries left.' : ''));
+      }
+      session = res.session;
+      $('sub').textContent = res.name || '';
+      loadRoutes();
+    });
+  }
+
+  /* ------------------------------- route list ------------------------------- */
+
+  function loadRoutes() {
+    api({ op: 'routes' }, function (res) {
+      if (!res.ok) return handleDead(res);
+      state.routes = res.routes || [];
+      $('title').textContent = 'Choose a route';
+      $('hchip').classList.add('hide');
+
+      if (!state.routes.length) {
+        $('routeList').innerHTML = '<p class="empty">No routes published yet.<br>Call the office.</p>';
+      } else {
+        $('routeList').innerHTML = state.routes.map(function (r) {
+          return '<button class="btn routebtn" data-code="' + esc(r.code) + '">' +
+                   '<span class="dot" style="background:' + swatch(r.colour) + '"></span>' +
+                   '<span style="flex:1"><b>' + esc(r.name) + '</b><br>' +
+                     '<span class="rgrade">' + esc(r.colour || 'no colour set') +
+                     (r.vehicle ? ' &middot; ' + esc(r.vehicle) : '') + '</span></span>' +
+                   '<span style="color:var(--muted)">&#8250;</span>' +
+                 '</button>';
+        }).join('');
+        Array.prototype.forEach.call($('routeList').querySelectorAll('[data-code]'), function (b) {
+          b.addEventListener('click', function () { openRoute(b.getAttribute('data-code')); });
+        });
+      }
+      $('routeFoot').textContent = (res.dayName ? res.dayName + ' ' : '') +
+        (res.session === 'AM' ? 'morning run' : 'afternoon run') +
+        (res.builtAt ? ' · updated ' + shortTime(res.builtAt) : '');
+      show('routeView');
+    });
+  }
+
+  /** The colour NAME always ships with the swatch; this is only the visual half. */
+  function swatch(name) {
+    var map = { purple: '#7a3fa8', pink: '#e0679a', white: '#ffffff', orange: '#e8862a',
+                red: '#c0392b', green: '#2e8b57', blue: '#2f6fb5' };
+    return map[String(name || '').trim().toLowerCase()] || '#d8d8dc';
+  }
+  function shortTime(iso) {
+    var m = String(iso).match(/(\d{2}):(\d{2})/);
+    if (!m) return String(iso);
+    var h = Number(m[1]), ap = h >= 12 ? 'pm' : 'am';
+    return ((h % 12) || 12) + ':' + m[2] + ap;
+  }
+
+  /* --------------------------------- sheet --------------------------------- */
+
+  function openRoute(code) {
+    state.code = code;
+    var cached = readCache(code);
+    if (cached) renderSheet(cached, true);      // paint instantly, then refresh
+    show('sheetView');
+    api({ op: 'manifest', code: code }, function (res) {
+      if (!res.ok) {
+        if (!cached) return handleDead(res);
+        return;                                  // keep the cached sheet; the stale banner shows
+      }
+      writeCache(code, res);
+      renderSheet(res, false);
+    });
+  }
+
+  function renderSheet(m, stale) {
+    state.manifest = m;
+    $('title').textContent = m.name || 'Route';
+    $('sub').textContent = (m.drivers || []).map(function (d) { return d.name; }).join(', ') ||
+                           'no driver listed';
+    $('hchip').classList.remove('hide');
+    $('hdot').style.background = swatch(m.colour);
+    $('hcolour').textContent = m.colour || 'no colour';
+
+    var b = [];
+    if (stale) {
+      b.push('<div class="banner b-stale">Showing the last list this phone saved. ' +
+             'Not live — check your signal.</div>');
+    }
+    if (!m.hasAttendance) {
+      // Honest about what the morning cannot know.
+      b.push('<div class="banner b-warn">Morning run: absences are not known yet, so everyone ' +
+             'is listed. Check with the office before leaving anyone.</div>');
+    }
+    if (m.attendanceOffDay) {
+      b.push('<div class="banner b-warn">Attendance has not been pulled for today yet.</div>');
+    }
+    if (m.stopsUnset) {
+      b.push('<div class="banner b-warn">Stops are not set up for this route yet — this is the ' +
+             'full rider list, not a stop order.</div>');
+    }
+    $('sheetBanners').innerHTML = b.join('');
+
+    var boarding = m.boarding || {};
+    $('stopList').innerHTML = (m.stops || []).map(function (s) {
+      if (!s.riders.length) return '';
+      var head = m.stopsUnset ? '' :
+        '<div class="stophead"><span class="stopname">' + esc(s.stop.name) + '</span>' +
+        '<span class="stopmeta">' +
+          [s.stop.time, s.stop.landmark].filter(Boolean).map(esc).join(' &middot; ') +
+        '</span></div>' +
+        (s.stop.driverNote ? '<div class="note">' + esc(s.stop.driverNote) + '</div>' : '');
+      return '<div class="stop">' + head + '<ul>' + s.riders.map(function (r) {
+        var act = (boarding[r.rk] || {}).action || '';
+        return '<li class="rider">' +
+          '<div class="rname"><b>' + esc(r.name) + '</b>' +
+            '<span class="rgrade">Grade ' + esc(r.grade) + '</span>' +
+            (r.flags && r.flags.length ? '<span class="rflag">' + esc(r.flags.join(' · ')) + '</span>' : '') +
+          '</div>' +
+          '<button class="tick" data-rk="' + esc(r.rk) + '" data-stop="' + esc(r.stopId) + '"' +
+            ' data-on="' + esc(act) + '" aria-label="Mark ' + esc(r.name) + '">' +
+            tickGlyph(act) + '</button>' +
+        '</li>';
+      }).join('') + '</ul></div>';
+    }).join('') || '<p class="empty">Nobody is riding this route today.</p>';
+
+    var gone = m.notRiding || [];
+    $('notRiding').classList.toggle('hide', gone.length === 0);
+    $('notRidingList').innerHTML = gone.map(function (r) {
+      return '<li class="rider gone"><div class="rname"><b>' + esc(r.name) + '</b>' +
+        '<span class="reason">' + esc(r.reason || 'NOT RIDING') + '</span>' +
+        (r.detail ? '<span class="detail">' + esc(r.detail) + '</span>' : '') +
+      '</div></li>';
+    }).join('');
+
+    Array.prototype.forEach.call($('stopList').querySelectorAll('.tick'), function (btn) {
+      btn.addEventListener('click', function () { cycle(btn); });
+    });
+
+    $('sheetFoot').innerHTML = 'Ticks are a note to yourself — a blank one means <b>not ' +
+      'recorded</b>, not "not on the bus".' +
+      (m.builtAt ? '<br>List updated ' + esc(shortTime(m.builtAt)) + '.' : '');
+  }
+
+  function tickGlyph(a) {
+    return a === 'on' ? '&#10003;' : a === 'no_show' ? '&#10007;' : '&#9711;';
+  }
+
+  /** blank → on → no_show → blank(off). Optimistic, and reverts if the server refuses. */
+  function cycle(btn) {
+    var cur = btn.getAttribute('data-on') || '';
+    var next = cur === '' ? 'on' : cur === 'on' ? 'no_show' : 'off';
+    var shown = next === 'off' ? '' : next;
+    btn.setAttribute('data-on', shown);
+    btn.innerHTML = tickGlyph(shown);
+    api({ op: 'board', code: state.code, rk: btn.getAttribute('data-rk'),
+          stopId: btn.getAttribute('data-stop'), action: next }, function (res) {
+      if (!res.ok) {
+        btn.setAttribute('data-on', cur);
+        btn.innerHTML = tickGlyph(cur);
+      }
+    });
+  }
+
+  /* --------------------------- never blank --------------------------- */
+
+  /* The board this phone last saw, so a dead signal shows yesterday's answer under a red banner
+     rather than an empty screen. Keyed by day so it can never silently show another day's list. */
+  function cacheKey(code) { return 'transpo_' + code + '_' + new Date().toDateString(); }
+  function writeCache(code, m) {
+    try { localStorage.setItem(cacheKey(code), JSON.stringify(m)); } catch (e) { /* private mode */ }
+  }
+  function readCache(code) {
+    try {
+      var raw = localStorage.getItem(cacheKey(code));
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function handleDead(res) {
+    if (res.reason === 'session') {          // expired overnight — ask for the PIN again
+      session = null;
+      show('pinView');
+      return pinError('Please enter your PIN again.');
+    }
+    $('stopList').innerHTML = '<p class="empty">' +
+      (res.reason === 'offline' ? 'No connection. Pull down to try again.'
+                                : 'Not available right now. Call the office.') + '</p>';
+    $('notRiding').classList.add('hide');
+    $('sheetBanners').innerHTML = '';
+    $('sheetFoot').textContent = '';
+    show('sheetView');
+  }
+
+  /* --------------------------------- wire up --------------------------------- */
+
+  $('pinGo').addEventListener('click', login);
+  $('pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+  $('backBtn').addEventListener('click', function () {
+    $('title').textContent = 'Choose a route';
+    $('hchip').classList.add('hide');
+    show('routeView');
+  });
+
+  show('pinView');
+  setTimeout(function () { try { $('pin').focus(); } catch (e) {} }, 250);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "_note": "Config for tools/build-demo.mjs — see build.driver.json for the run order. The office console is DOMAIN-gated in production and doGet supplies the signed-in address, replaced here with a fabricated one. Same two markup-only edits as the driver page: _self for the switcher iframe, and logic.js so the dashboard's check-off states and the adoption table are computed by the app's own office.js rather than faked here.",
+  "src": "../FACTS/transpo-department/apps/office/pages/Office.html",
+  "dst": "demos/transpo-routes/office.html",
+  "demoName": "Transportation Office",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<script src=\"logic.js\"></script>"],
+    ["<?= who ?>", "transportation@example.edu"]
+  ]
+}
