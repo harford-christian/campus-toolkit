@@ -88,8 +88,28 @@ function fingerprint(builtFrom) {
     files: files.sort(),
     missing,
     gsr: gsrMethods(concat),
+    ops: envelopeOps(concat),
     hash: crypto.createHash('sha256').update(normalize(concat)).digest('hex').slice(0, 16)
   };
+}
+
+/**
+ * The `{op:'…'}` values an envelope-style app sends.
+ *
+ * WHY THIS EXISTS. gsrMethods alone cannot see a contract change in an app that funnels every call
+ * through ONE server function — campus-presence (`processPost`), transpo-routes (`driverApi` /
+ * `officeApi`). The method name never changes, so the scanner reported "content changed (mock
+ * contract intact)" while four new ops (movementOut, movementBack, movementOpenList,
+ * studentOptions) had appeared and the mock handled none of them. Acting on that advice
+ * auto-resyncs the demo into dead buttons. Found 2026-09-14, and only because the demo's own
+ * verify.mjs disagreed with this scanner.
+ *
+ * For those apps the op set IS the contract, so it belongs in the fingerprint.
+ */
+function envelopeOps(html) {
+  const out = new Set();
+  for (const m of html.matchAll(/\bop\s*:\s*['"]([A-Za-z][A-Za-z0-9_]*)['"]/g)) out.add(m[1]);
+  return [...out].sort();
 }
 
 /* ---------- discovery: demoable web apps under Projects/ ---------- */
@@ -144,9 +164,23 @@ for (const [key, t] of Object.entries(manifest.tools)) {
   const base = baseline[key];
   if (fp.missing.length) { status = 'SOURCE-MISSING'; detail = 'missing: ' + fp.missing.join(', '); }
   else if (!base) { status = 'UNBASELINED'; detail = 'run `mark` to baseline'; }
-  else if (base.hash === fp.hash && JSON.stringify(base.gsr) === JSON.stringify(fp.gsr) && JSON.stringify(base.files) === JSON.stringify(fp.files)) { status = 'OK'; }
+  // `base.ops === undefined` means the baseline predates the ops check — that is UNKNOWN, not
+  // changed. Comparing it against a real op list would flag every demo once, for nothing.
+  else if (base.hash === fp.hash && JSON.stringify(base.gsr) === JSON.stringify(fp.gsr) && JSON.stringify(base.files) === JSON.stringify(fp.files) && (base.ops === undefined || JSON.stringify(base.ops) === JSON.stringify(fp.ops))) { status = 'OK'; }
   else if (JSON.stringify(base.files) !== JSON.stringify(fp.files)) { status = 'SIGNIFICANT-PROMPT'; detail = 'source view added/removed'; }
   else if (JSON.stringify(base.gsr) !== JSON.stringify(fp.gsr)) { status = 'SIGNIFICANT-PROMPT'; detail = 'google.script.run methods changed: ' + fp.gsr.join(', '); }
+  // An envelope app's ops are its contract — a new one means the mock needs work, not a rebuild.
+  // `base.ops` is absent in baselines written before this check existed; treat that as "unknown"
+  // rather than "changed", so adding the check does not mass-flag every demo once.
+  else if (base.ops && JSON.stringify(base.ops) !== JSON.stringify(fp.ops)) {
+    const added = fp.ops.filter((o) => !base.ops.includes(o));
+    const gone = base.ops.filter((o) => !fp.ops.includes(o));
+    status = 'SIGNIFICANT-PROMPT';
+    detail = 'envelope ops changed' +
+      (added.length ? ' — added: ' + added.join(', ') : '') +
+      (gone.length ? ' — removed: ' + gone.join(', ') : '') +
+      '. The mock must handle these before a rebuild, or those controls do nothing.';
+  }
   else { status = 'SIGNIFICANT-AUTO'; detail = 'content changed (mock contract intact)'; }
   tools[key] = { title: t.title, demoFolder: t.demoFolder, status, detail, fingerprint: fp };
 }

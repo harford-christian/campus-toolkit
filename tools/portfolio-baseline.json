@@ -17,6 +17,7 @@
       "tabsExtrasApi",
       "teacherApi"
     ],
+    "ops": [],
     "hash": "2a8a23a4753dc29a"
   },
   "library": {
@@ -31,6 +32,7 @@
       "recommendBook",
       "reserveBook"
     ],
+    "ops": [],
     "hash": "a1171e34dd059424"
   },
   "campus-control": {
@@ -55,6 +57,12 @@
       "getMonitorSnapshotForClient",
       "processPost"
     ],
+    "ops": [
+      "addSchedule",
+      "cancelScheduleOverride",
+      "tempScheduleChange",
+      "updateSchedule"
+    ],
     "hash": "bb31f5b1239c8455"
   },
   "athletics": {
@@ -69,6 +77,7 @@
     "gsr": [
       "api"
     ],
+    "ops": [],
     "hash": "eed561db67bd8c60"
   },
   "purchasing": {
@@ -147,6 +156,7 @@
       "uploadOrderDocument",
       "verifyApproverPin"
     ],
+    "ops": [],
     "hash": "3c8f7c2a1ec79f39"
   },
   "leave-sub": {
@@ -167,6 +177,7 @@
       "getStaffHandbook",
       "getSubData"
     ],
+    "ops": [],
     "hash": "46837559e8ad76b2"
   },
   "concessions": {
@@ -188,6 +199,7 @@
       "api_reopenOrder",
       "api_verifyPin"
     ],
+    "ops": [],
     "hash": "68123af7d28051be"
   },
   "lobby-tv": {
@@ -202,6 +214,7 @@
       "uploadImage",
       "uploadPowerPoint"
     ],
+    "ops": [],
     "hash": "b043806b37162814"
   },
   "custom-forms": {
@@ -215,6 +228,10 @@
       "authRequestOtp",
       "authVerifyOtp",
       "withdrawSubmission"
+    ],
+    "ops": [
+      "equals",
+      "sum"
     ],
     "hash": "41170028c9cb765b"
   },
@@ -235,6 +252,7 @@
       "setMessageAds",
       "whoAmI"
     ],
+    "ops": [],
     "hash": "f4da87fa64574622"
   },
   "lunch-inventory": {
@@ -254,12 +272,14 @@
       "processLunchAction",
       "saveItemEdits"
     ],
+    "ops": [],
     "hash": "96f540404393630b"
   },
   "facts-provisioning": {
     "files": [],
     "missing": [],
     "gsr": [],
+    "ops": [],
     "hash": "e3b0c44298fc1c14"
   },
   "staff-onboarding": {
@@ -277,6 +297,7 @@
       "adminStateApi",
       "contentApi"
     ],
+    "ops": [],
     "hash": "b30fe2f4d282a7ca"
   },
   "transportation": {
@@ -292,6 +313,7 @@
       "saveView",
       "setOverride"
     ],
+    "ops": [],
     "hash": "9a831a18b4a7f44e"
   },
   "campus-presence": {
@@ -310,7 +332,24 @@
       "kioskApi",
       "officeApi"
     ],
-    "hash": "6d1b2f28b4fcf8bf"
+    "hash": "bd4cbd9733ef57d5",
+    "ops": [
+      "acknowledge",
+      "bootstrap",
+      "earlyOut",
+      "getBoardSnapshot",
+      "getMetrics",
+      "getMusterReport",
+      "lateIn",
+      "manualVisitorOut",
+      "markPaged",
+      "resolveFlag",
+      "searchStudents",
+      "visitorIn",
+      "visitorLookupBadge",
+      "visitorOpenList",
+      "visitorOut"
+    ]
   },
   "transpo-routes": {
     "files": [
@@ -321,6 +360,22 @@
     "gsr": [
       "driverApi",
       "officeApi"
+    ],
+    "ops": [
+      "activity",
+      "addDevice",
+      "addDriver",
+      "board",
+      "dashboard",
+      "drivers",
+      "login",
+      "manifest",
+      "resetPin",
+      "revokeDevice",
+      "routes",
+      "saveStops",
+      "setActive",
+      "stops"
     ],
     "hash": "efd8811c00623c6a"
   }
