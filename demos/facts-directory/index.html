@@ -33,6 +33,11 @@
   h1 b { color: var(--gold); }
   .who { color: var(--who); font-size: .8rem; }
   .searchbar { display: flex; gap: .5rem; }
+  /* the way IN to the favourites view — a chip under the search bar, gold so it reads as
+     "yours". 44px tall per the house touch rule. */
+  .favview { margin: .6rem 0 0; min-height: 44px; padding: .4rem .9rem; font-size: .85rem;
+             background: var(--gold); color: var(--gold-ink); border-radius: 1.4rem; }
+  .favview[hidden] { display: none; }
   /* inputs >= 16px so iOS doesn't zoom on focus; tap targets >= 44px (HCS house rules) */
   #q { flex: 1; font-size: 1.05rem; min-height: 44px; padding: .6rem .8rem;
        border: 1px solid var(--input-border); border-radius: .5rem;
@@ -183,6 +188,10 @@
              autofocus autocomplete="off">
       <button id="go">Search</button>
     </div>
+    <!-- Favourites were only reachable by CLEARING the search box, which nobody discovers
+         (Josh couldn't find his own, 2026-09-08). This chip is the way in. Hidden until the
+         user actually has favourites, so it never adds clutter for someone who doesn't. -->
+    <button id="favview" class="favview" hidden>★ Favourites</button>
   </div>
   <div class="status" id="status">Type a name — pick a student to see their full record.</div>
   <div id="results"></div>
@@ -1823,10 +1832,30 @@ if (typeof module !== 'undefined' && module.exports) {
 
   function isFav_(id) { return favIds.indexOf(String(id)) !== -1; }
 
+  /** Keep the header chip in step with how many favourites this user has. */
+  function syncFavChip_() {
+    var el = document.getElementById('favview');
+    if (!el) return;
+    el.hidden = favIds.length === 0;
+    el.textContent = '★ Favourites (' + favIds.length + ')';
+  }
+
+  /** Show the favourites view on demand — clears the query, which is what reveals it. */
+  function showFavorites_() {
+    q.value = '';
+    navStack = [];
+    currentView = { type: 'list' };
+    lastList = null;        // otherwise Back would restore the previous search over the top
+    lastListStatus = '';
+    renderIdle_();
+    window.scrollTo(0, 0);
+  }
+
   function loadFavorites_() {
     google.script.run
       .withSuccessHandler(function (ids) {
         favIds = ids || [];
+        syncFavChip_();
         if (!q.value.trim()) renderIdle_();   // show them as soon as they arrive
         rerenderIfPerson_();                  // and light the star on an open record
       })
@@ -1841,11 +1870,13 @@ if (typeof module !== 'undefined' && module.exports) {
     // authoritative list (which also tells us if the cap refused the add).
     if (on && !isFav_(id)) favIds.push(String(id));
     else if (!on) favIds = favIds.filter(function (x) { return x !== String(id); });
+    syncFavChip_();
     rerenderIfPerson_();
     google.script.run
       .withSuccessHandler(function (res) {
         favBusy = false;
         favIds = res.ids || [];
+        syncFavChip_();
         // Re-render BEFORE writing the status line: renderPerson and renderIdle_ both reset
         // statusEl, so setting the message first would have silently wiped it.
         rerenderIfPerson_();
@@ -2724,6 +2755,10 @@ if (typeof module !== 'undefined' && module.exports) {
     debounceTimer = setTimeout(run, 300);
   });
   go.addEventListener('click', runNow);
+  (function () {
+    var fv = document.getElementById('favview');
+    if (fv) fv.addEventListener('click', showFavorites_);
+  })();
   q.addEventListener('keydown', function (e) { if (e.key === 'Enter') runNow(); });
 
   /* ---------- deep link (?id=…&n=…) ----------

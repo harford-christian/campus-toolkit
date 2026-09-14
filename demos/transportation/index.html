@@ -1484,7 +1484,11 @@ function dsDriverLists(board, routes, dayName, only) {
         code: (rt && rt.code) || code || '',
         name: (rt && rt.name) || label || code || 'Bus',
         colour: (rt && rt.colour) || '', vehicle: (rt && rt.vehicle) || '',
-        drivers: dsDriversFor(rt, 'PM', dayName).map(function (d) {
+        // Take the session from the BOARD instead of hardcoding PM. dsBuildBoard already accepts
+        // {session} and stamps it on its output, so an AM board asked for its driver lists quietly
+        // got the PM driver — wrong on Aberdeen/HdG, which runs two drivers on different weekdays.
+        // Defaults to PM, so every existing caller behaves exactly as before.
+        drivers: dsDriversFor(rt, (board && board.session) || 'PM', dayName).map(function (d) {
           return { name: d.name, phone: d.phone || '' };
         }),
         riding: [], notRiding: []
@@ -1616,6 +1620,41 @@ function dsRampSlice(board, routes, opts, pickups) {
   });
 }
 
+/**
+ * THE DRIVER SLICE — the per-route sheet the ../transpo-department app serves to bus drivers and
+ * subs on their own phones. Published alongside the ramp slice by the same minute trigger.
+ *
+ * This is deliberately a THIN wrapper over dsDriverLists, which already answers exactly the driver's
+ * question (riding / NOT riding with the reason, the colour, today's driver) and is already tested.
+ * Do not grow a second classification path in here: this app owns the board, and the driver app is
+ * only a window onto what it publishes — the same relationship transportation-kiosk has.
+ *
+ * PII BOUNDARY — READ BEFORE ADDING A FIELD. Unlike the ramp slice, this file DOES carry the student
+ * id, because the consumer has to join each child to their bus stop (Transpo_WORKING!StudentStops is
+ * keyed by student id) and that join cannot happen here without this app knowing about that app's
+ * tables. The file is a server-to-server artifact in the shared folder — the same folder as
+ * FACTS_Export.xlsx — and NOTHING here is served to a phone directly. The projection to the phone
+ * happens in ../transpo-department/logic/manifest.js (projectRider), which names its fields one at a
+ * time and is guarded by a forbidden-field test. If anyone ever points a driver's browser at this
+ * file instead, that boundary is gone — so don't.
+ *
+ * PM ONLY for now. An AM board needs no attendance (nobody is marked absent before the morning run)
+ * and its entire value is the stop sequence, which does not exist yet — so AM ships with Phase 2
+ * rather than costing a second board build every minute for a list nobody can use.
+ *
+ * @param {Object} board  dsBuildBoard output (session stamped on it)
+ * @param {Object} routes dsBuildRoutes output (keyed by code)
+ * @param {string} dayName 'Mon'..'Fri' — picks today's driver on a route that rotates
+ * @return {Object} {session, dayName, routes:[{code,name,colour,vehicle,drivers,riding,notRiding}]}
+ */
+function dsDriverSlice(board, routes, dayName) {
+  return {
+    session: (board && board.session) || 'PM',
+    dayName: dayName || '',
+    routes: dsDriverLists(board, routes, dayName, null)
+  };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     dsCellToString: dsCellToString, dsHeaderMap: dsHeaderMap, dsSerializeTab: dsSerializeTab,
@@ -1628,7 +1667,7 @@ if (typeof module !== 'undefined' && module.exports) {
     dsBuildPickups: dsBuildPickups, dsFlatList: dsFlatList, dsStudentCard: dsStudentCard,
     dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
     dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor, dsDaysInclude: dsDaysInclude,
-    dsDriverLists: dsDriverLists, dsRampSlice: dsRampSlice,
+    dsDriverLists: dsDriverLists, dsRampSlice: dsRampSlice, dsDriverSlice: dsDriverSlice,
     DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
     dsCanChange: dsCanChange, dsBuildStaffNames: dsBuildStaffNames, dsScopeRows: dsScopeRows,
     dsResolveStaff: dsResolveStaff, dsBuildStaffDirectory: dsBuildStaffDirectory,
