@@ -225,11 +225,27 @@
         "campus-sign-in-out-system/apps/office/pages/ClientLogic.html"
       ],
       "buildMethod": "demos/campus-presence/build-logic.mjs (vendors the source project's logic/*.js into logic.js, scrubbing the FACTS-Finder /exec default out of SETTINGS_DEFAULTS) + build-demo.mjs once per surface, configs committed at demos/campus-presence/build.{kiosk,board,muster,metrics}.json + hand switcher/data/mock. The two kiosk surfaces are ONE built page read with ?station=hs|el, as the two iPads are. Settings and Flags are intentionally not built. demos/campus-presence/verify.mjs re-checks the dataset, the mock's op contract and the vendored logic bundle against the source modules"
+    },
+    "transpo-routes": {
+      "title": "Driver Routes",
+      "demoFolder": "demos/transpo-routes",
+      "launch": "demos/transpo-routes/index.html",
+      "sourceProject": [
+        "FACTS/transpo-department/apps/driver",
+        "FACTS/transpo-department/apps/office"
+      ],
+      "builtFrom": [
+        "FACTS/transpo-department/apps/driver/pages/Driver.html",
+        "FACTS/transpo-department/apps/office/pages/Office.html"
+      ],
+      "buildMethod": "build-logic.mjs vendors the source project's logic/*.js verbatim into logic.js, then build-demo.mjs x2 (configs committed at demos/transpo-routes/build.driver.json and build.office.json; _self + logic.js injected via the <base> replacement, token/who tokens replaced) + hand data/mock. verify.mjs re-checks privacy (real names matched by hash, never listed), vendored-logic drift, the mock contract and the NOT_CHECKED distinction."
     }
   },
   "coveredProjects": [
     "FACTS/facts-directory-search",
     "FACTS/facts-to-gac-staff-email-config",
+    "FACTS/transpo-department/apps/driver",
+    "FACTS/transpo-department/apps/office",
     "FACTS/transportation",
     "athletics/eagles-landing/apps/admin",
     "athletics/eagles-landing/apps/public",
