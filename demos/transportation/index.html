@@ -147,6 +147,16 @@
   .att.standing { background: #e7e9ee; color: var(--dd); }
   .att.auth   { background: #6A1B9A; color: #fff; }   /* a temporary pickup authorization is on file */
   .att.game   { background: #E65100; color: #fff; }   /* posted sports dismissal — still expected, CONFIRM */
+  .att.spec   { background: #0277BD; color: #fff; }   /* 8th-period special: comes out late, with the class */
+  .grphdr { background: #E1F5FE; color: #01579B; font-weight: 800; padding: .45rem .9rem; border-top: 3px solid #0277BD;
+            display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
+  .grphdr .muted { display: inline; color: #01579B; font-weight: 500; }
+  .pmenu { position: relative; display: inline-block; }
+  #printMenu { position: absolute; z-index: 20; top: 100%; left: 0; margin-top: .25rem; background: #fff;
+               border: 1px solid var(--card-border); border-radius: .5rem; box-shadow: 0 6px 20px rgba(0,0,0,.15);
+               display: flex; flex-direction: column; min-width: 12rem; padding: .3rem; }
+  #printMenu button { text-align: left; background: #fff; color: var(--dd); border: 0; min-height: 44px; padding: .5rem .8rem; border-radius: .4rem; }
+  #printMenu button:hover { background: #f1f2f5; }
   .authbox { background: #F3E5F5; border: 1px solid #CE93D8; border-radius: .4rem; padding: .45rem .6rem; margin: .35rem 0; }
   .authbox .who { font-weight: 700; }
   .authbox .muted { display: block; }
@@ -300,10 +310,18 @@
         <select id="fRoute"><option value="">All routes</option></select>
         <button id="saveBtn" class="ghost" title="Remember these filters for me">☆ Save view</button>
         <button id="refresh" class="ghost" title="Reload">↻</button>
-        <button id="printBtn" class="ghost"
-                title="Print one page per bus route for the drivers — who rides today and who does not. Pick a route above to print just that bus.">&#128424; Print bus lists</button>
-        <button id="printChangesBtn" class="ghost"
-                title="One sheet for the desk: only what is DIFFERENT today, grouped by bus. Buses with nothing different are left off.">&#128424; Print changes</button>
+        <!-- ONE Print button, three sheets (Josh, 2026-09-15). -->
+        <div class="pmenu">
+          <button id="printOpen" class="ghost" aria-haspopup="true" aria-expanded="false" title="Print a sheet">&#128424; Print &#9662;</button>
+          <div id="printMenu" hidden role="menu">
+            <button id="printBtn" role="menuitem"
+                    title="One page per bus route for the drivers — who rides today and who does not. Pick a route above to print just that bus.">Bus List</button>
+            <button id="printChangesBtn" role="menuitem"
+                    title="One sheet for the desk: only what is DIFFERENT today, grouped by bus.">Bus Changes</button>
+            <button id="printRampBtn" role="menuitem"
+                    title="For the ramp: who is NOT coming out, the 8th-period specials groups, and every bus/car change — K4-5 and EL-side 6th.">Ramp Changes</button>
+          </div>
+        </div>
       </div>
       <div class="chiprow" id="typeRow"></div>
       <div class="chiprow grades" id="grades"></div>
@@ -786,6 +804,7 @@ function dsFlatList(board) {
           standing: !!r.standing, standingNote: r.standingNote || '',
           fromRouteCode: r.fromRouteCode || '', fromRouteName: r.fromRouteName || '',
           pickupAuth: r.pickupAuth || [],
+          special: r.special || null,
           walkUp: !!r.walkUp, walkUpWalking: !!r.walkUpWalking,
           walkUpTo: r.walkUpTo || '', walkUpWhy: r.walkUpWhy || '',
           expected: r.expected, reason: r.reason, detail: r.detail, note: r.note
@@ -1444,6 +1463,7 @@ function dsBuildBoard(d, opts) {
   var ovr = d.overrides || {};
   var routes = opts.routes || {};
   var auth = opts.pickupAuth || {};          // temporary pickup authorizations, per student
+  var specials = opts.specials || null;      // today's 8th-period specials, by homeroom / grade
 
   var rows = (d.roster || []).filter(function (s) { return s.session === session; });
   var byGroup = {}, notExpected = [], seen = {};
@@ -1497,6 +1517,7 @@ function dsBuildBoard(d, opts) {
       standing: !!(o && o.standing), standingNote: (o && o.standing) ? (o.note || '') : '',
       fromRouteCode: moved ? s.routeCode : '', fromRouteName: moved ? s.routeName : '',
       pickupAuth: auth[s.id] || [],
+      special: specials ? dsSpecialFor(specials, s) : null,
       expected: v.expected, reason: v.reason, detail: v.detail
     };
 
@@ -1582,6 +1603,121 @@ function dsFilterBoard(board, f) {
 }
 
 // Node test harness reaches these directly; GAS and the browser ignore the export.
+/* ------------------------------------ 8th-period specials ------------------------------------ */
+
+/**
+ * Fold a person's name so the two forms FACTS writes compare equal: the 7-12 Homeroom field says
+ * "Burge, the ramp lead L." while the roster and schedule rows say "Sowell Gina". Lowercase, accents
+ * stripped (Bueché), punctuation dropped, and only SURNAME + FIRST FORENAME kept. Paid for in blood
+ * by Campus Presence on 2026-09-15, when exact-match reached none of 25 homerooms.
+ */
+function dsNameKey(s) {
+  var t = String(s == null ? '' : s);
+  if (typeof t.normalize === 'function') t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  t = t.replace(/[\u00e9\u00e8\u00ea\u00eb]/g, 'e').replace(/[\u00e1\u00e0\u00e2\u00e4]/g, 'a')
+       .replace(/[\u00ed\u00ee\u00ef]/g, 'i').replace(/[\u00f3\u00f4\u00f6]/g, 'o').replace(/[\u00fa\u00fb\u00fc]/g, 'u')
+       .replace(/[\u00f1]/g, 'n').replace(/\uFFFD/g, '');
+  var toks = t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(String);
+  return toks.slice(0, 2).join(' ');
+}
+
+/**
+ * Dismissal_WORKING!Specials for ONE weekday: which homerooms (or whole grades) are in a special
+ * during the last period today. @return {byTeacher: {nameKey: spec}, byGrade: {grade: spec}}
+ * where spec = { subject, teacher, from, note, homeroomTeacher, grade }.
+ */
+function dsBuildSpecials(values, dayName) {
+  var out = { byTeacher: {}, byGrade: {}, rows: 0 };
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  var normGrade = function (g) { var s = String(g || '').trim().toUpperCase().replace(/\.0+$/, ''); return /^0\d$/.test(s) ? s.replace(/^0+/, '') : s; };
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var subject = get(row, 'Special');
+    if (!subject) continue;
+    var days = get(row, 'Day').split(/[,\s]+/).filter(String);
+    if (!dsDaysInclude(days, dayName)) continue;
+    var spec = { subject: subject, teacher: get(row, 'Teacher'), from: get(row, 'From'), note: get(row, 'Note'),
+                 homeroomTeacher: get(row, 'Homeroom Teacher'), grade: normGrade(get(row, 'Grade')) };
+    out.rows++;
+    if (spec.homeroomTeacher) out.byTeacher[dsNameKey(spec.homeroomTeacher)] = spec;
+    else if (spec.grade) out.byGrade[spec.grade] = spec;
+  }
+  return out;
+}
+
+/** The special for one roster row: the homeroom's row first, then the whole-grade fallback. */
+function dsSpecialFor(specials, s) {
+  if (!specials) return null;
+  var k = dsNameKey(s.homeroomTeacher || '');
+  if (k && specials.byTeacher[k]) return specials.byTeacher[k];
+  var g = String(s.grade || '').trim().toUpperCase().replace(/\.0+$/, '');
+  if (/^0\d$/.test(g)) g = g.replace(/^0+/, '');
+  return specials.byGrade[g] || null;
+}
+
+/**
+ * THE RAMP CHANGES SHEET — what the ramp lead and Coreen need to know that is different today, for the
+ * children collected at the elementary ramp: K4-5 plus 6th graders whose pickup is the EL side;
+ * Bus, Car and Early Bird. Three groups: NOT expected (with the reason), the 8th-period specials
+ * groups (they come out late and together), and every bus/car change recorded today. GAME DAY
+ * riders are listed to confirm, never as gone.
+ */
+function dsRampChanges(board, routes, dayName) {
+  routes = routes || {};
+  var flat = dsFlatList(board);
+  var norm = function (g) { var s = String(g == null ? '' : g).trim().toUpperCase(); return /^0\d$/.test(s) ? s.replace(/^0+/, '') : s; };
+  var GR = { 'K4': 1, 'K5': 1, '1': 1, '2': 1, '3': 1, '4': 1, '5': 1 };
+  var TY = { 'Bus': 1, 'Car': 1, 'Early Bird': 1 };
+  var pop = flat.filter(function (r) {
+    var g = norm(r.grade);
+    var ramp = GR[g] || (g === '6' && String(r.pickup || '').toUpperCase() === 'EL');
+    return ramp && TY[r.type];
+  });
+  var lane = function (r) {
+    if (r.routes && r.routes.length) {
+      return r.routes.map(function (label, i) { var rt = dsRouteFor(routes, (r.routeCodes || [])[i] || '', label); return (rt && rt.name) || label; }).join(' / ');
+    }
+    return r.type;
+  };
+  var byName = function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; };
+
+  var notExpected = pop.filter(function (r) { return !r.expected; }).map(function (r) {
+    return { name: r.name, grade: norm(r.grade), lane: lane(r), reason: r.reason || 'NOT EXPECTED', detail: r.detail || '' };
+  }).sort(byName);
+
+  var groups = {};
+  pop.forEach(function (r) {
+    if (!r.special || !r.expected) return;
+    var key = r.special.subject + '|' + (r.special.from || '') + '|' + (r.special.teacher || '');
+    var g = groups[key] = groups[key] || { subject: r.special.subject, from: r.special.from || '', teacher: r.special.teacher || '', kids: [] };
+    g.kids.push({ name: r.name, grade: norm(r.grade), lane: lane(r) });
+  });
+  var specials = Object.keys(groups).map(function (k) { groups[k].kids.sort(byName); return groups[k]; })
+    .sort(function (a, b) { return a.subject < b.subject ? -1 : a.subject > b.subject ? 1 : 0; });
+
+  var changes = pop.filter(function (r) { return r.overridden || r.fromRouteCode; }).map(function (r) {
+    var from = r.fromRouteName || r.fromRouteCode
+      ? 'Bus — ' + ((dsRouteFor(routes, r.fromRouteCode, r.fromRouteName) || {}).name || r.fromRouteName || r.fromRouteCode)
+      : (r.type === 'Bus' ? 'not the bus' : 'usual');
+    var to = r.type === 'Bus' ? 'Bus — ' + lane(r) : r.type + (r.overrideDestination ? ' → ' + r.overrideDestination : '');
+    return { name: r.name, grade: norm(r.grade), from: from, to: to, note: r.overrideNote || '', by: r.overrideBy || '' };
+  }).sort(byName);
+
+  var check = pop.filter(function (r) { return r.expected && r.reason === 'GAME DAY'; }).map(function (r) {
+    return { name: r.name, grade: norm(r.grade), lane: lane(r), note: r.detail || '' };
+  }).sort(byName);
+
+  return { notExpected: notExpected, specials: specials, changes: changes, check: check,
+           counts: { population: pop.length, notExpected: notExpected.length,
+                     specials: specials.reduce(function (n, g) { return n + g.kids.length; }, 0),
+                     changes: changes.length, check: check.length } };
+}
+
 /* ------------------------------ temporary pickup authorizations ------------------------------ */
 
 var DS_PICKUP_AUTH_METHODS = ['Email', 'Phone call', 'In person', 'Written note'];
@@ -1946,6 +2082,8 @@ function dsRampSlice(board, routes, opts, pickups) {
       expected: r.expected, reason: r.reason || '', detail: r.detail || '',
       split: !!r.split, today: !!r.overridden, handedTo: r.overrideDestination || '',
       walkUp: !!r.walkUp, pickups: pickups[r.id] || [],
+      // the 8th-period special this child's class is in today — subject and where they come from
+      special: r.special ? { subject: r.special.subject, from: r.special.from || '' } : null,
       // temporary authorizations ACTIVE today: [name, relationship, through] — names and dates only
       authPickups: dsAuthPickupsFor(r.pickupAuth)
     };
@@ -2001,6 +2139,7 @@ if (typeof module !== 'undefined' && module.exports) {
     dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor, dsDaysInclude: dsDaysInclude,
     dsBuildPickupAuth: dsBuildPickupAuth, dsAuthPickupsFor: dsAuthPickupsFor, dsPickupAuthValidate: dsPickupAuthValidate,
     dsBuildSports: dsBuildSports, dsSportsDetail: dsSportsDetail, dsClock12: dsClock12,
+    dsNameKey: dsNameKey, dsBuildSpecials: dsBuildSpecials, dsSpecialFor: dsSpecialFor, dsRampChanges: dsRampChanges,
     dsPickupAuthEmail: dsPickupAuthEmail, dsIsoDate: dsIsoDate, DS_PICKUP_AUTH_METHODS: DS_PICKUP_AUTH_METHODS,
     dsDriverLists: dsDriverLists, dsRampSlice: dsRampSlice, dsDriverSlice: dsDriverSlice,
     DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
@@ -2194,6 +2333,7 @@ if (typeof module !== 'undefined' && module.exports) {
     else if (r.walkTo === 'Unresolved') b += '<span class="att walk">walk-to unknown</span>';
     if (r.standing) b += '<span class="att standing" title="A standing arrangement the office wrote down">STANDING</span>';
     if (hasActiveAuth(r)) b += '<span class="att auth" title="A temporary pickup authorization is on file — see the card">PICKUP+</span>';
+    if (r.special) b += '<span class="att spec" title="In ' + esc(r.special.subject) + ' for the last period — comes out late, with the class' + (r.special.from ? ', from the ' + esc(r.special.from) : '') + '">8TH ' + esc(String(r.special.subject).toUpperCase()) + '</span>';
     if (r.overridden) b += '<span class="att ovr">TODAY</span>';
     return b;
   }
@@ -2354,8 +2494,27 @@ if (typeof module !== 'undefined' && module.exports) {
       $('tally').innerHTML = '<b>' + (rows.length - flagged) + '</b> expected' +
         (flagged ? ' · <span class="flagged"><b>' + flagged + '</b> flagged</span>' : '') +
         ' · ' + rows.length + ' on this list';
+      // 8TH-PERIOD SPECIALS FIRST (Josh, 2026-09-15): a class in PE / Art / Music / Computer for
+      // the last period comes out late and TOGETHER, so those children sit under one header per
+      // special above the alphabetical list, instead of scattered through it.
+      var inSpecial = rows.filter(function (r) { return r.special; }), rest = rows.filter(function (r) { return !r.special; });
+      var grpHtml = '';
+      if (inSpecial.length) {
+        var byKey = {};
+        inSpecial.forEach(function (r) {
+          var k = r.special.subject + '|' + (r.special.from || '');
+          (byKey[k] = byKey[k] || { subject: r.special.subject, from: r.special.from || '', teacher: r.special.teacher || '', rows: [] }).rows.push(r);
+        });
+        grpHtml = Object.keys(byKey).sort().map(function (k) {
+          var gp = byKey[k];
+          return '<div class="grphdr"><span>8th period ' + esc(gp.subject) + (gp.from ? ' <span class="muted">· from the ' + esc(gp.from) + '</span>' : '') +
+            (gp.teacher ? ' <span class="muted">· ' + esc(gp.teacher) + '</span>' : '') + '</span><span>' + gp.rows.length + ' — come out late, together</span></div>' +
+            gp.rows.map(personRow).join('');
+        }).join('');
+      }
       $('board').innerHTML = rows.length
-        ? '<div class="list">' + rows.map(personRow).join('') + '</div>'
+        ? '<div class="list">' + grpHtml + (inSpecial.length && rest.length ? '<div class="grphdr" style="background:#f1f2f5;color:var(--dd);border-color:#c9ccd3"><span>Everyone else</span></div>' : '') +
+          rest.map(personRow).join('') + '</div>'
         : '<div class="list"><div class="empty">Nobody matches these filters.</div></div>';
     } else {
       var view = dsFilterBoard(raw.board, filters());
@@ -2416,6 +2575,11 @@ if (typeof module !== 'undefined' && module.exports) {
       h += '<div class="bigdest">' + esc(destOf(s)) + '</div>';
     }
     if (s.vehicle) h += '<div class="muted">' + esc(s.vehicle) + '</div>';
+    if (s.special) {
+      h += '<div class="flagbox" style="background:#E1F5FE;color:#01579B">8th period today: <b>' + esc(s.special.subject) + '</b>' +
+        (s.special.teacher ? ' with ' + esc(s.special.teacher) : '') + (s.special.from ? ' — comes out from the ' + esc(s.special.from) : '') +
+        ', late and with the class.</div>';
+    }
     if (srt) {
       var dw = dsDriversFor(srt, 'PM', raw.dayName);
       h += dw.length
@@ -2819,6 +2983,60 @@ if (typeof module !== 'undefined' && module.exports) {
       })
       .pickupAuthDelete(authId, SIM);
   }
+
+  /* ------------------------------ the Print menu + the ramp changes sheet ------------------------------ */
+  function setPrintMenu(open) {
+    $('printMenu').hidden = !open;
+    $('printOpen').setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  $('printOpen').addEventListener('click', function () { setPrintMenu($('printMenu').hidden); });
+  document.addEventListener('click', function (ev) {
+    if (!$('printMenu').hidden && !ev.target.closest('.pmenu')) setPrintMenu(false);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#printMenu button'), function (b) {
+    b.addEventListener('click', function () { setPrintMenu(false); });
+  });
+
+  /** The ramp's sheet: who is NOT coming out, the specials groups, and today's bus/car changes. */
+  function printRamp() {
+    if (!raw || !raw.ok) { alert('The board has not loaded yet.'); return; }
+    var rc = dsRampChanges(raw.board, raw.routes, raw.dayName);
+    var f = raw.freshness || {};
+    var stamp = (raw.dayName || '') + ' ' + (raw.dayKey || '') + ' \u00b7 PM \u00b7 printed ' +
+      String(raw.serverNow || '').slice(11) + ' \u00b7 FACTS attendance as of ' + (f.syncedAt || '?') +
+      (f.signOutActive ? ' \u00b7 ' + (f.signOutCount || 0) + ' signed out today' : '') +
+      (sportsLine(f) ? ' \u00b7 ' + sportsLine(f) : '');
+    var li = function (r, tail) { return '<li>' + esc(r.name) + ' (' + esc(r.grade) + ')' + (r.lane ? ' \u00b7 ' + esc(r.lane) : '') + (tail ? ' \u2014 ' + tail : '') + '</li>'; };
+    var body = '<div class="cols">';
+    body += '<div class="bus"><h3>Not coming out \u2014 do not wait (' + rc.notExpected.length + ')</h3>' +
+      (rc.notExpected.length ? '<ul>' + rc.notExpected.map(function (r) { return li(r, '<span class="why">' + esc(r.reason) + '</span>' + (r.detail ? ' ' + esc(r.detail) : '')); }).join('') + '</ul>'
+                             : '<div class="lbl">nobody</div>') + '</div>';
+    body += rc.specials.map(function (gp) {
+      return '<div class="bus"><h3>8th period ' + esc(gp.subject) + (gp.from ? ' \u00b7 from the ' + esc(gp.from) : '') + ' (' + gp.kids.length + ')</h3>' +
+        '<div class="lbl">come out late, together' + (gp.teacher ? ' \u00b7 ' + esc(gp.teacher) : '') + '</div><ul>' +
+        gp.kids.map(function (k) { return li(k, ''); }).join('') + '</ul></div>';
+    }).join('');
+    body += '<div class="bus"><h3>Bus / car changes today (' + rc.changes.length + ')</h3>' +
+      (rc.changes.length ? '<ul>' + rc.changes.map(function (r) { return li(r, esc(r.from) + ' \u2192 <span class="why">' + esc(r.to) + '</span>' + (r.note ? ' \u00b7 ' + esc(r.note) : '')); }).join('') + '</ul>'
+                         : '<div class="lbl">none recorded</div>') + '</div>';
+    if (rc.check.length) {
+      body += '<div class="bus"><h3>GAME DAY \u2014 confirm they did not leave with the team (' + rc.check.length + ')</h3><ul>' +
+        rc.check.map(function (r) { return li(r, esc(r.note)); }).join('') + '</ul></div>';
+    }
+    body += '</div>';
+    $('printArea').innerHTML =
+      '<section class="csheet"><h2>Ramp changes \u2014 today only</h2>' +
+      '<div class="meta">' + esc(stamp) + ' \u00b7 K4\u20135 and EL-side 6th \u00b7 ' + rc.counts.population + ' children on the ramp</div>' + body +
+      '<p class="foot">Everything else is as usual. A child who is absent but not yet marked in FACTS still reads as coming out \u2014 unknown means coming out. ' +
+      'Specials groups arrive late and together from the room named. ' +
+      esc(sportsLine(f) || '') + '</p></section>';
+    document.body.classList.add('printing');
+    var done = function () { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); }, 50);
+    setTimeout(done, 60000);
+  }
+  $('printRampBtn').addEventListener('click', printRamp);
 
   function cfgCall(btn, fn, args) {
     var txt = btn.textContent;
