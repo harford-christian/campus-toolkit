@@ -146,6 +146,7 @@
   .att.walkup { background: #00796B; color: #fff; }
   .att.standing { background: #e7e9ee; color: var(--dd); }
   .att.auth   { background: #6A1B9A; color: #fff; }   /* a temporary pickup authorization is on file */
+  .att.game   { background: #E65100; color: #fff; }   /* posted sports dismissal — still expected, CONFIRM */
   .authbox { background: #F3E5F5; border: 1px solid #CE93D8; border-radius: .4rem; padding: .45rem .6rem; margin: .35rem 0; }
   .authbox .who { font-weight: 700; }
   .authbox .muted { display: block; }
@@ -241,6 +242,28 @@
                            vertical-align: top; }
     .sheet th { font-size: 9.5pt; text-transform: uppercase; letter-spacing: .03em; }
     .sheet .foot { margin-top: .9rem; font-size: 9pt; color: #333; }
+
+    /* THE CHANGE SHEET (Josh, 2026-09-15) — one sheet of paper, today's changes only.
+       It has to fit in a hand at the top of dismissal, so it is set small and flows in
+       three columns; a bus block is never split across a column or a page, because half
+       a bus is worse than a second sheet. There is exactly one .csheet, so the
+       page-break-after on .sheet never applies to it. */
+    .csheet { color: #000; font: 8.5pt/1.25 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .csheet h2 { margin: 0 0 .15rem; font-size: 13pt; }
+    .csheet .meta { margin: 0 0 .5rem; font-size: 8.5pt; color: #222; }
+    .csheet .cols { column-count: 3; column-gap: .55rem; }
+    .csheet .bus { break-inside: avoid; page-break-inside: avoid; margin: 0 0 .5rem;
+                   border: 1px solid #000; border-radius: .25rem; padding: .25rem .35rem; }
+    .csheet .bus > h3 { margin: 0 0 .12rem; font-size: 9.5pt; border-bottom: 1px solid #000;
+                        padding-bottom: .1rem; }
+    .csheet .lbl { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .04em;
+                   margin: .2rem 0 .05rem; font-weight: 700; }
+    .csheet ul { margin: 0; padding-left: .8rem; }
+    .csheet li { margin: 0 0 .05rem; }
+    .csheet .why { font-weight: 700; }
+    .csheet .foot { margin-top: .5rem; font-size: 7.5pt; color: #333; column-span: all; }
+    .csheet .clean { font-size: 8pt; color: #333; margin-top: .3rem; column-span: all; }
+    @page { margin: .4in; }
   }
 </style>
 
@@ -279,6 +302,8 @@
         <button id="refresh" class="ghost" title="Reload">↻</button>
         <button id="printBtn" class="ghost"
                 title="Print one page per bus route for the drivers — who rides today and who does not. Pick a route above to print just that bus.">&#128424; Print bus lists</button>
+        <button id="printChangesBtn" class="ghost"
+                title="One sheet for the desk: only what is DIFFERENT today, grouped by bus. Buses with nothing different are left off.">&#128424; Print changes</button>
       </div>
       <div class="chiprow" id="typeRow"></div>
       <div class="chiprow grades" id="grades"></div>
@@ -1306,7 +1331,73 @@ function dsBuildStaffNames(values) {
  *
  * @return {{expected: boolean, reason: string, detail: string}}
  */
-function dsClassify(student, att, out) {
+/* ------------------------------------ sports dismissals ------------------------------------ */
+
+/** '13:15' -> '1:15 PM'; anything else passes through unchanged. */
+function dsClock12(hhmm) {
+  var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m) return String(hhmm || '');
+  var h = Number(m[1]), ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return h + ':' + m[2] + ' ' + ap;
+}
+
+/**
+ * The daily sports-dismissal feed, checked before it is trusted. A missing, malformed or
+ * WRONG-DAY file is `available: false` with a reason — never an exception, never yesterday's
+ * answer. `students` is keyed by FACTS Student ID (the roster's id); each entry lists that child's
+ * posted dismissals today. `teamsFailed` non-empty means INCOMPLETE, and the page must say so.
+ */
+function dsBuildSports(feed, dayKey) {
+  if (!feed || typeof feed !== 'object') return { available: false, why: 'no feed', students: {}, teamsFailed: [] };
+  if (String(feed.date || '').slice(0, 10) !== String(dayKey || '')) {
+    return { available: false, why: 'feed is for ' + (feed.date || 'an unknown day') + ', not ' + dayKey, students: {}, teamsFailed: [] };
+  }
+  if (feed.ok === false) return { available: false, why: 'producer reported a failure', students: {}, teamsFailed: [] };
+  if (!feed.students || typeof feed.students !== 'object' || Array.isArray(feed.students)) {
+    return { available: false, why: 'feed has no students object', students: {}, teamsFailed: [] };
+  }
+  var students = {}, n = 0;
+  Object.keys(feed.students).forEach(function (sid) {
+    var list = Array.isArray(feed.students[sid]) ? feed.students[sid] : [];
+    var keep = list.filter(function (e) { return e && (e.dismiss || e.depart); }).map(function (e) {
+      return { team: String(e.team || e.sport || 'team'), title: String(e.title || ''),
+               dismiss: String(e.dismiss || ''), depart: String(e.depart || ''), location: String(e.location || '') };
+    });
+    if (keep.length) { students[String(sid).trim()] = keep; n++; }
+  });
+  return { available: true, why: '', date: String(feed.date), generatedAt: String(feed.generatedAt || ''),
+           teamsFailed: (feed.teamsFailed || []).map(String), students: students, count: n };
+}
+
+/** The one line a driver or teacher reads: earliest posted time first, then the team. */
+function dsSportsDetail(list) {
+  var best = null;
+  (list || []).forEach(function (e) {
+    var t = e.dismiss || e.depart;
+    if (!best || t < (best.dismiss || best.depart)) best = e;
+  });
+  if (!best) return '';
+  return best.team + ' — posted ' + (best.dismiss ? 'dismissal ' : 'departure ') +
+         dsClock12(best.dismiss || best.depart) + ' · confirm with the office';
+}
+
+/**
+ * @param sports  this student's posted sports dismissals today (from dsBuildSports), or null.
+ *                Comes FOURTH: signed out / left early / absent are records a person made about
+ *                this child; a game is inferred from a calendar. When they disagree the human wins.
+ *                SOFT by design: the child stays EXPECTED, flagged GAME DAY, so nobody leaves
+ *                without them on a rumour — but nobody waits in silence either.
+ */
+function dsClassify(student, att, out, sports) {
+  var v = dsClassifyRecorded_(student, att, out);
+  if (v.expected && sports && sports.length) {
+    return { expected: true, reason: 'GAME DAY', detail: dsSportsDetail(sports) };
+  }
+  return v;
+}
+
+function dsClassifyRecorded_(student, att, out) {
   if (out) {
     return {
       expected: false, reason: 'SIGNED OUT',
@@ -1349,6 +1440,7 @@ function dsBuildBoard(d, opts) {
   var session = opts.session || 'PM';
   var att = d.attendance || {};
   var outs = d.signedOut || {};
+  var sports = d.sports || {};              // posted sports dismissals, keyed by student id
   var ovr = d.overrides || {};
   var routes = opts.routes || {};
   var auth = opts.pickupAuth || {};          // temporary pickup authorizations, per student
@@ -1367,7 +1459,7 @@ function dsBuildBoard(d, opts) {
     var o = ovr[s.id] || null;
     var type = o && o.type ? o.type : s.type;
     var routeCode = o && o.routeCode ? o.routeCode : s.routeCode;
-    var v = dsClassify(s, att[s.id], outs[s.id]);
+    var v = dsClassify(s, att[s.id], outs[s.id], sports[s.id]);
 
     // AN OVERRIDE REPLACES THE JOURNEY, NOT JUST THE LABEL. The first version changed `type` and
     // left routeName/vehicle as the roster had them, so "mum is collecting Ella, not the bus"
@@ -1679,6 +1771,7 @@ function dsDriverLists(board, routes, dayName, only) {
         var flags = [];
         (routesOf[r.id] || []).forEach(function (n) { if (n !== labelOf(r)) flags.push('also on ' + n); });
         if (r.overridden) flags.push('added today' + (r.overrideNote ? ' — ' + r.overrideNote : ''));
+        if (r.reason === 'GAME DAY') flags.push('GAME DAY — ' + (r.detail || 'posted early dismissal'));
         else if (r.standing) flags.push('standing' + (r.standingNote ? ' — ' + r.standingNote : ''));
         L.riding.push({ id: r.id, name: r.name, grade: r.grade, building: r.building || '', flags: flags });
       } else {
@@ -1749,7 +1842,7 @@ function dsDriverLists(board, routes, dayName, only) {
  */
 function dsChangeSheet(board, routes, dayName) {
   var lists = dsDriverLists(board, routes, dayName, '');
-  var buses = [], clean = 0, nOff = 0, nOn = 0;
+  var buses = [], clean = 0, nOff = 0, nOn = 0, nCheck = 0;
 
   lists.forEach(function (L) {
     // Every notRiding row is a change by definition — the list only exists because something
@@ -1767,16 +1860,25 @@ function dsChangeSheet(board, routes, dayName) {
       if (note) on.push({ name: r.name, grade: r.grade, note: note });
     });
 
-    if (!off.length && !on.length) { clean++; return; }
+    // A GAME DAY rider is neither off nor on: still expected, but somebody must CONFIRM they did
+    // not leave with the team. Its own list, so the desk does not read it as a plain change.
+    var check = [];
+    L.riding.forEach(function (r) {
+      var g = (r.flags || []).filter(function (f) { return /^GAME DAY/.test(f); })[0];
+      if (g) check.push({ name: r.name, grade: r.grade, note: g.replace(/^GAME DAY — /, '') });
+    });
+
+    if (!off.length && !on.length && !check.length) { clean++; return; }
     nOff += off.length;
     nOn += on.length;
+    nCheck += check.length;
     buses.push({
       code: L.code, name: L.name, colour: L.colour, vehicle: L.vehicle,
-      drivers: L.drivers, riding: L.riding.length, off: off, on: on
+      drivers: L.drivers, riding: L.riding.length, off: off, on: on, check: check
     });
   });
 
-  return { buses: buses, counts: { buses: buses.length, clean: clean, off: nOff, on: nOn } };
+  return { buses: buses, counts: { buses: buses.length, clean: clean, off: nOff, on: nOn, check: nCheck } };
 }
 
 /**
@@ -1898,6 +2000,7 @@ if (typeof module !== 'undefined' && module.exports) {
     dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
     dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor, dsDaysInclude: dsDaysInclude,
     dsBuildPickupAuth: dsBuildPickupAuth, dsAuthPickupsFor: dsAuthPickupsFor, dsPickupAuthValidate: dsPickupAuthValidate,
+    dsBuildSports: dsBuildSports, dsSportsDetail: dsSportsDetail, dsClock12: dsClock12,
     dsPickupAuthEmail: dsPickupAuthEmail, dsIsoDate: dsIsoDate, DS_PICKUP_AUTH_METHODS: DS_PICKUP_AUTH_METHODS,
     dsDriverLists: dsDriverLists, dsRampSlice: dsRampSlice, dsDriverSlice: dsDriverSlice,
     DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
@@ -2073,6 +2176,11 @@ if (typeof module !== 'undefined' && module.exports) {
   }
   function flagBadge(r) {
     if (r.expected) {
+      if (r.reason === 'GAME DAY') {
+        // SOFT flag: still expected. The detail says the team, the posted time and "confirm".
+        return '<span class="att game" title="Inferred from the team calendar — confirm with the office before leaving without them">GAME DAY' +
+          (r.detail ? ' ' + esc(r.detail) : '') + '</span>';
+      }
       return r.reason === 'LATE'
         ? '<span class="att late">LATE' + (r.detail ? ' ' + esc(r.detail) : '') + '</span>' : '';
     }
@@ -3018,8 +3126,19 @@ if (typeof module !== 'undefined' && module.exports) {
    * a dead 15-minute trigger looks exactly like a quiet day, and this is the only place that says
    * otherwise. Computed on the server so the school timezone is right.
    */
+  /** One sentence on the sports feed, for the freshness line and both printouts (R3). */
+  function sportsLine(f) {
+    var s = f && f.sports;
+    if (!s || !s.enabled) return '';
+    if (!s.available) return 'sports dismissals unavailable';
+    if (s.teamsFailed && s.teamsFailed.length) {
+      return 'sports feed INCOMPLETE — ' + s.teamsFailed.length + ' calendar(s) unavailable: ' + s.teamsFailed.join(', ');
+    }
+    return 'sports feed OK (' + (s.count || 0) + ' GAME DAY)';
+  }
   function renderFreshness(f) {
-    $('freshness').textContent =
+    var sl = sportsLine(f);
+    $('freshness').textContent = (sl ? sl + ' · ' : '') +
       'FACTS synced ' + (f.syncedAt || '?') +
       (f.syncedAgeMin != null ? ' (' + f.syncedAgeMin + ' min ago)' : '') +
       ' · ' + (f.attendanceRows || 0) + ' attendance exception(s)' +
@@ -3095,7 +3214,9 @@ if (typeof module !== 'undefined' && module.exports) {
           : '') +
         '<p class="foot">Riders are the FACTS route enrollment plus today\'s office changes as of the time ' +
           'printed. A child who is absent but not yet marked in FACTS still appears — unknown reads as ' +
-          'riding. A child with a note from home who is not on this list: check with the office.</p>' +
+          'riding. GAME DAY means a team calendar posted an early dismissal: confirm before leaving without them. ' +
+          (sportsLine(raw.freshness) ? esc(sportsLine(raw.freshness)) + '. ' : '') +
+          'A child with a note from home who is not on this list: check with the office.</p>' +
         '</section>';
     }).join('');
     document.body.classList.add('printing');
@@ -3107,7 +3228,86 @@ if (typeof module !== 'undefined' && module.exports) {
     setTimeout(function () { window.print(); }, 50);     // let the layout settle before the dialog
     setTimeout(done, 60000);                              // Safari does not always fire afterprint
   }
+  /* THE CHANGE SHEET — one sheet, today's changes only, grouped by bus (Josh, 2026-09-15).
+   *
+   * A different question from the driver's list. That one answers "who rides my bus?" and runs to
+   * a page per route; this answers "what is different today?", which the desk asks once, at the
+   * top of dismissal, and only if it fits on one sheet they can hold.
+   *
+   * Built from dsChangeSheet over the SAME raw.board the screen is showing, for the same reason
+   * printLists is: two sheets of paper that disagree about a child are worse than one.
+   *
+   * Renders into the SAME #printArea, gated on body.printing, so a bare Ctrl+P still prints the
+   * board the way it always did. */
+  function printChanges() {
+    if (!raw || !raw.ok) { alert('The board has not loaded yet.'); return; }
+    var cs = dsChangeSheet(raw.board, raw.routes, raw.dayName);
+    var f = raw.freshness || {};
+    var stamp = (raw.dayName || '') + ' ' + (raw.dayKey || '') + ' \u00b7 PM \u00b7 printed ' +
+      String(raw.serverNow || '').slice(11) + ' \u00b7 FACTS attendance as of ' + (f.syncedAt || '?') +
+      (f.signOutActive ? ' \u00b7 ' + (f.signOutCount || 0) + ' signed out today' : '');
+
+    var body;
+    if (!cs.buses.length) {
+      // Say it plainly. A blank sheet would read as "the report is broken".
+      body = '<p class="clean"><b>No changes today.</b> Every bus route is riding exactly as the ' +
+        'roster says' + (cs.counts.clean ? ' (' + cs.counts.clean + ' route(s) checked)' : '') + '.</p>';
+    } else {
+      body = '<div class="cols">' + cs.buses.map(function (B) {
+        var head = esc(B.name) + (B.colour ? ' \u00b7 ' + esc(B.colour) : '') +
+          (B.vehicle ? ' \u00b7 ' + esc(B.vehicle) : '');
+        var out = '<div class="bus"><h3>' + head + '</h3>';
+        if (B.off.length) {
+          out += '<div class="lbl">Not riding \u2014 do not wait</div><ul>' +
+            B.off.map(function (r) {
+              return '<li>' + esc(r.name) + ' (' + esc(r.grade) + ') \u2014 ' +
+                '<span class="why">' + esc(r.reason) + '</span>' +
+                (r.detail ? ' ' + esc(r.detail) : '') + '</li>';
+            }).join('') + '</ul>';
+        }
+        if (B.on.length) {
+          out += '<div class="lbl">Riding today who normally would not</div><ul>' +
+            B.on.map(function (r) {
+              return '<li>' + esc(r.name) + ' (' + esc(r.grade) + ') \u2014 ' + esc(r.note) + '</li>';
+            }).join('') + '</ul>';
+        }
+        if (B.check && B.check.length) {
+          out += '<div class="lbl">GAME DAY \u2014 confirm they did not leave with the team</div><ul>' +
+            B.check.map(function (r) {
+              return '<li>' + esc(r.name) + ' (' + esc(r.grade) + ') \u2014 ' + esc(r.note) + '</li>';
+            }).join('') + '</ul>';
+        }
+        return out + '</div>';
+      }).join('') +
+      // The routes that are NOT on this sheet have to be named as clean, or a desk reading it
+      // cannot tell "nothing changed on that bus" from "that bus is missing from the report".
+      '<p class="clean">' + cs.counts.clean + ' other route(s) have no changes today and are not ' +
+      'listed. ' + cs.counts.off + ' not riding \u00b7 ' + cs.counts.on + ' riding who normally would not' +
+      (cs.counts.check ? ' \u00b7 ' + cs.counts.check + ' GAME DAY to confirm' : '') + '.</p>' +
+      '</div>';
+    }
+
+    $('printArea').innerHTML =
+      '<section class="csheet"><h2>Dismissal changes \u2014 today only</h2>' +
+      '<div class="meta">' + esc(stamp) + '</div>' + body +
+      '<p class="foot">Changes only. A child not named here is riding as usual. A child who is ' +
+      'absent but not yet marked in FACTS still reads as riding \u2014 unknown means riding. ' +
+      'GAME DAY rows are inferred from the team calendars, not a sign-out: confirm before a bus leaves without them. ' +
+      esc(sportsLine(raw.freshness) || 'Sports dismissals: feed not enabled — a team leaving together does not sign out at the kiosk, so check with the office on game days') +
+      '.</p></section>';
+
+    document.body.classList.add('printing');
+    var done = function () {
+      document.body.classList.remove('printing');
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); }, 50);
+    setTimeout(done, 60000);
+  }
+
   $('printBtn').addEventListener('click', printLists);
+  $('printChangesBtn').addEventListener('click', printChanges);
   $('menuBtn').addEventListener('click', function () { setMenuOpen($('menuPanel').hidden); });
   $('gear').addEventListener('click', openSettings);
   $('cfgClose').addEventListener('click', function () { $('cfg').close(); });
