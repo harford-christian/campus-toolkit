@@ -26,6 +26,7 @@ window.MOCK_BACKEND = (function () {
   // Mutable demo state — everything the real app would WRITE.
   var state = {
     overrides: clone(T.Overrides),
+    pickupAuth: clone(T.PickupAuth),   // temporary pickup authorizations (the app's second write target)
     roles: clone(T.Roles),
     savedViews: {},                    // {email: view}
     roleViews: clone(D.roleViews)      // {role: view}
@@ -95,7 +96,7 @@ window.MOCK_BACKEND = (function () {
     var walkers = dsBuildWalkers(T.Walkers);
     var routes = dsBuildRoutes(T.Routes);
     var board = dsBuildBoard({ roster: roster, attendance: attendance, signedOut: signedOut, overrides: overrides },
-                             { session: 'PM', routes: routes });
+                             { session: 'PM', routes: routes, pickupAuth: dsBuildPickupAuth(state.pickupAuth, dayKey) });
     // Only TODAY's overrides feed the walk-up list; then the approved walkers are MARKED on the board.
     var walkUp = dsWalkUpList(dsFlatList(board), walkers, attendance, signedOut, dayName,
                               occasionalToday(todayOverrides), todayOverrides);
@@ -145,6 +146,52 @@ window.MOCK_BACKEND = (function () {
                             String(routeCode || '').trim(), String(note || '').trim(),
                             D.demo.email, hhmm(new Date()), String(destination || '').trim()]);
       return dismissalApi(sim);
+    },
+
+    // TEMPORARY PICKUP AUTHORIZATIONS — mirrors pickupAuthSave / pickupAuthDelete in Code.gs. The demo
+    // writes rows to its in-memory tab and reports the mail as "sent" to a fabricated address; the real
+    // app mails the guardians on file and the office mailbox.
+    pickupAuthSave: function (payload, sim) {
+      payload = payload || {};
+      if (!myPerm().canAuthorizePickup) throw new Error('Pickup authorizations are recorded by the office. Tell them and they will add it.');
+      var dayKey = todayKey(sim);
+      var v = dsPickupAuthValidate(payload, dayKey);
+      if (v.error) throw new Error(v.error);
+      var studentId = String(payload.studentId || '').trim();
+      var subject = null;
+      dsBuildRoster(T.Roster).forEach(function (r) { if (!subject && r.id === studentId) subject = r; });
+      var name = subject ? subject.name : String(payload.studentName || '');
+      var now = stamp(new Date());
+      var authId = String(payload.id || '').trim();
+      var kind = 'created';
+      if (authId) {
+        state.pickupAuth.forEach(function (row, i) {
+          if (i && String(row[0]) === authId && (!row[9] || String(row[9]).toLowerCase() === 'active')) { row[9] = 'Superseded'; row[12] = D.demo.email; row[13] = now; }
+        });
+        kind = 'updated';
+      } else {
+        authId = 'demo' + String(state.pickupAuth.length);
+      }
+      v.people.forEach(function (p) {
+        state.pickupAuth.push([authId, studentId, name, p.name, p.rel, v.start, v.end, v.method, v.note, 'Active', D.demo.email, now, '', '']);
+      });
+      var res = dismissalApi(sim);
+      res.authId = authId;
+      res.mail = { to: ['guardian.demo@example.edu', 'office.demo@example.edu'], sent: true, error: '' };
+      return res;
+    },
+    pickupAuthDelete: function (authId, sim) {
+      if (!myPerm().canAuthorizePickup) throw new Error('Pickup authorizations are removed by the office.');
+      authId = String(authId || '').trim();
+      var now = stamp(new Date()), n = 0;
+      state.pickupAuth.forEach(function (row, i) {
+        if (i && String(row[0]) === authId && (!row[9] || String(row[9]).toLowerCase() === 'active')) { row[9] = 'Deleted'; row[12] = D.demo.email; row[13] = now; n++; }
+      });
+      if (!n) throw new Error('That authorization no longer exists — reload and try again.');
+      var res = dismissalApi(sim);
+      res.authId = authId;
+      res.mail = { to: ['guardian.demo@example.edu', 'office.demo@example.edu'], sent: true, error: '' };
+      return res;
     },
 
     saveView: function (view) {

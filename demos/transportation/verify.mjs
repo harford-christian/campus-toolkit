@@ -56,9 +56,14 @@ check('Early Bird is computed by the producer\'s family rule, not hand-written',
   eq(P.trEarlyBirdSet_(D.producerInputs.gradeById, D.producerInputs.familyById), D.producerInputs.earlyBird));
 check('87 fabricated students, one PM row each plus AM and split rows',
   Object.keys(D.producerInputs.nameById).length === 87 && D.tabs.Roster.length - 1 > 87);
-check('all ten tabs the app reads are present',
-  eq(Object.keys(D.tabs).sort(), ['Attendance Today', 'EVENTS', 'Overrides', 'PickupContacts', 'Roles',
+check('all eleven tabs the app reads are present',
+  eq(Object.keys(D.tabs).sort(), ['Attendance Today', 'EVENTS', 'Overrides', 'PickupAuth', 'PickupContacts', 'Roles',
                                   'Roster', 'Routes', 'Staff', 'Standing', 'Walkers']));
+check('a temporary pickup authorization rides on the board row and the ramp slice as names + dates only',
+  (() => { const r = M.dismissalApi(''); const f = S.dsFlatList(r.board).find(x => x.id === '400156');
+    if (!f || !f.pickupAuth.length || !f.pickupAuth[0].active) return false;
+    const sl = S.dsRampSlice(r.board, r.routes).find(x => x.name === f.name);
+    return sl && sl.authPickups.length === 1 && sl.authPickups[0][0] === 'Marisol Vega' && JSON.stringify(sl).indexOf("mom's email") === -1; })());
 check('every student in the sign-out log, attendance, overrides and walkers is on the roster',
   [...D.tabs.EVENTS.slice(1).map(r => r[3]), ...D.tabs['Attendance Today'].slice(1).map(r => r[0]),
    ...D.tabs.Overrides.slice(1).map(r => r[1]), ...D.tabs.Walkers.slice(1).map(r => r[0])]

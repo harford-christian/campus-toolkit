@@ -626,11 +626,23 @@ window.DISMISSAL_DATA = (function () {
        'office.demo@example.edu', '2026-09-06', '']];
   }
 
+  // TEMPORARY pickup authorizations (2026-09-15): a parent's email lets someone not on the FACTS
+  // list collect the child for a window of days. One row per person; an Auth ID groups them. The
+  // demo ships one live example so the PICKUP+ badge and the card section have something to show.
+  var PICKUP_AUTH_HEADER = ['Auth ID', 'Student ID', 'Student Name', 'Person', 'Relationship', 'Start', 'End',
+                            'Method', 'Note', 'Status', 'Created By', 'Created At', 'Updated By', 'Updated At'];
+  function pickupAuthValues() {
+    return [PICKUP_AUTH_HEADER.slice(),
+      ['demo1', '400156', 'Ashby Clover', 'Marisol Vega', 'Aunt', DEMO.date, DEMO.fridaySim.slice(0, 10), 'Email',
+       "mom's email — grandparents' week", 'Active', 'office.demo@example.edu', DEMO.date + ' 07:52', '', '']];
+  }
+
   var tabs = {
     'Roster': rosterValues(),
     'Attendance Today': attendanceValues(),
     'Overrides': overridesValues(),
     'Standing': standingValues(),
+    'PickupAuth': pickupAuthValues(),
     'Walkers': walkersValues(),
     'Routes': routesValues(),
     'Roles': rolesValues(),

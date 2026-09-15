@@ -145,6 +145,18 @@
   .att.ovr    { background: var(--ok); color: #fff; }
   .att.walkup { background: #00796B; color: #fff; }
   .att.standing { background: #e7e9ee; color: var(--dd); }
+  .att.auth   { background: #6A1B9A; color: #fff; }   /* a temporary pickup authorization is on file */
+  .authbox { background: #F3E5F5; border: 1px solid #CE93D8; border-radius: .4rem; padding: .45rem .6rem; margin: .35rem 0; }
+  .authbox .who { font-weight: 700; }
+  .authbox .muted { display: block; }
+  .authbox .acts { margin-top: .3rem; display: flex; gap: .4rem; }
+  .authbox .acts button { min-height: 36px; padding: .2rem .7rem; font-size: .85rem; }
+  .prow { display: flex; gap: .4rem; margin: .3rem 0; }
+  .prow input { flex: 1; min-width: 0; }
+  .prow input.rel { flex: .7; }
+  .daterow { display: flex; gap: .5rem; }
+  .daterow label { flex: 1; }
+  .daterow input { width: 100%; }
 
   .empty { padding: 1rem .9rem; color: var(--dt); }
   .simbar { background: var(--gold); color: var(--gold-ink); font-weight: 700; padding: .5rem .9rem;
@@ -304,6 +316,33 @@
   <div class="dlgrow">
     <button class="cancel" id="ovrCancel">Cancel</button>
     <button id="ovrSave">Save for today</button>
+  </div>
+</div></dialog>
+
+<!-- Temporary pickup authorization: someone NOT on the FACTS list may collect the child for a
+     window of days, on the parent's say-so. Office and Admin only; parents + office get mail. -->
+<dialog id="auth"><div class="dlg">
+  <h3 id="authName">Student</h3>
+  <p class="sub">Temporarily authorize someone to pick up this child. The parents on file and the office
+    get an email confirmation when you save, change or remove it.</p>
+  <label class="muted">Who may pick up (name and relationship)</label>
+  <div id="authPeople"></div>
+  <button type="button" class="ghost" id="authAdd">+ another person</button>
+  <div class="daterow">
+    <label class="muted" for="authStart">From<input id="authStart" type="date"></label>
+    <label class="muted" for="authEnd">Through<input id="authEnd" type="date"></label>
+  </div>
+  <label class="muted" for="authMethod">How the parent told you</label>
+  <select id="authMethod" style="width:100%">
+    <option>Email</option><option>Phone call</option><option>In person</option><option>Written note</option>
+  </select>
+  <label class="muted" for="authNote">Note</label>
+  <input id="authNote" placeholder="e.g. mom's email 9/15 — grandparents visiting" style="width:100%">
+  <input id="authId" type="hidden">
+  <div class="muted" id="authMsg"></div>
+  <div class="dlgrow">
+    <button class="cancel" id="authCancel">Cancel</button>
+    <button id="authSave">Save and notify</button>
   </div>
 </div></dialog>
 
@@ -721,6 +760,7 @@ function dsFlatList(board) {
           overrideDestination: r.overrideDestination || '',
           standing: !!r.standing, standingNote: r.standingNote || '',
           fromRouteCode: r.fromRouteCode || '', fromRouteName: r.fromRouteName || '',
+          pickupAuth: r.pickupAuth || [],
           walkUp: !!r.walkUp, walkUpWalking: !!r.walkUpWalking,
           walkUpTo: r.walkUpTo || '', walkUpWhy: r.walkUpWhy || '',
           expected: r.expected, reason: r.reason, detail: r.detail, note: r.note
@@ -1080,6 +1120,9 @@ function dsPermissions(email, roleRows, teacherName, homeroomTeachers) {
     canChangeWalkUp: isAdmin || !!roles['Office'] || !!roles['Ramp'] || !!roles['Walk-Up'],
     canChangeOwnClass: isAdmin || !!roles['Office'] || !!roles['Ramp'],
     canEditRoutes: isAdmin || !!roles['Transportation'],
+    // Temporary pickup authorizations: the front line takes the parent's email, so the record is
+    // theirs (Josh, 2026-09-15). Ramp sees it, and cannot write it.
+    canAuthorizePickup: isAdmin || !!roles['Office'],
     canManageRoles: Object.keys(adminOf).length > 0,
     isAdmin: isAdmin,
     teacherImplicit: teacherImplicit
@@ -1308,6 +1351,7 @@ function dsBuildBoard(d, opts) {
   var outs = d.signedOut || {};
   var ovr = d.overrides || {};
   var routes = opts.routes || {};
+  var auth = opts.pickupAuth || {};          // temporary pickup authorizations, per student
 
   var rows = (d.roster || []).filter(function (s) { return s.session === session; });
   var byGroup = {}, notExpected = [], seen = {};
@@ -1360,6 +1404,7 @@ function dsBuildBoard(d, opts) {
       overrideDestination: o ? (o.destination || '') : '',
       standing: !!(o && o.standing), standingNote: (o && o.standing) ? (o.note || '') : '',
       fromRouteCode: moved ? s.routeCode : '', fromRouteName: moved ? s.routeName : '',
+      pickupAuth: auth[s.id] || [],
       expected: v.expected, reason: v.reason, detail: v.detail
     };
 
@@ -1445,6 +1490,126 @@ function dsFilterBoard(board, f) {
 }
 
 // Node test harness reaches these directly; GAS and the browser ignore the export.
+/* ------------------------------ temporary pickup authorizations ------------------------------ */
+
+var DS_PICKUP_AUTH_METHODS = ['Email', 'Phone call', 'In person', 'Written note'];
+
+/** 'yyyy-mm-dd' from a Sheets Date ('2026-09-17 00:00'), an ISO string, or a typed US date. */
+function dsIsoDate(v) {
+  var s = dsCellToString(v).trim();
+  var iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  var us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+  if (us) return us[3] + '-' + (us[1].length < 2 ? '0' : '') + us[1] + '-' + (us[2].length < 2 ? '0' : '') + us[2];
+  return '';
+}
+
+/**
+ * Dismissal_WORKING!PickupAuth → per student, one entry per Auth ID with its people. Only Active
+ * rows count; a row whose End is before today is dropped unless opts.includeExpired (the delete
+ * path needs the record it is deleting). Each entry says whether it is `active` today or `upcoming`.
+ * @return {studentId: [{ id, studentId, studentName, people: [{name, rel}], start, end, method,
+ *                        note, by, at, updatedBy, updatedAt, active, upcoming }]}
+ */
+function dsBuildPickupAuth(values, dayKey, opts) {
+  opts = opts || {};
+  var out = {};
+  if (!values || values.length < 2) return out;
+  var h = dsHeaderMap(values[0]);
+  var get = function (row, name) {
+    var i = h[name];
+    return i === undefined ? '' : dsCellToString(row[i]).trim();
+  };
+  var byAuth = {}, order = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var aid = get(row, 'Auth ID'), sid = get(row, 'Student ID');
+    if (!aid || !sid) continue;
+    var status = get(row, 'Status').toLowerCase();
+    if (status && status !== 'active') continue;                 // Superseded / Deleted rows are history
+    var start = dsIsoDate(get(row, 'Start')) || dayKey;
+    var end = dsIsoDate(get(row, 'End')) || start;
+    if (end < dayKey && !opts.includeExpired) continue;
+    var a = byAuth[aid];
+    if (!a) {
+      a = byAuth[aid] = {
+        id: aid, studentId: sid, studentName: get(row, 'Student Name'), people: [],
+        start: start, end: end, method: get(row, 'Method'), note: get(row, 'Note'),
+        by: get(row, 'Created By'), at: get(row, 'Created At'),
+        updatedBy: get(row, 'Updated By'), updatedAt: get(row, 'Updated At'),
+        active: start <= dayKey && dayKey <= end, upcoming: start > dayKey
+      };
+      order.push(a);
+    }
+    if (get(row, 'Person')) a.people.push({ name: get(row, 'Person'), rel: get(row, 'Relationship') });
+  }
+  order.forEach(function (a) { (out[a.studentId] = out[a.studentId] || []).push(a); });
+  Object.keys(out).forEach(function (sid) {
+    out[sid].sort(function (x, y) { return x.start < y.start ? -1 : x.start > y.start ? 1 : 0; });
+  });
+  return out;
+}
+
+/** The ramp-slice form: ACTIVE authorizations only, [name, relationship, through]. */
+function dsAuthPickupsFor(list) {
+  var out = [];
+  (list || []).forEach(function (a) {
+    if (!a || !a.active) return;
+    (a.people || []).forEach(function (p) { out.push([p.name, p.rel || '', a.end]); });
+  });
+  return out;
+}
+
+/**
+ * What the front line typed, checked before anything is written or mailed.
+ * @return {ok, people, start, end, method, note} or {error}
+ */
+function dsPickupAuthValidate(p, dayKey) {
+  p = p || {};
+  var people = [];
+  (p.people || []).forEach(function (x) {
+    var name = String((x && x.name) || '').trim(), rel = String((x && x.rel) || '').trim();
+    if (name) people.push({ name: name.slice(0, 80), rel: rel.slice(0, 40) });
+  });
+  if (!people.length) return { error: 'At least one name is required.' };
+  var start = dsIsoDate(p.start) || dayKey, end = dsIsoDate(p.end) || start;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return { error: 'Dates must be yyyy-mm-dd.' };
+  if (end < start) return { error: 'The end date is before the start date.' };
+  if (end < dayKey) return { error: 'That authorization would already be over — check the end date.' };
+  var method = String(p.method || '').trim();
+  if (DS_PICKUP_AUTH_METHODS.indexOf(method) === -1) {
+    return { error: 'Say how the parent told you: ' + DS_PICKUP_AUTH_METHODS.join(', ') + '.' };
+  }
+  return { ok: true, people: people, start: start, end: end, method: method,
+           note: String(p.note || '').trim().slice(0, 300) };
+}
+
+/**
+ * The confirmation the parents and the office receive. Plain text, no links, no student id.
+ * @param kind 'created' | 'updated' | 'deleted'
+ */
+function dsPickupAuthEmail(kind, auth, studentName, actor) {
+  var who = (auth.people || []).map(function (p) { return p.name + (p.rel ? ' (' + p.rel + ')' : ''); }).join(', ');
+  var when = auth.start === auth.end ? 'on ' + auth.start : 'from ' + auth.start + ' through ' + auth.end;
+  var titles = { created: 'Pickup authorization added', updated: 'Pickup authorization updated',
+                 deleted: 'Pickup authorization removed' };
+  var subject = (titles[kind] || titles.created) + ' — ' + studentName;
+  var body;
+  if (kind === 'deleted') {
+    body = 'The temporary pickup authorization for ' + studentName + ' has been REMOVED.\n\n' +
+           'It had allowed: ' + who + '\nValid ' + when + '.';
+  } else {
+    body = 'A temporary pickup authorization for ' + studentName + ' has been ' +
+           (kind === 'updated' ? 'updated' : 'added') + '.\n\n' +
+           'Authorized to pick up: ' + who + '\nValid ' + when + '.\n' +
+           'Received by: ' + (auth.method || '') + (auth.note ? '\nNote: ' + auth.note : '');
+  }
+  body += '\n\nRecorded by ' + actor + ' at the Harford Christian School elementary office. If this is ' +
+          'not what you asked for, reply to this email or call the office.\n\n' +
+          'This is an automated confirmation from the HCS Dismissal app.';
+  return { subject: subject, body: body };
+}
+
 /* ------------------------------------ the driver's list ------------------------------------ */
 
 /**
@@ -1552,6 +1717,69 @@ function dsDriverLists(board, routes, dayName, only) {
 }
 
 /**
+ * THE CHANGE SHEET — one page, today's changes only, grouped by bus (Josh, 2026-09-15).
+ *
+ * The driver lists answer "who rides my bus?" and run to one page PER ROUTE. This answers a
+ * different question the front desk asks once, at the top of dismissal: "what is different
+ * today?" — and it has to be one sheet of paper they can hold, or it does not get used.
+ *
+ * So this is dsDriverLists with the unchanged children removed. Deliberately a THIN wrapper over
+ * it, exactly as dsDriverSlice is: the moment the two compute their own answers they can disagree,
+ * and a change sheet that disagrees with the driver's list is worse than no change sheet.
+ *
+ * WHAT COUNTS AS A CHANGE (Josh's three categories):
+ *   off[] — not riding this bus today. Covers "not riding at all" (ABSENT, SIGNED OUT, LEFT EARLY)
+ *           and "not riding their normal bus" (CAR TODAY, ON <OTHER ROUTE> TODAY). They share a
+ *           list because the driver's action is identical for both: do not wait.
+ *   on[]  — riding a bus they do not normally ride. An override ("added today"), or a child who
+ *           shows on two routes at once, which is an ambiguity the desk should see rather than a
+ *           change anyone chose.
+ *
+ * A STANDING arrangement is NOT a change. "These boys are car pickups, always" is this child's
+ * normal; printing it daily would bury the one line that actually differs today.
+ *
+ * A bus with nothing different is omitted entirely. That omission is the feature — it is what
+ * keeps this to one page — so the caller must say out loud how many routes ran clean, or a
+ * missing bus reads as missing data.
+ *
+ * @param {Object} board    dsBuildBoard output
+ * @param {Object} routes   dsBuildRoutes output
+ * @param {string} dayName  'Monday' … — picks today's driver
+ * @return {{buses: Array, counts: {buses, clean, off, on}}}
+ */
+function dsChangeSheet(board, routes, dayName) {
+  var lists = dsDriverLists(board, routes, dayName, '');
+  var buses = [], clean = 0, nOff = 0, nOn = 0;
+
+  lists.forEach(function (L) {
+    // Every notRiding row is a change by definition — the list only exists because something
+    // took the child off this bus.
+    var off = L.notRiding.map(function (r) {
+      return { name: r.name, grade: r.grade, reason: r.reason || 'NOT EXPECTED', detail: r.detail || '' };
+    });
+
+    // A rider is only interesting if a flag says they are not usually here.
+    var on = [];
+    L.riding.forEach(function (r) {
+      var note = (r.flags || []).filter(function (f) {
+        return /^added today/.test(f) || /^also on /.test(f);
+      }).join('; ');
+      if (note) on.push({ name: r.name, grade: r.grade, note: note });
+    });
+
+    if (!off.length && !on.length) { clean++; return; }
+    nOff += off.length;
+    nOn += on.length;
+    buses.push({
+      code: L.code, name: L.name, colour: L.colour, vehicle: L.vehicle,
+      drivers: L.drivers, riding: L.riding.length, off: off, on: on
+    });
+  });
+
+  return { buses: buses, counts: { buses: buses.length, clean: clean, off: nOff, on: nOn } };
+}
+
+/**
  * THE RAMP SLICE — the minimal, read-only board the transportation-kiosk renders from a published
  * JSON file, and the smallest thing that answers "who is in the ramp line, and who is NOT". A
  * deliberate SUBSET: the ramp watches the little ones collected by car or bus, so the default is
@@ -1615,7 +1843,9 @@ function dsRampSlice(board, routes, opts, pickups) {
       name: r.name, grade: norm(r.grade), type: r.type, lanes: lanes,
       expected: r.expected, reason: r.reason || '', detail: r.detail || '',
       split: !!r.split, today: !!r.overridden, handedTo: r.overrideDestination || '',
-      walkUp: !!r.walkUp, pickups: pickups[r.id] || []
+      walkUp: !!r.walkUp, pickups: pickups[r.id] || [],
+      // temporary authorizations ACTIVE today: [name, relationship, through] — names and dates only
+      authPickups: dsAuthPickupsFor(r.pickupAuth)
     };
   });
 }
@@ -1667,6 +1897,8 @@ if (typeof module !== 'undefined' && module.exports) {
     dsBuildPickups: dsBuildPickups, dsFlatList: dsFlatList, dsStudentCard: dsStudentCard,
     dsBuildWalkers: dsBuildWalkers, dsWalkUpList: dsWalkUpList,
     dsBuildRoutes: dsBuildRoutes, dsDriversFor: dsDriversFor, dsRouteFor: dsRouteFor, dsDaysInclude: dsDaysInclude,
+    dsBuildPickupAuth: dsBuildPickupAuth, dsAuthPickupsFor: dsAuthPickupsFor, dsPickupAuthValidate: dsPickupAuthValidate,
+    dsPickupAuthEmail: dsPickupAuthEmail, dsIsoDate: dsIsoDate, DS_PICKUP_AUTH_METHODS: DS_PICKUP_AUTH_METHODS,
     dsDriverLists: dsDriverLists, dsRampSlice: dsRampSlice, dsDriverSlice: dsDriverSlice,
     DS_ROLES: DS_ROLES, dsBuildRoles: dsBuildRoles, dsPermissions: dsPermissions,
     dsCanChange: dsCanChange, dsBuildStaffNames: dsBuildStaffNames, dsScopeRows: dsScopeRows,
@@ -1853,6 +2085,7 @@ if (typeof module !== 'undefined' && module.exports) {
     if (r.walkUp) b += '<span class="att walkup">WALK-UP</span>';
     else if (r.walkTo === 'Unresolved') b += '<span class="att walk">walk-to unknown</span>';
     if (r.standing) b += '<span class="att standing" title="A standing arrangement the office wrote down">STANDING</span>';
+    if (hasActiveAuth(r)) b += '<span class="att auth" title="A temporary pickup authorization is on file — see the card">PICKUP+</span>';
     if (r.overridden) b += '<span class="att ovr">TODAY</span>';
     return b;
   }
@@ -2141,6 +2374,7 @@ if (typeof module !== 'undefined' && module.exports) {
           '</span><span class="r">' + esc(p[1]) + '</span></div>';
       }).join('');
     }
+    h += authSectionHtml(s);
     h += '</div>';
 
     h += '<div class="sect"><h4>Siblings</h4>';
@@ -2156,11 +2390,16 @@ if (typeof module !== 'undefined' && module.exports) {
     // presentation — setOverride re-checks and refuses — but showing a control that will be
     // refused, at the ramp, in front of a parent, is its own kind of failure.
     var mayChange = dsCanChange(myPerm, s, !!wk);
+    // The front line's second control: a parent's email that lets someone else collect the child
+    // for a few days (Josh, 2026-09-15). Office and Admin only — pickupAuthSave re-checks.
+    var authBtn = myPerm.canAuthorizePickup
+      ? '<button class="cancel" id="cardAuth" title="Temporarily let someone not on the FACTS list collect this child">Authorization Override</button>'
+      : '';
     h += mayChange.ok
-      ? '<div class="dlgrow"><button class="cancel" id="cardClose">Close</button>' +
+      ? '<div class="dlgrow"><button class="cancel" id="cardClose">Close</button>' + authBtn +
         '<button id="cardOvr">Change for today</button></div>'
       : '<div class="nochange">' + esc(mayChange.why) + '</div>' +
-        '<div class="dlgrow"><button class="cancel" id="cardClose">Close</button></div>';
+        '<div class="dlgrow"><button class="cancel" id="cardClose">Close</button>' + authBtn + '</div>';
 
     $('cardBody').innerHTML = h;
     $('card').showModal();
@@ -2168,6 +2407,18 @@ if (typeof module !== 'undefined' && module.exports) {
     $('cardClose').addEventListener('click', function () { $('card').close(); });
     if (mayChange.ok) {
       $('cardOvr').addEventListener('click', function () { $('card').close(); openOverride(s); });
+    }
+    if (myPerm.canAuthorizePickup) {
+      $('cardAuth').addEventListener('click', function () { $('card').close(); openAuth(s, null); });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-authedit]'), function (b) {
+        b.addEventListener('click', function () {
+          var a = (s.pickupAuth || []).filter(function (x) { return x.id === b.getAttribute('data-authedit'); })[0];
+          $('card').close(); openAuth(s, a || null);
+        });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-authdel]'), function (b) {
+        b.addEventListener('click', function () { deleteAuth(s, b.getAttribute('data-authdel'), b); });
+      });
     }
     Array.prototype.forEach.call(document.querySelectorAll('.showphone'), function (b) {
       b.addEventListener('click', function () {
@@ -2349,6 +2600,118 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /** One membership call, one shape: disable, call, replace the whole rolesApi payload. */
+  /* ------------------------------ temporary pickup authorizations ------------------------------
+   *
+   * A parent emails the office: "my sister Jane will pick the kids up this week." Jane is not on the
+   * FACTS pickup list, so the front line records her here for a window of days (Josh, 2026-09-15).
+   * The record rides on the board row, shows as PICKUP+ on the list, lists on the card, and reaches
+   * the ramp kiosk on the next publish. Save / change / remove each mail the guardians on file and
+   * the office; the server says whether the mail went, so a failure is sent by hand, not missed. */
+  function hasActiveAuth(r) {
+    return !!(r && r.pickupAuth && r.pickupAuth.some(function (a) { return a.active; }));
+  }
+  function authWhen(a) {
+    return a.start === a.end ? 'on ' + a.start : a.start + ' through ' + a.end;
+  }
+  function authSectionHtml(s) {
+    var list = s.pickupAuth || [];
+    if (!list.length) return '';
+    return list.map(function (a) {
+      var who = (a.people || []).map(function (p) { return esc(p.name) + (p.rel ? ' <span class="muted" style="display:inline">(' + esc(p.rel) + ')</span>' : ''); }).join(', ');
+      return '<div class="authbox"><span class="att auth">' + (a.active ? 'TEMPORARY' : 'STARTS ' + esc(a.start)) + '</span> ' +
+        '<span class="who">' + who + '</span>' +
+        '<span class="muted">' + esc(authWhen(a)) + ' · ' + esc(a.method || '') + (a.note ? ' · ' + esc(a.note) : '') + '</span>' +
+        '<span class="muted">Recorded by ' + esc(a.by || '?') + (a.at ? ' at ' + esc(a.at) : '') + '</span>' +
+        (myPerm.canAuthorizePickup
+          ? '<div class="acts"><button type="button" class="ghost" data-authedit="' + esc(a.id) + '">Edit</button>' +
+            '<button type="button" class="ghost" data-authdel="' + esc(a.id) + '">Remove</button></div>'
+          : '') +
+        '</div>';
+    }).join('');
+  }
+  function personRowHtml(name, rel) {
+    return '<div class="prow"><input class="pname2" placeholder="Full name" value="' + esc(name || '') + '">' +
+      '<input class="rel" placeholder="Relationship" value="' + esc(rel || '') + '"></div>';
+  }
+  var authFor = null;
+  function openAuth(s, existing) {
+    authFor = s;
+    $('authName').textContent = s.name;
+    var today = (raw && raw.dayKey) || '';
+    $('authPeople').innerHTML = existing
+      ? (existing.people || []).map(function (p) { return personRowHtml(p.name, p.rel); }).join('') || personRowHtml('', '')
+      : personRowHtml('', '');
+    $('authStart').value = existing ? existing.start : today;
+    $('authEnd').value = existing ? existing.end : today;
+    $('authMethod').value = existing && existing.method ? existing.method : 'Email';
+    $('authNote').value = existing ? (existing.note || '') : '';
+    $('authId').value = existing ? existing.id : '';
+    $('authMsg').textContent = '';
+    $('authSave').textContent = existing ? 'Save changes and notify' : 'Save and notify';
+    $('auth').showModal();
+    var first = $('authPeople').querySelector('input'); if (first) first.focus();
+  }
+  $('authAdd').addEventListener('click', function () {
+    $('authPeople').insertAdjacentHTML('beforeend', personRowHtml('', ''));
+    var rows = $('authPeople').querySelectorAll('.pname2'); rows[rows.length - 1].focus();
+  });
+  $('authCancel').addEventListener('click', function () { $('auth').close(); });
+  function mailSummary(res) {
+    var m = res && res.mail;
+    if (!m) return '';
+    if (m.sent) return 'Confirmation sent to ' + m.to.join(', ') + '.';
+    return 'SAVED, but the confirmation email could NOT be sent' + (m.error ? ' (' + m.error + ')' : '') +
+           '. Please email the parents' + (m.to.length ? ' at ' + m.to.join(', ') : '') + ' by hand.';
+  }
+  function afterWrite(res) {
+    reqSeq++; liveOk = true; retries = 0; degraded = null;
+    applyPayload(res); cachePut(res); renderFreshness(res.freshness || {});
+    banners(); render();
+  }
+  $('authSave').addEventListener('click', function () {
+    if (!authFor) return;
+    var people = Array.prototype.map.call($('authPeople').querySelectorAll('.prow'), function (row) {
+      return { name: row.querySelector('.pname2').value, rel: row.querySelector('.rel').value };
+    });
+    var payload = { studentId: authFor.id, studentName: authFor.name, id: $('authId').value,
+                    people: people, start: $('authStart').value, end: $('authEnd').value,
+                    method: $('authMethod').value, note: $('authNote').value };
+    var b = $('authSave'); b.disabled = true; b.textContent = 'Saving…';
+    $('authMsg').textContent = '';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        b.disabled = false;
+        if (res && res.ok) {
+          afterWrite(res);
+          $('auth').close();
+          alert(mailSummary(res));
+        } else {
+          b.textContent = 'Save and notify';
+          $('authMsg').textContent = (res && res.error) || 'Could not save.';
+        }
+      })
+      .withFailureHandler(function (err) {
+        b.disabled = false; b.textContent = 'Save and notify';
+        $('authMsg').textContent = 'Could not save: ' + errMsg(err);
+      })
+      .pickupAuthSave(payload, SIM);
+  });
+  function deleteAuth(s, authId, btn) {
+    var a = (s.pickupAuth || []).filter(function (x) { return x.id === authId; })[0];
+    var who = a ? a.people.map(function (p) { return p.name; }).join(', ') : 'this authorization';
+    if (!confirm('Remove the pickup authorization for ' + who + '? The parents and the office will be emailed.')) return;
+    btn.disabled = true; btn.textContent = 'Removing…';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok) { afterWrite(res); $('card').close(); alert(mailSummary(res)); }
+        else { btn.disabled = false; btn.textContent = 'Remove'; alert((res && res.error) || 'Could not remove.'); }
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false; btn.textContent = 'Remove'; alert('Could not remove: ' + errMsg(err));
+      })
+      .pickupAuthDelete(authId, SIM);
+  }
+
   function cfgCall(btn, fn, args) {
     var txt = btn.textContent;
     btn.disabled = true; btn.textContent = '…';
