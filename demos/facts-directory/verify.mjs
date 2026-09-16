@@ -185,6 +185,58 @@ check('every seeded favourite is a real student in the dataset',
     return D.favorites.every(f => ids.indexOf(f) !== -1);
   })());
 
+/* ---------- game-day dismissal: the bar and the classes it costs (app @38) ---------- */
+const gd2 = S.athleticsForStudent(nora2.activities, nora2.profile.gender,
+  D.athleticsTeams, D.athleticsEvents, TODAY);
+const dismissMin = S.searchTimeToMin_(gd2[0].dismiss || gd2[0].depart);
+check('the bar renders as sport + dismissal, with PM dropped',
+  gd2[0].team === 'Varsity Girls Soccer' &&
+  S.searchTimeLabel_(gd2[0].dismiss).replace(/\s*PM$/, '') === '2:00');
+check('exactly one class is CUT SHORT by that dismissal, and it is the straddling one',
+  (() => {
+    const sc = S.annotateSchedule(nora2.classes, pt, ctx);
+    const missed = sc.filter(c => S.isMissedForGame(c, dismissMin));
+    // Spanish IV runs 1:49-2:34 and so is interrupted, not merely "starts later" — the subtler
+    // half of the rule, and the one worth having on screen.
+    return missed.length === 1 && missed[0].description === 'Spanish IV' &&
+           S.searchTimeToMin_(missed[0].begin) < dismissMin;
+  })());
+check('morning classes are NOT flagged (they finish before the team leaves)',
+  (() => {
+    const sc = S.annotateSchedule(nora2.classes, pt, ctx);
+    return sc.filter(c => c.meetsToday && S.searchTimeToMin_(c.end) <= dismissMin)
+      .every(c => !S.isMissedForGame(c, dismissMin));
+  })());
+
+/* ---------- the school day names its own blocks (app @36) ---------- */
+check('at lunchtime the day bar says Lunch, not "no class in session"',
+  (() => {
+    const b = S.schoolDayBlock(pt, { dayCol: D.demoNow.dayOfWeek, nowMin: 11 * 60 + 50,
+                                    bells: ctx.bells }, nora2.profile.grade);
+    return b && b.state === 'block' && b.label === 'Lunch';
+  })());
+check('the TWO-LUNCH band is respected in the demo grid too',
+  S.slotAppliesToGrade_('Lunch 9-12', '12') === true &&
+  S.slotAppliesToGrade_('Lunch 7-8', '12') === false);
+
+/* ---------- a teacher's current class (app @39) ---------- */
+check('teacherDetail carries `pattern`, so a teacher resolves a current class',
+  (() => {
+    const t = S.teacherDetail(tabs, tabs.find(x => x.name === 'Teachers').values[1][0]);
+    return t && t.classes.length > 0 && t.classes.every(c => 'pattern' in c);
+  })());
+
+/* ---------- result groups render Students, Teachers, Classes (app @39) ---------- */
+const page = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
+check('result groups are ordered Students, then Teachers, then Classes',
+  (() => {
+    const s = page.indexOf('if (res.total) {'), t = page.indexOf('if (teachers.length) {'),
+          c = page.indexOf('if (classes.length) {');
+    return s > 0 && s < t && t < c;
+  })());
+check('the favourites chip — the way IN to that view — is in the page',
+  /id="favview"/.test(page) && /function showFavorites_/.test(page));
+
 /* ---------- the page itself ---------- */
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 check('no unreplaced Apps Script template tokens', !/<\?[=!]/.test(html));

@@ -105,6 +105,10 @@
   .cls.now { font-weight: 700; background: #FFF8E1; box-shadow: inset 3px 0 0 var(--gold); }
   .cls.now .t { color: #6b5400; font-weight: 600; }
   .cls.off { opacity: .62; } /* doesn't meet today */
+  /* A class cut short, or missed entirely, by today's game dismissal. */
+  .cls.missed { background: #FDECEA; box-shadow: inset 0 0 0 2px #C62828; }
+  .cls.missed .t { color: #7f1d1d; }
+  .cls.now.missed { box-shadow: inset 0 0 0 2px #C62828, inset 3px 0 0 var(--gold); }
   .nowtag { background: #8FE39B; color: #0d3a17; font-size: .62rem; font-weight: 700;
             padding: .1em .45em; border-radius: .6em; vertical-align: middle; margin-left: .35rem; }
   /* today's attendance — deliberately loud, it changes where a student physically is */
@@ -132,8 +136,10 @@
      dismissal has passed the child is actually OUT of the building, so it takes the same
      purple as a sign-out (.attbar.out) — the page should read the same way for "gone at a
      coach's dismissal" as for "gone because the office signed them out". */
-  .attbar.game { background: #E7F6EC; color: #14532d; }
-  .attbar.game.gone { background: #F3EEFF; color: #4c1d95; }
+  /* A game today (Josh's spec, 2026-09-14): red frame, light red fill — the SAME treatment the
+     classes they'll miss get, so the bar and the affected rows read as one statement. */
+  .attbar.game { background: #FDECEA; color: #7f1d1d; border: 2px solid #C62828;
+                 border-radius: .4rem; margin: .6rem .9rem; padding: .55rem .8rem; }
   .attbar b { font-weight: 700; }
   .clstime { float: right; color: var(--dt); font-size: .78rem; font-weight: 600; white-space: nowrap;
              margin-left: .5rem; }
@@ -777,6 +783,10 @@ function teacherDetail(tabs, id) {
           category: searchCellToString_(row[h['Category']]),
           period: h['Period'] === undefined ? '' : searchCellToString_(row[h['Period']]).trim(),
           room: h['Room'] === undefined ? '' : searchCellToString_(row[h['Room']]).trim(),
+          // The join key into `Period Times`. Without it a teacher's classes carry no clock
+          // time, so annotateSchedule can't tell which one they are teaching RIGHT NOW —
+          // which is the whole point of showing a teacher's schedule mid-day.
+          pattern: h['Pattern'] === undefined ? '' : searchCellToString_(row[h['Pattern']]).trim(),
           quarters: {},
           students: 0
         };
@@ -791,7 +801,7 @@ function teacherDetail(tabs, id) {
     profile: t,
     classes: order.map(function (c) {
       return { code: c.code, key: c.key, description: c.description, category: c.category,
-               period: c.period, room: c.room,
+               period: c.period, room: c.room, pattern: c.pattern,
                quarters: Object.keys(c.quarters).sort().join(' / '), students: c.students };
     })
   };
@@ -1233,6 +1243,97 @@ function bellTimeForSlot_(bells, slotLabel) {
 }
 
 /**
+ * Does a grade-banded slot label apply to this student?
+ *
+ * HCS runs TWO lunches — "Lunch 7-8" at 10:57 and "Lunch 9-12" at 11:45 — and the same banding
+ * on P4/P5. Without this check a 9th grader at 11:00 would be told they are at lunch when they
+ * are actually in Period 4, because the 7-8 lunch is running at that moment for other students.
+ *
+ * An unbanded label ("Homeroom") applies to everyone. A banded label with a grade we cannot
+ * read as a number (K5, ELC) returns FALSE: saying nothing beats naming the wrong lunch.
+ */
+function slotAppliesToGrade_(slotLabel, grade) {
+  var band = /(\d{1,2})\s*-\s*(\d{1,2})\s*$/.exec(String(slotLabel || ''));
+  if (!band) return true;
+  var g = String(grade == null ? '' : grade).trim();
+  if (!/^\d{1,2}$/.test(g)) return false; // "K5"/"ELC"/blank — don't guess a band
+  return Number(g) >= Number(band[1]) && Number(g) <= Number(band[2]);
+}
+
+/** "Lunch 7-8" -> "Lunch". The band is implied by whose record you're looking at. */
+function blockDisplayName_(slotLabel) {
+  var s = String(slotLabel || '').replace(/\s*\d{1,2}\s*-\s*\d{1,2}\s*$/, '').trim();
+  return s || String(slotLabel || '');
+}
+
+/**
+ * Where the school day is RIGHT NOW for this student when no class of theirs is in session.
+ *
+ * Without this the schedule said "no class in session at this time", which at 11:50 reads like
+ * something is broken rather than "they're at lunch" (Josh, 2026-09-14). The non-teaching slots
+ * — Lunch, Homeroom — are already in the `Period Times` grid as Pattern-0 slot rows, so the
+ * honest answer is sitting there; it just was never consulted.
+ *
+ * Bell times win over the FACTS grid per slot, exactly as annotateSchedule does, so a delay day
+ * names the block at its real time instead of the normal-day one.
+ *
+ * @param periodTimes buildPeriodTimes() output
+ * @param ctx   { dayCol:1..5 ('' = weekend), nowMin, bells }
+ * @param grade the student's `Grade Level` — decides WHICH lunch applies
+ * @return {?{state:string, label:string, begin:string, end:string}}
+ *   state: 'block'   — inside a named non-teaching block (label = "Lunch"/"Homeroom")
+ *          'between' — inside the school day but between blocks (passing time)
+ *          'before' / 'after' — outside the school day
+ *   null when the day has no slots at all (weekend, or no grid), so the caller can stay quiet.
+ */
+function schoolDayBlock(periodTimes, ctx, grade) {
+  ctx = ctx || {};
+  var day = String(ctx.dayCol || '');
+  var now = ctx.nowMin;
+  if (!day || now === null || now === undefined || now < 0) return null;
+
+  var bySlot = (periodTimes || {}).bySlot || {};
+  var byPattern = (periodTimes || {}).byPattern || {};
+  var bells = ctx.bells || {};
+  var dayStart = -1, dayEnd = -1, hit = null;
+
+  var consider = function (label, cell, teaching) {
+    if (!cell) return;
+    if (!slotAppliesToGrade_(label, grade)) return;
+    var b = bellTimeForSlot_(bells, label);
+    var begin = (b && b.start) || cell.begin;
+    var end = (b && b.end) || cell.end;
+    var bm = searchTimeToMin_(begin), em = searchTimeToMin_(end);
+    if (bm < 0 || em <= bm) return;
+    // The school day spans EVERY slot, teaching or not — that's what makes "before"/"after"
+    // distinguishable from "between classes".
+    if (dayStart < 0 || bm < dayStart) dayStart = bm;
+    if (em > dayEnd) dayEnd = em;
+    if (teaching) return;                       // periods are named by the class, not here
+    if (now < bm || now >= em) return;          // end is exclusive, as everywhere else here
+    if (!hit || bm > searchTimeToMin_(hit.begin)) {
+      hit = { state: 'block', label: blockDisplayName_(label), begin: begin, end: end };
+    }
+  };
+
+  Object.keys(bySlot).forEach(function (label) {
+    consider(label, bySlot[label][day], /^P\s*\d/i.test(label));
+  });
+  // Patterned (teaching) slots only widen the day's span; a student's own class already names
+  // itself when it's in session.
+  Object.keys(byPattern).forEach(function (p) {
+    var cell = byPattern[p][day];
+    if (cell) consider(cell.slotLabel, cell, true);
+  });
+
+  if (hit) return hit;
+  if (dayStart < 0) return null;
+  if (now < dayStart) return { state: 'before', label: '', begin: '', end: '' };
+  if (now >= dayEnd) return { state: 'after', label: '', begin: '', end: '' };
+  return { state: 'between', label: '', begin: '', end: '' };
+}
+
+/**
  * Annotate a student's classes with today's slot/time and flag the one happening NOW.
  *
  * @param {Array} classes personDetail().classes
@@ -1627,16 +1728,20 @@ function athleticsMatchTeams(activity, gender, teams) {
      Read positionally, never by substring: strip the optional gender letter and level prefix,
      then require the REMAINDER TO START with a sport token. That is what keeps "SPVB" (a bus
      route) from matching volleyball on the "vb" buried in it. */
-  if (!sport) {
-    /* Match the WHOLE code as one shape — optional gender letter, any number of level tokens,
-       then the sport — rather than stripping a prefix and inspecting the remainder.
+  /* Match the WHOLE code as one shape rather than stripping a prefix and inspecting what's left.
+     Anchoring both ends is what refuses the bus routes ("SP-AM", "CCAM", "IXL") and anything
+     else that merely CONTAINS a sport token.
 
-       Stripping one level token is wrong for a double-level code: "BJVVBB" (Boys JV+Varsity
-       BasketBall) leaves "vbb", which starts with "vb", so a basketball player was matched to
-       volleyball. Anchoring both ends also refuses the bus routes ("SP-AM", "CCAM", "IXL") and
-       anything else that merely CONTAINS a sport token, which prefix-matching could not. */
-    var codeSport = (/^(?:[bg])?(?:jv|v|ms)*(cctry|xc|volley|vb|basket|bb|soft|sb|base|bsb|flag|ff|soccer|soc|sc|golf)$/
-      .exec(String((activity && activity.code) || '').toLowerCase()) || [])[1] || '';
+     The gender letter appears on EITHER side of the level, because HCS uses both orders:
+       level-then-gender  JVBSoc, MSGSoc, VBSoc, VGSC   (what the registrar entered 2026-09-14)
+       gender-then-level  BVSOC, GMSVB, BJVVBB          (the older team-code convention)
+     Stripping one level token also breaks a double-level code: "BJVVBB" (Boys JV+Varsity
+     BasketBall) leaves "vbb", which starts with "vb" — a basketball player matched to
+     volleyball. Letting the regex backtrack across the whole string avoids both traps. */
+  var codeParts = /^([bg])?((?:jv|v|ms)*)([bg])?(cctry|xc|volley|vb|basket|bb|soft|sb|base|bsb|flag|ff|soccer|soc|sc|golf)$/
+    .exec(String((activity && activity.code) || '').toLowerCase()) || [];
+  var codeSport = codeParts[4] || '';
+  if (!sport) {
     sport =
       /^(cctry|xc)$/.test(codeSport) ? 'Cross-Country' :
       /^(vb|volley)$/.test(codeSport) ? 'Volleyball' :
@@ -1668,15 +1773,26 @@ function athleticsMatchTeams(activity, gender, teams) {
   if (/\bjv\b/.test(noJv)) levels.JV = true;
   if (/\bvarsity\b/.test(noJv)) levels.Varsity = true;
 
-  var codeLevel = /^(?:[bg])?(jv|v|ms)(?=[a-z])/.exec(
-    String((activity && activity.code) || '').toLowerCase());
+  var codeLevel = /^(jv|v|ms)/.exec(codeParts[2] || '');
   if (codeLevel) {
     levels[codeLevel[1] === 'v' ? 'Varsity' : codeLevel[1] === 'jv' ? 'JV' : 'MS'] = true;
   }
   var wantLevel = Object.keys(levels);
 
+  /* Gender: THE CLASS WINS when it states one, and only then fall back to the student.
+     The original rule took gender from the student alone, because FACTS course titles "often
+     state no gender" — but HCS's do ("MS Girls Soccer"), and ignoring that put a boy enrolled
+     in MSGSoc onto the MS BOYS calendar. The class is the more specific signal; the student's
+     own record is the fallback for a title like "Junior Varsity & Varsity Basketball" that
+     names none. This also means a blank/unknown Gender cell no longer matches both teams. */
+  var classGender =
+    /\b(girls?|women'?s?|ladies)\b/.test(l) ? 'Girls' :
+    /\b(boys?|men'?s?)\b/.test(l) ? 'Boys' :
+    (codeParts[1] || codeParts[3]) === 'g' ? 'Girls' :
+    (codeParts[1] || codeParts[3]) === 'b' ? 'Boys' : '';
+
   var g = String(gender || '').trim().toLowerCase().charAt(0);
-  var wantGender = g === 'm' ? 'Boys' : g === 'f' ? 'Girls' : '';
+  var wantGender = classGender || (g === 'm' ? 'Boys' : g === 'f' ? 'Girls' : '');
 
   var candidates = (teams || []).filter(function (t) {
     if (t.sport !== sport) return false;
@@ -1693,8 +1809,31 @@ function athleticsMatchTeams(activity, gender, teams) {
   if (wantLevel.length) {
     var byLevel = candidates.filter(function (t) { return wantLevel.indexOf(t.level) !== -1; });
     if (byLevel.length) return byLevel;
+    /* No calendar at that level. Falling back to "every candidate" is only safe when there is
+       exactly ONE — the real case being "MS Cross Country" against HCS's single XC calendar.
+       With more than one it INVENTS teams: "JV Boys Soccer" read for a girl used to return MS
+       *and* Varsity girls, neither of which she is on. Silence beats a wrong bus time. */
+    return candidates.length === 1 ? candidates : [];
   }
   return candidates;
+}
+
+/**
+ * Will this class be missed because the student leaves for a game?
+ *
+ * The test is the class's END, not its start: a class that is still running when the team is
+ * dismissed is cut short, and one that starts afterwards is missed entirely — both matter to a
+ * teacher. A class that has already ENDED by the dismissal is unaffected.
+ *
+ * @param c          one annotateSchedule row (needs meetsToday + end)
+ * @param dismissMin dismissal in minutes past midnight; -1 when there is no game today
+ */
+function isMissedForGame(c, dismissMin) {
+  if (!c || !c.meetsToday || dismissMin === null || dismissMin === undefined || dismissMin < 0) {
+    return false;
+  }
+  var end = searchTimeToMin_(c.end);
+  return end > dismissMin; // end is exclusive everywhere here, so ">" not ">="
 }
 
 /**
@@ -1792,6 +1931,8 @@ if (typeof module !== 'undefined' && module.exports) {
     studentStatus: studentStatus,
     bellSlotTimes: bellSlotTimes,
     annotateSchedule: annotateSchedule,
+    schoolDayBlock: schoolDayBlock,
+    slotAppliesToGrade_: slotAppliesToGrade_,
     parseSimClock: parseSimClock,
     isHomeroomClass_: isHomeroomClass_,
     parseAthleticsTimes: parseAthleticsTimes,
@@ -1799,6 +1940,7 @@ if (typeof module !== 'undefined' && module.exports) {
     athleticsParseIcs: athleticsParseIcs,
     athleticsMatchTeams: athleticsMatchTeams,
     athleticsForStudent: athleticsForStudent,
+    isMissedForGame: isMissedForGame,
     parseQuarterRanges: parseQuarterRanges,
     quarterForDate: quarterForDate,
     searchTimeToMin_: searchTimeToMin_,
@@ -2179,10 +2321,11 @@ if (typeof module !== 'undefined' && module.exports) {
       lastListStatus = statusEl.innerHTML;
       return;
     }
+    // Counts read in the same order the groups render (Josh, 2026-09-16).
     var parts = [];
-    if (classes.length) parts.push((res.classesTotal || classes.length) + ' class' + (res.classesTotal === 1 ? '' : 'es'));
-    if (teachers.length) parts.push(teachers.length + ' teacher' + (teachers.length === 1 ? '' : 's'));
     if (res.total) parts.push(res.total + ' student' + (res.total === 1 ? '' : 's'));
+    if (teachers.length) parts.push(teachers.length + ' teacher' + (teachers.length === 1 ? '' : 's'));
+    if (classes.length) parts.push((res.classesTotal || classes.length) + ' class' + (res.classesTotal === 1 ? '' : 'es'));
     statusEl.textContent = parts.join(', ') +
       (res.hasClose ? ' (including similar spellings)' : '') +
       (res.truncated ? ' — showing ' + res.people.length + ' students, add another word to narrow down' : '') +
@@ -2192,29 +2335,8 @@ if (typeof module !== 'undefined' && module.exports) {
     var groupCount = (classes.length ? 1 : 0) + (teachers.length ? 1 : 0) + (res.total ? 1 : 0);
     var labels = groupCount > 1;
     var html = '';
-    if (classes.length) {
-      html += (labels ? '<div class="grouplabel">Classes</div>' : '') +
-        '<div class="people">' + classes.map(function (c, i) {
-          var meta = [c.teacher, c.grades ? 'Grades ' + c.grades : '',
-            c.students + ' student' + (c.students === 1 ? '' : 's')].filter(String).join(' · ');
-          return '<button class="person" data-c="' + i + '">' +
-            '<span class="pname">' + highlight(esc(c.description || c.code), res.tokens, 'ex') +
-            ' <span class="tag">Class</span></span>' +
-            '<span class="pmeta">' + esc(meta) + '</span></button>';
-        }).join('') + '</div>';
-    }
-    if (teachers.length) {
-      html += (labels ? '<div class="grouplabel">Teachers</div>' : '') +
-        '<div class="people">' + teachers.map(function (t, i) {
-          var meta = [t.department, t.level, t.grades ? 'Grades ' + t.grades : '']
-            .filter(String).join(' · ') || 'Teacher';
-          if (t.close) meta += ' · similar spelling';
-          return '<button class="person" data-t="' + i + '">' +
-            '<span class="pname">' + nameHtml(t.name, res.tokens, t.fuzzyWords) +
-            ' <span class="tag">Teacher</span></span>' +
-            '<span class="pmeta">' + esc(meta) + '</span></button>';
-        }).join('') + '</div>';
-    }
+    /* GROUP ORDER (Josh, 2026-09-16): Students, then Teachers, then Classes. A name
+       search is overwhelmingly a search for a person, so the people come first. */
     if (res.total) {
       html += (labels ? '<div class="grouplabel">Students</div>' : '') +
         '<div class="people">' + res.people.map(function (p, i) {
@@ -2225,6 +2347,33 @@ if (typeof module !== 'undefined' && module.exports) {
           return '<button class="person" data-i="' + i + '">' +
             '<span class="pname">' + nameHtml(p.name, res.tokens, p.fuzzyWords) +
             attTag_(p.attendance, p.status) + '</span>' +
+            '<span class="pmeta">' + esc(meta) + '</span></button>';
+        }).join('') + '</div>';
+    }
+    if (teachers.length) {
+      html += (labels ? '<div class="grouplabel">Teachers</div>' : '') +
+        '<div class="people">' + teachers.map(function (t, i) {
+          var meta = [t.department, t.level, t.grades ? 'Grades ' + t.grades : '']
+            .filter(String).join(' · ') || 'Teacher';
+          if (t.close) meta += ' · similar spelling';
+          // What they're teaching RIGHT NOW, so the answer to "where is Mrs Duvall?" is in the
+          // result list rather than one tap away (Josh, 2026-09-16).
+          var teaching = teacherNowLabel_(t.id);
+          if (teaching) meta = teaching + (meta ? ' · ' + meta : '');
+          return '<button class="person" data-t="' + i + '">' +
+            '<span class="pname">' + nameHtml(t.name, res.tokens, t.fuzzyWords) +
+            ' <span class="tag">Teacher</span></span>' +
+            '<span class="pmeta">' + esc(meta) + '</span></button>';
+        }).join('') + '</div>';
+    }
+    if (classes.length) {
+      html += (labels ? '<div class="grouplabel">Classes</div>' : '') +
+        '<div class="people">' + classes.map(function (c, i) {
+          var meta = [c.teacher, c.grades ? 'Grades ' + c.grades : '',
+            c.students + ' student' + (c.students === 1 ? '' : 's')].filter(String).join(' · ');
+          return '<button class="person" data-c="' + i + '">' +
+            '<span class="pname">' + highlight(esc(c.description || c.code), res.tokens, 'ex') +
+            ' <span class="tag">Class</span></span>' +
             '<span class="pmeta">' + esc(meta) + '</span></button>';
         }).join('') + '</div>';
     }
@@ -2315,27 +2464,21 @@ if (typeof module !== 'undefined' && module.exports) {
     // Only events that pull the child out of class earn a place at the top; the rest of the
     // team calendar (practices, home games) is after-school and changes nothing here.
     var leaving = games.filter(function (g) { return g.leavesEarly; });
+    /* Josh, 2026-09-14: the sport and the dismissal time, nothing else. The earlier version
+       carried departure, game time, venue and a leaving/left phrase — true, but it buried the
+       one fact a teacher acts on. " PM" is dropped because every real dismissal is an
+       afternoon one; a genuinely morning departure (Saturday tournaments do exist in the data)
+       keeps its AM so "8:30 Dismissal" can never be misread. */
     var gameBar = leaving.map(function (g) {
-      /* TENSE MATTERS (Josh, 2026-09-07): the whole point is answering "is this child gone, or
-         about to be?". A bar that reads "Dismissed 2:00 PM" at 9am implies they have already
-         left; the same words at 3pm are correct. So compare the dismissal against the school
-         clock and say which side of it we are on. Falls back to the neutral wording if the
-         clock is unknown. */
       var when = g.dismiss || g.depart;
-      var mins = searchTimeToMin_(when);
-      var nowMin = schoolNow_().nowMin;
-      var gone = (mins >= 0 && nowMin >= 0) ? (nowMin >= mins) : null;
-      var verb = g.dismiss ? 'dismissed' : 'leaves';
-      var lead = gone === null ? (g.dismiss ? 'Dismissed ' : 'Leaves ') + searchTimeLabel_(when)
-        : gone ? (g.dismiss ? 'LEFT — dismissed ' : 'LEFT at ') + searchTimeLabel_(when)
-          : 'Leaving today — ' + verb + ' ' + searchTimeLabel_(when);
-      return '<div class="attbar game' + (gone ? ' gone' : '') + '"><b>' + esc(g.team) +
-        ' today</b> — ' + esc(lead) +
-        (g.dismiss && g.depart ? ' · departs ' + esc(searchTimeLabel_(g.depart)) : '') +
-        (g.start ? ' · game ' + esc(searchTimeLabel_(g.start)) : '') +
-        (g.location ? ' <span class="assumed">' + esc(g.location) + '</span>' : '') +
-        '</div>';
+      return '<div class="attbar game"><b>' + esc(g.team) + '</b> · ' +
+        esc(searchTimeLabel_(when).replace(/\s*PM$/, '')) + ' Dismissal</div>';
     }).join('');
+
+    /* The classes this dismissal actually costs them. Earliest dismissal wins if a student
+       somehow has two games today. */
+    var dismissMin = leaving.length
+      ? searchTimeToMin_(leaving[0].dismiss || leaving[0].depart) : -1;
 
     // Favourite toggle. Lives in the record body rather than the section header, because a
     // button inside a <summary> fights the collapse on every tap.
@@ -2372,7 +2515,7 @@ if (typeof module !== 'undefined' && module.exports) {
     var anyTimes = sched.some(function (c) { return c.beginLabel; });
 
     html += section_('schedule', 'Schedule', '(' + d.classes.length + ')',
-      dayBarHtml_(sched, ctx, anyTimes) +
+      dayBarHtml_(sched, ctx, anyTimes, d.profile.grade) +
       (sched.length ? sched.map(function (c, i) {
         var meta = [c.period, c.room ? 'Room ' + c.room : '', c.teacher, c.quarters, c.category]
           .filter(String).join(' · ');
@@ -2380,6 +2523,7 @@ if (typeof module !== 'undefined' && module.exports) {
           : c.beginLabel ? (c.beginLabel + (c.endLabel ? '–' + c.endLabel : ''))
           : (anyTimes && c.period ? 'not today' : '');
         return '<button class="cls' + (c.current ? ' now' : (anyTimes && !c.meetsToday ? ' off' : '')) +
+          (isMissedForGame(c, dismissMin) ? ' missed' : '') +
           '" data-cl="' + i + '">' +
           (time ? '<span class="clstime">' + esc(time) + '</span>' : '') +
           esc(c.description || c.code) +
@@ -2536,7 +2680,7 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /** The line above a schedule explaining what today is and where the times came from. */
-  function dayBarHtml_(sched, ctx, anyTimes) {
+  function dayBarHtml_(sched, ctx, anyTimes, grade) {
     var simNote = SIM ? '<div class="daybar warn"><b>SIMULATED TIME</b> — ' + esc(SIM.label) +
       ' (' + (ctx.dayCol ? ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][ctx.dayCol] : 'weekend') +
       '). Remove <code>?sim=</code> from the URL for real time.</div>' : '';
@@ -2565,7 +2709,22 @@ if (typeof module !== 'undefined' && module.exports) {
     }
     var qs = live.map(function (c) { return String(c.quarters || ''); });
     var mixedQuarters = qs.some(function (q) { return q !== qs[0]; });
-    var curPhrase = !cur ? 'no class in session at this time'
+    /* When none of THEIR classes is in session, name where the school day actually is instead
+       of reporting an absence of one. "no class in session at this time" at 11:50 reads as
+       though something is wrong; the honest answer — they're at lunch — was already sitting in
+       the Period Times grid (Josh, 2026-09-14). Lunch is grade-banded, so schoolDayBlock picks
+       the band that matches this student rather than whichever lunch happens to be running. */
+    var curPhrase = !cur ? (function () {
+      var blk = schoolDayBlock(periodTimes, ctx, grade);
+      if (!blk) return 'no class in session right now';
+      if (blk.state === 'block') {
+        return 'at <b>' + esc(blk.label) + '</b>' +
+          (blk.end ? ' until ' + esc(searchTimeLabel_(blk.end)) : '');
+      }
+      if (blk.state === 'before') return 'before the school day starts';
+      if (blk.state === 'after') return 'after the school day ends';
+      return 'between classes';
+    })()
       : live.length === 1 ? 'in <b>' + esc(cur.description || cur.code) + '</b> now'
       : live.length + ' classes share this period — <b>' +
         live.map(function (c) {
@@ -2625,6 +2784,25 @@ if (typeof module !== 'undefined' && module.exports) {
       .teacherApi(t.id);
   }
 
+  /**
+   * "Now: Physics" for one teacher, or '' when nothing of theirs is in session.
+   * Same engine the student schedule uses — annotateSchedule over the Period Times grid with
+   * today's bells — so a delay day, the Friday reversal and quarter filtering all apply here
+   * too, rather than being reimplemented for teachers.
+   */
+  function teacherNowLabel_(id) {
+    if (!tabsData || !periodTimes) return '';
+    var d = teacherDetail(tabsData, id);
+    if (!d || !d.classes.length) return '';
+    var live = annotateSchedule(d.classes, periodTimes, scheduleCtx_())
+      .filter(function (c) { return c.current; });
+    if (!live.length) return '';
+    // Two classes can legitimately share a slot (semester-split); name the first and say so
+    // rather than silently picking one.
+    return 'Now: ' + (live[0].description || live[0].code) +
+      (live.length > 1 ? ' (+' + (live.length - 1) + ' sharing this period)' : '');
+  }
+
   function renderTeacher(d, t) {
     if (!d) { statusEl.textContent = 'No record found for ' + t.name + '.'; return; }
     statusEl.textContent = '';
@@ -2645,11 +2823,30 @@ if (typeof module !== 'undefined' && module.exports) {
       dlRow('Active', p.active) +
       '</dl></div>', true);
 
+    /* A teacher's classes get the SAME treatment as a student's: today's clock times, in
+       school-day order, with the one in session bolded (Josh, 2026-09-16). Reuses
+       annotateSchedule rather than a second ordering rule, so the Friday reversal, delay-day
+       bells and quarter filtering behave identically on both pages. */
+    var tctx = scheduleCtx_();
+    var tsched = annotateSchedule(d.classes, periodTimes, tctx);
+    var tAnyTimes = tsched.some(function (c) { return c.beginLabel; });
+    // annotateSchedule returns its OWN row shape and drops `students`; carry it back by key.
+    var tCount = {};
+    d.classes.forEach(function (c) { tCount[c.key] = c.students; });
+
     html += section_('teacherClasses', 'Classes', '(' + d.classes.length + ')',
-      (d.classes.length ? d.classes.map(function (c, i) {
-        return '<button class="cls" data-cl="' + i + '">' + esc(c.description || c.code) +
+      dayBarHtml_(tsched, tctx, tAnyTimes, '') +
+      (tsched.length ? tsched.map(function (c, i) {
+        var time = c.offQuarter ? 'not this quarter'
+          : c.beginLabel ? (c.beginLabel + (c.endLabel ? '–' + c.endLabel : ''))
+            : (tAnyTimes && c.period ? 'not today' : '');
+        return '<button class="cls' + (c.current ? ' now' : (tAnyTimes && !c.meetsToday ? ' off' : '')) +
+          '" data-cl="' + i + '">' +
+          (time ? '<span class="clstime">' + esc(time) + '</span>' : '') +
+          esc(c.description || c.code) +
+          (c.current ? '<span class="nowtag">' + (c.sharedSlot ? 'NOW?' : 'NOW') + '</span>' : '') +
           '<div class="t">' + esc([c.period, c.room ? 'Room ' + c.room : '',
-            c.students + ' student' + (c.students === 1 ? '' : 's'),
+            tCount[c.key] + ' student' + (tCount[c.key] === 1 ? '' : 's'),
             c.quarters, c.category].filter(String).join(' · ')) + '</div></button>';
       }).join('') : '<div class="hit">No classes on the schedule tab.</div>'), true);
 
@@ -2658,7 +2855,9 @@ if (typeof module !== 'undefined' && module.exports) {
     bindSections_();
     Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-cl]'), function (btn) {
       btn.addEventListener('click', function () {
-        openClass(d.classes[Number(btn.getAttribute('data-cl'))]);
+        // tsched, not d.classes — annotateSchedule reorders into school-day order, so the
+        // index would otherwise open the wrong class.
+        openClass(tsched[Number(btn.getAttribute('data-cl'))]);
       });
     });
     window.scrollTo(0, 0);
