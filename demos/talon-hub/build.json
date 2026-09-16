@@ -1,0 +1,74 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/talon-hub/build.json. Written 2026-09-16 so this demo stops needing reverse-engineering on every rebuild — the previous build (2026-07-17) had no checked-in config. includeDir is the APP ROOT, not the pages folder, because the includes are written include('pages/Theme') with the prefix. No nested includes, so the builder's single pass is enough.",
+  "_blocker": "DO NOT REBUILD YET — the mock is 138 operations behind. Verified 2026-09-16 by EXECUTING demos/talon-hub/mock.js against every op the client calls: it answers 110 of 248. Whole areas added since July — tryouts, polls, potlucks, uniforms, live scoring, race timing, meet entries — have no handler, so a rebuild on today's source would publish a demo whose controls return NO_SUCH_FN and do nothing. The portfolio scanner calls this demo 'mock contract intact' because it inspects top-level google.script.run method names and talon-hub has exactly ONE (api); the envelope ops it dispatches on are invisible to that check. Re-run the coverage check (load data.js + mock.js in node, call api(op,{}) for each op, count NO_SUCH_FN) before trusting any 'intact' verdict here.",
+  "src": "../athletics/talon-hub/apps/staff/pages/Staff.html",
+  "dst": "demos/talon-hub/index.html",
+  "includeDir": "../athletics/talon-hub/apps/staff",
+  "demoName": "Talon Hub · Staff",
+  "replace": [
+    [
+      "<!-- GENERATED SOURCE: edit ui/Theme.html",
+      "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<title>Talon Hub · Staff</title>\n</head>\n<body>\n<!-- GENERATED SOURCE: edit ui/Theme.html"
+    ],
+    [
+      "    boot();\r\n  })();\r\n</script>\r\n",
+      "    boot();\r\n  })();\r\n</script>\r\n</body>\r\n</html>\r\n"
+    ],
+    [
+      "<?= BUILD_ID ?>",
+      "demo-2026"
+    ],
+    [
+      "<?= WHO ?>",
+      "demo.coach@example.edu"
+    ],
+    [
+      "<?= NEED_LOGIN ?>",
+      "0"
+    ],
+    [
+      "<?= (typeof DEMO_SPORT !== 'undefined' ? DEMO_SPORT : '') ?>",
+      ""
+    ],
+    [
+      "<?= (typeof DEMO_TEAM !== 'undefined' ? DEMO_TEAM : '') ?>",
+      ""
+    ],
+    [
+      "<?= (typeof EXEC_URL !== 'undefined' ? EXEC_URL : '') ?>",
+      ""
+    ],
+    [
+      "<?= (typeof VOL_MEET !== 'undefined' ? VOL_MEET : '') ?>",
+      ""
+    ],
+    [
+      "https://script.google.com/macros/s/AKfycbwU6h7mWS4QkNBKz_K0GuGgJGuBsj_8WBfPhNZbZm5RQXd8YT7GqK-o3eNLa5z6S1nC",
+      "https://example.invalid/demo-deployment"
+    ],
+    [
+      "AKfycby81dhHTjNxf_BAuN2jaUctIn4H7jkXwdWy4sbDDKIAVllUrQWTaIxJ11RPP75ORNEHcA",
+      "DEMO_DEPLOYMENT_ID"
+    ],
+    [
+      "AKfycbyHx_BBq7SolZfIttiFlyRO1wEhNo0wxiHL4GDEgoK_ahILBnIahZJuRe3LA17_zyWHhw",
+      "DEMO_DEPLOYMENT_ID_2"
+    ],
+    [
+      "harfordchristian.org",
+      "example.edu"
+    ],
+    [
+      "harfordchristian\\.org",
+      "example\\.edu"
+    ]
+  ],
+  "_replaceNotes": {
+    "wrapper": "The app is a FRAGMENT — no page under pages/ contains </head>; HtmlService wraps it at runtime. build-demo.mjs injects the demo shim before </head>, so WITHOUT these first two replacements the shim is silently not injected and the demo loads with no mock backend at all. Same situation as demos/transportation. The two anchors are the first line of Theme.html (first include) and the last lines of StaffApp.html (last include).",
+    "NEED_LOGIN": "MUST be 0. StaffApp.html:151 reads it as === '1' to raise the sign-in overlay. The live source now ships a login gate that the July demo predates — rebuilding without this puts a sign-in wall in front of the demo.",
+    "WHO": "Fabricated; whoEmail() lowercases it and it drives who the app thinks is signed in.",
+    "EXEC_URL": "Deliberately empty — it is the live /exec URL and must never reach a published page.",
+    "VOL_MEET": "Meet-volunteer code; empty so the demo never enters volunteer mode.",
+    "scrubs": "The last four are PRIVACY, not cosmetics: the source carries a live /exec URL, two real AKfycb deployment ids and the real school domain. Re-grep after any source change — a new hard-coded id would slip straight through: grep -rhoE 'AKfycb[A-Za-z0-9_-]+|script\\.google\\.com/macros/s/[A-Za-z0-9_-]+|harfordchristian' pages/*.html NOTE the escaped variant: one occurrence sits inside a regex literal (/@harfordchristian\\.org$/), so it needs its own entry — a plain-text scrub silently misses it."
+  }
+}
