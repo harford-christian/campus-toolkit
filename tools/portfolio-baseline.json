@@ -18,7 +18,7 @@
       "teacherApi"
     ],
     "ops": [],
-    "hash": "2a8a23a4753dc29a"
+    "hash": "a0997aa776dc228c"
   },
   "library": {
     "files": [
@@ -78,7 +78,7 @@
       "api"
     ],
     "ops": [],
-    "hash": "eed561db67bd8c60"
+    "hash": "d4bf1dac3775744a"
   },
   "purchasing": {
     "files": [
@@ -307,14 +307,18 @@
     ],
     "missing": [],
     "gsr": [
-      "join",
+      "dismissalApi",
+      "pickupAuthDelete",
+      "pickupAuthSave",
+      "plannedApi",
       "rolesApi",
       "saveRoleView",
       "saveView",
-      "setOverride"
+      "setOverrides",
+      "setStanding"
     ],
     "ops": [],
-    "hash": "9a831a18b4a7f44e"
+    "hash": "ba586549bc0ee974"
   },
   "campus-presence": {
     "files": [
@@ -332,24 +336,33 @@
       "kioskApi",
       "officeApi"
     ],
-    "hash": "bd4cbd9733ef57d5",
     "ops": [
       "acknowledge",
       "bootstrap",
       "earlyOut",
+      "earlyOutGroup",
       "getBoardSnapshot",
       "getMetrics",
       "getMusterReport",
+      "getPickupContacts",
       "lateIn",
+      "listPlanned",
       "manualVisitorOut",
       "markPaged",
+      "movementBack",
+      "movementOpenList",
+      "movementOut",
+      "planDismissal",
+      "plannedFor",
       "resolveFlag",
       "searchStudents",
+      "studentOptions",
       "visitorIn",
       "visitorLookupBadge",
       "visitorOpenList",
       "visitorOut"
-    ]
+    ],
+    "hash": "52bed083808774a4"
   },
   "transpo-routes": {
     "files": [
@@ -375,8 +388,9 @@
       "routes",
       "saveStops",
       "setActive",
+      "sheet",
       "stops"
     ],
-    "hash": "efd8811c00623c6a"
+    "hash": "4c6b9f2ff6805ba9"
   }
 }
