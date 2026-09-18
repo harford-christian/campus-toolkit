@@ -658,10 +658,43 @@ window.MOCK_BACKEND = (function () {
   function ping() { return { ok: true, app: 'staff', version: '0.1.0', build: 'demo-2026', role: D.role, now: nowIso() }; }
   function runSchemaCheck() { return { ok: true, tabs: 0, note: 'demo' }; }
 
+  // ---- lost + found ----
+  // The dataset already carried these items; only the handlers were missing, so the screen
+  // rendered empty. Field names are the client's (PascalCase, straight off the sheet).
+  function lostFoundList() { return { ok: true, items: clone(state.lostFound) }; }
+  function postLostItem(a) {
+    if (!a.description) return { ok: false, code: 'BAD_INPUT', msg: 'Describe the item.' };
+    state.lostFound.unshift({
+      ItemID: 'LF-' + String(state.lostFound.length + 1),
+      Description: a.description, FoundWhere: a.where || '', FoundWhen: a.when || '',
+      PhotoThumb: a.dataUri || '', Status: 'Open', Claimed: false,
+      PostedBy: D.email, inDays: 0, Season: D.season
+    });
+    return { ok: true };
+  }
+  function findLost(id) {
+    return state.lostFound.filter(function (x) { return x.ItemID === id; })[0] || null;
+  }
+  function returnLostItem(a) {
+    var it = findLost(a.itemId);
+    if (!it) return { ok: false, code: 'NOT_FOUND' };
+    it.Claimed = true; it.Status = 'Returned';
+    it.ClaimedByName = 'Demo Guardian'; it.ClaimedByEmail = 'guardian@example.com';
+    return { ok: true };
+  }
+  function removeLostItem(a) {
+    for (var i = 0; i < state.lostFound.length; i++) {
+      if (state.lostFound[i].ItemID === a.itemId) { state.lostFound.splice(i, 1); return { ok: true }; }
+    }
+    return { ok: false, code: 'NOT_FOUND' };
+  }
+
   // =====================================================================
   // Single dispatcher
   // =====================================================================
   var ENDPOINTS = {
+    lostFoundList: lostFoundList, postLostItem: postLostItem,
+    returnLostItem: returnLostItem, removeLostItem: removeLostItem,
     getStaffBundle: getStaffBundle, getDeptSchedule: getDeptSchedule, globalSearch: globalSearch,
     getEventBoard: getEventBoard, getManifest: getManifest, getMissingList: getMissingList,
     setCheckoff: setCheckoff, ackAttendance: ackAttendance, setEventStatus: setEventStatus,
@@ -697,7 +730,14 @@ window.MOCK_BACKEND = (function () {
 
   function api(fn, args) {
     var h = ENDPOINTS[fn];
-    if (typeof h !== 'function') return { ok: false, code: 'NO_SUCH_FN' };
+    if (typeof h !== 'function') {
+      /* An operation this demo has not reproduced. NO_SUCH_FN made the control look wired and
+         then do nothing at all — the worst outcome for a showcase. The real client resolves a
+         non-ok envelope into each loader's error state (see call() in StaffApp), so naming it
+         plainly turns a dead button into an honest one. */
+      return { ok: false, code: 'DEMO_ONLY',
+               msg: 'Not part of this demo — this screen is live in the real Talon Hub.' };
+    }
     return h(args || {});
   }
 
