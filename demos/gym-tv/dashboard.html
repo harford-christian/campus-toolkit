@@ -3,7 +3,7 @@
   GymControlDashboard.html — admin control (the default /exec page).
   Auth = Google identity + staff allow-list. Open via the DOMAIN-restricted deployment so
   Session.getActiveUser() resolves; whoAmI() gates the UI and every WRITE calls _requireStaff_().
-  Manage editors in the editor: setGymAdminEmails('admin@harfordchristian.org, ...').
+  Manage editors in the editor: setGymAdminEmails('admin@example.edu, ...').
 -->
 <html>
 <head>
@@ -164,7 +164,7 @@
     document.getElementById('app').style.display = 'none';
     document.getElementById('gateMsg').textContent = (me && me.email)
       ? ('Signed in as ' + me.email + ' — not on the gym-TV admin list. Ask IT to add you (setGymAdminEmails), or use an approved HCS account.')
-      : 'Please open this page signed in to your Harford Christian (@harfordchristian.org) account.';
+      : 'Please open this page signed in to your Harford Christian (@example.edu) account.';
     document.getElementById('gateBtn').style.display = 'inline-block';
   }
   function onFail(e) { if (/authoriz|not signed/i.test(e.message)) showDenied({ email: '' }); else alert(e.message); }

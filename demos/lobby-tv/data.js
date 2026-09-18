@@ -5,7 +5,7 @@
 window.LOBBYTV_DATA = {
   // Base control state; per-mode overrides are merged over this in mock.js.
   base: {
-    rev: 7, updatedAt: '2026-07-10T09:00:00-04:00', updatedBy: 'demo@harfordchristian.org',
+    rev: 7, updatedAt: '2026-07-10T09:00:00-04:00', updatedBy: 'demo@example.edu',
     scheduleOverride: 'auto', chapelCancelled: false,
     tickerMessages: ['Welcome to Harford Christian School', 'Spirit Week is next week — themes posted', 'Go Eagles!'],
     emergency: { active: false, message: '' },

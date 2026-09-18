@@ -1,7 +1,7 @@
 /* data.js — fabricated data for the Emergency Lockdown demo.
    Fake doors, categories, and a demo user. No real staff, emails, or door names. */
 window.LOCKDOWN_DATA = {
-  demoUser: 'demo@harfordchristian.org',
+  demoUser: 'demo@example.edu',
   doors: [
     { name: 'Main Entrance',   group: 'Front' },
     { name: 'Front Office',    group: 'Front' },

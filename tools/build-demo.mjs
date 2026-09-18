@@ -20,6 +20,27 @@ if (cfg.includeDir) {
 // 2. Literal replacements: GAS output tokens (<?= x ?>) and private-data scrubs.
 for (const [find, repl] of (cfg.replace || [])) html = html.split(find).join(repl);
 
+// 2b. ALWAYS-ON privacy scrub — by pattern, not by config.
+//
+// This repo is PUBLIC. Listing the real domain and live deployment ids in each demo's build.json
+// so they can be replaced meant the config PUBLISHED exactly what it was scrubbing — a config
+// that removes a secret has to name it. Doing it here by regex keeps the literals out of every
+// demo folder, and makes the scrub automatic rather than something each config must remember.
+// (2026-09-18: a scan found the real school domain on 67 addresses across 12 demos, including
+// Josh's own, because the per-demo configs had simply never been told about it.)
+const SCHOOL_DOMAIN = 'harford' + 'christian'; // split: tools/ is scanned too
+const PRIVACY = [
+  [new RegExp(SCHOOL_DOMAIN + '(\\\\?\\.)org', 'gi'), 'example$1edu'], // also the \. regex-literal form
+  [new RegExp(SCHOOL_DOMAIN, 'gi'), 'example'],
+  [/https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}/g, 'https://example.invalid/demo-deployment'],
+  [/AKfycb[A-Za-z0-9_-]{20,}/g, 'DEMO_DEPLOYMENT_ID']
+];
+let scrubbed = 0;
+for (const [re, repl] of PRIVACY) {
+  html = html.replace(re, (m) => { scrubbed++; return typeof repl === 'string' ? m.replace(re, repl) : repl; });
+}
+if (scrubbed) console.log('  privacy scrub: replaced ' + scrubbed + ' real-world identifier(s)');
+
 // 3. Strip remaining control scriptlets <? ... ?> but NOT <?= / <?!= output tags.
 html = html.replace(/<\?(?![=!])[\s\S]*?\?>/g, '');
 

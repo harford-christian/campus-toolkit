@@ -632,7 +632,7 @@ window.MOCK_BACKEND = (function () {
   // =====================================================================
   function getFormLinks() { return { ok: true, links: clone(state.formLinks) }; }
   function setFormLinks(args) { ['physical', 'concussion', 'handbook'].forEach(function (k) { if (args[k] !== undefined) state.formLinks[k] = args[k]; }); return { ok: true }; }
-  function groupConvention(t) { return String(t.label || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, '-') + '@harfordchristian.org'; }
+  function groupConvention(t) { return String(t.label || '').toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, '-') + '@example.edu'; }
   function getTeamGroups() { return { ok: true, teams: state.teams.map(function (t) { return { teamId: t.TeamID, label: t.label + ' · ' + t.Season, convention: groupConvention(t), override: state.groupOverrides[t.TeamID] || '' }; }) }; }
   function setTeamGroup(args) { var t = teamById(args.teamId); if (!t) return { ok: false, code: 'BAD_INPUT' }; state.groupOverrides[args.teamId] = args.groupEmail || ''; return { ok: true }; }
   function groupMembers(args) {

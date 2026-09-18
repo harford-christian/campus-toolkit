@@ -284,7 +284,7 @@
           <button id="nav-admin" onclick="switchTab('admin')">Management</button>
         
         <button onclick="toggleCart()" style="background-color: rgba(0,0,0,0.2);">&#x1F6D2; Cart (<span id="cart-count">0</span>)</button>
-        <button onclick="switchAccount()" style="background-color: rgba(0,0,0,0.2);" title="Currently signed in as jrivera@harfordchristian.org. Click to switch Google account.">&#x21BB; Switch Account</button>
+        <button onclick="switchAccount()" style="background-color: rgba(0,0,0,0.2);" title="Currently signed in as jrivera@example.edu. Click to switch Google account.">&#x21BB; Switch Account</button>
       </div>
     </div>
 
@@ -292,7 +292,7 @@
          (e.g. two same-named accounts in one browser). Email + role come straight from the
          authenticated session, so this reflects who the server actually sees. -->
     <div id="whoami-banner" style="background:#f3eaea; color:#333; font-size:0.85rem; padding:6px 30px; border-bottom:1px solid #e6cfcf; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-      <span>Signed in as <strong>jrivera@harfordchristian.org</strong> &middot; Owner</span>
+      <span>Signed in as <strong>jrivera@example.edu</strong> &middot; Owner</span>
       <button onclick="switchAccount()" style="background:none; border:1px solid var(--hcs-red); color:var(--hcs-red); border-radius:4px; padding:2px 10px; font-size:0.8rem; cursor:pointer;">&#x21BB; Not you? Switch account</button>
     </div>
 
@@ -906,7 +906,7 @@
         <div class="m-acct-avatar">JR</div>
         <div>
           <div class="m-acct-name">Jordan Rivera</div>
-          <div class="m-acct-email">jrivera@harfordchristian.org</div>
+          <div class="m-acct-email">jrivera@example.edu</div>
         </div>
       </div>
       <button class="m-sheet-row" onclick="closeMobileSheets(); switchAccount();">&#x21BB; &nbsp;Switch Google Account</button>
@@ -919,7 +919,7 @@
       Declare userEmail/userRole here so JavaScript.html can use them as globals.
     -->
     <script>
-      const userEmail = "jrivera@harfordchristian.org";
+      const userEmail = "jrivera@example.edu";
       const userRole  = "Owner";
       // Deep-link from emails: ?po=ORD-... is injected here so window.onload can
       // auto-open that specific order's modal on load. Empty string when not deep-linked.
@@ -1724,14 +1724,14 @@
       // Opens Google's account chooser pre-pointed at the current portal URL.
       // Apps Script web apps render inside an iframe, so we drive window.top
       // (the parent frame) so the chooser replaces the whole page, not just
-      // the iframe. The hd=harfordchristian.org hint filters Google's picker
+      // the iframe. The hd=example.edu hint filters Google's picker
       // to HCS accounts so personal Google accounts are hidden. After the user
       // picks an account, Google redirects back to the portal which reloads
       // as the newly-selected user.
       function switchAccount() {
         try {
           var target = (window.top && window.top.location && window.top.location.href) || window.location.href;
-          var url = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(target) + '&hd=harfordchristian.org';
+          var url = 'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(target) + '&hd=example.edu';
           if (window.top && window.top.location) {
             window.top.location.href = url;
           } else {
@@ -1739,7 +1739,7 @@
           }
         } catch(e) {
           // Cross-origin frame edge case — fall back to opening the chooser in a new tab
-          window.open('https://accounts.google.com/AccountChooser?hd=harfordchristian.org', '_blank');
+          window.open('https://accounts.google.com/AccountChooser?hd=example.edu', '_blank');
         }
       }
 
@@ -2330,13 +2330,13 @@
           + '<label>Description</label>'
           + '<input type="text" id="dept-description" value="' + descAttr + '">'
           + '<label>Department Head Email <span style="color:var(--text-muted); font-size:0.85rem;">(enables Team Orders visibility)</span></label>'
-          + '<input type="email" id="dept-head" value="' + headAttr + '" placeholder="head@harfordchristian.org">'
+          + '<input type="email" id="dept-head" value="' + headAttr + '" placeholder="head@example.edu">'
           + '<label>Annual Budget <span style="color:var(--text-muted); font-size:0.85rem;">(reserved for future budget tracking)</span></label>'
           + '<input type="number" id="dept-budget" min="0" step="0.01" value="' + budgetAttr + '">'
           + '<label>Google OU Path <span style="color:var(--text-muted); font-size:0.85rem;">(optional cross-reference)</span></label>'
           + '<input type="text" id="dept-oupath" value="' + ouAttr + '" placeholder="/Staff/Faculty">'
           + '<label>Viewers <span style="color:var(--text-muted); font-size:0.85rem;">(comma-separated emails who can see Team Orders for this dept)</span></label>'
-          + '<textarea id="dept-viewers" rows="2" placeholder="user1@harfordchristian.org, user2@harfordchristian.org">' + viewersText + '</textarea>'
+          + '<textarea id="dept-viewers" rows="2" placeholder="user1@example.edu, user2@example.edu">' + viewersText + '</textarea>'
           + '<div style="display:flex; align-items:center; gap:8px; margin-top:8px;">'
           +   '<input type="checkbox" id="dept-active"' + (d.active ? ' checked' : '') + ' style="width:auto; margin:0;">'
           +   '<label for="dept-active" style="margin:0;">Active</label>'

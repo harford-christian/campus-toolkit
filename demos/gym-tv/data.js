@@ -2,7 +2,7 @@
    invents opponents. Photos are placeholder images (no real people). Event dates
    and cooking timers are computed relative to now in mock.js. */
 window.GYMTV_DATA = {
-  demoUser: 'demo@harfordchristian.org',
+  demoUser: 'demo@example.edu',
   sports: ['JV Boys Basketball', 'JV Girls Basketball', 'MS Boys Basketball', 'MS Girls Basketball',
     'V Boys Basketball', 'V Girls Basketball', 'JV Girls Volleyball', 'MS Girls Volleyball', 'V Girls Volleyball'],
   carousel: [

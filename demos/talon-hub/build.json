@@ -41,26 +41,6 @@
     [
       "<?= (typeof VOL_MEET !== 'undefined' ? VOL_MEET : '') ?>",
       ""
-    ],
-    [
-      "https://script.google.com/macros/s/AKfycbwU6h7mWS4QkNBKz_K0GuGgJGuBsj_8WBfPhNZbZm5RQXd8YT7GqK-o3eNLa5z6S1nC",
-      "https://example.invalid/demo-deployment"
-    ],
-    [
-      "AKfycby81dhHTjNxf_BAuN2jaUctIn4H7jkXwdWy4sbDDKIAVllUrQWTaIxJ11RPP75ORNEHcA",
-      "DEMO_DEPLOYMENT_ID"
-    ],
-    [
-      "AKfycbyHx_BBq7SolZfIttiFlyRO1wEhNo0wxiHL4GDEgoK_ahILBnIahZJuRe3LA17_zyWHhw",
-      "DEMO_DEPLOYMENT_ID_2"
-    ],
-    [
-      "harfordchristian.org",
-      "example.edu"
-    ],
-    [
-      "harfordchristian\\.org",
-      "example\\.edu"
     ]
   ],
   "_replaceNotes": {
@@ -69,6 +49,6 @@
     "WHO": "Fabricated; whoEmail() lowercases it and it drives who the app thinks is signed in.",
     "EXEC_URL": "Deliberately empty — it is the live /exec URL and must never reach a published page.",
     "VOL_MEET": "Meet-volunteer code; empty so the demo never enters volunteer mode.",
-    "scrubs": "The last four are PRIVACY, not cosmetics: the source carries a live /exec URL, two real AKfycb deployment ids and the real school domain. Re-grep after any source change — a new hard-coded id would slip straight through: grep -rhoE 'AKfycb[A-Za-z0-9_-]+|script\\.google\\.com/macros/s/[A-Za-z0-9_-]+|harfordchristian' pages/*.html NOTE the escaped variant: one occurrence sits inside a regex literal (/@harfordchristian\\.org$/), so it needs its own entry — a plain-text scrub silently misses it."
+    "scrubs": "Real-world identifiers (the school domain, live /exec URLs, AKfycb deployment ids) are scrubbed BY PATTERN in tools/build-demo.mjs, not listed here — a config that names the secrets it removes publishes them, and this repo is public. Verify with node tools/privacy-scan.mjs, which fails the build on any that survive."
   }
 }

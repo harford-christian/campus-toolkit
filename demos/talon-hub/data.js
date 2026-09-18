@@ -1,6 +1,6 @@
 /* data.js — fabricated data for the Talon Hub · Staff demo. All athletes,
    guardians, opponents, coach emails, and metrics are invented. Guardian emails
-   use @example.com; the HCS / @harfordchristian.org brand is kept for staff/coach
+   use @example.com; the HCS / @example.edu brand is kept for staff/coach
    identity only. No real spreadsheet, calendar, portal, or file IDs appear here.
    Event dates are stored as day offsets (inDays) and resolved to yyyy-MM-dd in
    mock.js relative to "today" so they stay upcoming. Athlete missingForms are
@@ -32,7 +32,7 @@
     // ---- identity / bundle scalars ----
     role: 'Coach',                       // Coach experience (home/schedule/roster/practices/gameday…)
     owner: false,
-    email: 'demo.coach@harfordchristian.org',
+    email: 'demo.coach@example.edu',
     isGuardian: false,
     season: 'F26',
     neverLoggedIn: 3,
@@ -49,7 +49,7 @@
     teams: [
       {
         TeamID: 'BSOC-V-F26', Sport: 'BSOC', Level: 'V', Gender: 'Boys', Season: 'F26', CalendarId: '',
-        CoachEmails: 'aturner@harfordchristian.org, jbekele@harfordchristian.org',
+        CoachEmails: 'aturner@example.edu, jbekele@example.edu',
         Active: true, label: 'Boys Varsity Soccer', Phase: 'InSeason', GradeMin: 9, GradeMax: 12,
         mine: true, phase: 'InSeason', phaseLabel: 'In season', future: false,
         features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
@@ -57,7 +57,7 @@
       },
       {
         TeamID: 'GSOC-V-F26', Sport: 'GSOC', Level: 'V', Gender: 'Girls', Season: 'F26', CalendarId: '',
-        CoachEmails: 'mdelgado@harfordchristian.org, sroberts@harfordchristian.org',
+        CoachEmails: 'mdelgado@example.edu, sroberts@example.edu',
         Active: true, label: 'Girls Varsity Soccer', Phase: 'InSeason', GradeMin: 9, GradeMax: 12,
         mine: true, phase: 'InSeason', phaseLabel: 'In season', future: false,
         features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
@@ -73,9 +73,9 @@
     // Staff roster (AD console / staff mgr). Coach view doesn't surface this, but
     // listStaff stays shape-correct for the demo.
     staff: [
-      { email: 'aturner@harfordchristian.org', role: 'Coach', teams: [{ teamId: 'BSOC-V-F26', label: 'Boys Varsity Soccer', season: 'F26' }] },
-      { email: 'mdelgado@harfordchristian.org', role: 'Coach', teams: [{ teamId: 'GSOC-V-F26', label: 'Girls Varsity Soccer', season: 'F26' }] },
-      { email: 'athletics@harfordchristian.org', role: 'AD', teams: [] }
+      { email: 'aturner@example.edu', role: 'Coach', teams: [{ teamId: 'BSOC-V-F26', label: 'Boys Varsity Soccer', season: 'F26' }] },
+      { email: 'mdelgado@example.edu', role: 'Coach', teams: [{ teamId: 'GSOC-V-F26', label: 'Girls Varsity Soccer', season: 'F26' }] },
+      { email: 'athletics@example.edu', role: 'AD', teams: [] }
     ],
 
     // Registration form links (Ops → getFormLinks).
@@ -219,12 +219,12 @@
       {
         AnnouncementID: 'ANN-001', Audience: 'Program', TeamID: '', Title: 'Fall pictures Thursday',
         Body: 'Team photos in the gym before practice — wear home uniforms.', Severity: 'info',
-        CreatedAt: '', ExpiresAt: '', PostedByName: 'Athletics Office', PostedByEmail: 'athletics@harfordchristian.org', Status: 'Active'
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Athletics Office', PostedByEmail: 'athletics@example.edu', Status: 'Active'
       },
       {
         AnnouncementID: 'ANN-002', Audience: 'Team', TeamID: 'BSOC-V-F26', Title: 'Bus leaves 30 min early Friday',
         Body: 'Bayside Prep is farther than usual — depart 2:45 sharp from the gym lot.', Severity: 'urgent',
-        CreatedAt: '', ExpiresAt: '', PostedByName: 'Coach Turner', PostedByEmail: 'aturner@harfordchristian.org', Status: 'Active'
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Coach Turner', PostedByEmail: 'aturner@example.edu', Status: 'Active'
       }
     ],
 
@@ -271,15 +271,15 @@
 
     // Lost & Found (lostFoundList). PostedAt resolved in mock.js (inDays).
     lostFound: [
-      { ItemID: 'LF-001', Description: 'Blue Nike cleats, size 9', FoundWhere: 'HCS Turf Field', FoundWhen: 'After Tue practice', PhotoThumb: '', Status: 'Open', Claimed: false, PostedBy: 'aturner@harfordchristian.org', inDays: -1, Season: 'F26' },
-      { ItemID: 'LF-002', Description: 'Black water bottle, name faded', FoundWhere: 'Gym lot', FoundWhen: 'Friday bus', PhotoThumb: '', Status: 'Open', Claimed: false, PostedBy: 'aturner@harfordchristian.org', inDays: -3, Season: 'F26' }
+      { ItemID: 'LF-001', Description: 'Blue Nike cleats, size 9', FoundWhere: 'HCS Turf Field', FoundWhen: 'After Tue practice', PhotoThumb: '', Status: 'Open', Claimed: false, PostedBy: 'aturner@example.edu', inDays: -1, Season: 'F26' },
+      { ItemID: 'LF-002', Description: 'Black water bottle, name faded', FoundWhere: 'Gym lot', FoundWhen: 'Friday bus', PhotoThumb: '', Status: 'Open', Claimed: false, PostedBy: 'aturner@example.edu', inDays: -3, Season: 'F26' }
     ],
 
     // Tryouts (listTryouts / getTryout). Standings stay empty until evaluations exist.
     tryouts: [
       {
         TryoutID: 'TRY-F26-01', Name: 'Boys Varsity Soccer 2026', Sport: 'BSOC', Season: 'F26', TeamID: 'BSOC-V-F26',
-        Status: 'Open', EvalCode: 'SOC26X', CreatedBy: 'athletics@harfordchristian.org', CreatedAt: '',
+        Status: 'Open', EvalCode: 'SOC26X', CreatedBy: 'athletics@example.edu', CreatedAt: '',
         events: [
           { TryoutID: 'TRY-F26-01', EventKey: 'sprint', Name: '40-yard sprint', InputType: 'time', ConfigJson: '', MaxPoints: 10, Weight: 1, EventOrder: 0, AllEvaluators: false, Active: true },
           { TryoutID: 'TRY-F26-01', EventKey: 'juggling', Name: 'Juggling count', InputType: 'number', ConfigJson: '', MaxPoints: 10, Weight: 1, EventOrder: 1, AllEvaluators: false, Active: true },

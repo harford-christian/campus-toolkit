@@ -4657,7 +4657,7 @@ if (typeof module !== 'undefined') module.exports = XcSplits;
       var roleOpts = '<option value="Coach">Coach</option>' + (can('Admin') ? '<option value="AD">Athletic Director</option>' : '');
       var h = '<div class="sectlabel">👥 Staff &amp; assignments</div><div id="staff-list"><p class="s">Loading…</p></div>' +
         '<div class="admin-box"><div class="s" style="font-weight:700;color:var(--maroon)">Add a staff member</div>' +
-        '<input class="input" id="st-email" placeholder="name@harfordchristian.org"/>' +
+        '<input class="input" id="st-email" placeholder="name@example.edu"/>' +
         '<div class="flex" style="gap:.4rem;margin-top:.4rem;align-items:center"><label class="s">Role <select id="st-role" style="padding:.35rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)">' + roleOpts + '</select></label>' +
         '<button class="act" id="st-add">Add</button><span class="s" id="st-msg"></span></div>' +
         '<div class="xs" style="color:var(--muted);margin-top:.3rem">Adding someone here lets them sign in. Assign them to a team below so they see it.</div></div>';
@@ -4746,7 +4746,7 @@ if (typeof module !== 'undefined') module.exports = XcSplits;
         var box = $('sg-list'); if (!box) return;
         if (!r || !r.ok) { box.innerHTML = '<p class="s">Could not load.</p>'; return; }
         box.innerHTML = r.teams.map(function (t) {
-          return '<label class="s" style="display:block;margin-top:.25rem">' + esc(t.label) + '<input class="input sg-in" data-team="' + esc(t.teamId) + '" value="' + esc(t.override || '') + '" placeholder="' + esc(t.convention || 'group@harfordchristian.org') + '" style="margin-top:.1rem"/></label>';
+          return '<label class="s" style="display:block;margin-top:.25rem">' + esc(t.label) + '<input class="input sg-in" data-team="' + esc(t.teamId) + '" value="' + esc(t.override || '') + '" placeholder="' + esc(t.convention || 'group@example.edu') + '" style="margin-top:.1rem"/></label>';
         }).join('') + '<button class="act" id="sg-save" style="margin-top:.5rem">Save overrides</button>';
         $('sg-save').addEventListener('click', function () {
           $('sg-msg').textContent = ' Saving…';
@@ -4985,7 +4985,7 @@ if (typeof module !== 'undefined') module.exports = XcSplits;
     function openGuardians(athleteId) {
       var wrap = document.createElement('div'); wrap.id = 'gd-wrap';
       wrap.innerHTML = '<div class="dsetup-scrim" id="gd-scrim"></div><div class="dsetup" role="dialog" aria-modal="true"><div class="dsetup-head"><b>Guardians</b><button class="pk-x" id="gd-x" aria-label="Close">✕</button></div>' +
-        '<div class="xs muted" style="margin:0 .1rem .4rem">Link a guardian email — use a coach\'s @harfordchristian.org to enable their “Parent (my family)” view. The same email on two siblings links both.</div>' +
+        '<div class="xs muted" style="margin:0 .1rem .4rem">Link a guardian email — use a coach\'s @example.edu to enable their “Parent (my family)” view. The same email on two siblings links both.</div>' +
         '<button class="act" id="gd-resync" style="margin-bottom:.4rem">↻ Re-sync from FACTS</button>' +
         '<div id="gd-list"><p class="s">Loading…</p></div>' +
         '<div class="admin-box" style="margin-top:.5rem"><input class="input" id="gd-name" placeholder="Guardian name"/><input class="input" id="gd-email" placeholder="email@…" style="margin-top:.3rem"/>' +

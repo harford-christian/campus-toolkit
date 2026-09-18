@@ -9,7 +9,7 @@
      Security & Doors   → doorSchedule starts with 'Yes'
      Athletics / Business Office → added explicitly. */
 window.EVENTREQ_DATA = {
-  currentUser: { email: 'demo@harfordchristian.org', isAdmin: true, isSuperApprover: false },
+  currentUser: { email: 'demo@example.edu', isAdmin: true, isSuperApprover: false },
   myGroups: ['AV / IT Team', 'Security & Doors'],
   allGroups: [
     'Planning & Events', 'AV / IT Team', 'Facilities / Setup Crew',
@@ -35,7 +35,7 @@ window.EVENTREQ_DATA = {
   // Declarative requests. mock.js expands inDays/time into real date strings.
   requests: [
     {
-      token: 'req-a1b2c3d4-fall-band', requesterName: 'Jane Smith', requesterEmail: 'jsmith@harfordchristian.org',
+      token: 'req-a1b2c3d4-fall-band', requesterName: 'Jane Smith', requesterEmail: 'jsmith@example.edu',
       eventName: 'Fall Band Concert', eventType: 'School', location: 'Auditorium',
       inDays: 34, time: '19:00', setup: true,
       avRequired: 'Yes', heavyItems: 'No', doorSchedule: 'Yes, door schedule configured',
@@ -45,7 +45,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Approved', 'AV / IT Team': 'Pending', 'Security & Doors': 'Pending' }
     },
     {
-      token: 'req-e5f6a7b8-bball', requesterName: 'Coach Rivera', requesterEmail: 'mrivera@harfordchristian.org',
+      token: 'req-e5f6a7b8-bball', requesterName: 'Coach Rivera', requesterEmail: 'mrivera@example.edu',
       eventName: 'Varsity Basketball Home Opener', eventType: 'School', location: 'Main Gymnasium',
       inDays: 90, time: '18:00', setup: false,
       avRequired: 'No', heavyItems: 'Yes', doorSchedule: 'No',
@@ -55,7 +55,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Pending', 'Athletics': 'Pending', 'Facilities / Setup Crew': 'Pending' }
     },
     {
-      token: 'req-c9d0e1f2-worship', requesterName: 'Pastor Dan Ellis', requesterEmail: 'dellis@harfordchristian.org',
+      token: 'req-c9d0e1f2-worship', requesterName: 'Pastor Dan Ellis', requesterEmail: 'dellis@example.edu',
       eventName: 'Sunday Worship Service', eventType: 'Church', location: 'Chapel',
       inDays: 9, time: '09:00', setup: false,
       avRequired: 'No', heavyItems: 'No', doorSchedule: 'Yes, door schedule configured',
@@ -65,7 +65,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Approved', 'Security & Doors': 'Approved', 'Business Office': 'Approved' }
     },
     {
-      token: 'req-3a4b5c6d-robotics', requesterName: 'Mr. Patel', requesterEmail: 'rpatel@harfordchristian.org',
+      token: 'req-3a4b5c6d-robotics', requesterName: 'Mr. Patel', requesterEmail: 'rpatel@example.edu',
       eventName: 'Robotics Club Showcase', eventType: 'School', location: 'STEM Lab',
       inDays: 49, time: '16:00', setup: false,
       avRequired: 'Yes', heavyItems: 'No', doorSchedule: 'No',
@@ -75,7 +75,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Pending', 'AV / IT Team': 'Approved' }
     },
     {
-      token: 'req-7e8f9a0b-musical', requesterName: 'Ms. Dawson', requesterEmail: 'kdawson@harfordchristian.org',
+      token: 'req-7e8f9a0b-musical', requesterName: 'Ms. Dawson', requesterEmail: 'kdawson@example.edu',
       eventName: 'Spring Musical Rehearsal', eventType: 'School', location: 'Auditorium',
       inDays: 43, time: '16:00', setup: false,
       avRequired: 'No', heavyItems: 'No', doorSchedule: 'Yes, door schedule configured',
@@ -85,7 +85,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Approved', 'Security & Doors': 'Approved' }
     },
     {
-      token: 'req-1c2d3e4f-blood', requesterName: 'Jane Smith', requesterEmail: 'jsmith@harfordchristian.org',
+      token: 'req-1c2d3e4f-blood', requesterName: 'Jane Smith', requesterEmail: 'jsmith@example.edu',
       eventName: 'Community Blood Drive', eventType: 'Church', location: 'Fellowship Hall',
       inDays: 61, time: '10:00', setup: true,
       avRequired: 'No', heavyItems: 'Yes', doorSchedule: 'No',
@@ -95,7 +95,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Pending', 'Facilities / Setup Crew': 'Approved', 'Business Office': 'Pending' }
     },
     {
-      token: 'req-5a6b7c8d-inservice', requesterName: 'Mr. Patel', requesterEmail: 'rpatel@harfordchristian.org',
+      token: 'req-5a6b7c8d-inservice', requesterName: 'Mr. Patel', requesterEmail: 'rpatel@example.edu',
       eventName: 'Faculty In-Service Day', eventType: 'School', location: 'Media Center',
       inDays: 35, time: '08:00', setup: false,
       avRequired: 'No', heavyItems: 'No', doorSchedule: 'No',
@@ -105,7 +105,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Denied' }
     },
     {
-      token: 'req-9e0f1a2b-artfair', requesterName: 'Ms. Dawson', requesterEmail: 'kdawson@harfordchristian.org',
+      token: 'req-9e0f1a2b-artfair', requesterName: 'Ms. Dawson', requesterEmail: 'kdawson@example.edu',
       eventName: 'Elementary Art Fair', eventType: 'School', location: 'Commons',
       inDays: 106, time: '17:00', setup: false,
       avRequired: 'No', heavyItems: 'No', doorSchedule: 'No',
@@ -115,7 +115,7 @@ window.EVENTREQ_DATA = {
       approvals: { 'Planning & Events': 'Pending' }
     },
     {
-      token: 'req-d3e4f5a6-graduation', requesterName: 'Jane Smith', requesterEmail: 'jsmith@harfordchristian.org',
+      token: 'req-d3e4f5a6-graduation', requesterName: 'Jane Smith', requesterEmail: 'jsmith@example.edu',
       eventName: 'Graduation Ceremony', eventType: 'School', location: 'Main Gymnasium',
       inDays: 155, time: '10:00', setup: true,
       avRequired: 'Yes', heavyItems: 'Yes', doorSchedule: 'Yes, door schedule configured',

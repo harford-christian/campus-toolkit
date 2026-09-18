@@ -27,7 +27,7 @@ window.MOCK_BACKEND = (function () {
     Object.keys(r.approvals).forEach(function (g) {
       var st = r.approvals[g];
       ga[g] = (st === 'Approved' || st === 'Denied')
-        ? { status: st, by: 'approver@harfordchristian.org', at: fmtDate(-3) + ' 10:15' }
+        ? { status: st, by: 'approver@example.edu', at: fmtDate(-3) + ' 10:15' }
         : { status: 'Pending' };
     });
     return {

@@ -101,7 +101,7 @@ window.MOCK_BACKEND = (function () {
     setLobbyControl: function (patch) {
       var merged = merge(current(), patch || {});
       merged.rev = (merged.rev || 0) + 1;
-      merged.updatedAt = nowISO(); merged.updatedBy = 'demo@harfordchristian.org';
+      merged.updatedAt = nowISO(); merged.updatedBy = 'demo@example.edu';
       return store(merged);
     },
 

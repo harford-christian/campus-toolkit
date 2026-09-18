@@ -97,20 +97,20 @@
     // Active /Staff & Teachers accounts as the admin roster sees them.
     // onboarded: '' = would be treated as a new hire until marked.
     roster: [
-      { email: 'aharrington@harfordchristian.org', name: 'Amelia Harrington', ou: '/Staff & Teachers/Teachers/HS', created: '2019-08-02', onboarded: 'pre-existing 2026-08-14' },
-      { email: 'bcrowley@harfordchristian.org',    name: 'Ben Crowley',       ou: '/Staff & Teachers/Staff/Elementary', created: '2017-07-21', onboarded: 'pre-existing 2026-08-14' },
-      { email: 'cvasquez@harfordchristian.org',    name: 'Carmen Vasquez',    ou: '/Staff & Teachers/Teachers/Elementary', created: '2021-08-05', onboarded: '' },
-      { email: 'dfairbanks@harfordchristian.org',  name: 'Dana Fairbanks',    ou: '/Staff & Teachers/Coaches', created: '2022-06-30', onboarded: '' },
-      { email: 'ekowalski@harfordchristian.org',   name: 'Ethan Kowalski',    ou: '/Staff & Teachers/Subs, Aids & Part Time Employees', created: '2023-01-12', onboarded: '' },
-      { email: 'fmontgomery@harfordchristian.org', name: 'Faith Montgomery',  ou: '/Staff & Teachers/Staff/HS', created: '2018-07-19', onboarded: '' },
-      { email: 'gokafor@harfordchristian.org',     name: 'Grace Okafor',      ou: '/Staff & Teachers/Teachers/K', created: '2020-08-03', onboarded: '' },
-      { email: 'hlindqvist@harfordchristian.org',  name: 'Henrik Lindqvist',  ou: '/Staff & Teachers/Staff/Transportation', created: '2016-08-15', onboarded: '' },
-      { email: 'imarchetti@harfordchristian.org',  name: 'Isabella Marchetti',ou: '/Staff & Teachers/Teachers/HS', created: '2024-07-29', onboarded: '' },
-      { email: 'jwhitaker@harfordchristian.org',   name: 'Jonah Whitaker',    ou: '/Staff & Teachers/Coaches', created: '2024-08-01', onboarded: '' },
-      { email: 'kpemberton@harfordchristian.org',  name: 'Kate Pemberton',    ou: '/Staff & Teachers/Staff/Music', created: '2015-06-24', onboarded: '' },
-      { email: 'lsandhu@harfordchristian.org',     name: 'Lena Sandhu',       ou: '/Staff & Teachers/Subs, Aids & Part Time Employees', created: '2025-01-08', onboarded: '' },
-      { email: 'mdelgado@harfordchristian.org',    name: 'Marcus Delgado',    ou: '/Staff & Teachers/Teachers/Elementary', created: '2025-08-04', onboarded: '' },
-      { email: 'rnewhire@harfordchristian.org',    name: 'Riley Newhire',     ou: '/Staff & Teachers/Teachers/HS', created: '2026-08-12', onboarded: '' }
+      { email: 'aharrington@example.edu', name: 'Amelia Harrington', ou: '/Staff & Teachers/Teachers/HS', created: '2019-08-02', onboarded: 'pre-existing 2026-08-14' },
+      { email: 'bcrowley@example.edu',    name: 'Ben Crowley',       ou: '/Staff & Teachers/Staff/Elementary', created: '2017-07-21', onboarded: 'pre-existing 2026-08-14' },
+      { email: 'cvasquez@example.edu',    name: 'Carmen Vasquez',    ou: '/Staff & Teachers/Teachers/Elementary', created: '2021-08-05', onboarded: '' },
+      { email: 'dfairbanks@example.edu',  name: 'Dana Fairbanks',    ou: '/Staff & Teachers/Coaches', created: '2022-06-30', onboarded: '' },
+      { email: 'ekowalski@example.edu',   name: 'Ethan Kowalski',    ou: '/Staff & Teachers/Subs, Aids & Part Time Employees', created: '2023-01-12', onboarded: '' },
+      { email: 'fmontgomery@example.edu', name: 'Faith Montgomery',  ou: '/Staff & Teachers/Staff/HS', created: '2018-07-19', onboarded: '' },
+      { email: 'gokafor@example.edu',     name: 'Grace Okafor',      ou: '/Staff & Teachers/Teachers/K', created: '2020-08-03', onboarded: '' },
+      { email: 'hlindqvist@example.edu',  name: 'Henrik Lindqvist',  ou: '/Staff & Teachers/Staff/Transportation', created: '2016-08-15', onboarded: '' },
+      { email: 'imarchetti@example.edu',  name: 'Isabella Marchetti',ou: '/Staff & Teachers/Teachers/HS', created: '2024-07-29', onboarded: '' },
+      { email: 'jwhitaker@example.edu',   name: 'Jonah Whitaker',    ou: '/Staff & Teachers/Coaches', created: '2024-08-01', onboarded: '' },
+      { email: 'kpemberton@example.edu',  name: 'Kate Pemberton',    ou: '/Staff & Teachers/Staff/Music', created: '2015-06-24', onboarded: '' },
+      { email: 'lsandhu@example.edu',     name: 'Lena Sandhu',       ou: '/Staff & Teachers/Subs, Aids & Part Time Employees', created: '2025-01-08', onboarded: '' },
+      { email: 'mdelgado@example.edu',    name: 'Marcus Delgado',    ou: '/Staff & Teachers/Teachers/Elementary', created: '2025-08-04', onboarded: '' },
+      { email: 'rnewhire@example.edu',    name: 'Riley Newhire',     ou: '/Staff & Teachers/Teachers/HS', created: '2026-08-12', onboarded: '' }
     ]
   };
 })();

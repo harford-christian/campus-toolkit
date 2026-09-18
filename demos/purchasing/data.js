@@ -10,7 +10,7 @@
    stable regardless of when the demo is opened. */
 window.PURCHASING_DATA = {
   currentUser: {
-    email: 'jrivera@harfordchristian.org',
+    email: 'jrivera@example.edu',
     firstName: 'Jordan',
     lastName: 'Rivera',
     role: 'Owner'
@@ -37,12 +37,12 @@ window.PURCHASING_DATA = {
   // getActiveStaffForPicker() source (~6 staff). inMyDepts is true for people in
   // Jordan's departments (Science / Fine Arts).
   staff: [
-    { email: 'jwolf@harfordchristian.org',   name: 'Jamie Wolf',    dept: 'Science',        inMyDepts: true },
-    { email: 'achen@harfordchristian.org',   name: 'Alex Chen',     dept: 'Fine Arts',      inMyDepts: true },
-    { email: 'spatel@harfordchristian.org',  name: 'Sam Patel',     dept: 'Athletics',      inMyDepts: false },
-    { email: 'tbrooks@harfordchristian.org', name: 'Taylor Brooks', dept: 'English',        inMyDepts: false },
-    { email: 'mlee@harfordchristian.org',    name: 'Morgan Lee',    dept: 'Administration', inMyDepts: false },
-    { email: 'cnguyen@harfordchristian.org', name: 'Casey Nguyen',  dept: 'Operations',     inMyDepts: false }
+    { email: 'jwolf@example.edu',   name: 'Jamie Wolf',    dept: 'Science',        inMyDepts: true },
+    { email: 'achen@example.edu',   name: 'Alex Chen',     dept: 'Fine Arts',      inMyDepts: true },
+    { email: 'spatel@example.edu',  name: 'Sam Patel',     dept: 'Athletics',      inMyDepts: false },
+    { email: 'tbrooks@example.edu', name: 'Taylor Brooks', dept: 'English',        inMyDepts: false },
+    { email: 'mlee@example.edu',    name: 'Morgan Lee',    dept: 'Administration', inMyDepts: false },
+    { email: 'cnguyen@example.edu', name: 'Casey Nguyen',  dept: 'Operations',     inMyDepts: false }
   ],
 
   // getApproverSettings(email) source. Role is Owner per the demo persona.
@@ -87,8 +87,8 @@ window.PURCHASING_DATA = {
   orders: [
     {
       id: 'ORD-20260706-3310', date: '2026-07-06T09:12:00', status: 'Pending Approval',
-      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@harfordchristian.org', dept: 'Science',
-      vendor: '', bank: '', payType: '', additionalNotify: 'jwolf@harfordchristian.org',
+      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@example.edu', dept: 'Science',
+      vendor: '', bank: '', payType: '', additionalNotify: 'jwolf@example.edu',
       pricedAt: '', approvedAt: '', approvedBy: '', fulfillmentAt: '', closedAt: '',
       poPdfUrl: '', cancelJustification: '', preCancelStatus: '', packingSummary: '',
       items: [
@@ -98,7 +98,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260703-8846', date: '2026-07-03T15:40:00', status: 'Cancellation Requested',
-      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@harfordchristian.org', dept: 'Science',
+      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@example.edu', dept: 'Science',
       vendor: 'Amazon Business', bank: 'General Fund', payType: 'Credit Card', additionalNotify: '',
       pricedAt: '2026-07-04T14:20:00', approvedAt: '', approvedBy: '', fulfillmentAt: '', closedAt: '',
       poPdfUrl: '', preCancelStatus: 'Pending Signature', packingSummary: '',
@@ -109,7 +109,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260701-2884', date: '2026-07-01T11:05:00', status: 'Under Review',
-      requestor: 'Alex Chen', requestorEmail: 'achen@harfordchristian.org', dept: 'Fine Arts',
+      requestor: 'Alex Chen', requestorEmail: 'achen@example.edu', dept: 'Fine Arts',
       vendor: 'Blick Art Materials', bank: 'General Fund', payType: 'PO', additionalNotify: '',
       pricedAt: '2026-07-02T10:05:00', approvedAt: '', approvedBy: '', fulfillmentAt: '', closedAt: '',
       poPdfUrl: '', cancelJustification: '', preCancelStatus: '', packingSummary: '',
@@ -120,7 +120,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260625-1590', date: '2026-06-25T08:30:00', status: 'On Hold',
-      requestor: 'Sam Patel', requestorEmail: 'spatel@harfordchristian.org', dept: 'Athletics',
+      requestor: 'Sam Patel', requestorEmail: 'spatel@example.edu', dept: 'Athletics',
       vendor: 'BSN Sports', bank: 'Athletics Fund', payType: 'PO', additionalNotify: '',
       pricedAt: '2026-06-26T09:30:00', approvedAt: '', approvedBy: '', fulfillmentAt: '', closedAt: '',
       poPdfUrl: '', cancelJustification: '', preCancelStatus: '', packingSummary: '',
@@ -131,7 +131,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260618-7723', date: '2026-06-18T13:00:00', status: 'Pending Signature',
-      requestor: 'Taylor Brooks', requestorEmail: 'tbrooks@harfordchristian.org', dept: 'English',
+      requestor: 'Taylor Brooks', requestorEmail: 'tbrooks@example.edu', dept: 'English',
       vendor: 'Amazon Business', bank: 'General Fund', payType: 'Credit Card', additionalNotify: '',
       pricedAt: '2026-06-19T13:15:00', approvedAt: '', approvedBy: '', fulfillmentAt: '', closedAt: '',
       poPdfUrl: '', cancelJustification: '', preCancelStatus: '', packingSummary: '',
@@ -142,8 +142,8 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260610-4055', date: '2026-06-10T10:15:00', status: 'Approved',
-      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@harfordchristian.org', dept: 'Science',
-      vendor: 'School Specialty', bank: 'Restricted - Science Grant', payType: 'PO', additionalNotify: 'jwolf@harfordchristian.org',
+      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@example.edu', dept: 'Science',
+      vendor: 'School Specialty', bank: 'Restricted - Science Grant', payType: 'PO', additionalNotify: 'jwolf@example.edu',
       pricedAt: '2026-06-11T11:00:00', approvedAt: '2026-06-12T15:30:00', approvedBy: 'Morgan Lee',
       fulfillmentAt: '', closedAt: '', poPdfUrl: '', cancelJustification: '', preCancelStatus: '', packingSummary: '',
       items: [
@@ -153,7 +153,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260520-6631', date: '2026-05-20T09:00:00', status: 'Fulfillment',
-      requestor: 'Morgan Lee', requestorEmail: 'mlee@harfordchristian.org', dept: 'Administration',
+      requestor: 'Morgan Lee', requestorEmail: 'mlee@example.edu', dept: 'Administration',
       vendor: 'Staples', bank: 'General Fund', payType: 'PO', additionalNotify: '',
       pricedAt: '2026-05-21T10:00:00', approvedAt: '2026-05-22T14:00:00', approvedBy: 'Morgan Lee',
       fulfillmentAt: '2026-05-28T09:00:00', closedAt: '', poPdfUrl: '', cancelJustification: '',
@@ -165,7 +165,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260428-9012', date: '2026-04-28T14:20:00', status: 'Closed/Paid',
-      requestor: 'Casey Nguyen', requestorEmail: 'cnguyen@harfordchristian.org', dept: 'Operations',
+      requestor: 'Casey Nguyen', requestorEmail: 'cnguyen@example.edu', dept: 'Operations',
       vendor: 'Office Depot', bank: 'General Fund', payType: 'Check', additionalNotify: '',
       pricedAt: '2026-04-29T09:00:00', approvedAt: '2026-04-30T11:00:00', approvedBy: 'Morgan Lee',
       fulfillmentAt: '2026-05-06T10:00:00', closedAt: '2026-05-15T16:00:00', poPdfUrl: '',
@@ -177,7 +177,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260315-5240', date: '2026-03-15T10:45:00', status: 'Cancelled',
-      requestor: 'Sam Patel', requestorEmail: 'spatel@harfordchristian.org', dept: 'Athletics',
+      requestor: 'Sam Patel', requestorEmail: 'spatel@example.edu', dept: 'Athletics',
       vendor: '', bank: '', payType: '', additionalNotify: '',
       pricedAt: '', approvedAt: '', approvedBy: '', fulfillmentAt: '', closedAt: '',
       poPdfUrl: '', preCancelStatus: 'Pending Approval', packingSummary: '',
@@ -188,7 +188,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20260210-1178', date: '2026-02-10T11:30:00', status: 'Closed/Paid',
-      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@harfordchristian.org', dept: 'Science',
+      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@example.edu', dept: 'Science',
       vendor: 'Lakeshore Learning', bank: 'Restricted - Science Grant', payType: 'PO', additionalNotify: '',
       pricedAt: '2026-02-11T09:00:00', approvedAt: '2026-02-12T13:00:00', approvedBy: 'Morgan Lee',
       fulfillmentAt: '2026-02-20T10:00:00', closedAt: '2026-03-01T12:00:00', poPdfUrl: '',
@@ -200,7 +200,7 @@ window.PURCHASING_DATA = {
     },
     {
       id: 'ORD-20251118-2207', date: '2025-11-18T09:50:00', status: 'Closed/Paid',
-      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@harfordchristian.org', dept: 'Science',
+      requestor: 'Jordan Rivera', requestorEmail: 'jrivera@example.edu', dept: 'Science',
       vendor: 'CDW-G', bank: 'Technology Fund', payType: 'ACH', additionalNotify: '',
       pricedAt: '2025-11-19T10:00:00', approvedAt: '2025-11-20T14:00:00', approvedBy: 'Morgan Lee',
       fulfillmentAt: '2025-11-28T10:00:00', closedAt: '2025-12-05T10:00:00', poPdfUrl: '',
