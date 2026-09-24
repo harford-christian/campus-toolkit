@@ -8,17 +8,17 @@
     "gsr": [
       "athleticsApi",
       "classApi",
-      "favoriteToggleApi",
       "favoritesApi",
       "nowApi",
       "personApi",
       "presenceApi",
       "searchApi",
+      "tabsApi",
       "tabsExtrasApi",
       "teacherApi"
     ],
     "ops": [],
-    "hash": "a0997aa776dc228c"
+    "hash": "c362a4aa44d2c89e"
   },
   "library": {
     "files": [

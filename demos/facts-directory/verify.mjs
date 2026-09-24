@@ -237,6 +237,31 @@ check('result groups are ordered Students, then Teachers, then Classes',
 check('the favourites chip — the way IN to that view — is in the page',
   /id="favview"/.test(page) && /function showFavorites_/.test(page));
 
+/* ---------- Rooms view (app @40) ---------- */
+// The picker lists ROOM_BUILDINGS' explicit names, so a fixture room spelled differently
+// ("Band Room" vs the real "Band Room (EL)") silently vanishes from the demo. Pin it.
+{
+  const cls = S.buildClasses(tabs);
+  const hsRooms = S.buildingRooms(cls, 'hs');
+  const ctxR = Object.assign({}, ctx);                  // the demo clock: 10:30 on a weekday
+  const days = hsRooms.map(r => S.roomDay(cls, pt, r.room, ctxR));
+  check('High School lists all 20 configured rooms', hsRooms.length === 20);
+  check('every timed 7-12 class in the fixture sits in a High School room',
+    cls.filter(c => c.pattern && Object.keys(c.grades).some(g => /^\d+$/.test(g) && +g >= 7) && c.room)
+      .every(c => S.roomBuildingOf_(c.room)));
+  check('at the demo clock the grid shows BOTH an in-use room and an open room',
+    days.some(d => d.status.state === 'inuse') && days.some(d => d.status.state === 'open'));
+  check('Room 603 has an untimed class, so it reads Open? (the caveat case)',
+    S.roomDay(cls, pt, '603', ctxR).status.uncertain === true);
+  check('Room 105\'s day interleaves classes and Open periods in clock order',
+    (() => { const r = S.roomDay(cls, pt, '105', ctxR);
+      const b = r.rows.map(x => S.searchTimeToMin_(x.begin));
+      return r.rows.some(x => x.kind === 'class') && r.rows.some(x => x.kind === 'open') &&
+             b.every((m, i) => !i || m >= b[i - 1]); })());
+  check('the Rooms entry is on the idle screen',
+    /id="roomsentry"/.test(page) && /function openRooms_/.test(page));
+}
+
 /* ---------- the page itself ---------- */
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8');
 check('no unreplaced Apps Script template tokens', !/<\?[=!]/.test(html));

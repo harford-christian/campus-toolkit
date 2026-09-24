@@ -158,7 +158,7 @@ window.DIRECTORY_DATA = (function () {
     [400101, 'SS-GOV',    'Government (1 semester)',      'Core', 'Brennan Kate',    'Q1,2',     7306, 8,  '111'],
     [400101, 'SS-ECO',    'Economics (1 semester)',       'Core', 'Brennan Kate',    'Q3,4',     7307, 8,  '111'],
     [400101, 'FL-SPA4',   'Spanish IV',                   'Core', 'Delacroix Yvette','Q1,2,3,4', 7308, 9,  '112'],
-    [400101, 'FA-SHCB',   'Concert Band - Senior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7309, 11, 'Band Room'],
+    [400101, 'FA-SHCB',   'Concert Band - Senior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7309, 11, 'Band Room (EL)'],
     // grade 12 — Marcus
     [400102, 'HR-12',     'Homeroom - 12th Grade',        'Homeroom', 'Whitfield Dana', 'Q1,2,3,4', 7301, '',  '108'],
     [400102, 'E12-ENG',   'English - 12th Grade',         'Core', 'Whitfield Dana',  'Q1,2,3,4', 7302, 1,  '103'],
@@ -169,7 +169,7 @@ window.DIRECTORY_DATA = (function () {
     [400103, 'E11-ENG',   'English - 11th Grade',         'Core', 'Whitfield Dana',  'Q1,2,3,4', 7321, 2,  '103'],
     [400103, 'SC-CHEM',   'Chemistry',                    'Core', 'Okafor Simon',    'Q1,2,3,4', 7322, 3,  '100'],
     [400103, 'MA-ALG2',   'Algebra II',                   'Core', 'Rasmussen Iris',  'Q1,2,3,4', 7323, 5,  '105'],
-    [400103, 'FA-SHCB',   'Concert Band - Senior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7309, 11, 'Band Room'],
+    [400103, 'FA-SHCB',   'Concert Band - Senior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7309, 11, 'Band Room (EL)'],
     [400104, 'HR-11',     'Homeroom - 11th Grade',        'Homeroom', 'Okafor Simon', 'Q1,2,3,4', 7320, '',  '107'],
     [400104, 'E11-ENG',   'English - 11th Grade',         'Core', 'Whitfield Dana',  'Q1,2,3,4', 7321, 2,  '103'],
     [400104, 'SS-USHIS',  'U.S. History',                 'Core', 'Brennan Kate',    'Q1,2,3,4', 7324, 1,  '111'],
@@ -177,7 +177,7 @@ window.DIRECTORY_DATA = (function () {
     [400105, 'HR-10',     'Homeroom - 10th Grade',        'Homeroom', 'Brennan Kate', 'Q1,2,3,4', 7330, '',  '111'],
     [400105, 'E10-ENG',   'English - 10th Grade',         'Core', 'Whitfield Dana',  'Q1,2,3,4', 7331, 3,  '103'],
     [400105, 'SC-BIO',    'Biology',                      'Core', 'Okafor Simon',    'Q1,2,3,4', 7332, 5,  '100'],
-    [400105, 'FA-CHOIR',  'Vocal Choir - Senior High',    'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7333, 9, 'Choir Room'],
+    [400105, 'FA-CHOIR',  'Vocal Choir - Senior High',    'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7333, 9, 'Sanctuary (EL)'],
     [400114, 'HR-10',     'Homeroom - 10th Grade',        'Homeroom', 'Brennan Kate', 'Q1,2,3,4', 7330, '',  '111'],
     [400114, 'E10-ENG',   'English - 10th Grade',         'Core', 'Whitfield Dana',  'Q1,2,3,4', 7331, 3,  '103'],
     [400114, 'MA-GEOM',   'Geometry',                     'Core', 'Rasmussen Iris',  'Q1,2,3,4', 7334, 7,  '105'],
@@ -188,7 +188,7 @@ window.DIRECTORY_DATA = (function () {
     [400106, 'FL-GER1',   'German I',                     'Core', 'Delacroix Yvette','Q1,2,3,4', 7343, 1,  '112'],
     [400106, 'HPE-09',    'Physical Education - 9th Grade','Core', 'Sandoval Rico',  'Q1,2',     7344, 5,  'Gymnasium'],
     [400106, 'HLT-09',    'Health - 9th Grade',           'Core', 'Sandoval Rico',   'Q3,4',     7345, 5,  '106'],
-    [400106, 'FA-SHCB',   'Concert Band - Senior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7309, 11, 'Band Room'],
+    [400106, 'FA-SHCB',   'Concert Band - Senior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7309, 11, 'Band Room (EL)'],
     [400108, 'HR-09',     'Homeroom - 9th Grade',         'Homeroom', 'Nakamura Ellis', 'Q1,2,3,4', 7340, '', '110'],
     [400108, 'E09-ENG',   'English - 9th Grade',          'Core', 'Nakamura Ellis',  'Q1,2,3,4', 7341, 2,  '110'],
     [400108, 'MA-ALG1',   'Algebra I',                    'Core', 'Rasmussen Iris',  'Q1,2,3,4', 7342, 9,  '105'],
@@ -200,19 +200,19 @@ window.DIRECTORY_DATA = (function () {
     [400110, 'HR-08',     'Homeroom - 8th Grade',         'Homeroom', 'Duvall Marta', 'Q1,2,3,4', 7350, '',  '204'],
     [400110, 'E08-ENG',   'English - 8th Grade',          'Core', 'Duvall Marta',    'Q1,2,3,4', 7351, 1,  '204'],
     [400110, 'BI08-LOC',  'Life of Christ',               'Core', 'Vandermeer Luke', 'Q1,2,3,4', 7354, 6,  '109'], // 2nd section
-    [400110, 'JHCB',      'Concert Band - Junior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7355, 4, 'Band Room'],
+    [400110, 'JHCB',      'Concert Band - Junior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7355, 4, 'Band Room (EL)'],
     // grade 7
-    [400107, 'HR-07',     'Homeroom - 7th Grade',         'Homeroom', 'Duvall Marta', 'Q1,2,3,4', 7360, '',  '203'],
-    [400107, 'E07-ENG',   'English - 7th Grade',          'Core', 'Duvall Marta',    'Q1,2,3,4', 7361, 2,  '203'],
+    [400107, 'HR-07',     'Homeroom - 7th Grade',         'Homeroom', 'Duvall Marta', 'Q1,2,3,4', 7360, '',  '101'],
+    [400107, 'E07-ENG',   'English - 7th Grade',          'Core', 'Duvall Marta',    'Q1,2,3,4', 7361, 2,  '101'],
     [400107, 'BI07-OTH',  'Old Testament History',        'Core', 'Vandermeer Luke', 'Q1,2,3,4', 7362, 4,  '109'],
-    [400107, 'JHCB',      'Concert Band - Junior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7355, 4, 'Band Room'],
-    [400111, 'HR-07',     'Homeroom - 7th Grade',         'Homeroom', 'Duvall Marta', 'Q1,2,3,4', 7360, '',  '203'],
-    [400111, 'E07-ENG',   'English - 7th Grade',          'Core', 'Duvall Marta',    'Q1,2,3,4', 7361, 2,  '203'],
+    [400107, 'JHCB',      'Concert Band - Junior High',   'Fine-Arts Elective', 'Peters Wesley', 'Q1,2,3,4', 7355, 4, 'Band Room (EL)'],
+    [400111, 'HR-07',     'Homeroom - 7th Grade',         'Homeroom', 'Duvall Marta', 'Q1,2,3,4', 7360, '',  '101'],
+    [400111, 'E07-ENG',   'English - 7th Grade',          'Core', 'Duvall Marta',    'Q1,2,3,4', 7361, 2,  '101'],
     [400111, 'MA07-PRE',  'Pre-Algebra',                  'Core', 'Rasmussen Iris',  'Q1,2,3,4', 7353, 4,  '105'],
     // elementary — no periods exist in the source system for self-contained classrooms
     [400112, 'K5ALL',     'Kindergarten',                 'Core', 'Almeida Rosa',    'Q1,2,3,4', 7370, '',  'E105'],
     [400113, '3ALL',      'Third Grade',                  'Core', 'Sowell Gina',     'Q1,2,3,4', 7371, '',  'E211'],
-    [400113, '3ART',      'Art - 3rd Grade',              'Specials', 'Marchetti Dov','Q1,2,3,4', 7372, '', 'Art Room']
+    [400113, '3ART',      'Art - 3rd Grade',              'Specials', 'Marchetti Dov','Q1,2,3,4', 7372, '', '603']
   ];
 
   /* Teams and clubs. In the real system these are ordinary class enrolments whose COURSE

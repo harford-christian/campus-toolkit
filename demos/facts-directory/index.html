@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
 <base target="_top">
 <style>
   /* Varsity theme (V6, chosen 2026-07-24): HCS red page, white cards, gold accents.
@@ -157,6 +158,23 @@
                color: var(--dd); font-weight: 400; font-family: inherit; cursor: pointer; }
   button.cls:last-child { border-bottom: 0; }
   button.cls:hover, button.cls:focus-visible { background: #FBECEE; }
+  /* Rooms view: an OPEN period reads green like the NOW tag — "free" is the good news here —
+     and stays visually lighter than a class so the eye lands on what IS booked. */
+  .cls.open { color: #0d3a17; }
+  .cls.open .ol { font-weight: 700; }
+  .cls.open.now { background: #EAF9EC; box-shadow: inset 3px 0 0 #2e9e45; }
+  .roomgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+              gap: .5rem; }
+  .roombtn { display: flex; flex-direction: column; align-items: flex-start; gap: .2rem;
+             background: var(--card); color: var(--dd); border: 1px solid var(--card-border);
+             text-align: left; font-weight: 400; min-height: 64px; padding: .55rem .7rem; }
+  .roombtn:hover, .roombtn:focus-visible { background: #FBECEE; }
+  .roombtn .rn { font-weight: 700; }
+  .roombtn .rs { color: var(--dt); font-size: .75rem; line-height: 1.25; }
+  .rpill { font-size: .62rem; font-weight: 700; padding: .1em .45em; border-radius: .6em;
+           white-space: nowrap; }
+  .rpill.open { background: #8FE39B; color: #0d3a17; }
+  .rpill.inuse { background: var(--gold); color: var(--gold-ink); }
   .trunc { padding: .5rem .9rem; color: var(--dt); font-size: .8rem; font-style: italic;
            background: var(--card); border: 1px solid var(--card-border);
            border-radius: .6rem; margin-top: .6rem; }
@@ -332,6 +350,24 @@ var ROSTER_TAB_NAME = 'Roster';
 var DIRECTORY_TAB_NAMES = ['Directory', 'Sheet1'];
 var SCHEDULES_TAB_NAME = 'Student Schedules';
 var TEACHERS_TAB_NAME = 'Teachers';
+
+/**
+ * Buildings for the Rooms view, each an EXPLICIT room list (Josh, 2026-09-23).
+ *
+ * FACTS rooms carry no building — /Scheduling/Rooms is just {id, name, size, schoolCode} — and
+ * the names don't encode one either: bare numbers are split between buildings (100-112 are HS,
+ * 701A/B hold 6th grade) and the shared spaces are words ("Gymnasium", "Band Room (EL)"). So a
+ * prefix rule can't express it; a list can. Names must match the export's Room cell EXACTLY.
+ * RUN_listRooms (Code.gs) flags any 7-12 room that isn't on a list, so a new room shows up
+ * as a diagnostic line rather than silently missing from the picker.
+ * Only the 7-12 grid has period times, which is why the other buildings wait on K4-6 periods.
+ */
+var ROOM_BUILDINGS = [
+  { id: 'hs', name: 'High School',
+    rooms: ['100', '101', '102', '103', '104', '105', '106', '107', '108', '109', '110', '111',
+            '112', '204', '602', '603', 'Library (HS)', 'Gymnasium', 'Band Room (EL)',
+            'Sanctuary (EL)'] }
+];
 
 /**
  * Stable class identity. Two sections CAN share class code + teacher while meeting in
@@ -1458,6 +1494,176 @@ function annotateSchedule(classes, periodTimes, ctx) {
   return out;
 }
 
+/* ---------- rooms ----------
+   "What's in Room 105 today, and is it free right now?" A room's day is the classes whose Room
+   cell names it, run through annotateSchedule — the SAME engine as a student's or teacher's
+   schedule, so the Friday reversal, bell overrides and quarter filtering are not reimplemented —
+   plus an OPEN row for every period of the grid that no class of the room overlaps.
+
+   Open is decided by TIME OVERLAP, not by slot label, because the grid's grade-banded slots
+   (P4 7-8 vs P4 9-12, the two lunches) overlap each other: a 9-12 class running across the 7-8
+   P4 slot means the room is NOT open then, whatever the labels say.
+
+   Classes with no period pattern (Independent Study, every elementary class) have no time to
+   place. They can't be laid on the timeline, so an Open row in a room that has any of them is
+   not a guarantee — the caller shows a caveat and lists them (Josh's call, 2026-09-23). */
+
+/** The building a room belongs to, or null. */
+function roomBuildingOf_(room) {
+  for (var i = 0; i < ROOM_BUILDINGS.length; i++) {
+    if (ROOM_BUILDINGS[i].rooms.indexOf(String(room)) !== -1) return ROOM_BUILDINGS[i];
+  }
+  return null;
+}
+
+/** 'Room 105' for a number, the bare name for a named space ('Gymnasium'). */
+function roomDisplayName(room) {
+  return /^\d/.test(String(room)) ? 'Room ' + room : String(room);
+}
+
+/**
+ * A building's rooms in configured order, each with its section count. Every configured room is
+ * listed even with no classes — an empty room is the most available room there is.
+ * @param classes buildClasses() output
+ */
+function buildingRooms(classes, buildingId) {
+  var b = null;
+  for (var i = 0; i < ROOM_BUILDINGS.length; i++) if (ROOM_BUILDINGS[i].id === buildingId) b = ROOM_BUILDINGS[i];
+  if (!b) return [];
+  var count = {};
+  (classes || []).forEach(function (c) { if (c.room) count[c.room] = (count[c.room] || 0) + 1; });
+  return b.rooms.map(function (r) { return { room: r, name: roomDisplayName(r), sections: count[r] || 0 }; });
+}
+
+/**
+ * The teaching periods (and Homeroom) of one weekday, bell times winning per slot, one entry
+ * per slot label. Lunch and Afterschool are left out: they are not periods a room is booked in.
+ *
+ * The NAME comes from the pattern that occupies the slot — on Friday the P8 slot holds the
+ * "Period 1" classes, and staff know it as Period 1 at 2:37 — preferring a real "Period N"
+ * name (patterns 11-17 carry junk names) and falling back to the slot label.
+ */
+function roomDaySlots_(periodTimes, day, bells) {
+  var byPattern = (periodTimes || {}).byPattern || {};
+  var bySlot = (periodTimes || {}).bySlot || {};
+  var slots = {};
+  var order = [];
+  var add = function (cell) {
+    if (!cell || !cell.slotLabel) return;
+    var label = cell.slotLabel;
+    if (!/^P\s*\d/i.test(label) && !/^homeroom/i.test(label)) return;
+    var good = /^period\s*\d/i.test(cell.period || '') || /^homeroom/i.test(cell.period || '');
+    var s = slots[label];
+    if (s) { if (!s.named && good) { s.period = cell.period; s.named = true; } return; }
+    var b = bellTimeForSlot_(bells, label);
+    var begin = (b && b.start) || cell.begin;
+    var end = (b && b.end) || cell.end;
+    if (searchTimeToMin_(begin) < 0 || searchTimeToMin_(end) <= searchTimeToMin_(begin)) return;
+    slots[label] = { slotLabel: label, period: good ? cell.period : label, named: good,
+                     begin: begin, end: end, timeSource: b && b.start ? 'bell' : 'facts' };
+    order.push(label);
+  };
+  Object.keys(byPattern).sort(function (a, b) { return Number(a) - Number(b); })
+    .forEach(function (p) { add(byPattern[p][day]); });
+  Object.keys(bySlot).forEach(function (l) { add(bySlot[l][day]); });
+  return order.map(function (l) {
+    var s = slots[l];
+    // "P4 7-8" named "Period 4" would read as two identical Period 4 rows — keep the band.
+    var band = /(\d{1,2}\s*-\s*\d{1,2})\s*$/.exec(l);
+    var name = s.period;
+    if (band && name.indexOf(band[1]) === -1) name += ' (' + band[1].replace(/\s+/g, '') + ')';
+    return { slotLabel: l, period: name, begin: s.begin, end: s.end, timeSource: s.timeSource };
+  });
+}
+
+/**
+ * One room's day.
+ *
+ * @param classes buildClasses() output (the whole export — filtered to `room` here)
+ * @param periodTimes buildPeriodTimes() output
+ * @param ctx scheduleCtx: {dayCol 1..5 or '' (weekend), nowMin, bells, quarter}
+ * @return {{room, name, weekend:boolean, dayCol:string,
+ *           rows: Array<{kind:'class'|'open', ...}>, untimed: Array, notToday: Array,
+ *           status: {state:'inuse'|'open'|'free'|'before'|'after'|'none', live:Array,
+ *                    until:string, uncertain:boolean}}}
+ *   rows: today's classes + open periods in clock order.
+ *   untimed: classes with no grid cell on ANY weekday (can't be placed — the caveat).
+ *   notToday: classes that do meet, just not today (part-week, or off-quarter).
+ *   status.uncertain: the room has untimed classes, so "open" is not a guarantee.
+ */
+function roomDay(classes, periodTimes, room, ctx) {
+  ctx = ctx || {};
+  periodTimes = periodTimes || { byPattern: {}, bySlot: {} };
+  var weekend = !ctx.dayCol;
+  // A weekend shows a normal Monday — the room's week in its usual order — with no NOW.
+  var day = weekend ? SCHED_MONDAY_COL : String(ctx.dayCol);
+  var nowMin = weekend ? null : ctx.nowMin;
+  var mine = (classes || []).filter(function (c) { return c.room === String(room); });
+  var count = {}, grades = {};
+  var shaped = mine.map(function (c) {
+    count[c.key] = c.students.length;
+    grades[c.key] = classGradesLabel_(c.grades);
+    // buildClasses keeps quarters as a SET; annotateSchedule parses a string. Joining with ','
+    // is the union — the section meets in any quarter one of its students is enrolled for.
+    return { code: c.code, key: c.key, classId: c.classId, description: c.description,
+             category: c.category, teacher: c.teacher, period: c.period, room: c.room,
+             pattern: c.pattern, quarters: Object.keys(c.quarters).sort().join(',') };
+  });
+  var ann = annotateSchedule(shaped, periodTimes,
+    { dayCol: day, nowMin: nowMin, bells: ctx.bells || {}, quarter: ctx.quarter });
+  ann.forEach(function (o) { o.students = count[o.key] || 0; o.grades = grades[o.key] || ''; });
+
+  var timed = [], untimed = [], notToday = [];
+  ann.forEach(function (o) {
+    if (o.meetsToday && searchTimeToMin_(o.begin) >= 0) { timed.push(o); return; }
+    var anyDay = false;
+    for (var d = 1; d <= 5 && !anyDay; d++) if (schedSlotCell_(o, periodTimes, d)) anyDay = true;
+    (anyDay ? notToday : untimed).push(o);
+  });
+
+  var rows = timed.map(function (o) { o.kind = 'class'; return o; });
+  var seenOpen = {};
+  roomDaySlots_(periodTimes, day, ctx.bells || {}).forEach(function (s) {
+    var sb = searchTimeToMin_(s.begin), se = searchTimeToMin_(s.end);
+    var busy = timed.some(function (o) {
+      return searchTimeToMin_(o.begin) < se && searchTimeToMin_(o.end) > sb; // ends exclusive
+    });
+    if (busy || seenOpen[s.begin + '|' + s.end]) return;
+    seenOpen[s.begin + '|' + s.end] = true;
+    rows.push({ kind: 'open', period: s.period, slotLabel: s.slotLabel, begin: s.begin, end: s.end,
+                beginLabel: searchTimeLabel_(s.begin), endLabel: searchTimeLabel_(s.end),
+                timeSource: s.timeSource,
+                current: nowMin !== null && nowMin !== undefined && nowMin >= sb && nowMin < se });
+  });
+  rows.sort(function (a, b) {
+    var d = searchTimeToMin_(a.begin) - searchTimeToMin_(b.begin);
+    if (d) return d;
+    if (a.kind !== b.kind) return a.kind === 'class' ? -1 : 1;
+    return String(a.description || '') < String(b.description || '') ? -1 : 1;
+  });
+
+  // Status right now. Day bounds come from the rows actually shown, so "after the school day"
+  // means after this room's last period, not after some other band's.
+  var status = { state: 'none', live: [], until: '', uncertain: untimed.length > 0 };
+  if (!weekend && nowMin !== null && nowMin !== undefined && nowMin >= 0 && rows.length) {
+    var live = rows.filter(function (r) { return r.kind === 'class' && r.current; });
+    var open = rows.filter(function (r) { return r.kind === 'open' && r.current; })[0];
+    var first = searchTimeToMin_(rows[0].begin);
+    var last = Math.max.apply(null, rows.map(function (r) { return searchTimeToMin_(r.end); }));
+    if (live.length) {
+      status.state = 'inuse'; status.live = live;
+      status.until = live.map(function (r) { return r.end; }).sort().pop();
+    } else if (open) {
+      status.state = 'open'; status.until = open.end;
+    } else if (nowMin < first) status.state = 'before';
+    else if (nowMin >= last) status.state = 'after';
+    else status.state = 'free';   // inside the day, between periods (passing time, lunch)
+  }
+
+  return { room: String(room), name: roomDisplayName(room), weekend: weekend, dayCol: day,
+           rows: rows, untimed: untimed, notToday: notToday, status: status };
+}
+
 /* ---------- quarters ----------
    A class's `Quarters` column is positional term flags ("Q1,2" = terms 1+2). Two
    semester-split classes can share a period — Zion has Government (Q1,2) and Economics
@@ -1931,6 +2137,12 @@ if (typeof module !== 'undefined' && module.exports) {
     studentStatus: studentStatus,
     bellSlotTimes: bellSlotTimes,
     annotateSchedule: annotateSchedule,
+    ROOM_BUILDINGS: ROOM_BUILDINGS,
+    roomBuildingOf_: roomBuildingOf_,
+    roomDisplayName: roomDisplayName,
+    buildingRooms: buildingRooms,
+    roomDaySlots_: roomDaySlots_,
+    roomDay: roomDay,
     schoolDayBlock: schoolDayBlock,
     slotAppliesToGrade_: slotAppliesToGrade_,
     parseSimClock: parseSimClock,
@@ -1998,7 +2210,7 @@ if (typeof module !== 'undefined' && module.exports) {
       .withSuccessHandler(function (ids) {
         favIds = ids || [];
         syncFavChip_();
-        if (!q.value.trim()) renderIdle_();   // show them as soon as they arrive
+        if (!q.value.trim() && currentView.type === 'list') renderIdle_();   // show them as soon as they arrive
         rerenderIfPerson_();                  // and light the star on an open record
       })
       .withFailureHandler(function () { /* favourites are a convenience; never block search */ })
@@ -2022,7 +2234,9 @@ if (typeof module !== 'undefined' && module.exports) {
         // Re-render BEFORE writing the status line: renderPerson and renderIdle_ both reset
         // statusEl, so setting the message first would have silently wiped it.
         rerenderIfPerson_();
-        if (!q.value.trim()) renderIdle_();
+        // only when the idle screen is what's SHOWING — a star tapped on a record opened from
+        // favourites (empty box) must not swap that record for the favourites list
+        if (!q.value.trim() && currentView.type === 'list') renderIdle_();
         if (res.full) {
           statusEl.textContent = 'Favourites are full (' + favIds.length + ' of ' + favIds.length +
             ') — remove one before adding another.';
@@ -2065,8 +2279,10 @@ if (typeof module !== 'undefined' && module.exports) {
     .withSuccessHandler(function (tabs) {
       tabsData = tabs;
       periodTimes = buildPeriodTimes(tabs);
-      if (q.value.trim()) run(); // rerun whatever's typed through the instant engine
-      else renderIdle_();        // favourites can only render once the dataset is here
+      if (currentView.type === 'list') {  // never repaint over a record opened while loading
+        if (q.value.trim()) run(); // rerun whatever's typed through the instant engine
+        else renderIdle_();        // favourites + the Rooms entry need the dataset
+      }
       loadExtras_();             // only now — the first call owns the critical path
     })
     .withFailureHandler(function () { /* server-search fallback keeps working */ })
@@ -2088,19 +2304,18 @@ if (typeof module !== 'undefined' && module.exports) {
       .presenceApi();
   }
   loadFavorites_(); // small and independent of the dataset — fire it with presence
-  loadPresence_(function () {
+  /* Fresh presence repaints whatever is on screen. Only the LIST/idle screen is redrawn by
+     re-running the search: doing that unconditionally (as before 2026-09-23) replaced an open
+     record, class or room with the results list every 2 minutes. */
+  function afterPresence_() {
     rerenderIfPerson_();
+    if (currentView.type !== 'list') return;
     // an empty box means the favourites view is showing: refresh its status pills too
     if (q.value.trim()) run(); else renderIdle_();
-  });
+  }
+  loadPresence_(afterPresence_);
   // 2 minutes: matches the server-side cache, so this costs a call only when it can differ.
-  setInterval(function () {
-    loadPresence_(function () {
-    rerenderIfPerson_();
-    // an empty box means the favourites view is showing: refresh its status pills too
-    if (q.value.trim()) run(); else renderIdle_();
-  });
-  }, 120000);
+  setInterval(function () { loadPresence_(afterPresence_); }, 120000);
 
   /** Today's presence for one student, '' -> null. */
   function presenceFor_(id) {
@@ -2235,9 +2450,27 @@ if (typeof module !== 'undefined' && module.exports) {
    * whole point of the feature. Falls back to the idle prompt when there are none.
    */
   var favPeople = [];
+  /* The way into the Rooms view (Josh, 2026-09-23: on the empty-search screen, beside the
+     favourites). Needs the dataset — rooms are built from it — so it appears once that lands. */
+  function roomsEntryHtml_() {
+    if (!tabsData) return '';
+    return '<div class="grouplabel">Rooms</div><div class="people">' +
+      '<button class="person" id="roomsentry"><span class="pname">Room schedules</span>' +
+      '<span class="pmeta">What’s in each room today · open now</span></button></div>';
+  }
+  function bindRoomsEntry_() {
+    var b = document.getElementById('roomsentry');
+    if (b) b.addEventListener('click', function () { openRooms_(); });
+  }
   function renderIdle_() {
+    // The idle screen is the ROOT of the tap trail. Without resetting it, clearing the box
+    // while a record was open left currentView='person', and the 60s re-render would then
+    // paint that record back over this screen.
+    navStack.length = 0;
+    currentView = { type: 'list' };
     if (!favIds.length || !tabsData) {
-      resultsEl.innerHTML = '';
+      resultsEl.innerHTML = roomsEntryHtml_();
+      bindRoomsEntry_();
       statusEl.textContent = IDLE_MSG;
       return;
     }
@@ -2252,7 +2485,8 @@ if (typeof module !== 'undefined' && module.exports) {
     favPeople = favIds.map(function (id) { return byId[id]; }).filter(Boolean);
 
     if (!favPeople.length) {
-      resultsEl.innerHTML = '';
+      resultsEl.innerHTML = roomsEntryHtml_();
+      bindRoomsEntry_();
       statusEl.textContent = IDLE_MSG;
       return;
     }
@@ -2268,7 +2502,8 @@ if (typeof module !== 'undefined' && module.exports) {
     }).join('');
 
     resultsEl.innerHTML = '<div class="grouplabel">★ Favourites</div>' +
-      '<div class="people">' + rows + '</div>';
+      '<div class="people">' + rows + '</div>' + roomsEntryHtml_();
+    bindRoomsEntry_();
     statusEl.textContent = IDLE_MSG;
     Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-fav]'), function (btn) {
       btn.addEventListener('click', function () {
@@ -2287,7 +2522,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   function backLabel_() {
     var d = navStack[navStack.length - 1];
-    if (!d || d.type === 'list') return '‹ Back to results';
+    if (!d || d.type === 'list') return q.value.trim() ? '‹ Back to results' : '‹ Back';
     return '‹ Back to ' + (d.type === 'class' ? (d.ref.description || d.ref.code) : d.ref.name);
   }
 
@@ -2295,11 +2530,16 @@ if (typeof module !== 'undefined' && module.exports) {
     var d = navStack.pop() || { type: 'list' };
     currentView = d;
     if (d.type === 'list') {
-      if (lastList) { renderList(lastList); statusEl.innerHTML = lastListStatus; }
+      // An empty box means the trail started on the idle screen (favourites / Rooms), so go
+      // back THERE — not to whatever search was last run before the box was cleared.
+      if (lastList && q.value.trim()) { renderList(lastList); statusEl.innerHTML = lastListStatus; }
       else renderIdle_();
     }
     else if (d.type === 'person') openPerson(d.ref, false);
     else if (d.type === 'teacher') openTeacher(d.ref, false);
+    else if (d.type === 'rooms') openRooms_(false);
+    else if (d.type === 'building') openBuilding_(d.ref, false);
+    else if (d.type === 'room') openRoom_(d.ref, false);
     else openClass(d.ref, false);
     window.scrollTo(0, 0);
   }
@@ -2680,10 +2920,13 @@ if (typeof module !== 'undefined' && module.exports) {
   }
 
   /** The line above a schedule explaining what today is and where the times came from. */
-  function dayBarHtml_(sched, ctx, anyTimes, grade) {
-    var simNote = SIM ? '<div class="daybar warn"><b>SIMULATED TIME</b> — ' + esc(SIM.label) +
+  function simNoteHtml_(ctx) {
+    return SIM ? '<div class="daybar warn"><b>SIMULATED TIME</b> — ' + esc(SIM.label) +
       ' (' + (ctx.dayCol ? ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'][ctx.dayCol] : 'weekend') +
       '). Remove <code>?sim=</code> from the URL for real time.</div>' : '';
+  }
+  function dayBarHtml_(sched, ctx, anyTimes, grade) {
+    var simNote = simNoteHtml_(ctx);
     if (!anyTimes) {
       // Distinguish the two very different reasons for "no times" instead of blaming elementary
       // for what may be a broken join (that mislabelling shipped in @17 and confused a 12th grader).
@@ -2753,6 +2996,14 @@ if (typeof module !== 'undefined' && module.exports) {
 
   /** Re-render an open student so the NOW highlight follows the clock. */
   function rerenderIfPerson_() {
+    // Rooms follow the clock too: the NOW row / Open-now pills move as periods change, and the
+    // bells (delay day) or server clock can arrive after the view was first drawn.
+    if ((currentView.type === 'room' || currentView.type === 'building') && tabsData) {
+      var sy = window.scrollY;
+      if (currentView.type === 'room') renderRoom_(currentView.ref); else renderBuilding_(currentView.ref);
+      window.scrollTo(0, sy);
+      return;
+    }
     if (currentView.type === 'person' && lastPersonDetail) {
       var scrollY = window.scrollY;
       /* REBUILD from the current dataset, don't just re-render the cached object. The deferred
@@ -2923,6 +3174,180 @@ if (typeof module !== 'undefined' && module.exports) {
       });
     });
     window.scrollTo(0, 0);
+  }
+
+  /* ---------- rooms: building → room → that room's day ----------
+     All built in the browser from the dataset already loaded (Student Schedules + Period
+     Times), so no server call and no cache change. roomDay (SearchClient) runs the room's
+     classes through annotateSchedule — the Friday reversal, delay-day bells and quarter
+     filtering are the same code the student and teacher schedules use. */
+  var roomClasses_ = null, roomClassesFrom_ = null;
+  function roomClasses() {
+    // buildClasses walks the whole schedule tab; the grid re-renders every minute, so build it
+    // once per dataset rather than once per room tile.
+    if (roomClassesFrom_ !== tabsData) { roomClasses_ = buildClasses(tabsData || []); roomClassesFrom_ = tabsData; }
+    return roomClasses_;
+  }
+
+  /** The short status pill for a room tile / heading. '' when there's nothing to say. */
+  function roomPill_(st) {
+    if (st.state === 'inuse') return '<span class="rpill inuse">In use</span>';
+    if (st.state === 'open' || st.state === 'free') {
+      // A room with untimed classes can't be PROMISED free — same "?" as the NOW? tag.
+      return '<span class="rpill open">' + (st.uncertain ? 'Open?' : 'Open') + '</span>';
+    }
+    return '';
+  }
+
+  function openRooms_(push) {
+    if (!tabsData) { statusEl.textContent = 'Still loading the schedule — try again in a moment.'; return; }
+    if (push !== false) navPush_({ type: 'rooms', ref: { name: 'Rooms' } });
+    // Only one building today; still ask, so adding the others is a config line, not a redesign.
+    statusEl.textContent = 'Pick a building.';
+    var cls = roomClasses();
+    resultsEl.innerHTML = backButtonHtml_() +
+      '<div class="grouplabel">Buildings</div><div class="people">' +
+      ROOM_BUILDINGS.map(function (b, i) {
+        var n = buildingRooms(cls, b.id).length;
+        return '<button class="person" data-b="' + i + '"><span class="pname">' + esc(b.name) +
+          '</span><span class="pmeta">' + n + ' rooms</span></button>';
+      }).join('') + '</div>';
+    bindBack_();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-b]'), function (btn) {
+      btn.addEventListener('click', function () {
+        var b = ROOM_BUILDINGS[Number(btn.getAttribute('data-b'))];
+        openBuilding_({ id: b.id, name: b.name });
+      });
+    });
+    window.scrollTo(0, 0);
+  }
+
+  function openBuilding_(b, push) {
+    if (push !== false) navPush_({ type: 'building', ref: b });
+    renderBuilding_(b);
+    window.scrollTo(0, 0);
+  }
+
+  /* Every room as a tile with what's happening in it NOW, so "find me a free room" is answered
+     on this screen without opening twenty rooms one by one. */
+  function renderBuilding_(b) {
+    var cls = roomClasses(), ctx = scheduleCtx_();
+    var tiles = buildingRooms(cls, b.id).map(function (r, i) {
+      var rd = roomDay(cls, periodTimes, r.room, ctx);
+      var st = rd.status;
+      var line = st.state === 'inuse'
+        ? (st.live[0].description || st.live[0].code) + (st.live.length > 1 ? ' (+' + (st.live.length - 1) + ')' : '')
+        : st.state === 'open' ? 'until ' + searchTimeLabel_(st.until)
+        : r.sections + ' class' + (r.sections === 1 ? '' : 'es');
+      return '<button class="roombtn" data-r="' + i + '"><span class="rn">' + esc(r.name) + ' ' +
+        roomPill_(st) + '</span><span class="rs">' + esc(line) + '</span></button>';
+    });
+    var t = schoolNow_();
+    statusEl.textContent = t.dayCol ? 'Tap a room for its full day.' : 'Weekend — tap a room for its usual weekday.';
+    resultsEl.innerHTML = backButtonHtml_() + '<div class="grouplabel">' + esc(b.name) + '</div>' +
+      '<div class="roomgrid">' + tiles.join('') + '</div>';
+    bindBack_();
+    var list = buildingRooms(cls, b.id);
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-r]'), function (btn) {
+      btn.addEventListener('click', function () {
+        var r = list[Number(btn.getAttribute('data-r'))];
+        openRoom_({ room: r.room, name: r.name, building: b.id, buildingName: b.name });
+      });
+    });
+  }
+
+  function openRoom_(r, push) {
+    if (push !== false) navPush_({ type: 'room', ref: r });
+    renderRoom_(r);
+    window.scrollTo(0, 0);
+  }
+
+  function renderRoom_(r) {
+    var ctx = scheduleCtx_();
+    var rd = roomDay(roomClasses(), periodTimes, r.room, ctx);
+    statusEl.textContent = '';
+    var clsRow = function (c, i, extraCls, timeText) {
+      return '<button class="cls' + (extraCls || '') + '" data-rc="' + i + '">' +
+        (timeText ? '<span class="clstime">' + esc(timeText) + '</span>' : '') +
+        esc(c.description || c.code) +
+        (c.current ? '<span class="nowtag">' + (c.sharedSlot ? 'NOW?' : 'NOW') + '</span>' : '') +
+        '<div class="t">' + esc([c.period, c.teacher,
+          c.students + ' student' + (c.students === 1 ? '' : 's'),
+          c.grades ? 'Gr ' + c.grades : '', c.quarters].filter(String).join(' · ')) +
+        '</div></button>';
+    };
+    var tappable = [];   // index → class, for the data-rc handlers below
+    var body = roomDayBarHtml_(rd, ctx) + (rd.rows.length ? rd.rows.map(function (x) {
+      var time = x.beginLabel + (x.endLabel ? '–' + x.endLabel : '');
+      if (x.kind === 'open') {
+        return '<div class="cls open' + (x.current ? ' now' : '') + '">' +
+          '<span class="clstime">' + esc(time) + '</span><span class="ol">Open</span>' +
+          (x.current ? '<span class="nowtag">NOW</span>' : '') +
+          '<div class="t">' + esc(x.period) + '</div></div>';
+      }
+      tappable.push(x);
+      return clsRow(x, tappable.length - 1, x.current ? ' now' : '', time);
+    }).join('') : '<div class="hit">No period times for this day.</div>');
+
+    var html = backButtonHtml_() +
+      section_('roomDay', esc(rd.name) + ' ' + roomPill_(rd.status), '— ' + esc(r.buildingName || ''), body, true);
+
+    if (rd.untimed.length) {
+      html += section_('roomUntimed', 'No set time in FACTS', '(' + rd.untimed.length + ')',
+        '<div class="daybar warn">FACTS gives these classes no period, so they can’t be placed on ' +
+        'the day above — the room may be in use during a period marked Open.</div>' +
+        rd.untimed.map(function (c) { tappable.push(c); return clsRow(c, tappable.length - 1, '', ''); }).join(''),
+        true);
+    }
+    if (rd.notToday.length) {
+      html += section_('roomNotToday', rd.weekend ? 'Not on Mondays' : 'Not meeting today',
+        '(' + rd.notToday.length + ')',
+        rd.notToday.map(function (c) {
+          tappable.push(c);
+          return clsRow(c, tappable.length - 1, ' off', c.offQuarter ? 'not this quarter' : 'not today');
+        }).join(''), false);
+    }
+
+    resultsEl.innerHTML = html;
+    bindBack_();
+    bindSections_();
+    Array.prototype.forEach.call(resultsEl.querySelectorAll('[data-rc]'), function (btn) {
+      btn.addEventListener('click', function () { openClass(tappable[Number(btn.getAttribute('data-rc'))]); });
+    });
+  }
+
+  /** The line above a room's day: what's happening in it right now, and where times came from. */
+  function roomDayBarHtml_(rd, ctx) {
+    var simNote = simNoteHtml_(ctx);
+    if (!rd.rows.length) return simNote;
+    if (rd.weekend) return simNote + '<div class="daybar">Weekend — showing this room’s usual Monday.</div>';
+    var st = rd.status, phrase;
+    if (st.state === 'inuse') {
+      phrase = st.live.length === 1
+        ? 'in use — <b>' + esc(st.live[0].description || st.live[0].code) + '</b> until ' + esc(searchTimeLabel_(st.until))
+        : st.live.length + ' classes share this period — <b>' +
+          st.live.map(function (c) { return esc(c.description || c.code); }).join('</b> or <b>') +
+          '</b> (compare the Q labels)';
+    } else if (st.state === 'open') {
+      phrase = '<b>open</b> now until ' + esc(searchTimeLabel_(st.until)) +
+        (st.uncertain ? ' — but see the classes with no set time below' : '');
+    } else if (st.state === 'free' || st.state === 'before' || st.state === 'after') {
+      // Josh, 2026-09-24: for a ROOM the question is "is anyone in it", not where the school
+      // day is — before school, after school and passing time all read the same.
+      phrase = 'currently unoccupied';
+    } else phrase = '';
+    if (bellToday && bellToday.closed) {
+      return simNote + '<div class="daybar warn"><b>' + esc(bellToday.mode || 'No school') +
+        '</b> per the bell calendar — times are the normal schedule' + (phrase ? ' · ' + phrase : '') + '</div>';
+    }
+    var mode = bellToday && bellToday.ok ? (bellToday.mode || '') : '';
+    var abnormal = mode && !/^normal/i.test(mode);
+    // "Normal Schedule: currently unoccupied" (Josh's wording). The rest stays ' · '-joined.
+    var modeLabel = mode ? '<b>' + esc(mode + (/schedule\s*$/i.test(mode) ? '' : ' Schedule')) + ':</b>' : '';
+    var bits = [];
+    if (phrase) bits.push(modeLabel ? modeLabel + ' ' + phrase : phrase);
+    else if (modeLabel) bits.push(modeLabel.replace(':</b>', '</b>'));
+    return simNote + (bits.length ? '<div class="daybar' + (abnormal ? ' warn' : '') + '">' + bits.join(' · ') + '</div>' : '');
   }
 
   /* ---------- search plumbing ---------- */
