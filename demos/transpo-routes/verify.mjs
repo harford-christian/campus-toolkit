@@ -16,6 +16,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, '../../../FACTS/transpo-department');
@@ -69,7 +70,7 @@ console.log('\n  vendored logic');
 if (!existsSync(SRC)) {
   skip('source project not checked out — cannot compare logic.js');
 } else {
-  const FILES = ['schema.js', 'stops.js', 'manifest.js', 'office.js', 'auth.js'];
+  const FILES = ['schema.js', 'stops.js', 'manifest.js', 'office.js', 'auth.js', 'sheet.js'];
   let drift = [];
   for (const f of FILES) {
     let body = readFileSync(path.join(SRC, 'logic', f), 'utf8');
@@ -78,6 +79,7 @@ if (!existsSync(SRC)) {
     body = body.replace(
       /\(typeof module !== 'undefined' && module\.exports\)\s*\r?\n?\s*\? require\([^)]*\) : null/g,
       'null');
+    body = aliasStaffNames(body).text;              // build-logic.mjs applies the same transform
     // Compare on a whitespace-normalised basis so a line-ending flip is not reported as drift.
     const norm = (s) => s.replace(/\r\n/g, '\n').trim();
     if (!norm(logicJs).includes(norm(body))) drift.push(f);
@@ -185,6 +187,27 @@ if (win.MOCK_BACKEND) {
 
   const noStops = B.driverApi({ op: 'manifest', code: 'E' });
   ok(noStops.stopsUnset === true, 'a route with no stops entered reports stopsUnset, so the page can say so');
+
+  // The driver page reads routes per half of the day (opRoutes_). The old flat shape rendered as
+  // "the afternoon list has not been published yet" with every check above still green.
+  const picker = B.driverApi({ op: 'routes' });
+  ok(picker.sessions && picker.sessions.PM && picker.sessions.PM.routes.length === 7 &&
+     picker.sessions.AM === null && picker.defaultSession === 'PM',
+     'routes comes back per run (opRoutes_ shape): PM published with 7 routes, AM honestly null');
+  ok(B.driverApi({ op: 'manifest', code: 'J', run: 'AM' }).reason === 'no-session',
+     'asking for the unpublished morning run is refused, not answered with the afternoon');
+  ok(man.routeInfo && man.routeInfo.leaveHcs && man.routeInfo.lineUpBy,
+     'the driver sheet carries the run header (line up by / leave) from RouteInfo');
+
+  // The office Print sheets tab, through the source project's own buildRouteSheet.
+  const sheet = B.officeApi({ op: 'sheet', code: 'J', session: 'PM' });
+  ok(sheet.ok && sheet.stops.length === 4 && sheet.stops.every((s) => s.directions),
+     'the printed Jarrettsville sheet has its 4 stops, each with written directions');
+  ok(sheet.stops.every((s) => s.children.every((c) => c.contacts.length > 0 &&
+     c.contacts.every((x) => /^410-555-01\d\d$/.test(x.phone)))),
+     'every child on the sheet has guardian contacts, all in the fictional 555-01xx block');
+  ok(B.officeApi({ op: 'sheet', code: 'J', session: 'AM' }).reason === 'no-session',
+     'the morning sheet is refused as unpublished');
 }
 
 console.log('\n' + (fail ? `  ${fail} FAILURE(S)\n` : '  all checks passed\n'));

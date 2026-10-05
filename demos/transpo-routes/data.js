@@ -104,15 +104,15 @@ window.TRANSPO_DATA = (function () {
   /* ---------- STOPS: entered for two routes, absent for the other five ---------- */
   var STOPS = {
     'J': [
-      { stopId:'j1', seq:10, name:'Jarrettsville firehouse', landmark:'Pull in past the bay doors', time:'3:25', driverNote:'Do not block the apron' },
-      { stopId:'j2', seq:20, name:'Norrisville Road',        landmark:'By the white fence',         time:'3:34', driverNote:'' },
-      { stopId:'j3', seq:30, name:'Baldwin Mill crossroads', landmark:'Opposite the produce stand', time:'3:41', driverNote:'Children cross BEHIND the bus here' },
-      { stopId:'j4', seq:40, name:'Federal Hill Road',       landmark:'Top of the lane',            time:'3:50', driverNote:'' }
+      { stopId:'j1', seq:10, name:'Jarrettsville firehouse', landmark:'Pull in past the bay doors', time:'3:25', driverNote:'Do not block the apron', directions:'Right out of school onto Route 24 N. Left on Jarrettsville Road for 6 miles. Firehouse is on the right after the light.' },
+      { stopId:'j2', seq:20, name:'Norrisville Road',        landmark:'By the white fence',         time:'3:34', driverNote:'', directions:'From the firehouse continue north 1 mile. Right on Norrisville Road. Stop is 0.4 miles on the left by the white fence.' },
+      { stopId:'j3', seq:30, name:'Baldwin Mill crossroads', landmark:'Opposite the produce stand', time:'3:41', driverNote:'Children cross BEHIND the bus here', directions:'Continue on Norrisville Road to the stop sign. Left on Baldwin Mill Road. Pull over opposite the produce stand.' },
+      { stopId:'j4', seq:40, name:'Federal Hill Road',       landmark:'Top of the lane',            time:'3:50', driverNote:'', directions:'Right on Federal Hill Road. Climb to the top of the lane and stop before the turnaround.' }
     ],
     'Ab': [
-      { stopId:'a1', seq:10, name:'Abingdon library',     landmark:'Car park entrance', time:'3:22', driverNote:'' },
-      { stopId:'a2', seq:20, name:'Emmorton Road shops',  landmark:'By the pharmacy',   time:'3:31', driverNote:'' },
-      { stopId:'a3', seq:30, name:'Woodsdale Court',      landmark:'Turning circle',    time:'3:40', driverNote:'Tight turn — reverse from the top' }
+      { stopId:'a1', seq:10, name:'Abingdon library',     landmark:'Car park entrance', time:'3:22', driverNote:'', directions:'Left out of school onto Route 24 S. Right on Route 924. Library car park is on the left past the second light.' },
+      { stopId:'a2', seq:20, name:'Emmorton Road shops',  landmark:'By the pharmacy',   time:'3:31', driverNote:'', directions:'Back out onto Route 924 S. Right on Emmorton Road. Stop at the shops by the pharmacy.' },
+      { stopId:'a3', seq:30, name:'Woodsdale Court',      landmark:'Turning circle',    time:'3:40', driverNote:'Tight turn — reverse from the top', directions:'Continue on Emmorton Road 1 mile. Left on Woodsdale Road, first right into Woodsdale Court.' }
     ]
   };
 
@@ -125,6 +125,12 @@ window.TRANSPO_DATA = (function () {
     's202':'a2', 's206':'a2',
     's204':'a3', 's205':'a3'
   };
+
+  /* ---------- RouteInfo: the printed sheet's header line (fabricated) ---------- */
+  var ROUTE_INFO = [
+    { 'Route Code':'J',  Session:'PM', Bus:'12', 'Leave HCS':'3:12', 'Line Up By':'3:05', 'Line Up':'Ramp, door 3' },
+    { 'Route Code':'Ab', Session:'PM', Bus:'7',  'Leave HCS':'3:10', 'Line Up By':'3:05', 'Line Up':'Ramp, door 1' }
+  ];
 
   /* ---------- people ---------- */
   var DRIVER_ROWS = [
@@ -198,6 +204,21 @@ window.TRANSPO_DATA = (function () {
     });
   });
 
+  /* ---------- guardian contacts, as FACTS supplies them: [name, relationship, phone] ----------
+     Fabricated and deterministic: the surname is the rider's, the first names come from a fixed
+     list, and every number is in the 555-0100..0199 block reserved for fiction. */
+  var GIVEN = ['Dana','Morgan','Robin','Casey','Jordan','Avery','Leslie','Shawn','Terry','Jamie','Kelly','Lane'];
+  var FAMILIES = [];                              // one guardian set per surname, so siblings share it
+  function contactsFor(r) {
+    var surname = String(r[1]).split(' ')[0];
+    var i = FAMILIES.indexOf(surname);
+    if (i < 0) { FAMILIES.push(surname); i = FAMILIES.length - 1; }
+    var p = function (k) { return '410-555-01' + ('0' + ((i * 2 + k) % 100)).slice(-2); };
+    var out = [[GIVEN[i % GIVEN.length] + ' ' + surname, 'Mother', p(0)]];
+    if (i % 3 !== 2) out.push([GIVEN[(i + 5) % GIVEN.length] + ' ' + surname, 'Father', p(1)]);
+    return out;
+  }
+
   /* ---------- assemble the published slice, exactly as ../transportation writes it ---------- */
   function slice() {
     var byRoute = {};
@@ -218,7 +239,8 @@ window.TRANSPO_DATA = (function () {
                                reason:gone[0], detail:gone[1] });
             } else {
               riding.push({ id:r[0], name:r[1], grade:r[2], expected:true,
-                            flags: FLAGS[r[0]] || [] });
+                            flags: FLAGS[r[0]] || [],
+                            contacts: contactsFor(r) });
             }
           });
           var by = function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; };
@@ -237,7 +259,7 @@ window.TRANSPO_DATA = (function () {
       STOPS[code].forEach(function (s) {
         out.push({ 'Stop ID':s.stopId, 'Route Code':code, Session:'PM', Seq:s.seq,
                    'Stop Name':s.name, Landmark:s.landmark, Time:s.time, Days:'',
-                   Active:'Y', 'Driver Note':s.driverNote, Note:'' });
+                   Active:'Y', 'Driver Note':s.driverNote, Directions:s.directions || '', Note:'' });
       });
     });
     return out;
@@ -254,7 +276,7 @@ window.TRANSPO_DATA = (function () {
   return {
     DEMO: DEMO, ROUTES: ROUTES,
     published: slice(),
-    stopRows: stopRows(), linkRows: linkRows(),
+    stopRows: stopRows(), linkRows: linkRows(), routeInfo: ROUTE_INFO,
     drivers: DRIVER_ROWS, devices: DEVICE_ROWS, activity: ACTIVITY, boarding: BOARDING
   };
 })();

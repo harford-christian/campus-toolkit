@@ -15,6 +15,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, '../../../FACTS/transpo-department/logic');
@@ -25,7 +26,7 @@ if (!existsSync(SRC)) {
 }
 
 // Order matters only for readability — GAS hoists function declarations across the whole scope.
-const FILES = ['schema.js', 'stops.js', 'manifest.js', 'office.js', 'auth.js'];
+const FILES = ['schema.js', 'stops.js', 'manifest.js', 'office.js', 'auth.js', 'sheet.js'];
 
 const parts = FILES.map((f) => {
   let body = readFileSync(path.join(SRC, f), 'utf8');
@@ -41,6 +42,10 @@ const parts = FILES.map((f) => {
   body = body.replace(
     /\(typeof module !== 'undefined' && module\.exports\)\s*\r?\n?\s*\? require\([^)]*\) : null/g,
     'null');
+
+  // Real staff first names in the comments become role aliases — the one deliberate departure
+  // from verbatim (verify.mjs applies the same transform before comparing).
+  body = aliasStaffNames(body).text;
 
   return `/* ===== ${f} ===== */\n` + body;
 });
@@ -58,6 +63,7 @@ const out = [
   '    buildStops: buildStops, buildStudentStops: buildStudentStops, resequence: resequence,',
   '    checkState: checkState, boardingTally: boardingTally, checkStateLabel: checkStateLabel,',
   '    driverAdoption: driverAdoption, recentActivity: recentActivity, coverageGaps: coverageGaps,',
+  '    buildRouteSheet: buildRouteSheet,',
   '    CHECK_STATE: CHECK_STATE, DRIVER_RIDER_FIELDS: DRIVER_RIDER_FIELDS,',
   '    FORBIDDEN_RIDER_FIELDS: FORBIDDEN_RIDER_FIELDS',
   '  };',

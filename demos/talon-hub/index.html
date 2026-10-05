@@ -2942,7 +2942,42 @@ var SoccerLive = (function () {
     return Object.keys(started).filter(function (a) { return !hasKick[a]; });
   }
 
-  return { STAT: STAT, matchMinute: matchMinute, reduceGame: reduceGame, gameResult: gameResult, toStatsJson: toStatsJson, parseGames: parseGames, plainText: plainText, reconstructKickoff: reconstructKickoff };
+  /**
+   * Recovery diff: which plays does THIS device hold that the server never got?
+   * The pad keeps its full event list on the phone (localStorage); a lost save
+   * (2026-10-01: kickoff XI, a tap, and the halftime reset all dropped) leaves
+   * Seqs that are simply ABSENT on the server. Returns
+   *   add   — local rows whose Seq the server lacks (never a GAMEMETA marker;
+   *           a locally-voided row is skipped — nothing to restore),
+   *   voids — Seqs undone locally but still live on the server.
+   * `pendingSeqs` ({seq:1}) = rows still in the outbox (they'll send themselves).
+   * A Seq the server holds is never touched, even if its content differs — that
+   * row came from another device and the server copy wins.
+   */
+  function recoverDiff(serverEvents, localEvents, pendingSeqs) {
+    var have = {}, pend = pendingSeqs || {}, add = [], voids = [];
+    (serverEvents || []).forEach(function (e) { if (e) have[String(Number(e.Seq))] = e; });
+    (localEvents || []).forEach(function (e) {
+      if (!e) return;
+      var seq = Number(e.Seq); if (!isFinite(seq)) return;
+      var k = String(seq);
+      if (pend[k]) return;
+      var srv = have[k];
+      if (!srv) {
+        if (truthy_(e.Void) || String(e.StatType || '') === 'GAMEMETA' || !e.StatType) return;
+        add.push({ seq: seq, side: String(e.Side || 'US'), athleteId: String(e.AthleteID || ''), statType: String(e.StatType),
+          linkSeq: (e.LinkSeq === '' || e.LinkSeq == null) ? '' : Number(e.LinkSeq),
+          matchMin: (e.MatchMin === '' || e.MatchMin == null) ? '' : Number(e.MatchMin),
+          period: (e.Period === '' || e.Period == null) ? '' : Number(e.Period) });
+      } else if (truthy_(e.Void) && !truthy_(srv.Void) && String(srv.StatType) === String(e.StatType) && String(srv.AthleteID || '') === String(e.AthleteID || '')) {
+        voids.push(seq);
+      }
+    });
+    add.sort(function (a, b) { return a.seq - b.seq; }); voids.sort(function (a, b) { return a - b; });
+    return { add: add, voids: voids };
+  }
+
+  return { STAT: STAT, matchMinute: matchMinute, reduceGame: reduceGame, gameResult: gameResult, toStatsJson: toStatsJson, parseGames: parseGames, plainText: plainText, reconstructKickoff: reconstructKickoff, recoverDiff: recoverDiff };
 })();
 
 if (typeof module !== 'undefined') module.exports = SoccerLive;
@@ -6303,6 +6338,106 @@ var MeetEntry = (function () {
 
 if (typeof module !== 'undefined') module.exports = MeetEntry;
 
+'use strict';
+/**
+ * attendance.js — mark-out enums + validation. Pure JS.
+ *
+ * ATTENDANCE rows are EXCEPTIONS ONLY: no row = riding team transport both
+ * legs. Deleting an exception is modeled as setting both statuses back to
+ * TEAM (the gateway then removes the row).
+ */
+
+var Attendance = (function () {
+  var OUTBOUND = { TEAM: true, SELF: true, ABSENT: true };
+  var RETURN = { TEAM: true, GUARDIAN: true, SELF: true, OTHER: true };
+
+  // ONE friendly label per status, shared by parent + player + coach so the same
+  // choice never reads three different ways (the 2026-09-18 vocab audit found
+  // "Riding with the team"/"Going"/"Getting there" all meaning the same thing).
+  var OUT_LABEL = { TEAM: 'Team bus', SELF: 'Own way', ABSENT: 'Not going' };
+  var RET_LABEL = { TEAM: 'Team bus', GUARDIAN: 'Getting picked up', SELF: 'Drives self', OTHER: 'Other' };
+  /** Friendly label for a leg status. leg: 'OUT'|'RETURN' (default OUT). */
+  function label(leg, status) {
+    var m = (String(leg || '').toUpperCase() === 'RETURN') ? RET_LABEL : OUT_LABEL;
+    return m[status] || String(status || '');
+  }
+  /** [value,label] option lists for building the family/coach controls. */
+  function outOptions(hasBus) { return hasBus ? [['TEAM', OUT_LABEL.TEAM], ['SELF', OUT_LABEL.SELF]] : []; }
+  function retOptions() { return [['TEAM', RET_LABEL.TEAM], ['GUARDIAN', RET_LABEL.GUARDIAN], ['SELF', RET_LABEL.SELF], ['OTHER', RET_LABEL.OTHER]]; }
+
+  /**
+   * @param input { eventId, athleteId, outboundStatus?, returnStatus?, reason?, note? }
+   * @param event projected SCHEDULE row (or null if not found)
+   * @param nowMs current time
+   * @returns { ok:true, clean:{...} } or { ok:false, code, msg }
+   */
+  function validate(input, event, nowMs) {
+    if (!input || !input.eventId || !input.athleteId) {
+      return { ok: false, code: 'BAD_INPUT', msg: 'Missing event or athlete.' };
+    }
+    if (!event) return { ok: false, code: 'NO_EVENT', msg: 'Event not found.' };
+    if (String(event.Status) === 'Cancelled') {
+      return { ok: false, code: 'EVENT_CANCELLED', msg: 'This event is cancelled.' };
+    }
+    var eventEndMs = Date.parse(event.Date + 'T23:59:59');
+    if (!isNaN(eventEndMs) && eventEndMs < nowMs) {
+      return { ok: false, code: 'EVENT_PAST', msg: 'This event is in the past.' };
+    }
+    var clean = { eventId: String(input.eventId), athleteId: String(input.athleteId) };
+    if (input.outboundStatus !== undefined) {
+      if (!OUTBOUND[input.outboundStatus]) {
+        return { ok: false, code: 'BAD_STATUS', msg: 'Invalid outbound status.' };
+      }
+      clean.outboundStatus = input.outboundStatus;
+    }
+    if (input.returnStatus !== undefined) {
+      if (!RETURN[input.returnStatus]) {
+        return { ok: false, code: 'BAD_STATUS', msg: 'Invalid return status.' };
+      }
+      clean.returnStatus = input.returnStatus;
+    }
+    if (clean.outboundStatus === undefined && clean.returnStatus === undefined) {
+      return { ok: false, code: 'BAD_INPUT', msg: 'No status change supplied.' };
+    }
+    clean.reason = String(input.reason || input.note || '').slice(0, 500);
+    return { ok: true, clean: clean };
+  }
+
+  /** True when a row is all-defaults and can be deleted (exceptions-only doctrine). */
+  function isDefaultRow(row) {
+    return (row.OutboundStatus === 'TEAM' || !row.OutboundStatus) &&
+      (row.ReturnStatus === 'TEAM' || !row.ReturnStatus);
+  }
+
+  /**
+   * What a STUDENT is allowed to submit. All students may mark attendance
+   * (TEAM = going / ABSENT = not). Setting a return trip, or SELF outbound
+   * (getting there on their own), is a travel decision allowed only when a
+   * parent granted it. Returns {ok:true} or {ok:false, code:'TRAVEL_NOT_ALLOWED'}.
+   */
+  function studentPolicy(outboundStatus, returnStatus, canTravel) {
+    if (canTravel) return { ok: true };
+    var setsReturn = returnStatus !== undefined && returnStatus !== null && returnStatus !== '';
+    if (setsReturn || outboundStatus === 'SELF') return { ok: false, code: 'TRAVEL_NOT_ALLOWED' };
+    return { ok: true };
+  }
+
+  return {
+    OUTBOUND_STATUSES: Object.keys(OUTBOUND),
+    RETURN_STATUSES: Object.keys(RETURN),
+    OUT_LABEL: OUT_LABEL,
+    RET_LABEL: RET_LABEL,
+    label: label,
+    outOptions: outOptions,
+    retOptions: retOptions,
+    validate: validate,
+    isDefaultRow: isDefaultRow,
+    studentPolicy: studentPolicy
+  };
+})();
+
+if (typeof module !== 'undefined') module.exports = Attendance;
+
 </script>
 
 <script>
@@ -8512,6 +8647,32 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       }), { title: p.name + ' — why?' });
     }
 
+    // Coach rider-changer (bus events): pick a player, then set how they get TO
+    // the game — Team bus / Own way (meeting there) / Not going. The "own way"
+    // case is the late-email one ("running behind, I'll meet you there") so the
+    // bus isn't held. Reuses setAthleteAttendance + the mark-out reason flow.
+    function openRiderChange() {
+      var list = (state._changeList || []).slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; });
+      if (!list.length) { TalonUI.toast('Nobody to change yet.'); return; }
+      TalonUI.moreSheet(list.map(function (p) {
+        return { label: p.name, onClick: function () { riderStatusSheet(p); } };
+      }), { title: 'Change whose ride?' });
+    }
+    function riderStatusSheet(p) {
+      TalonUI.moreSheet([
+        { label: '🚌 ' + Attendance.label('OUT', 'TEAM') + ' — riding with us', onClick: function () { applyRider_(p, 'TEAM', ''); } },
+        { label: '🏃 ' + Attendance.label('OUT', 'SELF') + ' — meeting us there', onClick: function () { applyRider_(p, 'SELF', 'Meeting there'); } },
+        { label: '🚫 ' + Attendance.label('OUT', 'ABSENT'), onClick: function () { markOutReason(p); } }
+      ], { title: p.name + ' — getting there how?' });
+    }
+    function applyRider_(p, status, reason) {
+      call('setAthleteAttendance', { eventId: state.currentEvent, athleteId: p.athleteId, outboundStatus: status, reason: reason })
+        .then(function (rr) {
+          if (rr && rr.ok) { TalonUI.toast(p.name + ' → ' + Attendance.label('OUT', status) + '.'); openEvent(state.currentEvent); }
+          else TalonUI.toast((rr && (rr.msg || rr.code)) || 'Error');
+        }).catch(function () { TalonUI.toast('Network error.'); });
+    }
+
     // Team-travel editor — the owner surface for the hub-owned TransportMode /
     // DepartTime / ReturnEstTime columns (nothing set them before, so the
     // family apps' travel UI never switched on). One instance per page.
@@ -8848,9 +9009,12 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       h += whereWhenHtml_(ev, isDuring);
       if (isDuring) h += gdChecklistHtml(ev);
       // The stat pad opens from any soccer game's page — tomorrow's included.
-      if (!isAfter && ev.TeamID && String(ev.EventType) !== 'Practice' &&
+      // A PAST game reopens only on a phone that still holds its own copy of it —
+      // the recovery path for plays the server never got (2026-10-01 Mount Airy).
+      var padLocal = isAfter && padHasLocalCopy_(ev.EventID);
+      if ((!isAfter || padLocal) && ev.TeamID && String(ev.EventType) !== 'Practice' &&
           typeof Sports !== 'undefined' && Sports.keyFor(ev.Sport) === 'soccer' && canManageTeam(ev.TeamID)) {
-        h += '<button class="btn block" id="btn-trklive" style="margin:.4rem 0">⚽ Track live stats</button>';
+        h += '<button class="btn block" id="btn-trklive" style="margin:.4rem 0">' + (padLocal ? '⚽ Stats saved on this phone' : '⚽ Track live stats') + '</button>';
       }
       // 🖨 Print roster — a quick paper team sheet (#/name/grade) for the bench or
       // the scorer's table. Opt-in per sport, default on for soccer (a coach can
@@ -8881,28 +9045,31 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         h += '<button class="act block" id="btn-volunteers" style="margin:.4rem 0">👥 Invite volunteers — code &amp; link</button>';
       }
       // --- The at-the-field questions lead: who's missing, then the two legs ---
-      h += '<div class="sectlabel">Missing list <span class="muted">' + (missing.length ? '(' + missing.length + ')' : '(none)') + '</span></div>';
-      h += missing.length ? missing.map(function (m) {
-        // AT_OTHER = dual-rostered player at his other team's event (auto-derived,
-        // nothing to acknowledge) — neutral, not red.
+      // WHO'S NOT PLAYING — the first question. "Own way" players ARE attending
+      // (they show under the ride legs), so they're deliberately NOT listed here;
+      // that removes the old duplication where an absent player appeared both in
+      // "Missing list" and again as the outbound "Not going" group.
+      var notPlaying = missing.filter(function (m) { return m.status === 'ABSENT' || m.status === 'AT_OTHER'; });
+      h += '<div class="sectlabel">🚫 Not playing <span class="muted">' + (notPlaying.length ? '(' + notPlaying.length + ')' : '(none)') + '</span></div>';
+      h += notPlaying.length ? notPlaying.map(function (m) {
+        // AT_OTHER = dual-rostered player at his other team's event (auto-derived).
         if (m.status === 'AT_OTHER') {
           return '<div class="row"><div><span class="who">' + esc(m.name) + '</span> <span class="pill plain">↔ ' + esc(m.reason) + '</span></div><span class="muted" title="Auto-excused by the dual-roster rule">auto</span></div>';
         }
-        return '<div class="row"><div><span class="who">' + esc(m.name) + '</span> <span class="pill ' + m.status + '">' + m.status + '</span>' + (m.reason ? '<div class="s">' + esc(m.reason) + '</div>' : '') + '</div><div class="flex" style="gap:.25rem">' +
-          (m.coachAck ? '<span class="muted">✓ ack</span>' : '<button class="act btn-ack" data-a="' + esc(m.athleteId) + '">Ack</button>') +
-          '<button class="act btn-unmark" data-a="' + esc(m.athleteId) + '" data-n="' + esc(m.name) + '" title="Put them back on the team bus">↩</button></div></div>';
-      }).join('') : '<p class="s">' + (bus ? 'Everyone is riding with the team.' : 'Nobody is marked out.') + '</p>';
-      // Coaches went live with ~90 families and immediately started receiving
-      // absences by personal email. There was nowhere to record one: the app
-      // could only acknowledge an absence somebody else had entered.
-      state._ridingList = manifest.outbound.team || [];   // who the picker can offer
-      if (state._ridingList.length) {
+        return '<div class="row"><div><span class="who">' + esc(m.name) + '</span> <span class="pill err">Not going</span>' + (m.reason ? '<div class="s">' + esc(m.reason) + '</div>' : '') + '</div><div class="flex" style="gap:.25rem">' +
+          (m.coachAck ? '<span class="muted">✓ seen</span>' : '<button class="act btn-ack" data-a="' + esc(m.athleteId) + '">Mark seen</button>') +
+          '<button class="act btn-unmark" data-a="' + esc(m.athleteId) + '" data-n="' + esc(m.name) + '" title="' + (bus ? 'Put them back on the team bus' : 'Mark them attending') + '">↩ back</button></div></div>';
+      }).join('') : '<p class="s">Everyone is playing.</p>';
+      // Change any rider's plan in two taps — a late "I\'ll meet you there" email
+      // becomes "Own way" so the bus never waits (Josh, 2026-09-18). The movable
+      // set = current bus riders + own-way players. Home/non-bus games keep the
+      // simple mark-out (attending vs not).
+      state._changeList = (manifest.outbound.team || []).concat(manifest.outbound.self || []);
+      if (bus && state._changeList.length) {
+        h += '<button class="act" id="btn-riderchange" style="margin-top:.35rem">＋ Change a player’s ride</button>';
+      } else if (!bus && (manifest.outbound.team || []).length) {
+        state._ridingList = manifest.outbound.team || [];
         h += '<button class="act" id="btn-markout" style="margin-top:.35rem">＋ Mark someone out</button>';
-      }
-      // Dual-rostered players committed elsewhere: visible so the headcount math is transparent.
-      if (manifest.outbound.atOther && manifest.outbound.atOther.length) {
-        h += '<div class="s" style="color:var(--muted);margin:.2rem 0">↔ At their other team (not on either leg): ' +
-          manifest.outbound.atOther.map(function (e2) { return esc(e2.name) + ' (' + esc(e2.note || '') + ')'; }).join(', ') + '</div>';
       }
       // Ride legs exist only where a bus does. A home game is attendance-only:
       // the Missing list above IS the whole answer (Josh, 2026-08-28: "Home
@@ -10167,6 +10334,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         tick: null, sync: null
       };
       try { state.meet.role = localStorage.getItem('talonMeetRole:' + eventId) || null; } catch (e) {}
+      raceFlush_(); // drain any taps still queued from a prior visit / a closed tab
       setContent('<p class="placeholder">Loading race timing…</p>');
       var t0 = Date.now();
       call('getServerNow').then(function (sn) {
@@ -10186,6 +10354,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       var inPlay = ((state.meet && state.meet.races) || []).some(function (r) { return r.status === 'Running' || r.status === 'Stopped'; });
       if (inPlay && !(await TalonUI.confirm('Leave the timing screen? The clocks keep running — reopen the meet and tap 🏁 Time this meet to come right back.', { title: 'Leave the race?', okLabel: 'Leave' }))) return;
       mtStopTimers();
+      raceWakeOff_();
       if (VOL.on) { state.meet = null; state.race = null; volDone(); return; } // volunteers have no coach app to fall back to
       var back = state.meet && (state.meet.returnEventId || state.meet.eventId);
       state.meet = null; state.race = null;
@@ -10326,6 +10495,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       var races = state.meet.races || [];
       var h = '<button class="link" id="mt-exit">‹ Leave</button><div class="sectlabel">⏱ Timekeeper</div>' +
         '<div class="xs muted" style="margin:0 .1rem .4rem">Start each race at its gun, then tap <b>＋ Finisher</b> as each runner crosses — you can keep the time yourself here. Started by accident? Reset. Stopped too early? Resume.</div>' +
+        '<div class="notice" id="race-outbox" style="display:none;margin-bottom:.4rem;background:color-mix(in srgb,var(--warn) 14%,var(--card));border-color:color-mix(in srgb,var(--warn) 45%,var(--line))"></div>' +
         (state.meet.canStart ? '<button class="act block" id="mt-volbtn" style="margin-bottom:.5rem">👥 Volunteer code &amp; link</button>' : '');
       h += races.map(function (rc) {
         var run = rc.status === 'Running' && rc.startedAtMs;
@@ -10419,9 +10589,12 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       // ("＋ Additional runner"). Hitting the cap re-renders to the close options.
       if (!extra && entered && marked >= entered) { mtRenderTimekeeper(); return; }
       state.meet.tkSeq = state.meet.tkSeq || {}; state.meet.tkLast = state.meet.tkLast || {};
-      if (state.meet.tkSeq[sessionId] == null) state.meet.tkSeq[sessionId] = marked;
+      // Init above BOTH the server count AND any tap still queued for this race,
+      // so a monotonic seq is never reused (even across a stray-tap void or a
+      // reload with unsent taps) — the dup-guard would otherwise drop it.
+      if (state.meet.tkSeq[sessionId] == null) state.meet.tkSeq[sessionId] = Math.max(marked, raceOutboxMaxSeq_(sessionId, 'time'));
       var seq = (state.meet.tkSeq[sessionId] += 1);
-      call('raceTap', { sessionId: sessionId, role: 'time', seq: seq, elapsedMs: mtElapsed(rc.startedAtMs) }).catch(function () {});
+      raceQueue_('raceTap', { sessionId: sessionId, role: 'time', seq: seq, elapsedMs: mtElapsed(rc.startedAtMs) });
       state.meet.tkLast[sessionId] = 'TP-' + sessionId + '-time-' + seq;
       rc.counts = rc.counts || {}; rc.counts.time = marked + 1;
       if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
@@ -10437,7 +10610,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       var rc = (state.meet.races || []).filter(function (x) { return x.sessionId === sessionId; })[0];
       var last = state.meet.tkLast && state.meet.tkLast[sessionId];
       if (!last || !rc) { TalonUI.toast('Nothing to undo here — drop a stray time in reconcile.'); return; }
-      call('voidTap', { tapId: last, void: true }).catch(function () {});
+      raceQueue_('voidTap', { tapId: last, void: true });
       state.meet.tkLast[sessionId] = null; // single-level undo; the seq keeps advancing
       rc.counts = rc.counts || {}; rc.counts.time = Math.max(0, (rc.counts.time || 0) - 1);
       TalonUI.toast('Removed the last finish.');
@@ -10491,7 +10664,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         state.race = { sessionId: rc.sessionId, role: state.meet.role, offset: state.meet.offset,
           startedAtMs: rc.startedAtMs || 0, status: rc.status, distance: rc.distance, scoreMethod: 'chute',
           raceKey: rc.raceKey, raceLabel: rc.raceLabel, teamId: state.meet.teamId, eventId: state.meet.eventId,
-          marker: null, seq: { time: (rc.counts && rc.counts.time) || 0, chute: (rc.counts && rc.counts.chute) || 0, spot: 0, marker: 0, boys: 0, girls: 0 }, meet: true };
+          marker: null, seq: { time: Math.max((rc.counts && rc.counts.time) || 0, raceOutboxMaxSeq_(rc.sessionId, 'time')), chute: Math.max((rc.counts && rc.counts.chute) || 0, raceOutboxMaxSeq_(rc.sessionId, 'chute')), spot: 0, marker: 0, boys: 0, girls: 0 }, voids: {}, tapLast: {}, meet: true };
       } else { state.race.startedAtMs = rc.startedAtMs || 0; state.race.status = rc.status; }
 
       var h = '<button class="link" id="mt-exit">‹ Leave</button>';
@@ -10506,17 +10679,19 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         h += '<div class="card" style="text-align:center"><div class="s muted">Waiting for the timekeeper to start ' + esc(rc.raceLabel || 'this race') + '.</div></div>';
       } else if (state.meet.role === 'chute') {
         h += '<div class="card"><div class="xs muted" style="margin-bottom:.3rem">Type each bib as the runner reaches you, in order. The funnel keeps them in order, so accuracy matters more than speed.</div>' +
-          '<div class="s">Bibs entered: <b id="race-mycount">' + (state.race.seq.chute || 0) + '</b></div>' +
+          '<div class="s">Bibs entered: <b id="race-mycount">' + raceShown_(state.race, 'chute') + '</b></div>' +
           '<input id="race-bib" class="input" inputmode="numeric" placeholder="Bib #" style="width:100%;text-align:center;font-size:2rem;font-weight:800;margin:.4rem 0"/>' +
-          '<button class="btn block gd-btn" id="race-tap" style="font-size:1.3rem;padding:1.2rem">＋ Record bib ' + ((state.race.seq.chute || 0) + 1) + '</button>' +
+          '<button class="btn block gd-btn" id="race-tap" style="font-size:1.3rem;padding:1.2rem">＋ Record bib ' + (raceShown_(state.race, 'chute') + 1) + '</button>' +
           '<button class="act" id="race-undo" style="margin-top:.4rem">↶ Undo last</button></div>';
       } else {
         h += '<div class="card" style="text-align:center"><div class="xs muted" style="margin-bottom:.3rem">Tap the instant each runner crosses. Times only — the funnel records who.</div>' +
-          '<div class="s">Finishers: <b id="race-mycount">' + (state.race.seq.time || 0) + '</b></div>' +
-          '<button class="btn block gd-btn" id="race-tap" style="margin-top:.4rem;font-size:1.5rem;padding:1.6rem">＋ Finish ' + ((state.race.seq.time || 0) + 1) + '</button>' +
+          '<div class="s">Finishers: <b id="race-mycount">' + raceShown_(state.race, 'time') + '</b></div>' +
+          '<button class="btn block gd-btn" id="race-tap" style="margin-top:.4rem;font-size:1.5rem;padding:1.6rem">＋ Finish ' + (raceShown_(state.race, 'time') + 1) + '</button>' +
           '<button class="act" id="race-undo" style="margin-top:.4rem">↶ Undo last</button></div>';
       }
+      h += '<div class="notice" id="race-outbox" style="display:none;margin-top:.4rem;background:color-mix(in srgb,var(--warn) 14%,var(--card));border-color:color-mix(in srgb,var(--warn) 45%,var(--line))"></div>';
       setContent(h);
+      raceOutboxBadge_();
       $('mt-exit').addEventListener('click', mtLeave);
       Array.prototype.forEach.call($('content').querySelectorAll('.mt-switch'), function (b) {
         b.addEventListener('click', function () { state.meet.workingKey = b.getAttribute('data-k'); state.race = null; mtRenderWork(); });
@@ -10531,6 +10706,8 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
     // half-entered bib is safe.
     function mtStartTimers() {
       mtStopTimers();
+      raceOutboxBadge_();
+      if ((state.meet.races || []).some(function (rc) { return rc.status === 'Running' && rc.startedAtMs; })) raceWakeOn_();
       state.meet.tick = setInterval(function () {
         (state.meet.races || []).forEach(function (rc) {
           if (rc.status === 'Running' && rc.startedAtMs) {
@@ -10540,6 +10717,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
           var ct = $('content').querySelector('[data-cnt-time="' + rc.raceKey + '"]'); if (ct && rc.counts) ct.textContent = rc.counts.time || 0;
           var cc = $('content').querySelector('[data-cnt-chute="' + rc.raceKey + '"]'); if (cc && rc.counts) cc.textContent = rc.counts.chute || 0;
         });
+        raceOutboxBadge_();
       }, 1000);
       state.meet.sync = setInterval(mtSync, 4000);
     }
@@ -10851,6 +11029,91 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
     var RACE_ROLES = [['boys', '👦 Boys sticks'], ['girls', '👧 Girls sticks'], ['time', '⏱ Time'], ['spot', '👁 Spotter'], ['marker', '📍 Mile marker']];
     var RACE_ROLES_CHUTE = [['time', '⏱ Finish line — times only'], ['chute', '🔢 Funnel — bibs in order'], ['spot', '👁 Spotter'], ['marker', '📍 Mile marker']];
     function raceRolesFor_(method) { return method === 'chute' ? RACE_ROLES_CHUTE : RACE_ROLES; }
+    // ---- Durable race-tap outbox (network-drop safe) -------------------------
+    // A XC course usually has flaky signal, and the chute method joins
+    // finishers→bibs BY POSITION: a single dropped tap silently shifts every
+    // runner after it. So a finish/bib tap is NEVER fire-and-forget — it is
+    // queued to localStorage and retried until the server acknowledges. The
+    // server dedups on (session,role,seq), so a resend is idempotent, and the
+    // queue survives a reload/crash. Mirrors the soccer pad's outbox but is
+    // NETWORK-aware: a transport failure KEEPS the op and retries; only a real
+    // server ack (or a permanent rejection like a Locked race, which a resend
+    // can't fix) removes it — so a blip can't lose a finish and can't wedge the
+    // queue either. Voids (undo) ride the SAME FIFO queue, so a tap and its
+    // later undo always apply in order.
+    var RACE_OUTBOX = 'talonRaceOutbox';
+    var _raceFlushing = false, _raceFlushTimer = null, _raceOutboxSeq = 0;
+    function raceOutboxLoad_() { try { var a = JSON.parse(localStorage.getItem(RACE_OUTBOX) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+    function raceOutboxSave_(a) { try { localStorage.setItem(RACE_OUTBOX, JSON.stringify(a)); } catch (e) {} }
+    function raceOutboxCount_() { return raceOutboxLoad_().length; }
+    /** Highest queued seq still pending for a (session,role) — so the local seq
+     *  allocator never hands out a number that's already waiting to be sent. */
+    function raceOutboxMaxSeq_(sessionId, role) {
+      var mx = 0;
+      raceOutboxLoad_().forEach(function (o) {
+        if (o.fn === 'raceTap' && o.args && String(o.args.sessionId) === String(sessionId) && String(o.args.role) === String(role)) {
+          var n = Number(o.args.seq) || 0; if (n > mx) mx = n;
+        }
+      });
+      return mx;
+    }
+    function raceQueue_(fn, args) {
+      var q = raceOutboxLoad_();
+      q.push({ id: Date.now() + '.' + (++_raceOutboxSeq), fn: fn, args: args });
+      raceOutboxSave_(q);
+      raceOutboxBadge_();
+      raceFlush_();
+    }
+    function raceFlush_() {
+      if (_raceFlushing) return;
+      var q = raceOutboxLoad_();
+      if (!q.length) { raceOutboxBadge_(); return; }
+      _raceFlushing = true;
+      var head = q[0];
+      call(head.fn, head.args).then(function (r) {
+        _raceFlushing = false;
+        // Transport failure → KEEP the op and retry on a timer (this is what
+        // makes a network drop lossless). Anything else — a server ack, or a
+        // permanent rejection a resend can't fix — drops the head so the queue
+        // never wedges.
+        if (r && r.code === 'NETWORK') { raceOutboxBadge_(); raceFlushSoon_(); return; }
+        var q2 = raceOutboxLoad_();
+        if (q2.length && q2[0] && q2[0].id === head.id) { q2.shift(); raceOutboxSave_(q2); }
+        raceOutboxBadge_();
+        if (raceOutboxLoad_().length) raceFlush_();
+      }).catch(function () { _raceFlushing = false; raceOutboxBadge_(); raceFlushSoon_(); });
+    }
+    function raceFlushSoon_() { if (_raceFlushTimer) return; _raceFlushTimer = setTimeout(function () { _raceFlushTimer = null; raceFlush_(); }, 8000); }
+    /** The "N taps not saved yet — retrying" pill on the timing/work screens. */
+    function raceOutboxBadge_() {
+      var el = $('race-outbox'); if (!el) return;
+      var n = raceOutboxCount_();
+      el.style.display = n ? 'block' : 'none';
+      el.textContent = n ? ('⚠ ' + n + ' tap' + (n === 1 ? '' : 's') + ' not saved yet — keep this screen open, retrying…') : '';
+    }
+    if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('online', function () { raceFlush_(); });
+    // Keep the phone awake while a race is running (a sleeping screen would stall
+    // the tapper mid-pack). Best-effort; the lock auto-drops when the tab hides,
+    // so re-acquire it when the screen comes back and a race is still live.
+    function raceWakeOn_() {
+      try {
+        if (!navigator.wakeLock || state._raceWake) return;
+        navigator.wakeLock.request('screen').then(function (l) {
+          state._raceWake = l;
+          if (l && l.addEventListener) l.addEventListener('release', function () { state._raceWake = null; });
+        }).catch(function () {});
+      } catch (e) {}
+    }
+    function raceWakeOff_() { try { if (state._raceWake) { state._raceWake.release().catch(function () {}); state._raceWake = null; } } catch (e) {} }
+    if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible' && state.meet && (state.meet.races || []).some(function (rc) { return rc.status === 'Running' && rc.startedAtMs; })) raceWakeOn_();
+    });
+    /** Net recorded count for a role = taps allocated minus undone (display only;
+     *  the seq allocator itself is never rewound, so a number is never reused). */
+    function raceShown_(r, role) { return Math.max(0, ((r.seq && r.seq[role]) || 0) - ((r.voids && r.voids[role]) || 0)); }
+    /** The TapID the server will mint for this (session,role,seq) — so undo can
+     *  void exactly that row. Mirrors epRaceTap_'s id format. */
+    function raceTapId_(r, role, seq) { return 'TP-' + r.sessionId + '-' + role + (role === 'marker' && r.marker ? '-' + r.marker : '') + '-' + seq; }
     function raceElapsed() {
       var r = state.race; if (!r || !r.startedAtMs) return 0;
       return Math.max(0, (Date.now() + (r.offset || 0)) - r.startedAtMs);
@@ -10909,24 +11172,28 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
     function raceExit() { raceReturn_(); }
     function raceTap(role) {
       var r = state.race; if (!r || r.status !== 'Running') return;
+      r.voids = r.voids || {}; r.tapLast = r.tapLast || {};
       var bibEl = $('race-bib'); var bib = bibEl ? String(bibEl.value || '').trim() : '';
       if (role === 'marker') {
         var mk = r.marker || ''; if (!mk) { TalonUI.toast('Pick a marker first.'); return; }
         r.seq.marker = (r.seq.marker || 0) + 1;
-        call('raceTap', { sessionId: r.sessionId, role: 'marker', marker: mk, seq: r.seq.marker, elapsedMs: raceElapsed(), bib: bib }).catch(function () {});
+        r.tapLast.marker = raceTapId_(r, 'marker', r.seq.marker);
+        raceQueue_('raceTap', { sessionId: r.sessionId, role: 'marker', marker: mk, seq: r.seq.marker, elapsedMs: raceElapsed(), bib: bib });
       } else if (role === 'chute') {
         // The funnel exit records a bib and nothing else. An empty one would put
         // a hole in the ordinal join and silently shift every runner after it,
         // so refuse it here rather than discover it during reconcile.
         if (!bib) { TalonUI.toast('Type the bib number first.'); return; }
         r.seq.chute = (r.seq.chute || 0) + 1;
-        call('raceTap', { sessionId: r.sessionId, role: 'chute', seq: r.seq.chute, elapsedMs: 0, bib: bib }).catch(function () {});
+        r.tapLast.chute = raceTapId_(r, 'chute', r.seq.chute);
+        raceQueue_('raceTap', { sessionId: r.sessionId, role: 'chute', seq: r.seq.chute, elapsedMs: 0, bib: bib });
       } else {
         // Bibs mode attaches the typed bib to boys/girls taps; sticks mode leaves
         // the single-tap path exactly as before (no bib, no extra work).
         var useBib = (r.scoreMethod === 'bibs' && (role === 'boys' || role === 'girls'));
         r.seq[role] = (r.seq[role] || 0) + 1;
-        call('raceTap', { sessionId: r.sessionId, role: role, seq: r.seq[role], elapsedMs: raceElapsed(), bib: useBib ? bib : '' }).catch(function () {});
+        r.tapLast[role] = raceTapId_(r, role, r.seq[role]);
+        raceQueue_('raceTap', { sessionId: r.sessionId, role: role, seq: r.seq[role], elapsedMs: raceElapsed(), bib: useBib ? bib : '' });
       }
       if (navigator.vibrate) { try { navigator.vibrate(20); } catch (e) {} }
       raceRerender_(); // optimistic (also clears the bib field via re-render)
@@ -10935,11 +11202,17 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
     // work screen in meet mode, the legacy single-race screen otherwise.
     function raceRerender_() { if (state.race && state.race.meet) { mtRenderWork(); } else { renderRace(); } }
     function raceUndo(role) {
-      var r = state.race; if (!r || !r.seq[role]) return;
-      // Undo is local-optimistic on the count; the server tap stays (dup-guarded),
-      // but the coach can drop stray finishers in the reconcile step. Decrement so
-      // the next tap re-uses the seq (overwrites via dup guard? no — just step back).
-      r.seq[role] = Math.max(0, r.seq[role] - 1);
+      var r = state.race; if (!r) return;
+      r.voids = r.voids || {}; r.tapLast = r.tapLast || {};
+      // Undo VOIDS the last tap on the server (through the same durable FIFO
+      // queue) and advances the void counter. The seq allocator is NEVER rewound,
+      // so the next tap gets a fresh number the dup-guard accepts. (The old code
+      // decremented the seq, so the re-tap reused it and the server dup-guard
+      // silently dropped the correction, leaving the wrong entry in place.)
+      if (!r.tapLast[role]) { TalonUI.toast('Nothing to undo here — fix stray entries in reconcile.'); return; }
+      raceQueue_('voidTap', { tapId: r.tapLast[role], void: true });
+      r.tapLast[role] = null; // single-level undo
+      r.voids[role] = (r.voids[role] || 0) + 1;
       raceRerender_();
     }
     function renderRace() {
@@ -10980,16 +11253,16 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         // the order, so this person only has to type accurately. Position N in
         // this stream is the same runner as position N in the time stream.
         h += '<div class="xs" style="color:var(--muted);margin-bottom:.3rem">Type each bib as the runner reaches you, in order. The funnel keeps them in order, so accuracy matters more than speed.</div>' +
-          '<div class="s">Bibs entered: <b id="race-mycount">' + (r.seq.chute || 0) + '</b></div>' +
+          '<div class="s">Bibs entered: <b id="race-mycount">' + raceShown_(r, 'chute') + '</b></div>' +
           '<input id="race-bib" class="input" inputmode="numeric" placeholder="Bib #" style="width:100%;text-align:center;font-size:2rem;font-weight:800;margin:.4rem 0"/>' +
-          '<button class="btn block gd-btn" id="race-tap" style="font-size:1.3rem;padding:1.2rem">＋ Record bib ' + ((r.seq.chute || 0) + 1) + '</button>' +
+          '<button class="btn block gd-btn" id="race-tap" style="font-size:1.3rem;padding:1.2rem">＋ Record bib ' + (raceShown_(r, 'chute') + 1) + '</button>' +
           '<button class="act" id="race-undo" style="margin-top:.4rem">↶ Undo last</button>';
       } else if (r.role === 'boys' || r.role === 'girls' || r.role === 'time' || r.role === 'spot') {
         var myLetter = r.role === 'boys' ? 'B' : (r.role === 'girls' ? 'G' : '#');
         var bibField = (r.scoreMethod === 'bibs' && (r.role === 'boys' || r.role === 'girls'))
           ? '<input id="race-bib" class="input" inputmode="numeric" placeholder="Bib # (optional)" style="width:100%;text-align:center;font-size:1.3rem;margin:.3rem 0 .4rem"/>' : '';
-        h += '<div class="s">Recorded: <b id="race-mycount">' + (r.seq[r.role] || 0) + '</b></div>' + bibField +
-          '<button class="btn block gd-btn" id="race-tap" style="margin-top:.5rem;font-size:1.4rem;padding:1.4rem">＋ ' + (r.role === 'time' || r.role === 'spot' ? 'Finish' : myLetter + (( r.seq[r.role] || 0) + 1)) + '</button>' +
+        h += '<div class="s">Recorded: <b id="race-mycount">' + raceShown_(r, r.role) + '</b></div>' + bibField +
+          '<button class="btn block gd-btn" id="race-tap" style="margin-top:.5rem;font-size:1.4rem;padding:1.4rem">＋ ' + (r.role === 'time' || r.role === 'spot' ? 'Finish' : myLetter + (raceShown_(r, r.role) + 1)) + '</button>' +
           '<button class="act" id="race-undo" style="margin-top:.4rem">↶ Undo last</button>';
       }
       h += '</div>';
@@ -11128,15 +11401,21 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
     }
 
     function leg(legId, label, group, checked, expected, gameday) {
-      // Plain language, not bus jargon. The question in a coach's head is "who
-      // needs a ride?" and the screen used to answer it with "Team transport"
-      // (Josh, 2026-08-25 — had to ask where to find this, hours before an away
-      // game). Each heading also carries its own count, so the answer is legible
-      // without counting names.
+      // The SAME two legs read as a PLAN before the bus leaves (read-only names,
+      // no boxes) and as a BOARDING HEADCOUNT during the trip (tap each rider on).
+      // Before, a checkbox next to a name was unanswerable — "does ✓ mean they're
+      // riding, or that I've counted them aboard?" (Josh, 2026-09-18) — so boxes
+      // now appear ONLY while travelling. Labels come from Attendance (one shared
+      // vocabulary across parent/player/coach). "Not going" lives above, in the
+      // Not-playing list, so it's dropped from the outbound leg here.
+      var L = function (s) { return Attendance.label(legId === 'OUT' ? 'OUT' : 'RETURN', s); };
       var lists = legId === 'OUT'
-        ? [['team', 'Riding with the team', group.team], ['self', 'Getting their own ride', group.self], ['absent', 'Not going', group.absent]]
-        : [['team', 'Riding the bus home', group.team], ['guardian', 'Picked up by a guardian', group.guardian], ['self', 'Driving themselves', group.self], ['other', 'Other arrangement', group.other]];
-      var h = '<div class="leg"><h3>' + label + ' <span class="counts">' + checked + '/' + expected + ' checked</span></h3>';
+        ? [['team', L('TEAM'), group.team], ['self', L('SELF'), group.self]]
+        : [['team', L('TEAM'), group.team], ['guardian', L('GUARDIAN'), group.guardian], ['self', L('SELF'), group.self], ['other', L('OTHER'), group.other]];
+      var head = legId === 'OUT' ? '🚌 To the game' : '🏠 Ride home';
+      var countTxt = gameday ? (checked + ' of ' + expected + ' aboard') : (expected + ' riding the bus');
+      var h = '<div class="leg"><h3>' + head + ' <span class="counts">' + countTxt + '</span></h3>';
+      if (gameday) h += '<div class="xs" style="color:var(--muted);margin:-.05rem 0 .2rem">Tap each player as they get on the bus.</div>';
       lists.forEach(function (g) {
         if (!g[2] || !g[2].length) return;
         h += '<div class="s" style="margin-top:.3rem"><b>' + g[1] + '</b> <span class="muted">(' + g[2].length + ')</span></div>';
@@ -11144,11 +11423,10 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
           var flag = e.isOverride ? ' <span class="pill override">⚠️ other guardian</span>' : '';
           var by = e.authorizedBy ? '<div class="s">by ' + esc(e.authorizedBy) + (e.note ? ' — ' + esc(e.note) : '') + '</div>' : '';
           var on = legId === 'OUT' ? e.checkedOut : e.checkedReturn;
-          var canCheck = g[0] === 'team';
-          if (gameday && canCheck) {
-            h += '<div class="gd-btn' + (on ? '' : ' off') + ' btn-chk" data-a="' + esc(e.athleteId) + '" data-leg="' + legId + '" data-on="' + (on ? '1' : '0') + '"><span>' + esc(e.name) + '</span><span>' + (on ? '✓' : '○') + '</span></div>';
+          if (gameday && g[0] === 'team') {   // boarding roll-call: only the bus riders, only while travelling
+            h += '<div class="gd-btn' + (on ? '' : ' off') + ' btn-chk" data-a="' + esc(e.athleteId) + '" data-leg="' + legId + '" data-on="' + (on ? '1' : '0') + '"><span>' + esc(e.name) + '</span><span>' + (on ? '✓ aboard' : '○ tap') + '</span></div>';
           } else {
-            h += '<div class="row"><div><span class="who">' + esc(e.name) + '</span>' + flag + by + '</div>' + (canCheck ? '<button class="chk' + (on ? ' on' : '') + ' btn-chk" data-a="' + esc(e.athleteId) + '" data-leg="' + legId + '" data-on="' + (on ? '1' : '0') + '">' + (on ? '✓' : '○') + '</button>' : '') + '</div>';
+            h += '<div class="row"><div><span class="who">' + esc(e.name) + '</span>' + flag + by + '</div></div>';
           }
         });
       });
@@ -11199,6 +11477,7 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         });
       });
       var mo = $('btn-markout'); if (mo) mo.addEventListener('click', openMarkOut);
+      var rc = $('btn-riderchange'); if (rc) rc.addEventListener('click', openRiderChange);
       q('.btn-status', function (b) { b.addEventListener('click', function () { var notify = $('notify-chk') && $('notify-chk').checked; $('admin-status').textContent = ' Saving…'; call('setEventStatus', { eventId: state.currentEvent, status: b.getAttribute('data-s'), notify: notify }).then(function (r) { if (r && r.ok) { $('admin-status').textContent = notify ? (r.notified.refused ? ' set, email refused (quota)' : ' set, ' + r.notified.sent + ' notified') : ' set'; openEvent(state.currentEvent); } else $('admin-status').textContent = ' error'; }); }); });
     }
 
@@ -11243,8 +11522,15 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       if (!q.length) { padOutboxBadge_(); return; }
       _padFlushing = true;
       var head = q[0];
-      call(head.fn, head.args).then(function () {
+      call(head.fn, head.args).then(function (r) {
         _padFlushing = false;
+        // call() never rejects — a transport failure RESOLVES as {code:'NETWORK'}.
+        // Treating that as an ack silently dropped the kickoff XI, a single tap,
+        // and the halftime reset on 2026-10-01 (Mount Airy: starters read 0').
+        // KEEP the op and retry on NETWORK (and on an expired sign-in, which
+        // re-prompts login); drop only a server ack or a permanent rejection a
+        // resend can't fix, so the queue never wedges. Mirrors raceFlush_.
+        if (!r || r.code === 'NETWORK' || r.code === 'AUTH_INVALID' || r.code === 'AUTH_EXPIRED') { padOutboxBadge_(); padFlushSoon_(); return; }
         var q2 = padOutboxLoad_();
         if (q2.length && q2[0] && q2[0].id === head.id) { q2.shift(); padOutboxSaveList_(q2); }
         padOutboxBadge_();
@@ -11457,6 +11743,9 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
         if (!games.length && saved0.notesGames && saved0.notesGames.length) state.spad.notesGames = saved0.notesGames;
         if (saved0.segments && saved0.segments.length) state.spad.segments = saved0.segments;
       }
+      // This phone's own copy of THIS game — the recovery source when the server
+      // is missing plays (see padRecoverSource_). Read before anything can save.
+      var localCopy = (state.spad.practice) ? null : padRecoverSource_(state.spad.eventId, saved0);
       setContent('<p class="placeholder">Loading match…</p>');
       call('getSoccerGame', { teamId: teamId, eventId: state.spad.eventId }).then(function (r) {
         if (!r || !r.ok) { setContent('<p class="placeholder">Could not load. ' + esc((r && (r.msg || r.code)) || '') + '</p>'); return; }
@@ -11509,6 +11798,14 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
           state.spad.events.sort(function (a, b) { return Number(a.Seq) - Number(b.Seq); });
           state.spad.seq = Math.max.apply(null, state.spad.events.map(function (e) { return Number(e.Seq); }).concat([0])) + 1;
           state.spad.status = 'live';
+        }
+        state.spad.recover = null;
+        if (localCopy) {
+          var pendSeq = {};
+          pend.add.forEach(function (e) { pendSeq[String(e.Seq)] = 1; });
+          Object.keys(pend.voids).forEach(function (sq) { pendSeq[sq] = 1; });
+          var rd = SoccerLive.recoverDiff(ev, localCopy.events, pendSeq);
+          if (rd.add.length || rd.voids.length) state.spad.recover = { add: rd.add, voids: rd.voids, otMin: Number(localCopy.otMin) || 0 };
         }
         padReduce(); padRender(); padFlush_();
       }).catch(function () { setContent('<p class="placeholder">Network error.</p>'); });
@@ -11602,6 +11899,87 @@ if (typeof module !== 'undefined') module.exports = MeetEntry;
       Array.prototype.forEach.call($('content').querySelectorAll('.spad-game'), function (b) {
         b.addEventListener('click', function () { padGoToGame_(Number(b.getAttribute('data-i'))); });
       });
+      padRecoverMount_();
+    }
+    /**
+     * RECOVERY (2026-10-01 Mount Airy): the old outbox treated a dropped request
+     * as delivered, so the kickoff XI, a tap, and the halftime reset never reached
+     * the server — starters read 0'. The phone that kept stats still holds every
+     * play, so: snapshot this device's copy of the game per-event (a later game
+     * on the same phone reuses the single SPAD_LS slot and would erase it), and
+     * on open, offer to re-send whatever the server lacks.
+     * Returns { events, otMin } — the union (by Seq) of the live slot + backup.
+     */
+    /** Does THIS device hold its own copy of a game (live slot or backup)? */
+    function padHasLocalCopy_(eventId) {
+      try {
+        var id = String(eventId);
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i) || '';
+          if (k === 'talonSoccerPadBak:' + id || k.indexOf('talonSoccerPadBak:' + id + '~') === 0) return true;
+        }
+        var sv = padLoad_();
+        return !!(sv && String(sv.baseEventId || sv.eventId) === id && Array.isArray(sv.events) && sv.events.length);
+      } catch (e) { return false; }
+    }
+    function padRecoverSource_(eventId, saved0) {
+      var key = 'talonSoccerPadBak:' + eventId, bak = null;
+      try { bak = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+      var cur = (saved0 && String(saved0.eventId) === String(eventId) && Array.isArray(saved0.events) && saved0.events.length) ? saved0 : null;
+      var bySeq = {}, otMin = 0;
+      [bak, cur].forEach(function (src) {   // cur last → wins a Seq both hold (it has the latest undo state)
+        if (!src || !Array.isArray(src.events)) return;
+        src.events.forEach(function (e) { if (e && isFinite(Number(e.Seq))) bySeq[String(Number(e.Seq))] = e; });
+        otMin = Math.max(otMin, Number(src.otMin) || 0);
+      });
+      var events = Object.keys(bySeq).map(function (k) { return bySeq[k]; });
+      if (!events.length) return null;
+      var copy = { events: events, otMin: otMin };
+      if (cur) { try { localStorage.setItem(key, JSON.stringify(copy)); } catch (e) {} }
+      return copy;
+    }
+    function padRecoverMount_() {
+      var s = state.spad, rc = s && s.recover;
+      if (!rc || s.practice || $('spad-recover-card')) return;
+      var ex = $('spad-exit'); if (!ex) return;
+      var n = rc.add.length + rc.voids.length, pl = n === 1 ? 'play' : 'plays';
+      var d = document.createElement('div');
+      d.id = 'spad-recover-card'; d.className = 'card tight';
+      d.style.cssText = 'border:2px solid #c0392b;margin:.4rem 0';
+      d.innerHTML = '<div class="s"><b>⚠ This phone has ' + n + ' ' + pl + ' the server never received.</b> ' +
+        'The box score and minutes are incomplete until they are sent.' +
+        (s.status === 'final' ? ' Sending also re-finalizes the game and re-sends the MaxPreps email.' : '') + '</div>' +
+        '<button class="btn block" id="spad-recover" style="margin-top:.4rem">⤴ Send ' + n + ' missing ' + pl + '</button>';
+      ex.insertAdjacentElement('afterend', d);
+      $('spad-recover').addEventListener('click', padRecoverRun_);
+    }
+    async function padRecoverRun_() {
+      var s = state.spad, rc = s && s.recover; if (!rc) return;
+      var wasFinal = s.status === 'final', n = rc.add.length + rc.voids.length;
+      if (!(await TalonUI.confirm('Send the ' + n + ' play' + (n === 1 ? '' : 's') + ' saved on this phone' +
+        (wasFinal ? ', then re-finalize the box score and re-send the MaxPreps email' : '') + '?', { title: 'Send missing plays?', okLabel: 'Send' }))) return;
+      var btn = $('spad-recover'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+      // Every write is idempotent on [EventID, Seq], so a stop part-way is safe to retry.
+      var fail = function (r, what) {
+        TalonUI.toast('Stopped while sending ' + what + ': ' + ((r && (r.msg || r.code)) || 'error') + '. Nothing is lost — tap again when you have signal.');
+        if (btn) { btn.disabled = false; btn.textContent = '⤴ Try again'; }
+      };
+      var r;
+      for (var i = 0; i < rc.add.length; i += 40) {
+        r = await call('soccerTapBatch', { teamId: s.teamId, eventId: s.eventId, broadcast: false, matchMin: '', taps: rc.add.slice(i, i + 40) });
+        if (!r || !r.ok) return fail(r, 'plays');
+      }
+      for (var j = 0; j < rc.voids.length; j++) {
+        r = await call('soccerUndo', { teamId: s.teamId, eventId: s.eventId, seq: rc.voids[j], broadcast: false });
+        if (!r || (!r.ok && r.code !== 'NO_EVENT')) return fail(r, 'undos');
+      }
+      if (wasFinal) {
+        r = await call('finalizeSoccerGame', { teamId: s.teamId, eventId: s.eventId, matchMin: padEndMin(), otMin: rc.otMin || s.otMin || 0 });
+        if (!r || !r.ok) return fail(r, 'the final box score');
+      }
+      s.recover = null;
+      TalonUI.toast(n + ' play' + (n === 1 ? '' : 's') + ' sent' + (wasFinal ? ' · box score re-finalized' + (r.maxprepsTo ? ' · MaxPreps re-sent' : '') : '') + '.');
+      openSoccerPad(s.baseEventId, s.teamId, s.opponent, null);
     }
     /** First game of the day nobody has touched — what "next" means after a final. */
     function padNextUntouched_() {

@@ -5,6 +5,7 @@
 //        · strip control scriptlets <? ... ?> (keep inner content) · inject demo <head> block.
 import fs from 'node:fs';
 import path from 'node:path';
+import { aliasStaffNames } from './staff-aliases.mjs';
 
 const cfg = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 let html = fs.readFileSync(cfg.src, 'utf8');
@@ -40,6 +41,10 @@ for (const [re, repl] of PRIVACY) {
   html = html.replace(re, (m) => { scrubbed++; return typeof repl === 'string' ? m.replace(re, repl) : repl; });
 }
 if (scrubbed) console.log('  privacy scrub: replaced ' + scrubbed + ' real-world identifier(s)');
+
+// 2c. Real staff first names in source comments -> role aliases (hash-matched; see staff-aliases.mjs).
+{ const r = aliasStaffNames(html); html = r.text;
+  if (r.count) console.log('  staff aliases: replaced ' + r.count + ' staff name(s) with role aliases'); }
 
 // 3. Strip remaining control scriptlets <? ... ?> but NOT <?= / <?!= output tags.
 html = html.replace(/<\?(?![=!])[\s\S]*?\?>/g, '');

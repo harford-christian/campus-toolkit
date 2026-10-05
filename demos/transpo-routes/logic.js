@@ -17,8 +17,10 @@
  *
  * Tiers (who a column may be serialized to):
  *   DRIVER — the anonymous driver app, on a personal phone behind a token + PIN.
- *            The narrowest surface in this project. Name, grade, stop. That is all.
- *   OFFICE — DOMAIN staff (Lois + the office) in apps/office.
+ *            The narrowest surface in this project: what a driver needs at the roadside and
+ *            nothing more. Matched to the paper sheet it replaces — see CONTACTS_ON_THE_PHONE
+ *            for why that includes guardian contacts and why it does NOT include the student id.
+ *   OFFICE — DOMAIN staff (Transportation Director 2 + the office) in apps/office.
  *   SYSTEM — never serialized to ANY client; visible only in the raw sheet.
  *
  * Columns are APPEND-ONLY once live (FACTS-export discipline): never insert, never
@@ -94,29 +96,70 @@ var BOARDING_HONESTY = 'An unchecked child is NOT RECORDED — never "not on the
  * The EXPLICIT allowlist of fields a rider object may carry onto the driver's phone.
  *
  * Build the published object by naming these fields one at a time. NEVER spread a roster row into
- * it — that is precisely how a student id, a phone number or a free-text note reaches an anonymous
- * surface, and it is the mistake the forbidden-field test exists to catch. Same doctrine as
+ * it — that is precisely how a student id or a free-text note reaches an anonymous surface, and it
+ * is the mistake the forbidden-field test exists to catch. Same doctrine as
  * ../transportation/Dismissal.gs:1225 (dsRampSlice).
  *
  *   rk        opaque per-day rider key (see RIDER_KEY_NOTE) — NOT the FACTS student id
  *   name      the child's name, as the driver must call it
  *   grade     so a driver knows roughly who they are looking for
- *   stopId    which stop groups them (resolved server-side; empty until Phase 2)
+ *   stopId    which stop groups them
  *   expected  bool — are they riding today
  *   reason    PM only: 'ABSENT' | 'LEFT EARLY' | 'SIGNED OUT' | 'CHANGED' — why not
- *   detail    PM only: the human sentence under the reason
+ *   (detail was REMOVED on 2026-09-18 — see DRIVER_RIDER_FIELDS)
  *   flags     PM only: 'also on <route>', 'added today', 'standing'
+ *   contacts  guardians to ring from the roadside — see CONTACTS_ON_THE_PHONE
+ *   dayRule   'Every other Monday' — the arrangement, verbatim from the office
  */
-var DRIVER_RIDER_FIELDS = ['rk', 'name', 'grade', 'stopId', 'expected', 'reason', 'detail', 'flags'];
+/**
+ * 'detail' WAS HERE AND IS NOT ANY MORE (audit, 2026-09-18).
+ *
+ * It was "the human sentence under the reason", and every sentence it could hold turned out to be
+ * somebody's private business: the FACTS attendance reason ("fever, dad emailed" is the example in
+ * the producer's own documentation), the name of the adult who collected a child, the reason and
+ * guardian on a planned pickup, or an office note plus a hand-over destination that legitimately
+ * names ANOTHER CHILD ("to her brother Charlie Huber").
+ *
+ * FORBIDDEN_RIDER_FIELDS named those note fields all along and the test checked them by KEY, so the
+ * content sailed through inside this allowlisted one. 'reason' carries the label — ABSENT, CAR
+ * TODAY, ON EDGEWOOD — which is the whole of what a driver needs in order to decide whether to
+ * wait. The story behind it stays inside the school (Josh, 2026-09-18).
+ */
+var DRIVER_RIDER_FIELDS = ['rk', 'name', 'grade', 'stopId', 'expected', 'reason',
+                           'flags', 'contacts', 'dayRule'];
 
 /**
- * Asserted absent from every published rider object by test/. This list is deliberately longer
- * than the roster's real field names — it also catches the plausible near-misses a future edit
- * might introduce (cellPhone, guardian, address) before they ever ship.
+ * CONTACTS ON THE PHONE — a deliberate reversal, recorded so nobody quietly undoes it.
+ *
+ * This surface originally carried name + grade + stop and nothing else, on the reasoning that the
+ * office holds the phone numbers and the authority. That was decided WITHOUT having seen the paper
+ * route sheet the drivers already carry (Transportation Director 2 supplied them 2026-09-17).
+ *
+ * That sheet lists, for every child, each guardian's name, relationship and phone number — 44 of
+ * them on Jarrettsville PM alone. So withholding contacts did not protect anything: it made the app
+ * strictly worse than the paper, which guarantees the paper stays in the bus and the app goes
+ * unused. Josh confirmed the reversal 2026-09-17.
+ *
+ * The line that still holds: contacts come from FACTS, not from a typed sheet, so they cannot go
+ * stale; they sit behind a tap rather than on the face of the list; and they are capped. The ramp
+ * kiosk is UNAFFECTED — it keeps name + relationship and no phone, because an iPad on a wall is a
+ * different exposure from a personal phone carrying a route.
+ *
+ * Shape: [name, relationship, phone] positionally, max CONTACTS_MAX per child.
+ */
+var CONTACTS_MAX = 3;
+
+/**
+ * Asserted absent from every published rider object by the test suite. Deliberately longer than the
+ * roster's real field names — it also catches plausible near-misses a future edit might introduce
+ * (cellPhone, guardian, address) before they ever ship.
+ *
+ * `phone` is NOT on this list any more; it lives inside `contacts` by design. The FACTS student id,
+ * the family id, the homeroom and every free-text note still are.
  */
 var FORBIDDEN_RIDER_FIELDS = [
   'id', 'studentId', 'personId', 'sid',
-  'phone', 'cellPhone', 'homePhone', 'workPhone', 'email', 'email2',
+  'email', 'email2',
   'pickups', 'pickupContacts', 'guardian', 'parent', 'emergencyContact',
   'address', 'addressID', 'familyId', 'family',
   'homeroom', 'homeroomTeacher', 'teacher',
@@ -138,7 +181,7 @@ var RIDER_KEY_NOTE = 'rk = trunc16(base64(HMAC-SHA256(studentId + "|" + dayKey, 
 var SCHEMA = {
   /**
    * The stop sequence for one route+session. THE genuinely new data in this project — no stop
-   * list exists in FACTS, in the dismissal app, or on Lois's master PDF (which is sorted by
+   * list exists in FACTS, in the dismissal app, or on Transportation Director 2's master PDF (which is sorted by
    * student surname and carries no stops at all). Office-owned; seeded empty.
    */
   Stops: {
@@ -151,6 +194,11 @@ var SCHEMA = {
       { name: 'Stop Name', tier: 'DRIVER' },      // what the driver calls it out loud
       { name: 'Landmark', tier: 'DRIVER' },       // 'Jarrettsville firehouse' — how you FIND it
       { name: 'Time', tier: 'DRIVER' },           // optional; a stop order alone is useful
+      // TURN-BY-TURN from the PREVIOUS stop, exactly as the paper sheet gives it:
+      // '- Turn RIGHT on Conowingo Rd / - Turn LEFT into parking lot - 2nd entrance'.
+      // This is the single most valuable field on the sheet for a SUBSTITUTE, and the reason the
+      // route order alone is not enough. Newlines separate the steps.
+      { name: 'Directions', tier: 'DRIVER' },
       { name: 'Days', tier: 'OFFICE' },           // blank = every school day; 'Mon,Wed,Fri' limits
       { name: 'Active', tier: 'OFFICE' },         // 'N' retires a stop without deleting its history
       // ABOUT THE PLACE, never about a child. The office UI says so at the input, because this
@@ -161,7 +209,31 @@ var SCHEMA = {
   },
 
   /**
-   * Which stop a child uses. This is the answer to Lois's "most students don't get picked up at
+   * One row per route+session: the things the paper sheet prints in its header and its first row,
+   * which belong to the run rather than to any stop.
+   *
+   * 'Line Up' is the order the vehicles queue in at dismissal ('Buses: 31, 32, 29, SE / Vans: 5, 4,
+   * 1, 2, Red Lion'). A substitute has no idea where to slot in without it.
+   */
+  RouteInfo: {
+    key: 'Route Code',
+    cols: [
+      { name: 'Route Code', tier: 'DRIVER' },
+      { name: 'Session', tier: 'DRIVER' },
+      // The vehicle NUMBER off the sheet header ('Bus: 32'). Distinct from the colour and from
+      // 'Bus'/'Van': drivers and children refer to the bus by its number, and the printed sheet
+      // has to say it or it is not the sheet it replaces.
+      { name: 'Bus', tier: 'DRIVER' },
+      { name: 'Leave HCS', tier: 'DRIVER' },      // '3:23'
+      { name: 'Line Up By', tier: 'DRIVER' },     // '2:50pm'
+      { name: 'Line Up', tier: 'DRIVER' },        // the queue order, verbatim
+      { name: 'Sheet Date', tier: 'OFFICE' },     // the date on the source document
+      { name: 'Note', tier: 'OFFICE' }
+    ]
+  },
+
+  /**
+   * Which stop a child uses. This is the answer to Transportation Director 2's "most students don't get picked up at
    * their address" — the link that exists in no system today.
    */
   StudentStops: {
@@ -172,6 +244,17 @@ var SCHEMA = {
       { name: 'Session', tier: 'DRIVER' },
       { name: 'Stop ID', tier: 'DRIVER' },
       { name: 'Days', tier: 'OFFICE' },           // resolved server-side; only today's riders publish
+      /**
+       * The arrangement in the office's own words — 'Every other Monday', 'M, T, W, F',
+       * 'Wed and Thurs afternoons (rides Street/Pylesville in the AM)'.
+       *
+       * TEXT, never a weekday set. Two of those three cannot be expressed as one: 'every other
+       * Monday' is fortnightly, and the third is a deal with a different route. Parsing them into
+       * `Days` would make the app assert a schedule the office never wrote, and a child would be
+       * waited for — or not — on the app's authority rather than on Transportation Director 2's. So `Days` filters when
+       * it is set, and this rides along to the driver verbatim so a human can apply judgement.
+       */
+      { name: 'Day Rule', tier: 'DRIVER' },
       { name: 'Note', tier: 'OFFICE' }
     ]
   },
@@ -186,7 +269,7 @@ var SCHEMA = {
       { name: 'Driver ID', tier: 'OFFICE' },
       { name: 'Name', tier: 'DRIVER' },           // the driver sees their own name, and today's driver
       { name: 'Phone', tier: 'OFFICE' },          // office-side only; drivers do not get each other's
-      // '*' = every route. That is the DEFAULT and it is Lois's actual ask: "routes accessible to
+      // '*' = every route. That is the DEFAULT and it is Transportation Director 2's actual ask: "routes accessible to
       // all drivers and subs". A comma list scopes a regular driver if she ever wants that.
       { name: 'Routes', tier: 'OFFICE' },
       // base64(HMAC-SHA256(pin + '|' + driverId, SECRET)). The PIN itself is never stored,
@@ -201,7 +284,7 @@ var SCHEMA = {
    * Enrolled devices. One row per phone; the token is the `?k=` in that phone's link.
    *
    * WHY THE SHEET AND NOT SCRIPT PROPERTIES (where it started): the office app is a SEPARATE script
-   * project and cannot read another project's properties, so with the tokens hidden there Lois could
+   * project and cannot read another project's properties, so with the tokens hidden there Transportation Director 2 could
    * never add or revoke a device — she would have to ask Josh for every new driver, which defeats
    * the point of giving her an interface.
    *
@@ -224,7 +307,7 @@ var SCHEMA = {
   /**
    * Append-only audit log: who opened the app, when, and what they looked at.
    *
-   * Exists to answer Lois's question "who is actually using this?" — which matters because
+   * Exists to answer Transportation Director 2's question "who is actually using this?" — which matters because
    * adoption will be partial and the office must be able to SEE that rather than infer it from
    * silence. Also carries failed PINs and lockouts, which is the only way a locked-out driver on
    * the roadside becomes visible to anyone.
@@ -292,7 +375,7 @@ function headerFor(tabName) {
 /**
  * stops.js — the stop sequence and the student→stop link. PURE.
  *
- * This is the only genuinely new data in the project. Lois's master transportation list carries
+ * This is the only genuinely new data in the project. Transportation Director 2's master transportation list carries
  * NO stops (it is Name / Grade / Route / Bus # / Notes, sorted by surname), FACTS has nowhere to
  * put them (/People/PickUpPoint returns 0 rows here), and the dismissal app never needed them.
  *
@@ -344,6 +427,13 @@ function buildStops(rows, routeCode, session, dayName) {
         name: String(r['Stop Name'] || '').trim(),
         landmark: String(r['Landmark'] || '').trim(),
         time: String(r['Time'] || '').trim(),
+        // Turn-by-turn from the PREVIOUS stop. Newlines separate the steps, and they are preserved:
+        // '- Turn RIGHT on Conowingo Rd' and '- Turn LEFT into parking lot' are two instructions,
+        // and running them together is how a substitute misses a turn.
+        directions: String(r['Directions'] || '').replace(/\r/g, '').trim(),
+        // Computed HERE so the page never needs its own copy of the rule. A second implementation
+        // in the client is precisely how the two quietly stop agreeing.
+        mapQuery: mapsQuery(String(r['Stop Name'] || '')),
         // ABOUT THE PLACE, never about a child — the office UI says so at the input.
         driverNote: String(r['Driver Note'] || '').trim()
       };
@@ -353,28 +443,83 @@ function buildStops(rows, routeCode, session, dayName) {
 }
 
 /**
- * {studentId: stopId} for one route+session on one weekday.
+ * Which stop each child uses, and any irregular arrangement, for one route+session on one weekday.
+ *
+ * @return {{stopOf: Object, ruleOf: Object}} — `{sid: stopId}` and `{sid: 'Every other Monday'}`.
+ *   Returned as two maps rather than one so the day rule can reach the driver even for a child
+ *   whose stop is not set.
  *
  * A student with no row, or whose row is filtered out by Days, resolves to NO stop rather than to
  * a guessed one. They still appear on the manifest — under "stop not set" — because a child whose
  * paperwork is incomplete still has to get home. Never drop a rider for want of metadata.
+ *
+ * `Day Rule` is NOT used to filter. It is prose the office wrote ('Every other Monday'), and acting
+ * on it would mean the app deciding a child is not coming on an interpretation it invented. `Days`
+ * filters; `Day Rule` informs the human.
  */
 function buildStudentStops(rows, routeCode, session, dayName) {
   var code = String(routeCode || '').trim().toLowerCase();
   var sess = String(session || '').trim().toUpperCase();
-  var out = {};
+  var stopOf = {}, ruleOf = {};
 
   (rows || []).forEach(function (r) {
     if (String(r['Route Code'] || '').trim().toLowerCase() !== code) return;
     if (String(r['Session'] || '').trim().toUpperCase() !== sess) return;
     if (!daysInclude(r['Days'], dayName)) return;
     var sid = String(r['Student ID'] || '').trim();
+    if (!sid) return;
     var stopId = String(r['Stop ID'] || '').trim();
-    if (sid && stopId) out[sid] = stopId;
+    if (stopId) stopOf[sid] = stopId;
+    var rule = String(r['Day Rule'] || '').trim();
+    if (rule) ruleOf[sid] = rule;
   });
 
-  return out;
+  return { stopOf: stopOf, ruleOf: ruleOf };
 }
+
+/**
+ * Reduce a stop's location to something a map can actually find.
+ *
+ * The Stop Location column is written for a human, not a geocoder. Real examples:
+ *   '533 E Jarrettsville Rd, Forest Hill, MD 21050 St. Ignatius parking lot. - 2nd entrance'
+ *   'Bear Creek Dr & Oaklawn Dr Forest Hill, MD 21050 (intersection)'
+ *   '1396 Tralee Circle, Belcamp, (drop off on the right side)'
+ * so the trailing landmark, the parenthetical and the kerb-side note all have to come off or the
+ * search lands nowhere.
+ *
+ * The Maryland zip is the reliable right-hand edge: everything up to and including it is the
+ * address, everything after it is commentary. Without a zip, cut at the first parenthesis.
+ *
+ * NOTE THIS IS ONLY FOR THE MAP PIN. The written directions are never derived from it — see
+ * DIRECTIONS_ARE_NOT_A_MAP_ROUTE.
+ */
+function mapsQuery(location) {
+  var s = String(location == null ? '' : location).replace(/\s+/g, ' ').trim();
+  if (!s) return '';
+  var zip = s.match(/^(.*?\b[A-Z]{2}\s*\d{5})\b/);
+  if (zip) return zip[1].trim();
+  return s.split('(')[0].replace(/[,\s]+$/, '').trim();
+}
+
+/**
+ * WHY THE APP NEVER NAVIGATES FOR THE DRIVER, in Transportation Director 2's own words (2026-09-19):
+ *
+ *   "The directions Transportation Director 1 writes is not necessarily the way Google Maps would suggest - for ex.
+ *    sometimes Transportation Director 1 has a bus driver take a different way so that they make a turn at a light
+ *    because it's a busy street and waiting to make a left hand turn in a bus would just take too
+ *    long, or they make a loop to ensure the student gets off on the right side of the road to
+ *    prevent them crossing the street."
+ *
+ * So the written steps encode judgement a router cannot see: vehicle length, junction safety, and
+ * which side of the road a child ends up on. A map that quietly proposed its own route would throw
+ * exactly that away, and a substitute — the person least able to know better — is the one who would
+ * follow it.
+ *
+ * The map is therefore a PIN, not a route: it answers "where is this place", while the written
+ * steps answer "how you get there". The directions stay above it, and the button says so.
+ */
+var DIRECTIONS_ARE_NOT_A_MAP_ROUTE =
+  'The written steps are the route. The map only shows where the stop is.';
 
 /** The next sequence number for a route+session, leaving the gap. */
 function nextSeq(stops) {
@@ -433,9 +578,38 @@ var _stops = null;
 function _deps() {
   return {
     sessionHasAttendance: _schema ? _schema.SESSION_HAS_ATTENDANCE : SESSION_HAS_ATTENDANCE,
+    contactsMax: _schema ? _schema.CONTACTS_MAX : CONTACTS_MAX,
     buildStops: _stops ? _stops.buildStops : buildStops,
     buildStudentStops: _stops ? _stops.buildStudentStops : buildStudentStops
   };
+}
+
+/**
+ * KEEP THE LABEL, DROP THE STORY (audit, 2026-09-18).
+ *
+ * FORBIDDEN_RIDER_FIELDS has always named note, overrideNote, standingNote and by — and the
+ * forbidden-field test checks for them by KEY. The producer was packing their CONTENT into two
+ * fields that ARE on the allowlist:
+ *
+ *   detail = overrideDestination + ' — ' + (standingNote | overrideNote)
+ *   flags  = 'added today — <note>', 'standing — <note>', 'PICKUP PLANNED — <reason> (<guardian>)'
+ *
+ * So the test passed on names while the office's words went to eight personal phones, and
+ * overrideDestination legitimately holds ANOTHER CHILD'S NAME ("to her brother Charlie Huber").
+ *
+ * ../transportation/Dismissal.gs dsDriverScrub_ now strips this at the publishing boundary, so the
+ * file on Drive is clean. This is the second line, and it exists for the same reason projectRider
+ * re-truncates contacts that the producer already capped: this module owns the promise about what
+ * reaches a phone, so this module enforces it. A CHANGE HERE MUST BE MADE IN dsDriverScrub_ TOO.
+ *
+ * 'also on Edgewood' is exempt: it is a route name, not a person, and it is the one flag a driver
+ * cannot do the job without — a split child really is on two buses.
+ */
+function driverText_(s) {
+  var t = String(s == null ? '' : s);
+  if (t.indexOf('also on ') === 0) return t;
+  var cut = t.indexOf(' \u2014 ');
+  return cut === -1 ? t : t.slice(0, cut);
 }
 
 /** Rendered where a stop has not been set yet. Phase 1 puts EVERY rider here, by design. */
@@ -451,7 +625,7 @@ var NO_STOP = { stopId: '', name: 'Stop not set', landmark: '', time: '', seq: 9
  *
  * `rk` is the opaque per-day key, NOT the FACTS student id. See schema.js RIDER_KEY_NOTE.
  */
-function projectRider(rider, rk, stopId) {
+function projectRider(rider, rk, stopId, dayRule) {
   return {
     rk: String(rk || ''),
     name: String(rider.name || ''),
@@ -459,8 +633,16 @@ function projectRider(rider, rk, stopId) {
     stopId: String(stopId || ''),
     expected: rider.expected !== false,
     reason: String(rider.reason || ''),
-    detail: String(rider.detail || ''),
-    flags: (rider.flags || []).map(String)
+    // detail is GONE from the driver contract — see schema.js DRIVER_RIDER_FIELDS. Flags keep their
+    // label and lose the story; the producer strips these too, and this is the second line.
+    flags: (rider.flags || []).map(driverText_),
+    // [name, relationship, phone] positionally, capped. See schema.js CONTACTS_ON_THE_PHONE for
+    // why these are here at all — it reverses an earlier decision, on evidence.
+    contacts: (rider.contacts || []).slice(0, _deps().contactsMax).map(function (c) {
+      return [String(c[0] || ''), String(c[1] || ''), String(c[2] || '')];
+    }),
+    // The office's own words for an irregular arrangement, passed through untouched.
+    dayRule: String(dayRule || '')
   };
 }
 
@@ -485,7 +667,9 @@ function buildManifest(opts) {
   var dep = _deps();
 
   var stops = dep.buildStops(opts.stopRows || [], routeCode, session, dayName);
-  var stopOf = dep.buildStudentStops(opts.linkRows || [], routeCode, session, dayName);
+  var links = dep.buildStudentStops(opts.linkRows || [], routeCode, session, dayName);
+  var stopOf = links.stopOf || links;          // older callers got a plain {sid: stopId} map
+  var ruleOf = links.ruleOf || {};
 
   // Buckets in stop order, plus the catch-all. The catch-all is LAST so a driver reads the route
   // in sequence and finds the unplaced children at the end rather than interleaved.
@@ -502,7 +686,7 @@ function buildManifest(opts) {
     // A rider pointed at a retired or filtered-out stop falls back to the catch-all rather than
     // vanishing into a bucket nobody renders.
     if (!buckets[stopId]) stopId = NO_STOP.stopId;
-    buckets[stopId].riders.push(projectRider(r, rkOf(sid), stopId));
+    buckets[stopId].riders.push(projectRider(r, rkOf(sid), stopId, ruleOf[sid]));
   });
 
   var stopList = order.concat([NO_STOP.stopId])
@@ -512,7 +696,8 @@ function buildManifest(opts) {
   // Not-riding is a FLAT list, deliberately never grouped by stop: its whole purpose is "do not
   // wait", and a driver should be able to read all of it at once without walking the route.
   var notRiding = (slice.notRiding || []).map(function (r) {
-    return projectRider(r, rkOf(r.id || r.studentId || ''), '');
+    var sid = r.id || r.studentId || '';
+    return projectRider(r, rkOf(sid), '', ruleOf[sid]);
   }).map(function (r) { r.expected = false; return r; });
 
   return {
@@ -535,7 +720,7 @@ function buildManifest(opts) {
     // says so out loud rather than implying an empty notRiding means everybody is coming.
     hasAttendance: dep.sessionHasAttendance[session] === true,
 
-    // TRUE until Lois has entered stops for this route. The page renders a flat list and explains
+    // TRUE until Transportation Director 2 has entered stops for this route. The page renders a flat list and explains
     // why, instead of showing an unexplained "Stop not set" header over every child.
     stopsUnset: stops.length === 0
   };
@@ -571,7 +756,7 @@ function foldBoarding(rows, routeCode, session, dayKey) {
 /* ===== office.js ===== */
 'use strict';
 /**
- * office.js — the folds behind Lois's view. PURE.
+ * office.js — the folds behind Transportation Director 2's view. PURE.
  *
  * The load-bearing idea in this file is CHECK_STATE. Everything else is bookkeeping.
  */
@@ -632,7 +817,7 @@ function checkStateLabel(state, tally, expected) {
 }
 
 /**
- * Per-driver adoption, so Lois can see who is actually getting value out of this rather than
+ * Per-driver adoption, so Transportation Director 2 can see who is actually getting value out of this rather than
  * guessing from silence.
  *
  * `lastLogin` is the honest measure of use. `boardingDays` counts DISTINCT DAYS a driver recorded
@@ -913,11 +1098,122 @@ function dayKeyFromDate(d) {
 }
 
 
+/* ===== sheet.js ===== */
+'use strict';
+/**
+ * sheet.js — the printable route sheet. PURE.
+ *
+ * THE POINT OF THIS FILE. Transportation Director 2 maintains eighteen Word documents by hand — nine routes, morning and
+ * afternoon — and most of what is in them (names, grades, guardian phones) is data FACTS already
+ * holds and keeps current. Every new pupil, withdrawal or changed mobile number means editing a
+ * document. The stops and the directions are the only part that is genuinely hers.
+ *
+ * So this regenerates her sheet instead: she owns the stops, FACTS owns the people, and the printed
+ * page cannot go stale because it is rebuilt every time it is opened.
+ *
+ * It deliberately reuses buildManifest rather than regrouping riders itself — one grouping path,
+ * the same one the driver's phone renders, so the paper and the screen can never disagree.
+ */
+
+var _sheetSchema = null;
+
+/** Column order, matching the document this replaces so it reads as the same sheet. */
+var SHEET_COLUMNS = ['Stop # & Time', 'Name & Grade', 'Phone Numbers',
+                     'Stop Location', 'Directions To Stop'];
+
+/**
+ * Build the print model for one route+session.
+ *
+ * @param {Object} manifest  buildManifest output (already grouped by stop, already projected)
+ * @param {Object} routeInfo RouteInfo row: {bus, leaveHcs, lineUpBy, lineUp}
+ * @param {Object} [opts]    {schoolName, year, printedOn}
+ */
+function buildRouteSheet(manifest, routeInfo, opts) {
+  manifest = manifest || {};
+  routeInfo = routeInfo || {};
+  opts = opts || {};
+
+  var session = String(manifest.session || 'PM').toUpperCase();
+  var stops = (manifest.stops || []).map(function (b, i) {
+    var s = b.stop || {};
+    return {
+      // Numbered from 1 in printed order. The catch-all keeps no number: it is not a place.
+      n: s.stopId ? String(i + 1) : '',
+      time: s.time || '',
+      location: s.name || '',
+      landmark: s.landmark || '',
+      directions: s.directions || '',
+      driverNote: s.driverNote || '',
+      placed: !!s.stopId,
+      children: (b.riders || []).map(printChild)
+    };
+  }).filter(function (s) { return s.children.length > 0; });
+
+  return {
+    schoolName: opts.schoolName || 'HARFORD CHRISTIAN SCHOOL',
+    title: session + ' ' + (manifest.name || '') + ' Route' +
+           (opts.year ? ' ' + opts.year : ''),
+    session: session,
+    dayName: manifest.dayName || '',
+    // Driver, bus and colour, exactly as the header of the paper sheet carries them.
+    driver: (manifest.drivers || []).map(function (d) { return d.name; }).join(', '),
+    bus: String(routeInfo.bus || routeInfo['Bus'] || ''),
+    colour: manifest.colour || '',
+    vehicle: manifest.vehicle || '',
+    printedOn: opts.printedOn || '',
+    lineUpBy: String(routeInfo.lineUpBy || routeInfo['Line Up By'] || ''),
+    leaveHcs: String(routeInfo.leaveHcs || routeInfo['Leave HCS'] || ''),
+    lineUp: String(routeInfo.lineUp || routeInfo['Line Up'] || ''),
+    columns: SHEET_COLUMNS,
+    stops: stops,
+    // Printed under the table rather than dropped: a child the office has not placed still has to
+    // get home, and a driver holding this sheet needs to know they exist.
+    notRiding: (manifest.notRiding || []).map(printChild),
+    // A sheet with no stops entered is still worth printing — it is a rider list — but it must not
+    // pretend to be a route.
+    stopsUnset: !!manifest.stopsUnset,
+    hasAttendance: manifest.hasAttendance !== false
+  };
+}
+
+/**
+ * One child as the sheet prints them.
+ *
+ * Contacts are formatted the way the document does it — 'Tina Beck (Mother): 410-555-0101' — one
+ * per line, because that is what a driver's eye is trained on.
+ */
+function printChild(r) {
+  return {
+    name: String(r.name || ''),
+    grade: String(r.grade || ''),
+    dayRule: String(r.dayRule || ''),
+    flags: (r.flags || []).map(String),
+    reason: String(r.reason || ''),
+    detail: String(r.detail || ''),
+    contacts: (r.contacts || []).map(function (c) {
+      var rel = c[1] ? ' (' + c[1] + ')' : '';
+      return { line: String(c[0] || '') + rel + ': ' + String(c[2] || ''),
+               name: String(c[0] || ''), relationship: String(c[1] || ''),
+               phone: String(c[2] || '') };
+    })
+  };
+}
+
+/** 'Name [grade]', the way the sheet writes it, with the arrangement underneath. */
+function childLabel(c) {
+  var out = c.name + (c.grade ? ' [' + c.grade + ']' : '');
+  var extra = [].concat(c.flags || []);
+  if (c.dayRule) extra.push(c.dayRule);
+  return extra.length ? out + '\n' + extra.join('\n') : out;
+}
+
+
   global.TRANSPO_LOGIC = {
     buildManifest: buildManifest, projectRider: projectRider, foldBoarding: foldBoarding,
     buildStops: buildStops, buildStudentStops: buildStudentStops, resequence: resequence,
     checkState: checkState, boardingTally: boardingTally, checkStateLabel: checkStateLabel,
     driverAdoption: driverAdoption, recentActivity: recentActivity, coverageGaps: coverageGaps,
+    buildRouteSheet: buildRouteSheet,
     CHECK_STATE: CHECK_STATE, DRIVER_RIDER_FIELDS: DRIVER_RIDER_FIELDS,
     FORBIDDEN_RIDER_FIELDS: FORBIDDEN_RIDER_FIELDS
   };

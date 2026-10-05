@@ -13,6 +13,7 @@
 // is there anything real in here?
 import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
+import { findStaffNames } from './staff-aliases.mjs';
 
 const ROOT = new URL('../demos/', import.meta.url).pathname.replace(/^\//, '');
 const SCANNABLE = /\.(js|mjs|html|json|css|md)$/;
@@ -60,6 +61,19 @@ for (const file of walk(ROOT)) {
       console.log(`      -> ${rule.fix}`);
     });
   }
+}
+
+// Real staff first names (hash-matched, so this file never names them). data.js files are skipped:
+// they are hand-written fabricated data, never built from source, and a fabricated child may share
+// a first name. A first name followed by a surname is a different full name and is skipped too.
+for (const file of walk(ROOT)) {
+  if (/data\.js$/.test(file)) continue;
+  readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+    if (!findStaffNames(line.replace(/\b[A-Z][a-z]+\s+(?=[A-Z][a-z])/g, '')).length) return;
+    findings++;
+    console.log(`LEAK  ${path.relative(ROOT, file)}:${i + 1}  real staff first name`);
+    console.log('      -> rebuild; tools/staff-aliases.mjs replaces it with a role alias');
+  });
 }
 
 console.log(findings

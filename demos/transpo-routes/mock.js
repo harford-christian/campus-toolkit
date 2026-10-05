@@ -45,6 +45,13 @@
     })[0];
   }
 
+  function routeInfoFor(code, session) {
+    return (D.routeInfo || []).filter(function (r) {
+      return String(r['Route Code']).toLowerCase() === String(code).toLowerCase() &&
+             String(r.Session).toUpperCase() === String(session).toUpperCase();
+    })[0] || {};
+  }
+
   /* ------------------------------- the driver app ------------------------------- */
 
   var session = null;
@@ -63,16 +70,24 @@
     if (!session) return { ok: false, reason: 'session' };
 
     if (req.op === 'routes') {
-      return {
-        ok: true, driver: 'Wendell Ashby',
-        builtAt: PUB.builtAt, dayName: PUB.dayName, session: PUB.slice.session,
+      // Same shape as opRoutes_: one pack per half of the day. The demo publishes the afternoon
+      // run only, so the Morning switch shows disabled — exactly what a fresh install looks like.
+      var sessions = { AM: null, PM: null };
+      sessions[String(PUB.slice.session).toUpperCase()] = {
+        builtAt: PUB.builtAt, dayName: PUB.dayName,
         routes: (PUB.slice.routes || []).map(function (r) {
           return { code: r.code, name: r.name, colour: r.colour, vehicle: r.vehicle };
         })
       };
+      return { ok: true, driver: 'Wendell Ashby',
+               defaultSession: PUB.slice.session, sessions: sessions };
     }
 
     if (req.op === 'manifest') {
+      // `run` is the half of the day (not `session`, which is the auth token). Only PM is published.
+      if (req.run && String(req.run).toUpperCase() !== String(PUB.slice.session).toUpperCase()) {
+        return { ok: false, reason: 'no-session' };
+      }
       var slice = routeSlice(req.code);
       if (!slice) return { ok: false, reason: 'no-route' };
 
@@ -83,6 +98,10 @@
         slice: slice, stopRows: D.stopRows, linkRows: D.linkRows,
         rkOf: rkOf, session: PUB.slice.session, dayName: PUB.dayName
       });
+      var info = routeInfoFor(slice.code, PUB.slice.session);
+      m.routeInfo = { leaveHcs: String(info['Leave HCS'] || ''),
+                      lineUpBy: String(info['Line Up By'] || ''),
+                      lineUp: String(info['Line Up'] || '') };
       m.ok = true;
       m.builtAt = PUB.builtAt;
       m.dayKey = PUB.dayKey;
@@ -178,6 +197,24 @@
           return { id: r.id, name: r.name, grade: r.grade, stopId: assigned[r.id] || '' };
         })
       };
+    }
+
+    if (req.op === 'sheet') {
+      // Mirrors opSheet_: the REAL buildManifest, then the REAL buildRouteSheet. The demo publishes
+      // the afternoon run only, so asking for the morning one gets the server's own honest refusal.
+      var sess = String(req.session || 'PM').toUpperCase();
+      if (sess !== String(PUB.slice.session).toUpperCase()) return { ok: false, reason: 'no-session' };
+      var sl = routeSlice(req.code);
+      if (!sl) return { ok: false, reason: 'no-route' };
+      var man = L.buildManifest({
+        slice: sl, stopRows: D.stopRows, linkRows: D.linkRows,
+        rkOf: rkOf, session: sess, dayName: PUB.dayName
+      });
+      var info = routeInfoFor(req.code, sess);
+      var sh = L.buildRouteSheet(man, info, { year: '2026-2027', printedOn: '9/15/26' });
+      sh.ok = true;
+      sh.builtAt = PUB.builtAt;
+      return sh;
     }
 
     if (req.op === 'saveStops') {

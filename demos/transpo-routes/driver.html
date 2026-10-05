@@ -92,6 +92,39 @@ li.rider {
 .tick[data-on="on"] { background: #e8f5ec; color: var(--green); }
 .tick[data-on="no_show"] { background: var(--redbg); color: var(--red); }
 
+/* directions: the field a SUBSTITUTE needs most. Monospace-ish and roomy, because it is read
+   in glances while stationary, not skimmed. */
+.dirs { background:#f4f6f8; border-left:3px solid #c3ccd6; border-radius:0 8px 8px 0;
+        padding:10px 12px; margin:6px 0 8px; font-size:.9rem; color:#37414d; white-space:pre-line; }
+.dirs b { display:block; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em;
+          color:var(--muted); margin-bottom:4px; font-weight:700; }
+.runhead { background:var(--card); border:1px solid var(--line); border-radius:10px;
+           padding:10px 12px; margin-bottom:10px; font-size:.87rem; display:flex;
+           flex-wrap:wrap; gap:4px 16px; }
+.runhead span b { color:var(--muted); font-weight:600; font-size:.76rem;
+                  text-transform:uppercase; letter-spacing:.04em; display:block; }
+/* the AM/PM switch */
+.seg { display:flex; gap:4px; background:#eceef1; border-radius:999px; padding:4px; margin-bottom:12px; }
+.seg button { flex:1; min-height:44px; border:none; background:none; font:inherit;
+              font-weight:600; border-radius:999px; color:var(--muted); width:auto; }
+.seg button[aria-selected="true"] { background:var(--card); color:var(--ink);
+                                    box-shadow:0 1px 3px rgba(0,0,0,.12); }
+/* contacts, revealed by tapping a child */
+.who { border-top:1px dashed var(--line); margin:0 14px; padding:10px 0; }
+.who a { display:flex; align-items:center; gap:10px; min-height:48px; text-decoration:none;
+         color:var(--ink); font-size:.95rem; }
+.who .rel { color:var(--muted); font-size:.8rem; }
+.who .tel { margin-left:auto; font-weight:600; color:#1a5fb4; }
+.rule { font-size:.78rem; color:var(--amber); }
+/* The map pin. Deliberately quieter than the written steps above it: those are the route, this
+   only answers "where is this place". */
+.mapline { display:flex; align-items:center; gap:8px; margin:-2px 0 10px; }
+.maplink { display:inline-flex; align-items:center; gap:6px; min-height:44px; width:auto;
+           padding:8px 12px; font-size:.85rem; font-weight:600; color:#1a5fb4;
+           background:var(--card); border:1px solid var(--line); border-radius:9px;
+           text-decoration:none; }
+.mapwhy { font-size:.74rem; color:var(--muted); flex:1; min-width:0; line-height:1.3; }
+
 /* not riding — the reason this app exists */
 .notriding { margin-top: 26px; }
 .notriding h2 { font-size: .95rem; text-transform: uppercase; letter-spacing: .04em;
@@ -150,6 +183,10 @@ li.gone .rname b { text-decoration: line-through; }
 
   <!-- 2. route picker -->
   <section id="routeView" class="hide">
+    <div class="seg" id="sessionSeg" role="tablist" aria-label="Morning or afternoon">
+      <button data-session="AM" aria-selected="false">Morning</button>
+      <button data-session="PM" aria-selected="true">Afternoon</button>
+    </div>
     <div id="routeList"></div>
     <p class="foot" id="routeFoot"></p>
   </section>
@@ -173,7 +210,7 @@ li.gone .rname b { text-decoration: line-through; }
 
   var TOKEN = 'demo-tok-1';
   var session = null;        // never persisted: a lost phone should not stay logged in
-  var state = { routes: [], manifest: null, code: '' };
+  var state = { picker: null, session: 'PM', manifest: null, code: '' };
 
   function $(id) {
     var el = document.getElementById(id);
@@ -255,31 +292,56 @@ li.gone .rname b { text-decoration: line-through; }
   function loadRoutes() {
     api({ op: 'routes' }, function (res) {
       if (!res.ok) return handleDead(res);
-      state.routes = res.routes || [];
-      $('title').textContent = 'Choose a route';
-      $('hchip').classList.add('hide');
-
-      if (!state.routes.length) {
-        $('routeList').innerHTML = '<p class="empty">No routes published yet.<br>Call the office.</p>';
-      } else {
-        $('routeList').innerHTML = state.routes.map(function (r) {
-          return '<button class="btn routebtn" data-code="' + esc(r.code) + '">' +
-                   '<span class="dot" style="background:' + swatch(r.colour) + '"></span>' +
-                   '<span style="flex:1"><b>' + esc(r.name) + '</b><br>' +
-                     '<span class="rgrade">' + esc(r.colour || 'no colour set') +
-                     (r.vehicle ? ' &middot; ' + esc(r.vehicle) : '') + '</span></span>' +
-                   '<span style="color:var(--muted)">&#8250;</span>' +
-                 '</button>';
-        }).join('');
-        Array.prototype.forEach.call($('routeList').querySelectorAll('[data-code]'), function (b) {
-          b.addEventListener('click', function () { openRoute(b.getAttribute('data-code')); });
-        });
-      }
-      $('routeFoot').textContent = (res.dayName ? res.dayName + ' ' : '') +
-        (res.session === 'AM' ? 'morning run' : 'afternoon run') +
-        (res.builtAt ? ' · updated ' + shortTime(res.builtAt) : '');
+      state.picker = res;
+      state.session = res.defaultSession || 'PM';
+      $('sub').textContent = res.driver || '';
+      renderRoutes();
       show('routeView');
     });
+  }
+
+  function renderRoutes() {
+    var pack = (state.picker.sessions || {})[state.session];
+
+    Array.prototype.forEach.call($('sessionSeg').querySelectorAll('button'), function (b) {
+      var s = b.getAttribute('data-session');
+      b.setAttribute('aria-selected', String(s === state.session));
+      // A half of the day with nothing published is disabled rather than hidden, so a driver is
+      // never left wondering whether the morning run exists.
+      b.disabled = !(state.picker.sessions || {})[s];
+      b.style.opacity = b.disabled ? '.45' : '';
+    });
+
+    $('title').textContent = 'Choose a route';
+    $('hchip').classList.add('hide');
+
+    if (!pack) {
+      $('routeList').innerHTML = '<p class="empty">The ' +
+        (state.session === 'AM' ? 'morning' : 'afternoon') +
+        ' list has not been published yet.<br>Call the office.</p>';
+      $('routeFoot').textContent = '';
+      return;
+    }
+
+    if (!pack.routes.length) {
+      $('routeList').innerHTML = '<p class="empty">No routes for you on this run.</p>';
+    } else {
+      $('routeList').innerHTML = pack.routes.map(function (r) {
+        return '<button class="btn routebtn" data-code="' + esc(r.code) + '">' +
+                 '<span class="dot" style="background:' + swatch(r.colour) + '"></span>' +
+                 '<span style="flex:1"><b>' + esc(r.name) + '</b><br>' +
+                   '<span class="rgrade">' + esc(r.colour || 'no colour set') +
+                   (r.vehicle ? ' &middot; ' + esc(r.vehicle) : '') + '</span></span>' +
+                 '<span style="color:var(--muted)">&#8250;</span>' +
+               '</button>';
+      }).join('');
+      Array.prototype.forEach.call($('routeList').querySelectorAll('[data-code]'), function (b) {
+        b.addEventListener('click', function () { openRoute(b.getAttribute('data-code')); });
+      });
+    }
+    $('routeFoot').textContent = (pack.dayName ? pack.dayName + ' ' : '') +
+      (state.session === 'AM' ? 'morning run' : 'afternoon run') +
+      (pack.builtAt ? ' · updated ' + shortTime(pack.builtAt) : '');
   }
 
   /** The colour NAME always ships with the swatch; this is only the visual half. */
@@ -302,7 +364,9 @@ li.gone .rname b { text-decoration: line-through; }
     var cached = readCache(code);
     if (cached) renderSheet(cached, true);      // paint instantly, then refresh
     show('sheetView');
-    api({ op: 'manifest', code: code }, function (res) {
+    // `run`, not `session`: api() overwrites req.session with the AUTH session token, so a
+    // field of that name is silently clobbered and the server always sees the afternoon.
+    api({ op: 'manifest', code: code, run: state.session }, function (res) {
       if (!res.ok) {
         if (!cached) return handleDead(res);
         return;                                  // keep the cached sheet; the stale banner shows
@@ -338,28 +402,45 @@ li.gone .rname b { text-decoration: line-through; }
       b.push('<div class="banner b-warn">Stops are not set up for this route yet — this is the ' +
              'full rider list, not a stop order.</div>');
     }
+    var ri = m.routeInfo || {};
+    if (ri.leaveHcs || ri.lineUpBy || ri.lineUp) {
+      b.push('<div class="runhead">' +
+        (ri.lineUpBy ? '<span><b>Line up by</b>' + esc(ri.lineUpBy) + '</span>' : '') +
+        (ri.leaveHcs ? '<span><b>Leave HCS</b>' + esc(ri.leaveHcs) + '</span>' : '') +
+        (ri.lineUp ? '<span><b>Order</b>' + esc(ri.lineUp) + '</span>' : '') +
+      '</div>');
+    }
     $('sheetBanners').innerHTML = b.join('');
 
     var boarding = m.boarding || {};
-    $('stopList').innerHTML = (m.stops || []).map(function (s) {
+    $('stopList').innerHTML = (m.stops || []).map(function (s, idx) {
       if (!s.riders.length) return '';
       var head = m.stopsUnset ? '' :
-        '<div class="stophead"><span class="stopname">' + esc(s.stop.name) + '</span>' +
+        '<div class="stophead"><span class="stopname">' +
+          (s.stop.stopId ? (idx + 1) + '. ' : '') + esc(s.stop.name) + '</span>' +
         '<span class="stopmeta">' +
           [s.stop.time, s.stop.landmark].filter(Boolean).map(esc).join(' &middot; ') +
         '</span></div>' +
+        // Turn-by-turn from the previous stop. The single most useful thing on the page for
+        // someone who has never driven this route.
+        (s.stop.directions
+          ? '<div class="dirs"><b>Getting there</b>' + esc(s.stop.directions) + '</div>' : '') +
+        mapLine(s.stop) +
         (s.stop.driverNote ? '<div class="note">' + esc(s.stop.driverNote) + '</div>' : '');
+
       return '<div class="stop">' + head + '<ul>' + s.riders.map(function (r) {
         var act = (boarding[r.rk] || {}).action || '';
-        return '<li class="rider">' +
-          '<div class="rname"><b>' + esc(r.name) + '</b>' +
-            '<span class="rgrade">Grade ' + esc(r.grade) + '</span>' +
+        return '<li class="rider" data-rider="' + esc(r.rk) + '">' +
+          '<div class="rname" data-who="' + esc(r.rk) + '"><b>' + esc(r.name) + '</b>' +
+            '<span class="rgrade">Grade ' + esc(r.grade) +
+              (r.contacts && r.contacts.length ? ' &middot; tap for contacts' : '') + '</span>' +
+            (r.dayRule ? '<span class="rule">' + esc(r.dayRule) + '</span>' : '') +
             (r.flags && r.flags.length ? '<span class="rflag">' + esc(r.flags.join(' · ')) + '</span>' : '') +
           '</div>' +
           '<button class="tick" data-rk="' + esc(r.rk) + '" data-stop="' + esc(r.stopId) + '"' +
             ' data-on="' + esc(act) + '" aria-label="Mark ' + esc(r.name) + '">' +
             tickGlyph(act) + '</button>' +
-        '</li>';
+        '</li>' + contactsBlock(r);
       }).join('') + '</ul></div>';
     }).join('') || '<p class="empty">Nobody is riding this route today.</p>';
 
@@ -368,17 +449,62 @@ li.gone .rname b { text-decoration: line-through; }
     $('notRidingList').innerHTML = gone.map(function (r) {
       return '<li class="rider gone"><div class="rname"><b>' + esc(r.name) + '</b>' +
         '<span class="reason">' + esc(r.reason || 'NOT RIDING') + '</span>' +
-        (r.detail ? '<span class="detail">' + esc(r.detail) + '</span>' : '') +
+
       '</div></li>';
     }).join('');
 
     Array.prototype.forEach.call($('stopList').querySelectorAll('.tick'), function (btn) {
       btn.addEventListener('click', function () { cycle(btn); });
     });
+    Array.prototype.forEach.call($('stopList').querySelectorAll('[data-who]'), function (el) {
+      el.addEventListener('click', function () { toggleWho(el.getAttribute('data-who')); });
+    });
 
     $('sheetFoot').innerHTML = 'Ticks are a note to yourself — a blank one means <b>not ' +
       'recorded</b>, not "not on the bus".' +
       (m.builtAt ? '<br>List updated ' + esc(shortTime(m.builtAt)) + '.' : '');
+  }
+
+  /**
+   * Guardians, hidden until the child is tapped.
+   *
+   * Behind a tap rather than on the face of the list: the list is read in public, at a stop, with
+   * people around. A tel: link means one tap to ring rather than copying a number by hand while
+   * holding up a bus.
+   */
+  function contactsBlock(r) {
+    if (!r.contacts || !r.contacts.length) return '';
+    return '<li class="who hide" data-for="' + esc(r.rk) + '">' +
+      r.contacts.map(function (c) {
+        return '<a href="tel:' + esc(String(c[2]).replace(/[^0-9+]/g, '')) + '">' +
+          '<span>' + esc(c[0]) + '<br><span class="rel">' + esc(c[1]) + '</span></span>' +
+          '<span class="tel">' + esc(c[2]) + '</span></a>';
+      }).join('') + '</li>';
+  }
+
+  function toggleWho(rk) {
+    var el = $('stopList').querySelector('[data-for="' + rk + '"]');
+    if (el) el.classList.toggle('hide');
+  }
+
+  /**
+   * A pin for the stop — NOT a route to it.
+   *
+   * Transportation Director 2, 2026-09-19: the written directions send a bus a particular way on purpose — turning at a
+   * light because a left turn in a bus holds up a busy street, or looping so a child gets off on
+   * the kerb side rather than crossing. A router cannot see any of that, and a SUBSTITUTE is the
+   * person least equipped to notice it has been lost. So the map opens a SEARCH for the place, sits
+   * below the written steps, and says plainly which of the two is the route.
+   */
+  function mapLine(stop) {
+    var q = stop.mapQuery || '';
+    if (!q) return '';
+    return '<div class="mapline">' +
+      '<a class="maplink" target="_blank" rel="noopener" ' +
+        'href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) + '">' +
+        '◎ Show on map</a>' +
+      '<span class="mapwhy">The written steps above are the route — the map only shows ' +
+        'where the stop is.</span></div>';
   }
 
   function tickGlyph(a) {
@@ -392,7 +518,8 @@ li.gone .rname b { text-decoration: line-through; }
     var shown = next === 'off' ? '' : next;
     btn.setAttribute('data-on', shown);
     btn.innerHTML = tickGlyph(shown);
-    api({ op: 'board', code: state.code, rk: btn.getAttribute('data-rk'),
+    api({ op: 'board', code: state.code, run: state.session,
+          rk: btn.getAttribute('data-rk'),
           stopId: btn.getAttribute('data-stop'), action: next }, function (res) {
       if (!res.ok) {
         btn.setAttribute('data-on', cur);
@@ -405,7 +532,9 @@ li.gone .rname b { text-decoration: line-through; }
 
   /* The board this phone last saw, so a dead signal shows yesterday's answer under a red banner
      rather than an empty screen. Keyed by day so it can never silently show another day's list. */
-  function cacheKey(code) { return 'transpo_' + code + '_' + new Date().toDateString(); }
+  function cacheKey(code) {
+    return 'transpo_' + code + '_' + state.session + '_' + new Date().toDateString();
+  }
   function writeCache(code, m) {
     try { localStorage.setItem(cacheKey(code), JSON.stringify(m)); } catch (e) { /* private mode */ }
   }
@@ -435,9 +564,16 @@ li.gone .rname b { text-decoration: line-through; }
 
   $('pinGo').addEventListener('click', login);
   $('pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+  Array.prototype.forEach.call($('sessionSeg').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () {
+      if (b.disabled) return;
+      state.session = b.getAttribute('data-session');
+      renderRoutes();
+    });
+  });
+
   $('backBtn').addEventListener('click', function () {
-    $('title').textContent = 'Choose a route';
-    $('hchip').classList.add('hide');
+    renderRoutes();
     show('routeView');
   });
 
