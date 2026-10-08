@@ -1,0 +1,13 @@
+{
+  "_note": "Config for tools/build-demo.mjs — see build.form.json for the order. Same two markup edits (_self base + logic.js; the crest becomes a generated badge), plus one label: the Actions tab's seed button names the real 2023-24 data it loads in production; the demo points that button at the project's own safe sample generator (mock.js), so the label says so.",
+  "src": "../macs-scheduling/secondary/AdminApp.html",
+  "dst": "demos/macs/admin.html",
+  "demoName": "MACS Fine Arts",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n  <script src=\"logic.js\"></script>"],
+    ["Seed Historical Test Data (real schools, 2023-24 names)", "Seed Sample Test Data (one fabricated school, every category)"]
+  ],
+  "replaceRegex": [
+    ["data:image/png;base64,[A-Za-z0-9+/=]+", "g", "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23c8102e'/%3E%3Ccircle cx='32' cy='32' r='24' fill='none' stroke='white' stroke-width='2'/%3E%3Ctext x='32' y='38' font-family='Inter,Arial,sans-serif' font-size='15' font-weight='800' fill='white' text-anchor='middle'%3EMACS%3C/text%3E%3C/svg%3E"]
+  ]
+}

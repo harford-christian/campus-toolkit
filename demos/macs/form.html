@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_self">
+  <script src="logic.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MACS Registration</title>
+  <!-- Inter, the typeface MACS Forms' own theme loads. The gate is a deliberate port of that
+       product's school picker, and without this the port silently fell back to system-ui —
+       right layout, visibly wrong letterforms next to the app it is imitating. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --md-red: #c8102e;
+      --md-red-deep: #8c0a1f;
+      --md-cream: #f2ead9;
+      --primary: #c8102e;
+      --primary-dark: #8c0a1f;
+      --accent: #c8102e;
+      --danger: #7a1220;
+      --bg: #2b2b2d;
+      --surface: #ffffff;
+      --border: #ecdfd8;
+      --text: #241414;
+      --text-muted: #7a6a63;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+    }
+    .page {
+      background: var(--surface); min-height: 100vh;
+      display: grid; grid-template-columns: 210px 1fr;
+    }
+
+    .sidebar {
+      background: var(--bg); color: #f2ead9; padding: 20px 14px; display: flex; flex-direction: column;
+      gap: 18px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    }
+    .masthead { display: flex; align-items: center; gap: 10px; padding: 0 4px 14px; border-bottom: 1px solid rgba(242,234,217,.14); }
+    .crest { width: 36px; height: auto; flex-shrink: 0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+    .masthead-title h1 { font-size: 14px; margin: 0; color: #fff; font-weight: 800; line-height: 1.25; }
+    .masthead-title p { margin: 3px 0 0; font-size: 10px; color: #e6b3bd; font-weight: 700; }
+
+    .navgroup-label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: #9c8f89; padding: 0 8px 5px; }
+    .navgroup { display: flex; flex-direction: column; gap: 1px; }
+    .tabbar button {
+      background: transparent; color: #f2ead9; border: none; text-align: left; width: 100%;
+      padding: 9px 10px; font-size: 13px; font-weight: 600; letter-spacing: 0; text-transform: none;
+      cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: background .15s; border-radius: 7px; opacity: .85;
+    }
+    .tabbar button:hover { background: rgba(242,234,217,.08); opacity: 1; }
+    .tabbar button.active { background: var(--md-red); color: #fff; opacity: 1; }
+
+    .main { padding: 0 0 60px; min-width: 0; }
+    .tabpanel { display: none; padding: 18px 32px; }
+    .tabpanel.active { display: block; }
+
+    label { display: block; font-size: 13px; font-weight: 700; color: var(--md-red-deep); margin-bottom: 6px; }
+    select, input {
+      width: 100%; padding: 11px 12px; font-size: 15px; border: 2px solid var(--border);
+      border-radius: 8px; background: #fff; color: var(--text);
+    }
+    select:focus, input:focus { outline: none; border-color: var(--md-red); box-shadow: 0 0 0 3px rgba(200,16,46,.15); }
+    .field { margin-bottom: 10px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+    @media (max-width: 620px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .notice { border-left: 4px solid var(--md-red-deep); background: #f7f0ee; padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 20px; }
+    .notice.warn { border-left-color: var(--danger); background: #fdf0ee; color: #7f1d1d; font-weight: 600; }
+    .notice.success { border-left-color: var(--md-red); background: #fdf1ee; color: var(--md-red-deep); font-weight: 600; }
+    .error-text { color: var(--danger); font-size: 12px; font-weight: 700; margin-top: 4px; display: none; }
+
+    .category-card {
+      border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden;
+      box-shadow: 0 2px 8px rgba(140,10,31,.06); transition: box-shadow .15s;
+    }
+    .category-card.open { box-shadow: 0 6px 18px rgba(140,10,31,.14); }
+    .category-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      padding: 10px 14px; background: #fffdfb;
+    }
+    .category-header .name { font-weight: 700; font-size: 20px; color: var(--md-red-deep); }
+    .category-header .code { color: var(--text-muted); font-size: 15px; font-weight: 500; }
+    .count-inputs { display: flex; gap: 14px; align-items: center; }
+    .count-inputs .count-field { display: flex; flex-direction: column; align-items: flex-start; }
+    .count-inputs label { font-size: 11px; margin-bottom: 2px; white-space: nowrap; }
+    .count-inputs select { width: 72px; padding: 6px 8px; font-size: 14px; text-align: center; }
+
+    .category-body { padding: 0 14px 12px; display: none; border-top: 1px solid var(--border); }
+    .category-card.open .category-body { display: block; }
+    .entry-count-badge {
+      font-size: 12px; font-weight: 700; color: #fff; background: var(--md-red);
+      border-radius: 999px; padding: 2px 9px; margin-left: 8px;
+    }
+
+    .entry-row {
+      border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; background: #fff; overflow: hidden;
+      box-shadow: 0 1px 4px rgba(140,10,31,.05);
+    }
+    .entry-row .level-tag {
+      display: inline-block; font-size: 12px; font-weight: 700; text-transform: uppercase;
+      color: var(--md-red-deep); background: #f6dde1; border-radius: 4px; padding: 2px 8px; flex-shrink: 0;
+    }
+    .entry-summary {
+      display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; user-select: none;
+    }
+    .entry-summary input {
+      flex: 1; padding: 8px 10px; font-size: 17px; font-weight: 700; color: var(--md-red-deep);
+      border: 1px solid var(--border); border-radius: 6px;
+    }
+    .entry-summary .entry-toggle {
+      font-size: 16px; font-weight: 700; color: var(--md-red-deep); width: 24px; height: 24px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; border-radius: 5px; background: #f6dde1;
+      transition: transform .15s ease;
+    }
+    .entry-row.open .entry-toggle { transform: rotate(180deg); }
+    .entry-details { display: none; padding: 4px 10px 10px; border-top: 1px solid var(--border); }
+    .entry-row.open .entry-details { display: block; }
+
+    .roster-wrap { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 10px; }
+    table.roster-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    table.roster-table th { text-align: left; font-size: 11px; color: var(--text-muted); font-weight: 700; padding: 4px 4px; border-bottom: 1px solid var(--border); }
+    table.roster-table td { padding: 3px 4px; }
+    table.roster-table td input { padding: 6px 8px; font-size: 13px; }
+    button.roster-remove { background: none; border: none; color: var(--danger); font-size: 16px; font-weight: 700; cursor: pointer; padding: 0 6px; }
+    button.roster-add, button.roster-autofill {
+      font-size: 12px; font-weight: 700; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px;
+      background: #fff; color: var(--md-red-deep); cursor: pointer; margin-right: 8px;
+    }
+    button.roster-autofill { background: var(--md-red); color: #fff; border-color: var(--md-red); }
+    button.roster-autofill:hover { background: var(--md-red-deep); border-color: var(--md-red-deep); }
+    .entry-row .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 8px; }
+    .entry-row .grid .field.full { grid-column: 1 / -1; }
+    .entry-row .grid label { font-size: 18px; margin-bottom: 3px; }
+    .entry-row textarea {
+      width: 100%; padding: 10px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 8px;
+      min-height: 70px; font-family: inherit; resize: vertical;
+    }
+    @media (max-width: 560px) { .entry-row .grid { grid-template-columns: 1fr; } }
+
+    .info-block { font-size: 14px; color: var(--text); }
+    .info-block h3 { color: var(--md-red-deep); font-size: 16px; margin: 18px 0 8px; }
+    .judging-list { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 10px; box-shadow: 0 2px 8px rgba(140,10,31,.05); }
+    .judging-list div { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; display: flex; justify-content: space-between; }
+    .judging-list div:last-child { border-bottom: none; }
+    .judging-list a { color: var(--md-red); font-weight: 700; text-decoration: none; }
+
+    .review-summary { border: 1px solid var(--border); border-radius: 10px; padding: 16px; background: #fffdfb; margin: 16px 0; box-shadow: 0 2px 8px rgba(140,10,31,.05); }
+    .review-summary .amount { font-size: 24px; font-weight: 800; color: var(--md-red-deep); }
+
+    button.submit-final {
+      background: var(--md-red); color: #fff; border: none; border-radius: 8px; padding: 13px 28px;
+      font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 12px;
+      box-shadow: 0 4px 12px rgba(224,60,49,.3); transition: transform .1s, box-shadow .1s;
+    }
+    button.submit-final:hover { background: var(--md-red-deep); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(200,16,46,.4); }
+    button.submit-final:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .total-count { color: var(--text-muted); font-size: 14px; }
+
+    /* School gate — first screen. Deliberately a LINE-FOR-LINE port of MACS Forms' own school
+       picker (hcs-custom-forms/apps/runner-macs/pages/{Index,Theme}.html), because a school
+       arriving here should not be able to tell it left that product. Two earlier attempts got
+       this wrong in opposite directions, so the reasoning is recorded:
+
+         1. Borrowing var(--bg) painted the whole screen #2b2b2d — that token is this page's
+            charcoal sidebar colour, and applyMacsBranding_ re-sets it from the live theme's
+            `primary`, which is the same charcoal. Result: a flat black slab.
+         2. "Fixing" it with the brand red painted a full-bleed maroon page. Also wrong: MACS
+            Forms' gate is a LIGHT page with a contained card, and the dark bar belongs to the
+            card, not the viewport.
+
+       The actual system: --hcs-red maps to MACS's charcoal (#2b2b2d) and --hcs-gold to MACS's
+       red (#c8102e), so the bar is dark, the rule under it is red, and the page behind is
+       near-white. Its Continue button looks grey in screenshots only because a disabled
+       charcoal button sits at opacity .55 — it is not a grey button.
+
+       Values below mirror that theme's tokens (radius 12/9px, line #e2e4e8, muted #6b7280,
+       page 680px) so the two screens line up pixel for pixel. --gate-* tokens are separate
+       from this page's own palette so the branding sync can never repaint the gate. */
+    :root {
+      --gate-page-bg: #fdfbfb;  /* theme `bg`   */
+      --gate-card-bg: #fffdfb;  /* theme `card` */
+      --gate-bar-bg: #2b2b2d;   /* theme `primary` -> --hcs-red in MACS's palette */
+      --gate-rule: #c8102e;     /* theme `accent`  -> --hcs-gold in MACS's palette */
+      --gate-line: #e2e4e8;
+      --gate-line-strong: #cfd3da;
+      --gate-text: #2b2b2b;
+      --gate-muted: #6b7280;
+    }
+    .gate-overlay {
+      position: fixed; inset: 0; background: var(--gate-page-bg); z-index: 1000; overflow-y: auto;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+    .gate-shell { max-width: 680px; margin: 0 auto; padding: 24px 16px 64px; }
+    .gate-topbar {
+      display: flex; align-items: center; gap: 12px; background: var(--gate-bar-bg); color: #fff;
+      padding: 12px 18px; border-radius: 12px 12px 0 0;
+    }
+    .gate-topbar .crest { height: 34px; width: auto; background: #fff; border-radius: 6px; padding: 3px 5px; }
+    .gate-topbar h2 { color: #fff; font-size: 1rem; margin: 0; font-weight: 800; letter-spacing: -.01em; }
+    .gate-goldrule { height: 4px; background: var(--gate-rule); }
+    .gate-card {
+      background: var(--gate-card-bg); border: 1px solid var(--gate-line);
+      border-radius: 0 0 12px 12px; padding: 22px;
+      box-shadow: 0 1px 2px rgba(16,24,40,.06), 0 6px 22px rgba(16,24,40,.06);
+    }
+    .gate-card h1 { font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; letter-spacing: -.02em; color: var(--gate-text); }
+    .gate-card p.help { color: var(--gate-muted); font-size: 1rem; margin: 0 0 16px; }
+    .gate-card label { display: block; font-weight: 600; font-size: .95rem; color: var(--gate-text); margin-bottom: 6px; }
+    .gate-card select, .gate-card input {
+      width: 100%; font: inherit; font-size: 1rem; color: var(--gate-text); background: var(--gate-card-bg);
+      border: 1px solid var(--gate-line-strong); border-radius: 9px; padding: 10px 12px;
+    }
+    .gate-card select:focus, .gate-card input:focus { outline: none; border-color: var(--gate-bar-bg); }
+    .gate-continue {
+      width: 100%; background: var(--gate-bar-bg); color: #fff; border: 1px solid transparent;
+      border-radius: 9px; padding: 11px 18px; font-size: .95rem; font-weight: 700; cursor: pointer;
+      margin-top: 14px;
+    }
+    .gate-continue:disabled { opacity: .55; cursor: not-allowed; }
+    .gate-error { color: #b42318; font-size: .83rem; margin: 8px 0 0; font-weight: 600; }
+    .gate-footer { text-align: center; color: var(--gate-muted); font-size: .83rem; margin: 20px 0 0; }
+
+    /* Custom modal — replaces native confirm()/alert() ("the constant Google prompt"). */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(20,10,10,.55); z-index: 2000;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-card { background: #fff; border-radius: 12px; padding: 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+    .modal-card p { margin: 0 0 18px; color: var(--text); font-size: 14px; line-height: 1.5; white-space: pre-line; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal-btn {
+      padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+      border: 1px solid var(--border); background: #fff; color: var(--md-red-deep);
+    }
+    .modal-btn.primary { background: var(--md-red); color: #fff; border-color: var(--md-red); }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "MACS Fine Arts" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div class="gate-overlay" id="gateOverlay">
+    <div class="gate-shell">
+    <div class="gate-topbar"><img class="crest" id="gateCrest" alt=""><h2>MACS Fine Arts</h2></div>
+    <div class="gate-goldrule"></div>
+    <div class="gate-card">
+      <div id="gateStepSchool">
+        <h1>Select your school</h1>
+        <p class="help">You&rsquo;ll get a one-time code by email to confirm you&rsquo;re registering for this school.</p>
+        <div class="field"><label for="gateSchoolSelect">School</label>
+          <select id="gateSchoolSelect"><option value="">Loading schools…</option></select>
+        </div>
+        <button class="gate-continue" id="gateSchoolBtn" type="button" disabled>Continue</button>
+      </div>
+
+      <div id="gateStepEmail" style="display:none">
+        <h1>Confirm your email</h1>
+        <p class="help">Enter the email address on file for <strong id="gateEmailSchoolName"></strong>. We&rsquo;ll send a 6-digit code.</p>
+        <div class="field"><label for="gateEmail">Email address</label>
+          <input type="email" id="gateEmail" autocomplete="email" inputmode="email">
+        </div>
+        <p class="gate-error" id="gateEmailError" style="display:none"></p>
+        <button class="gate-continue" id="gateSendBtn" type="button">Send code</button>
+        <p class="help" style="margin-top:12px"><a href="javascript:void(0)" id="gateBackToSchool">Choose a different school</a></p>
+      </div>
+
+      <div id="gateStepCode" style="display:none">
+        <h1>Enter your code</h1>
+        <p class="help">We sent a 6-digit code to <strong id="gateCodeEmail"></strong>. It expires in 10 minutes. Check spam if it hasn&rsquo;t arrived.</p>
+        <div class="field"><label for="gateCode">6-digit code</label>
+          <input type="text" id="gateCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+        </div>
+        <p class="gate-error" id="gateCodeError" style="display:none"></p>
+        <button class="gate-continue" id="gateVerifyBtn" type="button">Verify &amp; continue</button>
+        <p class="help" style="margin-top:12px"><a href="javascript:void(0)" id="gateBackToEmail">Use a different email</a></p>
+      </div>
+    </div>
+    <p class="gate-footer">Maryland Association of Christian Schools</p>
+    </div>
+  </div>
+  <div class="page" id="appPage" style="display:none">
+    <div class="sidebar">
+    <div class="masthead">
+      <img class="crest" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23c8102e'/%3E%3Ccircle cx='32' cy='32' r='24' fill='none' stroke='white' stroke-width='2'/%3E%3Ctext x='32' y='38' font-family='Inter,Arial,sans-serif' font-size='15' font-weight='800' fill='white' text-anchor='middle'%3EMACS%3C/text%3E%3C/svg%3E" alt="MACS logo">
+      <div class="masthead-title">
+        <h1>MACS Fine Arts</h1>
+        <p>Registration</p>
+      </div>
+    </div>
+
+    <div class="tabbar" id="tabbar"></div>
+    </div>
+
+    <div class="main">
+      <div id="warning" class="notice warn" style="display:none; margin:20px 32px 0"></div>
+      <div id="success" class="notice success" style="display:none; margin:20px 32px 0"></div>
+
+      <div id="panels"></div>
+    </div>
+  </div>
+
+  <script>
+    var categories = [];
+    var fieldTemplates = {};
+    var entryIdSeq = 0;
+    var SECTION_ORDER = ['Register', 'Bible', 'Music', 'Speech', 'Art', 'Projects', 'Judging', 'Payment'];
+    var LAST_TAB = 'Payment';
+
+    // ---- Custom modal (replaces native confirm()/alert() everywhere in this file) ----
+    function macsModal_(message, buttons) {
+      return new Promise(function (resolve) {
+        var backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop';
+        var card = document.createElement('div');
+        card.className = 'modal-card';
+        var p = document.createElement('p');
+        p.textContent = message;
+        card.appendChild(p);
+        var actions = document.createElement('div');
+        actions.className = 'modal-actions';
+        buttons.forEach(function (b) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'modal-btn' + (b.primary ? ' primary' : '');
+          btn.textContent = b.label;
+          btn.onclick = function () { document.body.removeChild(backdrop); resolve(b.value); };
+          actions.appendChild(btn);
+        });
+        card.appendChild(actions);
+        backdrop.appendChild(card);
+        document.body.appendChild(backdrop);
+        (buttons[buttons.length - 1] && actions.lastChild) && actions.lastChild.focus();
+      });
+    }
+    function macsAlert_(message) {
+      return macsModal_(message, [{ label: 'OK', primary: true, value: true }]);
+    }
+    function macsConfirm_(message, confirmLabel, cancelLabel) {
+      return macsModal_(message, [
+        { label: cancelLabel || 'Cancel', primary: false, value: false },
+        { label: confirmLabel || 'OK', primary: true, value: true }
+      ]);
+    }
+
+    // ---- School gate (first screen) ----
+    var FORM_READY = false;
+    var formReadyWaiters_ = [];
+    function markFormReady_() {
+      FORM_READY = true;
+      formReadyWaiters_.forEach(function (fn) { fn(); });
+      formReadyWaiters_ = [];
+    }
+    function whenFormReady_() {
+      return new Promise(function (resolve) {
+        if (FORM_READY) { resolve(); return; }
+        formReadyWaiters_.push(resolve);
+      });
+    }
+    // The verified session. Held in a variable only — deliberately NOT localStorage, so a
+    // shared school computer can't resume someone else's verified session. (The answers draft
+    // is separate and stays in localStorage; it holds no identity.)
+    var SESSION = null;
+
+    function gateShowStep_(which) {
+      ['School', 'Email', 'Code'].forEach(function (s) {
+        document.getElementById('gateStep' + s).style.display = (s === which) ? '' : 'none';
+      });
+    }
+    function gateError_(id, msg) {
+      var el = document.getElementById(id);
+      el.textContent = msg || '';
+      el.style.display = msg ? 'block' : 'none';
+    }
+    /** Disable + relabel a button for the duration of an async call. Returns a restore fn.
+     *  Every gate call goes through this, so no button can be double-submitted. */
+    function gateBusy_(btn, label) {
+      var original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = label;
+      return function () { btn.disabled = false; btn.textContent = original; };
+    }
+    function gateCall_(fnName, args) {
+      return new Promise(function (resolve, reject) {
+        var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fnName].apply(runner, args);
+      });
+    }
+
+    function populateGate_() {
+      var sel = document.getElementById('gateSchoolSelect');
+      var btn = document.getElementById('gateSchoolBtn');
+      if (!schools.length) { sel.innerHTML = '<option value="">No schools available</option>'; return; }
+      sel.innerHTML = '<option value="">— choose a school —</option>' +
+        schools.map(function (s) {
+          var d = document.createElement('div'); d.textContent = s.name;
+          return '<option value="' + s.code + '">' + d.innerHTML + '</option>';
+        }).join('');
+      btn.disabled = false;
+      var realCrest = document.querySelector('.sidebar .crest');
+      var gateCrest = document.getElementById('gateCrest');
+      if (realCrest && gateCrest) gateCrest.src = realCrest.src;
+    }
+
+    function gateSelectedSchool_() {
+      var code = document.getElementById('gateSchoolSelect').value;
+      return schools.filter(function (s) { return String(s.code) === String(code); })[0] || null;
+    }
+
+    document.getElementById('gateSchoolBtn').addEventListener('click', function () {
+      var school = gateSelectedSchool_();
+      if (!school) return;
+      document.getElementById('gateEmailSchoolName').textContent = school.name;
+      gateError_('gateEmailError', '');
+      gateShowStep_('Email');
+      document.getElementById('gateEmail').focus();
+    });
+
+    document.getElementById('gateBackToSchool').addEventListener('click', function () {
+      gateError_('gateEmailError', '');
+      gateShowStep_('School');
+    });
+    document.getElementById('gateBackToEmail').addEventListener('click', function () {
+      gateError_('gateCodeError', '');
+      gateShowStep_('Email');
+      document.getElementById('gateEmail').focus();
+    });
+
+    document.getElementById('gateSendBtn').addEventListener('click', async function () {
+      var school = gateSelectedSchool_();
+      var email = document.getElementById('gateEmail').value.trim();
+      if (!school) { gateShowStep_('School'); return; }
+      if (!email || email.indexOf('@') < 1) { gateError_('gateEmailError', 'Please enter a valid email address.'); return; }
+      gateError_('gateEmailError', '');
+      var restore = gateBusy_(this, 'Sending…');
+      var res;
+      try {
+        res = await gateCall_('requestSchoolCode', [school.name, email]);
+      } catch (err) {
+        restore();
+        gateError_('gateEmailError', 'Sign-in is temporarily unavailable. Please try again in a few minutes.');
+        return;
+      }
+      restore();
+      if (!res || !res.ok) { gateError_('gateEmailError', (res && res.msg) || 'Could not send a code. Please try again.'); return; }
+      document.getElementById('gateCodeEmail').textContent = email;
+      document.getElementById('gateCode').value = '';
+      gateError_('gateCodeError', '');
+      gateShowStep_('Code');
+      document.getElementById('gateCode').focus();
+    });
+
+    document.getElementById('gateVerifyBtn').addEventListener('click', async function () {
+      var school = gateSelectedSchool_();
+      var email = document.getElementById('gateEmail').value.trim();
+      var code = document.getElementById('gateCode').value.trim();
+      if (!school) { gateShowStep_('School'); return; }
+      if (!/^\d{6}$/.test(code)) { gateError_('gateCodeError', 'Enter the 6-digit code from the email.'); return; }
+      gateError_('gateCodeError', '');
+      var restore = gateBusy_(this, 'Verifying…');
+      var res;
+      try {
+        res = await gateCall_('verifySchoolCode', [school.name, email, code]);
+      } catch (err) {
+        restore();
+        gateError_('gateCodeError', 'Sign-in is temporarily unavailable. Please try again in a few minutes.');
+        return;
+      }
+      if (!res || !res.ok) {
+        restore();
+        gateError_('gateCodeError', (res && res.msg) || 'That code is not correct.');
+        return;
+      }
+      SESSION = { token: res.token, schoolCode: res.schoolCode, schoolName: res.schoolName, email: res.email };
+      this.textContent = 'Loading…';
+      try {
+        await whenFormReady_();
+        document.getElementById('gateOverlay').style.display = 'none';
+        document.getElementById('appPage').style.display = '';
+        applyVerifiedSchool_();
+        var resumed = await restoreDraftIfPresent();
+        // The draft may have been saved by a different school; the verified session always wins,
+        // so re-pin after restore regardless of what the draft wrote into schoolSelect.
+        applyVerifiedSchool_();
+        if (!resumed) onSchoolChange();
+      } finally {
+        // Always restore the button, even if something above threw — otherwise a failure here
+        // leaves it stuck disabled reading "Loading…" with no way forward.
+        restore();
+      }
+    });
+
+    /** Pin the Register tab's school field to the verified school and lock it. */
+    function applyVerifiedSchool_() {
+      var sel = document.getElementById('schoolSelect');
+      if (!sel || !SESSION) return;
+      sel.value = SESSION.schoolCode;
+      sel.disabled = true;
+      sel.title = 'Verified as ' + SESSION.schoolName + ' (' + SESSION.email + ')';
+    }
+
+    /** An expired session mid-fill: say so plainly and send them back to the gate. The
+     *  localStorage draft is independent of the token, so their answers survive a re-verify. */
+    async function handleSessionExpiry_() {
+      SESSION = null;
+      await macsAlert_('Your sign-in expired. Please verify your email again — your entries are saved and will be restored.');
+      document.getElementById('appPage').style.display = 'none';
+      document.getElementById('gateOverlay').style.display = '';
+      gateError_('gateCodeError', '');
+      document.getElementById('gateCode').value = '';
+      gateShowStep_('Email');
+    }
+    function isAuthError_(err) {
+      var m = String((err && err.message) || err || '');
+      return m.indexOf('AUTH_EXPIRED') > -1 || m.indexOf('AUTH_INVALID') > -1;
+    }
+
+    function switchTab(id) {
+      document.querySelectorAll('.tabbar button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === id); });
+      document.querySelectorAll('.tabpanel').forEach(function (p) { p.classList.toggle('active', p.id === 'tab-' + id); });
+      if (id === 'Judging') buildJudgingPanel();
+      if (id === 'Payment') buildPaymentPanel();
+    }
+
+    var NAV_GROUPS = [
+      { label: 'Registration', ids: ['Register'] },
+      { label: 'Categories', ids: ['Bible', 'Music', 'Speech', 'Art', 'Projects'] },
+      { label: 'Wrap Up', ids: ['Judging', 'Payment'] }
+    ];
+
+    function buildTabs(sectionsPresent) {
+      var bar = document.getElementById('tabbar');
+      var panelsEl = document.getElementById('panels');
+      var always = { Register: true, Judging: true, Payment: true };
+      var shown = SECTION_ORDER.filter(function (s) { return always[s] || sectionsPresent[s]; });
+      var firstId = shown[0];
+
+      NAV_GROUPS.forEach(function (group) {
+        var idsInGroup = group.ids.filter(function (id) { return shown.indexOf(id) !== -1; });
+        if (!idsInGroup.length) return;
+
+        var label = document.createElement('div');
+        label.className = 'navgroup-label';
+        label.textContent = group.label;
+        bar.appendChild(label);
+
+        var wrap = document.createElement('div');
+        wrap.className = 'navgroup';
+        idsInGroup.forEach(function (s) {
+          var btn = document.createElement('button');
+          btn.textContent = s;
+          btn.dataset.tab = s;
+          btn.className = s === firstId ? 'active' : '';
+          btn.onclick = function () { switchTab(s); };
+          wrap.appendChild(btn);
+        });
+        bar.appendChild(wrap);
+      });
+
+      shown.forEach(function (s, i) {
+        var panel = document.createElement('div');
+        panel.className = 'tabpanel' + (s === firstId ? ' active' : '');
+        panel.id = 'tab-' + s;
+        panelsEl.appendChild(panel);
+      });
+    }
+
+    function buildRegisterPanel() {
+      var panel = document.getElementById('tab-Register');
+      var options = schools.map(function (s) {
+        return '<option value="' + s.code + '" data-name="' + String(s.name || '').replace(/"/g, '&quot;') + '">' + s.name + ' (' + s.code + ')</option>';
+      }).join('');
+      panel.innerHTML =
+        '<div class="grid-2">' +
+        '<div class="field"><label for="schoolSelect">School *</label><select id="schoolSelect"><option value="">Select your school…</option>' + options + '</select>' +
+        '<div class="error-text" id="schoolError">Please select your school.</div></div>' +
+        '</div>' +
+        '<div class="grid-2">' +
+        '<div class="field"><label>Contact Person — First Name *</label><input id="contactFirst"></div>' +
+        '<div class="field"><label>Contact Person — Last Name *</label><input id="contactLast"></div>' +
+        '<div class="field"><label>Phone Number *</label><input id="contactPhone" placeholder="(000) 000-0000"></div>' +
+        '<div class="field"><label>Email *</label><input id="contactEmail" placeholder="example@example.com" type="email"></div>' +
+        '</div>';
+    }
+
+    var categoriesLoaded = false, templatesLoaded = false, judgingSheetsLoaded = false, paymentInfoLoaded = false, schoolsLoaded = false;
+    var judgingSheets = {};
+    var paymentInfo = {};
+    var schools = [];
+    function tryRenderForm() {
+      if (!categoriesLoaded || !templatesLoaded || !judgingSheetsLoaded || !paymentInfoLoaded || !schoolsLoaded) return;
+      var sectionsPresent = {};
+      categories.forEach(function (c) { sectionsPresent[c.section || 'Other'] = true; });
+      buildTabs(sectionsPresent);
+      buildRegisterPanel();
+      renderCategorySections();
+      buildJudgingPanel();
+      buildPaymentPanel();
+      markFormReady_();
+    }
+
+    // ---- Save-and-resume: autosave every change to this browser's
+    // localStorage (best-effort — file attachments can't be restored this
+    // way, so those need to be re-attached after a resume) ----
+    var DRAFT_STORAGE_KEY = 'macsFormDraft_v1';
+
+    function buildDraftSnapshot() {
+      var draft = { savedAt: new Date().toISOString(), school: {}, contact: {}, counts: {}, entries: [] };
+      var schoolSelectEl = document.getElementById('schoolSelect');
+      if (schoolSelectEl) {
+        draft.school.code = schoolSelectEl.value;
+        draft.contact.firstName = document.getElementById('contactFirst').value;
+        draft.contact.lastName = document.getElementById('contactLast').value;
+        draft.contact.phone = document.getElementById('contactPhone').value;
+        draft.contact.email = document.getElementById('contactEmail').value;
+      }
+      document.querySelectorAll('.count-field select[data-category-code]').forEach(function (sel) {
+        draft.counts[sel.dataset.categoryCode] = sel.value;
+      });
+      document.querySelectorAll('.entry-row').forEach(function (row) {
+        var entry = { categoryCode: row.dataset.categoryCode, fields: {}, roster: [] };
+        row.querySelectorAll('[data-field]:not([type=file])').forEach(function (input) {
+          entry.fields[input.dataset.field] = input.value;
+        });
+        row.querySelectorAll('.roster-table tbody tr').forEach(function (tr) {
+          entry.roster.push({
+            studentName: tr.querySelector('[data-roster-field="studentName"]').value,
+            participatingIn: tr.querySelector('[data-roster-field="participatingIn"]').value
+          });
+        });
+        draft.entries.push(entry);
+      });
+      return draft;
+    }
+
+    function saveDraft() {
+      try { localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(buildDraftSnapshot())); } catch (e) { /* storage unavailable — autosave is best-effort */ }
+    }
+
+    var saveDraftDebounced = (function () {
+      var timer;
+      return function () { clearTimeout(timer); timer = setTimeout(saveDraft, 500); };
+    })();
+
+    function clearDraft() {
+      try { localStorage.removeItem(DRAFT_STORAGE_KEY); } catch (e) { /* ignore */ }
+    }
+
+    async function restoreDraftIfPresent() {
+      var raw;
+      try { raw = localStorage.getItem(DRAFT_STORAGE_KEY); } catch (e) { return false; }
+      if (!raw) return false;
+      var draft;
+      try { draft = JSON.parse(raw); } catch (e) { clearDraft(); return false; }
+
+      var savedAt = draft.savedAt ? new Date(draft.savedAt).toLocaleString() : 'earlier';
+      var resume = await macsConfirm_('You have a saved draft from ' + savedAt + '. Resume it? (Any PDF attachments will need to be re-attached.)', 'Resume', 'Start fresh');
+      if (!resume) {
+        clearDraft();
+        return false;
+      }
+
+      if (draft.school && draft.school.code) {
+        document.getElementById('schoolSelect').value = draft.school.code;
+      }
+      if (draft.contact) {
+        document.getElementById('contactFirst').value = draft.contact.firstName || '';
+        document.getElementById('contactLast').value = draft.contact.lastName || '';
+        document.getElementById('contactPhone').value = draft.contact.phone || '';
+        document.getElementById('contactEmail').value = draft.contact.email || '';
+      }
+
+      Object.keys(draft.counts || {}).forEach(function (code) {
+        var sel = document.querySelector('.count-field select[data-category-code="' + code + '"]');
+        if (!sel) return;
+        sel.value = draft.counts[code];
+        sel.dispatchEvent(new Event('change'));
+      });
+
+      // Rows for every category now exist (created synchronously by the
+      // count change above) — fill them in DOM order, matching the order
+      // entries were saved in per category code.
+      var nextIndexByCode = {};
+      (draft.entries || []).forEach(function (entry) {
+        var i = nextIndexByCode[entry.categoryCode] || 0;
+        nextIndexByCode[entry.categoryCode] = i + 1;
+        var rowsForCode = document.querySelectorAll('.entry-row[data-category-code="' + entry.categoryCode + '"]');
+        var row = rowsForCode[i];
+        if (!row) return;
+        Object.keys(entry.fields || {}).forEach(function (key) {
+          var input = row.querySelector('[data-field="' + key + '"]');
+          if (input) input.value = entry.fields[key];
+        });
+        var rosterList = entry.roster || [];
+        var addBtn = row.querySelector('.roster-add');
+        while (addBtn && row.querySelectorAll('.roster-table tbody tr').length < rosterList.length) addBtn.click();
+        row.querySelectorAll('.roster-table tbody tr').forEach(function (tr, ri) {
+          var r = rosterList[ri];
+          if (!r) return;
+          tr.querySelector('[data-roster-field="studentName"]').value = r.studentName || '';
+          tr.querySelector('[data-roster-field="participatingIn"]').value = r.participatingIn || '';
+        });
+      });
+
+      document.querySelectorAll('.category-card').forEach(updateCategoryBadge);
+      updateTotalCount();
+      return true;
+    }
+
+    document.addEventListener('input', saveDraftDebounced, true);
+    document.addEventListener('change', saveDraftDebounced, true);
+
+    google.script.run.withSuccessHandler(function (cats) {
+      categories = cats;
+      categoriesLoaded = true;
+      tryRenderForm();
+    }).getCategoryList();
+
+    google.script.run.withSuccessHandler(function (templates) {
+      fieldTemplates = templates;
+      templatesLoaded = true;
+      tryRenderForm();
+    }).getFieldTemplateDefs();
+
+    google.script.run.withSuccessHandler(function (sheets) {
+      judgingSheets = sheets;
+      judgingSheetsLoaded = true;
+      tryRenderForm();
+    }).getJudgingSheets();
+
+    google.script.run.withSuccessHandler(function (info) {
+      paymentInfo = info || {};
+      paymentInfoLoaded = true;
+      tryRenderForm();
+    }).getPaymentInfo();
+
+    google.script.run.withSuccessHandler(function (list) {
+      schools = list || [];
+      schoolsLoaded = true;
+      populateGate_();
+      tryRenderForm();
+    }).getSchoolList();
+
+    // Live-synced from MACS Forms' _System (its THEME_JSON/BRAND_NAME) so this page's palette
+    // and org name stay in step with it — never blocks rendering (fires independently of
+    // tryRenderForm) and silently no-ops if MACS Forms is unreachable, keeping today's
+    // hardcoded colors as the fallback.
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res) return;
+      applyMacsBranding_(res.theme, res.brand);
+    }).getBranding();
+
+    function applyMacsBranding_(theme, brand) {
+      if (theme) {
+        var root = document.documentElement.style;
+        if (theme.accent) { root.setProperty('--md-red', theme.accent); root.setProperty('--primary', theme.accent); root.setProperty('--accent', theme.accent); }
+        if (theme.primary) root.setProperty('--bg', theme.primary);
+        if (theme.card) root.setProperty('--surface', theme.card);
+      }
+      if (brand && brand.orgName) {
+        var sub = document.querySelector('.masthead-title p');
+        if (sub) sub.textContent = brand.orgName + ' \u00b7 Registration';
+      }
+    }
+
+    // The school is fixed by sign-in, so this no longer reacts to a dropdown change — it just
+    // reports whether the verified school has already submitted. Called once after sign-in.
+    function onSchoolChange() {
+      document.getElementById('warning').style.display = 'none';
+      if (!SESSION) return;
+      google.script.run
+        .withSuccessHandler(function (status) {
+          if (status.alreadySubmitted) {
+            var w = document.getElementById('warning');
+            w.style.display = 'block';
+            w.textContent = 'This school has already submitted entries. To make a change, email the competition admin — the form does not accept a second submission.';
+          }
+        })
+        .withFailureHandler(function (err) { if (isAuthError_(err)) handleSessionExpiry_(); })
+        .checkSchoolStatus(SESSION.token);
+    }
+
+    // Group same-named categories (e.g. "Bible Memory" JBM + SBM) into one
+    // row per subcategory with separate Junior High / Senior High counts,
+    // matching the original JotForm layout instead of splitting by level.
+    function groupCategoriesByName() {
+      var groups = {};
+      var order = [];
+      categories.forEach(function (c) {
+        var key = (c.section || 'Other') + '::' + c.name;
+        if (!groups[key]) { groups[key] = { name: c.name, section: c.section, byLevel: {} }; order.push(key); }
+        groups[key].byLevel[c.level || 'Other'] = c;
+      });
+      return order.map(function (key) { return groups[key]; });
+    }
+
+    function renderCategorySections() {
+      var groups = groupCategoriesByName();
+      var bySection = {};
+      groups.forEach(function (g) {
+        var sec = g.section || 'Other';
+        if (!bySection[sec]) bySection[sec] = [];
+        bySection[sec].push(g);
+      });
+
+      Object.keys(bySection).forEach(function (sectionName) {
+        var panel = document.getElementById('tab-' + sectionName);
+        if (!panel) return;
+        bySection[sectionName].forEach(function (g) { panel.appendChild(buildCategoryCard(g)); });
+      });
+    }
+
+    function buildCategoryCard(group) {
+      var jh = group.byLevel['Junior High'];
+      var sh = group.byLevel['Senior High'];
+      var card = document.createElement('div');
+      card.className = 'category-card open';
+
+      var header = document.createElement('div');
+      header.className = 'category-header';
+
+      var titleDiv = document.createElement('div');
+      titleDiv.innerHTML = '<span class="name">' + group.name + '</span> ' +
+        '<span class="code">(' + [jh, sh].filter(Boolean).map(function (c) { return c.code; }).join(' / ') + ')</span>' +
+        '<span class="entry-count-badge" style="display:none">0</span>';
+      header.appendChild(titleDiv);
+
+      var countWrap = document.createElement('div');
+      countWrap.className = 'count-inputs';
+
+      var body = document.createElement('div');
+      body.className = 'category-body';
+      card.appendChild(header);
+      card.appendChild(body);
+      card.classList.add('open');
+
+      function makeCountField(cat, label) {
+        var max = cat.maxPerSchool > 0 ? cat.maxPerSchool : 20;
+        var field = document.createElement('div');
+        field.className = 'count-field';
+        var lab = document.createElement('label');
+        lab.textContent = label;
+        var input = document.createElement('select');
+        input.dataset.categoryCode = cat.code;
+        for (var i = 0; i <= max; i++) {
+          var opt = document.createElement('option');
+          opt.value = i; opt.textContent = i;
+          input.appendChild(opt);
+        }
+        input.value = '0';
+        input.addEventListener('change', function () {
+          var n = parseInt(input.value, 10) || 0;
+          syncEntryRowsForLevel(cat, body, card, n, label);
+        });
+        field.appendChild(lab); field.appendChild(input);
+        return field;
+      }
+
+      if (jh) countWrap.appendChild(makeCountField(jh, 'Jr. High'));
+      if (sh) countWrap.appendChild(makeCountField(sh, 'Sr. High'));
+      header.appendChild(countWrap);
+
+      return card;
+    }
+
+    var LEVEL_TAG_PREFIX = { 'Junior High': 'JR HIGH', 'Senior High': 'SR HIGH' };
+
+    // Adds/removes entry rows for one level of a category so the row
+    // count always matches the number typed into that level's count box,
+    // and renumbers every remaining row 1, 2, 3... (e.g. "JR HIGH 1",
+    // "JR HIGH 2") instead of repeating the raw count-field label.
+    function syncEntryRowsForLevel(cat, body, card, targetCount, levelLabel) {
+      var existing = Array.prototype.slice.call(body.querySelectorAll('.entry-row[data-category-code="' + cat.code + '"]'));
+      while (existing.length < targetCount) {
+        var row = buildEntryRow(cat, body, card);
+        body.appendChild(row);
+        existing.push(row);
+      }
+      while (existing.length > targetCount) {
+        var last = existing.pop();
+        last.remove();
+      }
+      var prefix = LEVEL_TAG_PREFIX[cat.level] || levelLabel;
+      existing.forEach(function (row, idx) {
+        row.querySelector('.level-tag').textContent = prefix + ' ' + (idx + 1);
+      });
+      updateCategoryBadge(card);
+      updateTotalCount();
+    }
+
+    // Fields + roster behavior come from the Field Templates the admin
+    // manages in the Admin app — nothing hardcoded here, so a new
+    // template shows up automatically once a category references it.
+    function templateFor(cat) {
+      return fieldTemplates[cat.fieldTemplate] || { fields: [{ key: 'title', label: 'Title' }], isGroupRoster: false };
+    }
+
+    function buildEntryRow(cat, body, card) {
+      var row = document.createElement('div');
+      row.className = 'entry-row';
+      row.dataset.entryId = ++entryIdSeq;
+      row.dataset.categoryCode = cat.code;
+
+      var template = templateFor(cat);
+
+      var summary = document.createElement('div');
+      summary.className = 'entry-summary';
+
+      var tag = document.createElement('span');
+      tag.className = 'level-tag';
+      summary.appendChild(tag);
+
+      var nameInput = document.createElement('input');
+      nameInput.dataset.field = 'studentName';
+      nameInput.placeholder = (cat.isGroupRoster ? 'Group Name' : 'Student Name') + ' *';
+      nameInput.required = true;
+      nameInput.addEventListener('click', function (e) { e.stopPropagation(); });
+      summary.appendChild(nameInput);
+
+      var toggle = document.createElement('span');
+      toggle.className = 'entry-toggle';
+      toggle.textContent = '▾';
+      summary.appendChild(toggle);
+
+      summary.addEventListener('click', function () {
+        row.classList.toggle('open');
+      });
+
+      var details = document.createElement('div');
+      details.className = 'entry-details';
+      var grid = document.createElement('div');
+      grid.className = 'grid';
+      (template.fields || []).forEach(function (f) {
+        var field = document.createElement('div');
+        field.className = 'field' + (f.full ? ' full' : '');
+        var label = document.createElement('label');
+        label.textContent = f.label;
+        var input;
+        if (f.type === 'file') {
+          input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'application/pdf';
+        } else {
+          input = document.createElement(f.type === 'textarea' ? 'textarea' : 'input');
+        }
+        input.dataset.field = f.key;
+        field.appendChild(label);
+        field.appendChild(input);
+        grid.appendChild(field);
+      });
+      details.appendChild(grid);
+
+      if (cat.isGroupRoster) details.appendChild(buildRosterTable(row));
+
+      row.appendChild(summary);
+      row.appendChild(details);
+      return row;
+    }
+
+    // Roster table for large-group categories: list each student in the
+    // group plus what else they're entered in. "Autofill" is a one-shot
+    // button (not live) that scans every entry on the whole form by
+    // matching student/group name and fills each roster row's
+    // "Participating In" cell — this replaces the old free-text
+    // "list your other events" field with real, button-driven data.
+    function buildRosterTable(entryRow) {
+      var wrap = document.createElement('div');
+      wrap.className = 'roster-wrap';
+
+      var table = document.createElement('table');
+      table.className = 'roster-table';
+      table.innerHTML = '<thead><tr><th>Student Name</th><th>Participating In</th><th></th></tr></thead>';
+      var tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+
+      function addRosterRow() {
+        var tr = document.createElement('tr');
+        var tdName = document.createElement('td');
+        var nameInput = document.createElement('input');
+        nameInput.dataset.rosterField = 'studentName';
+        tdName.appendChild(nameInput);
+        var tdParticipating = document.createElement('td');
+        var partInput = document.createElement('input');
+        partInput.dataset.rosterField = 'participatingIn';
+        tdParticipating.appendChild(partInput);
+        var tdRemove = document.createElement('td');
+        var removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'roster-remove';
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', function () { tr.remove(); saveDraftDebounced(); });
+        tdRemove.appendChild(removeBtn);
+        tr.appendChild(tdName); tr.appendChild(tdParticipating); tr.appendChild(tdRemove);
+        tbody.appendChild(tr);
+      }
+      addRosterRow();
+
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'roster-add';
+      addBtn.textContent = '+ Add Student';
+      addBtn.addEventListener('click', function () { addRosterRow(); saveDraftDebounced(); });
+
+      var autofillBtn = document.createElement('button');
+      autofillBtn.type = 'button';
+      autofillBtn.className = 'roster-autofill';
+      autofillBtn.textContent = 'Autofill Participating In';
+      autofillBtn.addEventListener('click', function () { autofillRoster(entryRow, tbody); });
+
+      wrap.appendChild(table);
+      wrap.appendChild(addBtn);
+      wrap.appendChild(autofillBtn);
+      return wrap;
+    }
+
+    // Builds a name -> ["Category Name (Level)", ...] map from every
+    // entry currently on the form (across all tabs), then fills each
+    // roster row's Participating In field from that map. Excludes this
+    // roster's own group entry from a student's own list.
+    function autofillRoster(ownEntryRow, tbody) {
+      var byName = {};
+      document.querySelectorAll('.entry-row').forEach(function (otherRow) {
+        if (otherRow === ownEntryRow) return;
+        var nameInput = otherRow.querySelector('.entry-summary input[data-field="studentName"]');
+        var name = nameInput ? nameInput.value.trim() : '';
+        if (!name) return;
+        var code = otherRow.dataset.categoryCode;
+        var catMeta = categories.filter(function (c) { return c.code === code; })[0];
+        var label = catMeta ? catMeta.name : code;
+        var key = name.toLowerCase();
+        if (!byName[key]) byName[key] = [];
+        byName[key].push(label);
+      });
+      tbody.querySelectorAll('tr').forEach(function (tr) {
+        var nameInput = tr.querySelector('[data-roster-field="studentName"]');
+        var partInput = tr.querySelector('[data-roster-field="participatingIn"]');
+        var key = nameInput.value.trim().toLowerCase();
+        if (!key) return;
+        partInput.value = (byName[key] || []).join(', ');
+      });
+    }
+
+    function updateCategoryBadge(card) {
+      var count = card.querySelectorAll('.entry-row').length;
+      var badge = card.querySelector('.entry-count-badge');
+      badge.style.display = count > 0 ? 'inline-block' : 'none';
+      badge.textContent = count;
+    }
+
+    function updateTotalCount() {
+      var total = document.querySelectorAll('.entry-row').length;
+      var els = document.querySelectorAll('.total-count');
+      els.forEach(function (el) { el.textContent = total + ' entr' + (total === 1 ? 'y' : 'ies') + ' added'; });
+    }
+
+    var JUDGING_SHEET_COPIES_PER_ENTRY = 3;
+
+    function buildJudgingPanel() {
+      var panel = document.getElementById('tab-Judging');
+      if (!panel) return;
+      var byCode = {};
+      categories.forEach(function (c) { byCode[c.code] = c; });
+
+      var counts = {}; // Category Code -> entry count
+      document.querySelectorAll('.entry-row').forEach(function (row) {
+        var code = row.dataset.categoryCode;
+        counts[code] = (counts[code] || 0) + 1;
+      });
+
+      if (!Object.keys(counts).length) {
+        panel.innerHTML = '<div class="info-block"><h3>Judging Sheets</h3>' +
+          '<p>Add entries on the category tabs to see the judging sheets for them here.</p></div>';
+        return;
+      }
+
+      // Grouped by judging sheet, not category — several categories can share
+      // one sheet, and the number of copies to bring only depends on total
+      // entries against that sheet, not which category each entry is in.
+      var entriesBySheet = {};
+      Object.keys(counts).forEach(function (code) {
+        var cat = byCode[code];
+        var sheetName = (cat && cat.judgingSheetName) || (cat ? cat.name : code);
+        entriesBySheet[sheetName] = (entriesBySheet[sheetName] || 0) + counts[code];
+      });
+
+      panel.innerHTML =
+        '<div class="info-block"><h3>Judging Sheets</h3>' +
+        '<p>Bring 3 printed copies per entry, per judging sheet — regardless of which category the entry is in.</p>' +
+        '<div class="judging-list">' +
+        Object.keys(entriesBySheet).sort().map(function (sheetName) {
+          var entryCount = entriesBySheet[sheetName];
+          var copies = entryCount * JUDGING_SHEET_COPIES_PER_ENTRY;
+          var url = judgingSheets[sheetName];
+          return '<div><span>' + sheetName + ' (' + entryCount + ' entr' + (entryCount === 1 ? 'y' : 'ies') +
+            ' — bring ' + copies + ' cop' + (copies === 1 ? 'y' : 'ies') + ')</span>' +
+            (url ? '<a href="' + url + '" target="_blank" rel="noopener">Judging Sheet</a>'
+                 : '<span style="color:var(--text-muted)">Not yet provided</span>') +
+            '</div>';
+        }).join('') +
+        '</div></div>';
+    }
+
+    // Which fee-sheet line an entry counts toward. Debate is its own line
+    // on the printed fee sheet even though it's priced the same as other
+    // group performances, so it's matched by name rather than derived
+    // from Section/Group Roster like everything else.
+    var PAYMENT_BUCKETS = [
+      { key: 'projects', label: 'Projects (Art and Science Fair)' },
+      { key: 'debate', label: 'Debate' },
+      { key: 'speechBible', label: 'Speech and Bible Performances' },
+      { key: 'groupSpeech', label: 'Group Speech Performances' },
+      { key: 'musicIndividual', label: 'Music — Individual Performers' },
+      { key: 'groupMusic', label: 'Group Music Performances' }
+    ];
+
+    function paymentBucketFor(cat) {
+      if (!cat) return null;
+      if (cat.section === 'Art' || cat.section === 'Projects') return 'projects';
+      if (/debate/i.test(cat.name || '')) return 'debate';
+      if (cat.section === 'Bible') return 'speechBible';
+      if (cat.section === 'Speech') return cat.isGroupRoster ? 'groupSpeech' : 'speechBible';
+      if (cat.section === 'Music') return cat.isGroupRoster ? 'groupMusic' : 'musicIndividual';
+      return null;
+    }
+
+    function buildPaymentPanel() {
+      var panel = document.getElementById('tab-Payment');
+      if (!panel) return;
+
+      var byCode = {};
+      categories.forEach(function (c) { byCode[c.code] = c; });
+      var counts = {};
+      PAYMENT_BUCKETS.forEach(function (b) { counts[b.key] = 0; });
+      document.querySelectorAll('.entry-row').forEach(function (row) {
+        var bucket = paymentBucketFor(byCode[row.dataset.categoryCode]);
+        if (bucket) counts[bucket]++;
+      });
+
+      panel.innerHTML =
+        '<div class="info-block"><h3>Review &amp; Payment</h3>' +
+        '<p>Review your entries on the previous tabs before submitting. Once submitted, this form cannot be edited — any correction must go through the competition admin by email.</p>' +
+        '<div class="judging-list">' +
+        PAYMENT_BUCKETS.map(function (b) {
+          return '<div><span>' + b.label + '</span><span>' + counts[b.key] + '</span></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="review-summary"><span class="total-count">0 entries added</span></div>' +
+        (paymentInfo.macsPaymentPdfLink
+          ? '<p><a href="' + paymentInfo.macsPaymentPdfLink + '" target="_blank" rel="noopener">Payment Form (MACS Schools)</a></p>'
+          : '') +
+        (paymentInfo.nonMacsPaymentPdfLink
+          ? '<p><a href="' + paymentInfo.nonMacsPaymentPdfLink + '" target="_blank" rel="noopener">Payment Form (Non-MACS Schools)</a></p>'
+          : '') +
+        '<button class="submit-final" onclick="submitAll()">Submit Final Entries</button></div>';
+      updateTotalCount();
+    }
+
+    async function submitAll() {
+      if (!SESSION) { await handleSessionExpiry_(); return; }
+      var schoolCode = SESSION.schoolCode;
+      var schoolName = SESSION.schoolName;
+
+      var contact = {
+        firstName: document.getElementById('contactFirst').value.trim(),
+        lastName: document.getElementById('contactLast').value.trim(),
+        phone: document.getElementById('contactPhone').value.trim(),
+        email: document.getElementById('contactEmail').value.trim()
+      };
+
+      var schoolErrorEl = document.getElementById('schoolError');
+      if (!schoolCode || !schoolName) {
+        schoolErrorEl.style.display = 'block';
+        switchTab('Register');
+        document.querySelectorAll('.tabbar button').forEach(function (b) { if (b.dataset.tab === 'Register') b.click(); });
+        return;
+      }
+      schoolErrorEl.style.display = 'none';
+
+      if (!contact.firstName || !contact.lastName || !contact.phone || !contact.email) {
+        macsAlert_('Please fill in Contact Person, Phone Number, and Email on the Register tab.');
+        switchTab('Register');
+        return;
+      }
+
+      var rows = document.querySelectorAll('.entry-row');
+      var entries = [];
+      var pendingUploads = []; // {entry, fileInput}
+      var invalid = false;
+      rows.forEach(function (row) {
+        var entry = { categoryCode: row.dataset.categoryCode };
+        row.querySelectorAll('[data-field]:not([type=file])').forEach(function (input) { entry[input.dataset.field] = input.value; });
+        var roster = [];
+        row.querySelectorAll('.roster-table tbody tr').forEach(function (tr) {
+          var name = tr.querySelector('[data-roster-field="studentName"]').value.trim();
+          var participating = tr.querySelector('[data-roster-field="participatingIn"]').value.trim();
+          if (name) roster.push({ studentName: name, participatingIn: participating });
+        });
+        entry.roster = roster;
+        if (!entry.studentName || !entry.studentName.trim()) { invalid = true; return; }
+        entries.push(entry);
+        row.querySelectorAll('[data-field][type=file]').forEach(function (fileInput) {
+          if (fileInput.files && fileInput.files[0]) pendingUploads.push({ entry: entry, fileInput: fileInput, fieldKey: fileInput.dataset.field });
+        });
+      });
+
+      if (invalid || entries.length === 0) {
+        macsAlert_('Every entry needs at least a student/group name. Remove empty entries or fill them in.');
+        return;
+      }
+      var confirmed = await macsConfirm_('Submitting ' + entries.length + ' entries for ' + schoolName + '. This CANNOT be undone or edited later. Continue?', 'Submit', 'Cancel');
+      if (!confirmed) return;
+
+      var submitBtn = document.querySelector('.submit-final');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+
+      function finalSubmit() {
+        google.script.run
+          .withSuccessHandler(function (result) {
+            clearDraft();
+            document.getElementById('panels').style.display = 'none';
+            document.getElementById('tabbar').style.display = 'none';
+            var s = document.getElementById('success');
+            s.style.display = 'block';
+            s.textContent = 'Submitted ' + result.count + ' entries successfully. Thank you!';
+          })
+          .withFailureHandler(function (err) {
+            if (isAuthError_(err)) { handleSessionExpiry_(); return; }
+            macsAlert_('Error: ' + err.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Final Entries';
+          })
+          .submitSchoolEntries(SESSION.token, entries, contact);
+      }
+
+      uploadPendingFiles(pendingUploads, 0, submitBtn, finalSubmit);
+    }
+
+    // Uploads any PDF attachments one at a time (not concurrent — keeps
+    // memory/quota usage predictable), setting entry[fieldKey] (e.g.
+    // "attachment") to the resulting Drive link, then calls onDone once
+    // every upload finishes.
+    function uploadPendingFiles(pending, index, submitBtn, onDone) {
+      if (index >= pending.length) { onDone(); return; }
+      var item = pending[index];
+      var file = item.fileInput.files[0];
+      submitBtn.textContent = 'Uploading file ' + (index + 1) + ' of ' + pending.length + '…';
+      var reader = new FileReader();
+      reader.onload = function () {
+        var base64 = reader.result.split(',')[1];
+        google.script.run
+          .withSuccessHandler(function (result) {
+            item.entry[item.fieldKey] = result.url;
+            uploadPendingFiles(pending, index + 1, submitBtn, onDone);
+          })
+          .withFailureHandler(function (err) {
+            if (isAuthError_(err)) { handleSessionExpiry_(); return; }
+            macsAlert_('File upload failed for "' + file.name + '": ' + err.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Final Entries';
+          })
+          .uploadEntryFile(base64, file.name, file.type, SESSION.token);
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+</body>
+</html>

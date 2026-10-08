@@ -161,14 +161,15 @@
       "demoFolder": "demos/lunch-inventory",
       "launch": "demos/lunch-inventory/index.html",
       "sourceProject": [
-        "lunch-inventory-management"
+        "hcs-lunch-inventory-management"
       ],
       "builtFrom": [
-        "lunch-inventory-management/Lunch_Home.html",
-        "lunch-inventory-management/Lunch_Kiosk.html",
-        "lunch-inventory-management/Lunch_Shipment.html",
-        "lunch-inventory-management/Lunch_Admin.html"
+        "hcs-lunch-inventory-management/Lunch_Home.html",
+        "hcs-lunch-inventory-management/Lunch_Kiosk.html",
+        "hcs-lunch-inventory-management/Lunch_Shipment.html",
+        "hcs-lunch-inventory-management/Lunch_Admin.html"
       ],
+      "_sourceNote": "Repointed 2026-10-08 from the deleted lunch-inventory-management working copy. That copy carried uncommitted in-app dialog edits (appConfirm/appAlert in Kiosk and Shipment) which the demo was built from; hcs-lunch-inventory-management is a July snapshot WITHOUT them, so the demo is currently AHEAD of its source. Before any rebuild, port the dialog block upstream first or the demo regresses to native confirm() boxes.",
       "buildMethod": "build-demo.mjs (4 pages) + hand wrapper/data/mock"
     },
     "facts-provisioning": {
@@ -239,10 +240,52 @@
         "FACTS/transpo-department/apps/office/pages/Office.html"
       ],
       "buildMethod": "build-logic.mjs vendors the source project's logic/*.js verbatim into logic.js, then build-demo.mjs x2 (configs committed at demos/transpo-routes/build.driver.json and build.office.json; _self + logic.js injected via the <base> replacement, token/who tokens replaced) + hand data/mock. verify.mjs re-checks privacy (real names matched by hash, never listed), vendored-logic drift, the mock contract and the NOT_CHECKED distinction."
+    },
+    "macs": {
+      "title": "MACS Fine Arts",
+      "demoFolder": "demos/macs",
+      "launch": "demos/macs/index.html",
+      "sourceProject": [
+        "macs-scheduling/secondary"
+      ],
+      "builtFrom": [
+        "macs-scheduling/secondary/Form.html",
+        "macs-scheduling/secondary/AdminApp.html"
+      ],
+      "buildMethod": "build-logic.mjs vendors Config/Auth/Intake/MacsBridge/AdminBackend/MasterList/TestData/YearRollover verbatim into logic.js (domain, admin address, sibling-app URL and Drive ids scrubbed; HistoricalData.js NEVER); mock.js supplies in-memory Sheets/Drive/cache/properties, the sibling forms project's roster + OTP endpoints and a mail outbox, and seeds three schools' entries through the real write path. Then build-demo.mjs x2 (demos/macs/build.form.json, build.admin.json: _self base + logic.js; the embedded crest swapped for a generated badge via replaceRegex; one admin button label). verify.mjs re-checks privacy (above all that HistoricalData never ships), vendored-logic drift, fresh builds, the mock contract and the gate / submission / admin / rollover behaviour.",
+      "_sourceNote": "secondary/HistoricalData.js holds ~571 real minors' names and real school names; elementary/ and spelling_bee/ carry committed xlsx files with real registrations. None of it may be read for a demo. creative_writing/ and spelling_bee/ forms are the same pattern as the secondary form and are not showcased (Josh, 2026-10-08)."
+    },
+    "student-portal": {
+      "title": "Student Portal",
+      "demoFolder": "demos/student-portal",
+      "launch": "demos/student-portal/index.html",
+      "sourceProject": [
+        "FACTS/student-interface"
+      ],
+      "builtFrom": [
+        "FACTS/student-interface/Index.html",
+        "FACTS/student-interface/Client.html"
+      ],
+      "buildMethod": "build-logic.mjs vendors the project's pure engines (Schedule/Due/Athletics/SchoolCal.js) and endpoint + data files (Code/Sports/Notify/Data/Bells.gs) verbatim into logic.js; mock.js supplies the config (not vendored: real calendar/Drive ids), in-memory Google services and a pinned clock, and feeds the Directory Search demo's SIS tabs as the staging workbook. Then build-demo.mjs (demos/student-portal/build.json: includeDir inlines Client.html; _self base + shared dataset + logic.js via the <base> replacement; boot object and inline payload from the mock; admin/deny branches and the personal credit removed). verify.mjs re-checks privacy, vendored-logic drift, the fresh build, the mock contract and the schedule / due engine / game card / closures / grades / attendance / prefs through the real code.",
+      "_sourceNote": "The source Config.gs holds 21 real team calendar ids, a Drive folder id and the deployment id — never vendor it; tools/.probe-cache/ holds real FACTS dumps — never copy it."
+    },
+    "conferences": {
+      "title": "Parent-Teacher Conferences",
+      "demoFolder": "demos/conferences",
+      "launch": "demos/conferences/index.html",
+      "sourceProject": [
+        "parent-teacher-conference-scheduling"
+      ],
+      "builtFrom": [
+        "parent-teacher-conference-scheduling/Parent.html",
+        "parent-teacher-conference-scheduling/Teacher.html"
+      ],
+      "buildMethod": "build-logic.mjs vendors the source project's SERVER files (Settings, BookingService, ParentView, TeacherView, FactsData, RosterSync) verbatim into logic.js; mock.js supplies an in-memory SpreadsheetApp/LockService/Session so that code runs unchanged in the browser, and feeds the Directory Search demo's SIS tabs to the real syncRoster/syncTeachers at boot. Then build-demo.mjs x2 (demos/conferences/build.parent.json, build.teacher.json: _self base, shared dataset + logic.js via the <base> replacement, the SSO ticket token replaced). verify.mjs re-checks privacy, vendored-logic drift, fresh builds, the mock contract and a parent->teacher booking round trip through the real code."
     }
   },
   "coveredProjects": [
     "FACTS/facts-directory-search",
+    "FACTS/student-interface",
     "FACTS/facts-to-gac-staff-email-config",
     "FACTS/transpo-department/apps/driver",
     "FACTS/transpo-department/apps/office",
@@ -269,7 +312,9 @@
     "leave-sub-automation/admin-interface",
     "leave-sub-automation/public-interface",
     "lobby-tv-project",
-    "lunch-inventory-management"
+    "macs-scheduling/secondary",
+    "hcs-lunch-inventory-management",
+    "parent-teacher-conference-scheduling"
   ],
   "excludeDirs": [
     "apps-script-showcase",

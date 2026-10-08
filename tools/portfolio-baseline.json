@@ -257,10 +257,10 @@
   },
   "lunch-inventory": {
     "files": [
-      "lunch-inventory-management/Lunch_Admin.html",
-      "lunch-inventory-management/Lunch_Home.html",
-      "lunch-inventory-management/Lunch_Kiosk.html",
-      "lunch-inventory-management/Lunch_Shipment.html"
+      "hcs-lunch-inventory-management/Lunch_Admin.html",
+      "hcs-lunch-inventory-management/Lunch_Home.html",
+      "hcs-lunch-inventory-management/Lunch_Kiosk.html",
+      "hcs-lunch-inventory-management/Lunch_Shipment.html"
     ],
     "missing": [],
     "gsr": [
@@ -273,7 +273,7 @@
       "saveItemEdits"
     ],
     "ops": [],
-    "hash": "96f540404393630b"
+    "hash": "31b8a9ae506d30b0"
   },
   "facts-provisioning": {
     "files": [],
@@ -392,5 +392,77 @@
       "stops"
     ],
     "hash": "4c6b9f2ff6805ba9"
+  },
+  "conferences": {
+    "files": [
+      "parent-teacher-conference-scheduling/Parent.html",
+      "parent-teacher-conference-scheduling/Teacher.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "cancelBooking",
+      "getCurrentTeacherGrid",
+      "getStudentAvailabilityGrid",
+      "loadStudentsFromSession",
+      "saveTeacherBlockChanges",
+      "ssoLogin",
+      "submitBookings"
+    ],
+    "ops": [],
+    "hash": "973ff6125df1364d"
+  },
+  "student-portal": {
+    "files": [
+      "FACTS/student-interface/Client.html",
+      "FACTS/student-interface/Index.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "athleticsApi",
+      "attendanceApi",
+      "bootApi",
+      "gradesApi",
+      "inboxApi",
+      "savePrefsApi"
+    ],
+    "ops": [],
+    "hash": "f52f20c048008bbc"
+  },
+  "macs": {
+    "files": [
+      "macs-scheduling/secondary/AdminApp.html",
+      "macs-scheduling/secondary/Form.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "admin_deleteSubmissionEntry",
+      "admin_getCategoryConfig",
+      "admin_getFieldTemplates",
+      "admin_getJudges",
+      "admin_getJudgingSheets",
+      "admin_getRegistrations",
+      "admin_getSchools",
+      "admin_getSettings",
+      "admin_getSubmissions",
+      "admin_resetForNextYear",
+      "admin_saveCategoryConfig",
+      "admin_saveFieldTemplates",
+      "admin_saveJudges",
+      "admin_saveJudgingSheets",
+      "admin_saveSchools",
+      "admin_saveSettings",
+      "admin_updateSubmissionEntry",
+      "checkSchoolStatus",
+      "getBranding",
+      "getCategoryList",
+      "getFieldTemplateDefs",
+      "getJudgingSheets",
+      "getPaymentInfo",
+      "getSchoolList",
+      "submitSchoolEntries",
+      "uploadEntryFile"
+    ],
+    "ops": [],
+    "hash": "76c262ab251eff2a"
   }
 }

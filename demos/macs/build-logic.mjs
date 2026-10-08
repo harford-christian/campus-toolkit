@@ -1,0 +1,89 @@
+// build-logic.mjs — vendor the REAL server code of the MACS Secondary competition app into the demo.
+//
+//   node demos/macs/build-logic.mjs
+//
+// What is vendored, verbatim: Config.js (the sheet layout and every default — categories, field templates,
+// settings, buildings), Intake.js (the registration endpoints and the one-time-submission write), MacsBridge.js
+// (the school sign-in gate), Auth.js (the session tokens), AdminBackend.js (every admin_* endpoint), MasterList.js,
+// TestData.js (the SAFE sample-data generator) and YearRollover.js (archive + reset). The demo runs them in the
+// browser over in-memory stand-ins for Sheets, Drive, the cache and the mail service (mock.js), so an entry id,
+// an "Other Entry IDs (auto)" cross-reference, a max-per-school refusal or a second-submission refusal is the
+// app's own behaviour.
+//
+// What is NOT vendored, and why:
+//   HistoricalData.js  real 2023-24 entrants — hundreds of real minors' names. Never. The admin page's
+//                      "seed historical data" button is pointed at the safe generator instead (mock.js), and
+//                      verify.mjs fails if that file's data ever lands in the bundle.
+//   Bootstrap.js       seeds a blank workbook with the real member schools; the demo seeds its own fabricated
+//                      schools from data.js, so this file has no job here.
+//   Scheduler / Solver / ConflictChecker / ConflictGraph / ScheduleOutput  run from the Sheet menu, not the
+//                      web app; not part of this demo.
+//
+// Scrubs applied to the vendored text (verify.mjs applies the same before comparing): the school's real domain
+// and the one real admin address, the live deployment URL of the sibling forms project, and two Drive ids that
+// appear in strings. Plus the usual: Node export guards dropped, staff first names aliased.
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+export const SRC = path.resolve(HERE, '../../../macs-scheduling/secondary');
+export const FILES = ['Config.js', 'Auth.js', 'Intake.js', 'MacsBridge.js', 'AdminBackend.js', 'MasterList.js', 'TestData.js', 'YearRollover.js'];
+export const SERVICES = ['SpreadsheetApp', 'CacheService', 'PropertiesService', 'DriveApp', 'UrlFetchApp', 'LockService',
+  'Session', 'Utilities', 'Logger', 'HtmlService', 'MailApp'];
+export const EXPORTS = [
+  // the form's endpoints
+  'getSchoolList', 'getBranding', 'getCategoryList', 'getJudgingSheets', 'getPaymentInfo', 'getFieldTemplateDefs',
+  'checkSchoolStatus', 'submitSchoolEntries', 'uploadEntryFile', 'requestSchoolCode', 'verifySchoolCode',
+  // the admin page's endpoints
+  'admin_getCategoryConfig', 'admin_saveCategoryConfig', 'admin_getFieldTemplates', 'admin_saveFieldTemplates',
+  'admin_getBuildingMap', 'admin_saveBuildingMap', 'admin_getJudgingSheets', 'admin_saveJudgingSheets',
+  'admin_uploadJudgingSheetFile', 'admin_getSettings', 'admin_saveSettings', 'admin_getJudges', 'admin_saveJudges',
+  'admin_getSchools', 'admin_saveSchools', 'admin_getRegistrations', 'admin_getSubmissions',
+  'admin_updateSubmissionEntry', 'admin_deleteSubmissionEntry', 'admin_runClearTestData', 'admin_resetForNextYear',
+  // internals the mock and verify.mjs use
+  'submitSchoolEntries_', 'seedTestData', 'clearTestData_', 'readSubmissions_', 'readCategoryConfig_', 'generateMasterList',
+  'requireAdmin_', 'requireSchoolSession_', 'isAuthorizedAdmin_', 'ensureSettingExists_', 'getOrCreateSheet_',
+  'setHeaderRow_', 'schoolSignInStatus_', 'matchSchoolCode_', 'resetForNextYear_',
+  'SHEETS', 'SUBMISSIONS_HEADERS', 'REGISTRATIONS_HEADERS', 'JUDGES_HEADERS', 'SCHOOLS_HEADERS', 'JUDGING_SHEETS_HEADERS',
+  'FIELD_TEMPLATES_HEADERS', 'DEFAULT_CATEGORY_CONFIG_HEADERS', 'DEFAULT_CATEGORY_CONFIG', 'DEFAULT_FIELD_TEMPLATES',
+  'DEFAULT_SETTINGS', 'DEFAULT_BUILDINGS', 'DEFAULT_JUDGING_SHEETS'
+];
+
+export function buildLogic() {
+  const DOMAIN = 'harford' + 'christian';
+  const parts = FILES.map((f) => {
+    let body = readFileSync(path.join(SRC, f), 'utf8');
+    body = body.replace(/^if \(typeof module !== 'undefined'\) module\.exports = \{[^\n]*\};\s*$/m, '');
+    body = body.replace(new RegExp(DOMAIN + '\\.org', 'gi'), 'example.edu').replace(new RegExp(DOMAIN, 'gi'), 'example');
+    body = body.replace(/\b[a-z]+@example\.edu\b/g, 'admin@example.edu');                     // the one real admin address
+    body = body.replace(/https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec/g, 'https://example.invalid/macs-forms/exec');
+    body = body.replace(/\b1[A-Za-z0-9_-]{30,}\b/g, 'DEMO_DRIVE_ID');                           // two Drive ids in strings
+    body = aliasStaffNames(body).text;
+    return `/* ===== ${f} ===== */\n` + body;
+  });
+  return [
+    '/* GENERATED by demos/macs/build-logic.mjs — do not edit.',
+    "   This is the SOURCE PROJECT'S OWN server code, verbatim (Config, Auth, Intake, MacsBridge, AdminBackend,",
+    '   MasterList, TestData, YearRollover) with the real domain, admin address, sibling-app URL and Drive ids',
+    '   scrubbed. The demo runs it in the browser over in-memory Google services (mock.js), so sign-in, entry ids,',
+    "   cross-references, the per-school caps and the one-time-submission rule are the app's real behaviour. */",
+    '(function (global) {',
+    '  var ' + SERVICES.join(', ') + ';',
+    ...parts,
+    '  global.MACS_LOGIC = {',
+    '    bind: function (env) { ' + SERVICES.map((s) => `${s} = env.${s};`).join(' ') + ' },',
+    ...EXPORTS.map((n, i) => `    ${n}: ${n}${i < EXPORTS.length - 1 ? ',' : ''}`),
+    '  };',
+    '})(typeof window !== "undefined" ? window : globalThis);',
+    ''
+  ].join('\n');
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (!existsSync(SRC)) { console.log('SKIP build-logic: source project not found at', SRC); process.exit(0); }
+  const out = buildLogic();
+  writeFileSync(path.join(HERE, 'logic.js'), out);
+  console.log('built demos/macs/logic.js (' + out.length + ' bytes) from', FILES.length, 'source files');
+}
