@@ -1,0 +1,25 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/student-portal/build-logic.mjs && node tools/build-demo.mjs demos/student-portal/build.json. The source Index.html is a complete template; Client.html is its one whitelisted include, inlined via includeDir. Each replacement reproduces what doGet supplies at runtime or removes a server-only branch, never the app's logic: (1) base target becomes _self because the switcher's iframe is this page's home, and the shared school dataset + logic.js are pulled in ahead of the shim; (2) the boot object and the inline payload come from the mock exactly where doGet would have serialised them; (3) the admin badge, the admin ?sim bar (re-purposed as the demo-clock bar) and the not-a-student deny panel are server-side branches a student never sees — build-demo strips control scriptlets but keeps their bodies, so the deny panel is hidden by its own style; (4) the one personal credit in the footer is removed.",
+  "src": "../FACTS/student-interface/Index.html",
+  "dst": "demos/student-portal/portal.html",
+  "includeDir": "../FACTS/student-interface",
+  "demoName": "Student Portal",
+  "replace": [
+    ["<base target=\"_top\">", "<base target=\"_self\">\n<script src=\"../facts-directory/data.js\"></script>\n<script src=\"logic.js\"></script>"],
+    ["<title><?= boot.appName ?></title>", "<title>Student Portal</title>"],
+    ["<?= boot.fullName || boot.email || 'no account detected' ?>", "Student"],
+    ["<? if (boot.isAdmin) { ?><span class=\"adm\">ADMIN</span><? } ?>", ""],
+    ["<a href=\"<?= boot.switchUrl ?>\" target=\"_top\">Switch account</a>", "<a href=\"#\" target=\"_self\" title=\"Use the Signed in as picker in the demo bar\">Switch account</a>"],
+    ["<? if (boot.sim) { ?><div class=\"simbar\">SIMULATED <?= boot.sim ?> — time travel for testing</div><? } ?>", "<div class=\"simbar\" id=\"demoSimbar\" hidden></div>"],
+    ["<main class=\"deny\">", "<main class=\"deny\" style=\"display:none\">"],
+    ["<?= boot.denyReason || 'This portal is for HCS student accounts.' ?>", ""],
+    ["<a class=\"btn wide\" href=\"<?= boot.switchUrl ?>\" target=\"_top\">", "<a class=\"btn wide\" href=\"#\">"],
+    ["<?= boot.email || '—' ?>", ""],
+    ["<?= boot.ou || '—' ?>", ""],
+    ["<?= boot.lookupError ? 'failed: ' + boot.lookupError : 'ok' ?>", ""],
+    ["<?= boot.serverTime ?>", ""],
+    ["<div class=\"credit\">by Noah May</div>", ""],
+    ["var BOOT = <?!= bootJson ?>;", "var BOOT = window.PORTAL_DEMO.boot();"],
+    ["var BOOT_DATA = <?!= dataJson ?>;", "var BOOT_DATA = window.PORTAL_DEMO.bootData();"]
+  ]
+}

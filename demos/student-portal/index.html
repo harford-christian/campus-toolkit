@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Student Portal — Showcase demo</title>
+<style>
+  :root { --maroon:#8f1b1b; --maroon-hi:#B22222; --gold:#D4AF37; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #e9ebef; }
+  .bar {
+    flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 10px 16px; color: #fff;
+    background: linear-gradient(120deg, #6d1414 0%, #8f1b1b 55%, #B22222 100%);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35); z-index: 2;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; }
+  .brand .logo { font-size: 1.5rem; }
+  .brand small { display: block; font-weight: 600; font-size: .72rem; opacity: .85; }
+  .pick { display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 700; }
+  .pick select { font: inherit; font-weight: 700; font-size: .82rem; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.14); color: #fff; padding: 6px 10px; max-width: 16rem; }
+  .pick select option { color: #222; }
+  .spacer { flex: 1; }
+  .hint { font-size: .78rem; opacity: .85; max-width: 26rem; line-height: 1.35; }
+  .back, .reset { color: #fff; text-decoration: none; font-weight: 700; font-size: .86rem; opacity: .9; border: 1px solid rgba(255,255,255,.3); padding: 7px 12px; border-radius: 999px; background: none; cursor: pointer; font-family: inherit; }
+  .back:hover, .reset:hover { background: rgba(255,255,255,.12); }
+  /* A phone app gets a phone-shaped stage: framing it full-width would misrepresent what students use. */
+  .stage { flex: 1; display: grid; place-items: center; padding: 18px 12px; }
+  .stage iframe {
+    width: 100%; max-width: 26rem; height: 100%; max-height: 52rem; border: 1px solid #c9cdd4; border-radius: 22px;
+    box-shadow: 0 10px 34px rgba(0,0,0,.18); background: #fff; display: block;
+  }
+  @media (max-width: 1180px) { .hint { display: none; } }
+  @media (max-width: 980px) { .brand small { display: none; } }
+  @media (max-width: 560px) { .stage { padding: 0; } .stage iframe { max-width: none; max-height: none; border-radius: 0; border: 0; } }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🎒</span>
+      <span>Student Portal<small>What is due, what is next, and when the bus leaves &middot; phone-first</small></span>
+    </div>
+    <label class="pick">Signed in as
+      <select id="student" aria-label="Which student is signed in"></select>
+    </label>
+    <label class="pick">Clock
+      <select id="clock" aria-label="Demo clock">
+        <option value="">Wed Sep 23 &middot; 10:30 AM (third period)</option>
+        <option value="2026-09-23 15:45">Wed Sep 23 &middot; 3:45 PM (school day over &rarr; Tonight)</option>
+        <option value="2026-09-21 11:00">Mon Sep 21 &middot; 11:00 AM (2-hour delay bells)</option>
+        <option value="2026-09-26 09:00">Sat Sep 26 (weekend: the week ahead)</option>
+      </select>
+    </label>
+    <span class="spacer"></span>
+    <span class="hint">Open <b>Schedule</b> for the week (Friday is closed, Monday ran late), then <b>More</b> for
+      games, attendance and reminders. Nora&rsquo;s soccer game today pins its 2:00 dismissal above the homework.</span>
+    <button class="reset" id="reset" type="button" title="Forget this visit's settings and go back to Nora">↻ Reset</button>
+    <a class="back" href="../../index.html" target="_top">← Gallery</a>
+  </div>
+  <div class="stage">
+    <iframe id="screen" src="portal.html" title="Student Portal screen"></iframe>
+  </div>
+<script>
+  // One Apps Script project in production, served to each student's own Workspace sign-in. The demo stands
+  // in for that sign-in with a picker; the pinned clock is the one fiction, moved by ?sim= on the frame.
+  var STUDENTS = [
+    { id: '400101', label: 'Nora Alderman · 12th · Varsity Soccer' },
+    { id: '400106', label: 'Owen Fairbanks · 9th · JV/V Soccer' },
+    { id: '400107', label: 'Wren Fairbanks · 7th' },
+    { id: '400112', label: 'Tess Kirkwood · K5 (elementary view)' }
+  ];
+  var frame = document.getElementById('screen');
+  var studentSel = document.getElementById('student');
+  var clockSel = document.getElementById('clock');
+  STUDENTS.forEach(function (s) { var o = document.createElement('option'); o.value = s.id; o.textContent = s.label; studentSel.appendChild(o); });
+
+  function read(k) { try { return JSON.parse(sessionStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function write(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var saved = read('portal-demo-student'); if (saved) studentSel.value = saved;
+  var savedClock = read('portal-demo-clock'); if (savedClock) clockSel.value = savedClock;
+
+  function reload() {
+    var sim = clockSel.value;
+    frame.src = 'portal.html' + (sim ? '?sim=' + encodeURIComponent(sim) : '');
+  }
+  studentSel.addEventListener('change', function () { write('portal-demo-student', studentSel.value); reload(); });
+  clockSel.addEventListener('change', function () { write('portal-demo-clock', clockSel.value); reload(); });
+  document.getElementById('reset').addEventListener('click', function () {
+    try { ['portal-demo-student', 'portal-demo-clock', 'portal-demo-prefs-v1'].forEach(function (k) { sessionStorage.removeItem(k); }); } catch (e) {}
+    studentSel.value = '400101'; clockSel.value = '';
+    reload();
+  });
+  if (savedClock) reload();
+</script>
+</body>
+</html>
