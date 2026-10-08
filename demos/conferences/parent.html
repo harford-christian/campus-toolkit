@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base target="_self">
+  <script src="../facts-directory/data.js"></script>
+  <script src="logic.js"></script>
+  <style>
+    :root {
+      --red: #c8102e;
+      --red-deep: #8c0a1f;
+      --danger: #7a1220;
+      --bg: #201f22;
+      --surface: #ffffff;
+      --border: #e7e0da;
+      --text: #241414;
+      --text-muted: #7a6a63;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg); color: var(--text); margin: 0; padding: 24px 16px 100px; line-height: 1.5;
+    }
+    .page {
+      max-width: 760px; margin: 0 auto; background: var(--surface);
+      border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,.4);
+    }
+    .top-bar {
+      background: var(--red-deep); color: #fff; padding: 22px 28px; border-radius: 16px 16px 0 0;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    }
+    .top-bar h1 { margin: 0; font-size: 21px; font-weight: 800; }
+    .top-bar p { margin: 4px 0 0; font-size: 13.5px; color: #f2d9dd; }
+    .top-bar-user {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700;
+      background: rgba(255,255,255,.15); padding: 6px 12px; border-radius: 999px; white-space: nowrap;
+    }
+    .top-bar-user .avatar {
+      width: 20px; height: 20px; border-radius: 50%; background: #fff; color: var(--red-deep);
+      display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;
+    }
+
+    .content { padding: 24px 28px 32px; }
+
+    label { display: block; font-size: 13px; font-weight: 700; color: var(--red-deep); margin-bottom: 6px; }
+    input, select {
+      width: 100%; padding: 11px 12px; font-size: 15px; border: 2px solid var(--border);
+      border-radius: 8px; background: #fff; color: var(--text); font-family: inherit;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(200,16,46,.15); }
+    .field { margin-bottom: 14px; }
+
+    button { cursor: pointer; border: none; border-radius: 9px; padding: 12px 20px; font-size: 14.5px; font-weight: 700; }
+    .btn-primary { background: var(--red); color: #fff; width: 100%; }
+    .btn-primary:hover { background: var(--red-deep); }
+    .btn-secondary { background: #fff; color: var(--red-deep); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: #fdf1ee; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    .lookup-card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 18px; background: #fdfcfb;
+    }
+
+    .status-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; padding: 6px 13px; border-radius: 999px; margin-top: 12px; }
+    .status-chip.saving { background: #f6dde1; color: var(--red-deep); }
+    .status-chip.success { background: #e3f6e9; color: #15803d; }
+    .spinner {
+      width: 12px; height: 12px; border: 2px solid rgba(0,0,0,.15); border-top-color: currentColor;
+      border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .notice { border-left: 4px solid var(--red-deep); background: #f7f0ee; padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-top: 12px; }
+    .notice.warn { border-left-color: var(--danger); background: #fdf0ee; color: #7f1d1d; font-weight: 600; }
+
+    .teacher-picker { margin-bottom: 14px; }
+    .picker-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted);
+      margin-bottom: 6px; display: flex; align-items: center; gap: 7px;
+    }
+    .student-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .teacher-option-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+    .teacher-option {
+      display: flex; align-items: flex-start; gap: 8px; border: 1px solid var(--border); border-radius: 8px;
+      padding: 9px 10px; cursor: pointer; background: #fff; font-size: 12.5px; font-weight: 600; color: var(--text);
+      text-align: left;
+    }
+    .teacher-option:hover { border-color: var(--red); }
+    .teacher-option .box {
+      width: 16px; height: 16px; border: 2px solid var(--border); border-radius: 4px; flex-shrink: 0; margin-top: 1px;
+      display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff;
+    }
+    .teacher-option .label { line-height: 1.3; }
+
+    .range-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .range-row select { width: auto; flex: 1 1 120px; }
+    .range-row span { color: var(--text-muted); font-size: 12.5px; font-weight: 600; }
+    .range-row button { width: auto; padding: 9px 14px; font-size: 12.5px; }
+
+    /* One sheet per class (across every child under this guardian) — a
+       true letter-paper ratio card, shrinking as more are shown at once.
+       Clicking one brings it to front (see overlay below) instead of
+       reflowing the grid it sits in. */
+    #classBoxesContainer {
+      display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 14px;
+    }
+    .class-sheet {
+      background: #fdfcfb; color: var(--text); border-radius: 3px 3px 8px 8px;
+      box-shadow: 0 1px 1px rgba(0,0,0,.12), 0 8px 18px rgba(0,0,0,.18);
+      transition: transform .15s ease, box-shadow .15s ease;
+      display: flex; flex-direction: column; overflow: hidden; position: relative;
+    }
+    .class-sheet::before {
+      content: ""; position: absolute; top: 0; left: 0; right: 0; height: .4em;
+      background: var(--sheet-tone, var(--red));
+    }
+    .class-sheet .sheet-pin {
+      position: absolute; top: .5em; right: .6em; width: .5em; height: .5em; border-radius: 50%;
+      background: var(--sheet-tone, var(--red)); box-shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+    /* Only sheets that actually bring-to-front (more than 4 classes shown)
+       look clickable — at 4 or fewer, sheets are already big enough to be
+       booked directly in the grid, so no front-bring affordance is shown. */
+    .class-sheet.front-clickable { cursor: pointer; }
+    .class-sheet.front-clickable:hover { transform: translateY(-3px); box-shadow: 0 2px 2px rgba(0,0,0,.15), 0 12px 24px rgba(0,0,0,.24); }
+    .class-sheet.picked-front { box-shadow: 0 0 0 3px var(--sheet-tone, var(--red)), 0 8px 18px rgba(0,0,0,.2); }
+
+    .sheet-head { padding: .7em .8em .5em; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .sheet-subject {
+      font-size: 1.1em; font-weight: 800; color: var(--sheet-tone, var(--red-deep));
+      line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sheet-meta { font-size: .8em; color: var(--text-muted); font-weight: 600; margin-top: 1px; }
+
+    .sheet-body { padding: .6em .7em .8em; flex: 1; overflow-y: auto; }
+    .sheet-date-group { margin-bottom: .6em; }
+    .sheet-date-group:last-child { margin-bottom: 0; }
+    .sheet-date-label {
+      font-size: .78em; font-weight: 800; text-transform: uppercase; letter-spacing: .03em;
+      color: var(--text-muted); margin-bottom: .35em;
+    }
+    .sheet-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .3em; }
+    .sheet-cell {
+      border: 1px solid var(--border); border-radius: .3em; background: #fff;
+      aspect-ratio: 1.4; display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: clip; padding: 0 .1em;
+    }
+    .sheet-cell.picked { background: var(--sheet-tone, var(--red)); color: #fff; border-color: var(--sheet-tone, var(--red)); }
+    .sheet-cell.taken { background: #efe6e2; color: var(--text-muted); border-color: #efe6e2; cursor: not-allowed; }
+    .sheet-cell.bookable { cursor: pointer; }
+    .sheet-cell.bookable:hover { outline: 2px solid var(--red); outline-offset: -1px; }
+
+    /* Booked (server-confirmed) fills the whole sheet body instead of a grid. */
+    .sheet-booked {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: .5em; text-align: center; background: #e3f6e9; color: #15803d; border-radius: .5em;
+      font-weight: 700; padding: .8em; cursor: pointer;
+    }
+    .sheet-booked .when { font-size: 1.1em; }
+    .sheet-booked .cancel-hint { font-size: .8em; font-weight: 600; opacity: .8; }
+
+    /* --- overlay: the front-brought sheet, layout underneath never changes --- */
+    .sheet-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(10,8,9,.5); z-index: 90;
+    }
+    .sheet-backdrop.visible { display: block; }
+    .sheet-overlay-stage {
+      display: none; position: fixed; inset: 0; z-index: 91; align-items: center; justify-content: center; padding: 20px;
+    }
+    .sheet-overlay-stage.visible { display: flex; }
+    .sheet-overlay-stage .class-sheet { cursor: default; box-shadow: 0 20px 30px rgba(0,0,0,.25), 0 40px 80px rgba(0,0,0,.5); }
+
+    .schedule-summary { margin-top: 22px; border: 1px solid var(--border); border-radius: 12px; background: #fdfcfb; padding: 16px; }
+    .schedule-summary h2 { margin: 0 0 4px; font-size: 15px; font-weight: 800; color: var(--red-deep); }
+    .schedule-summary .sub { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+    .schedule-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px;
+      background: #fff; border: 1px solid var(--border); margin-bottom: 7px; font-size: 12.5px;
+    }
+    .schedule-item:last-child { margin-bottom: 0; }
+    .schedule-item .initial {
+      width: 20px; height: 20px; border-radius: 50%; color: #fff; font-size: 9.5px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .schedule-item .when { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .schedule-item .what { flex: 1; color: var(--text-muted); }
+    .schedule-item .what b { color: var(--text); }
+    .schedule-item .remove { background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 2px 4px; }
+    .schedule-empty { font-size: 13px; color: var(--text-muted); font-style: italic; }
+
+    .signout-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-top: 10px; margin-bottom: 4px;
+    }
+    .signout-row button { background: none; border: none; padding: 0; font-size: 12.5px; font-weight: 700; color: var(--text-muted); text-decoration: underline; white-space: nowrap; }
+
+    .step-help { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.5; }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 100;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal-box {
+      background: #fff; border-radius: 12px; padding: 20px; max-width: 380px; width: 100%;
+      box-shadow: 0 20px 50px rgba(0,0,0,.35);
+    }
+    .modal-box p { margin: 0 0 16px; font-size: 14.5px; color: var(--text); line-height: 1.5; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-actions button { width: auto; padding: 10px 18px; }
+
+    .empty-state { color: var(--text-muted); font-size: 14.5px; font-style: italic; padding: 8px 0; }
+
+    .save-bar {
+      position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--border);
+      box-shadow: 0 -8px 24px rgba(0,0,0,.15); padding: 14px 20px; transform: translateY(100%);
+      transition: transform .2s ease; z-index: 40;
+    }
+    .save-bar.visible { transform: translateY(0); }
+    .save-bar-content { max-width: 760px; margin: 0 auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .save-bar-handle { display: flex; align-items: center; gap: 10px; cursor: default; }
+    .save-bar-chevron { display: none; color: var(--text-muted); font-size: 11px; transition: transform .15s; }
+    .save-bar .count { font-size: 14px; font-weight: 700; color: var(--red-deep); }
+    .save-bar-inner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex: 1; }
+    .save-bar .email-field { display: flex; align-items: center; gap: 8px; flex: 1 1 240px; }
+    .save-bar input[type=email] { flex: 1; margin: 0; }
+    .save-bar .actions { display: flex; gap: 8px; }
+    .save-bar .actions button { width: auto; padding: 11px 18px; }
+    .save-bar-error { color: var(--danger); font-size: 12px; font-weight: 600; width: 100%; margin-top: -6px; }
+
+    @media (max-width: 600px) {
+      body { padding: 12px 8px 150px; }
+      .top-bar { padding: 16px 18px; border-radius: 12px 12px 0 0; }
+      .top-bar h1 { font-size: 17px; }
+      .top-bar-user { font-size: 12px; padding: 5px 10px; }
+      .content { padding: 18px 16px 24px; }
+      .page { border-radius: 12px; }
+
+      .teacher-option-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+      .range-row select { flex: 1 1 100%; }
+      .range-row button { flex: 1 1 auto; }
+
+      .class-sheet { width: 100% !important; }
+
+      .signout-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .signout-row button { align-self: flex-end; }
+
+      /* Collapsed by default: just a thin handle bar (count + chevron).
+         Tapping it reveals the email field + Discard/Save buttons, so the
+         bar doesn't eat a big chunk of a phone screen the whole visit. */
+      .save-bar { padding: 10px 16px; }
+      .save-bar-content { flex-direction: column; align-items: stretch; gap: 0; }
+      .save-bar-handle { cursor: pointer; justify-content: space-between; padding: 4px 2px; }
+      .save-bar-chevron { display: inline-block; }
+      .save-bar.collapsed .save-bar-chevron { transform: rotate(180deg); }
+      .save-bar-inner { flex-direction: column; align-items: stretch; margin-top: 12px; }
+      .save-bar.collapsed .save-bar-inner { display: none; }
+      .save-bar .email-field { flex: 1 1 auto; }
+      .save-bar .actions { flex-direction: column; }
+      .save-bar .actions button { width: 100%; }
+
+      .modal-box { padding: 16px; }
+      .modal-actions button { flex: 1; }
+    }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Parent-Teacher Conferences" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <div class="top-bar">
+      <h1>Parent-Teacher Conferences</h1>
+      <div class="top-bar-user" id="topBarUser" style="display:none;">
+        <span class="avatar" id="topBarInitial"></span>
+        <span id="topBarName"></span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="lookup-card" id="lookupFormEmail" style="display:none;">
+        <p class="step-help">Please sign in through the school's Parent Portal to access your conference schedule.</p>
+        <div id="lookupMsg"></div>
+      </div>
+
+      <div class="signout-row" id="signoutRow" style="display:none;">
+        <span class="step-help" style="display:inline;" id="signedInText">Signed in — this device will stay signed in for 60 days, so you won't need to enter a code again unless you sign out.</span>
+        <button onclick="signOut()">Not <span id="signedInName"></span>? Sign out</button>
+      </div>
+
+      <div id="classPickers"></div>
+
+      <div class="lookup-card" id="rangePicker" style="display:none; margin-top:16px;">
+        <div class="picker-label">Filter by date</div>
+        <p class="step-help">Optional — only shows times on one conference date, instead of every date at once.</p>
+        <div class="range-row">
+          <select id="dateFilter" onchange="applyGlobalDateFilter()"></select>
+        </div>
+      </div>
+
+      <p class="step-help" id="classBoxesHelp" style="display:none;">Each selected class shows below as its own sheet — tap one to bring it to front, then tap an open time to pick it (tap again to un-pick).</p>
+      <div id="classBoxesContainer" style="margin-top:10px;"></div>
+      <div class="sheet-backdrop" id="sheetBackdrop"></div>
+      <div class="sheet-overlay-stage" id="sheetOverlayStage"></div>
+
+      <div class="schedule-summary" id="scheduleSummary" style="display:none;">
+        <h2>Your Schedule</h2>
+        <div class="sub">Every time you've picked so far, across every child — review here before you hit Save Times below.</div>
+        <div id="scheduleList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <p id="confirmModalMsg"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="confirmModalNo">No</button>
+        <button class="btn-primary" id="confirmModalYes">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="infoModal">
+    <div class="modal-box">
+      <p id="infoModalMsg"></p>
+      <div class="modal-actions">
+        <button class="btn-primary" id="infoModalOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="save-bar" id="saveBar">
+    <div class="save-bar-content">
+      <div class="save-bar-handle" id="saveBarHandle" onclick="toggleSaveBar()">
+        <div class="count" id="pendingCount"></div>
+        <span class="save-bar-chevron" id="saveBarChevron">▲</span>
+      </div>
+      <div class="save-bar-inner" id="saveBarInner">
+        <div class="save-bar-error" id="saveBarError" style="display:none;"></div>
+        <div class="email-field" title="Confirmation emails for these times go here.">
+          <input type="email" id="confirmEmail" placeholder="Your email address (required to save)">
+        </div>
+        <div class="actions">
+          <button class="btn-secondary" onclick="discardPending()">Discard</button>
+          <button class="btn-primary" id="saveBtn" onclick="savePending()">Save Times</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Injected server-side by Code.js's doGet (e.parameter.ssoToken) — this page runs
+    // inside Apps Script's sandboxed content iframe, whose own window.location does
+    // NOT carry the original request's query string, so client-side code can't read
+    // ?ssoToken= directly from the URL.
+    var SSO_TOKEN = sessionStorage.getItem('ptc_demo_out') ? '' : 'demo-ticket'; // demo: production injects the portal's signed ticket here
+
+    // One paper-ratio sheet per bookable class (across every child under
+    // this guardian), laid out in a wrapping grid that shrinks as more
+    // sheets are shown at once. Clicking a sheet brings it to front in a
+    // centered overlay instead of reflowing the grid behind it — booking
+    // only happens from that enlarged, interactive copy.
+    var STUDENT_COLORS = [
+      { accent: '#c8102e', tint: '#fdf1ee', deep: '#8c0a1f' }, // red — matches the app's own accent
+      { accent: '#2f6f62', tint: '#e7f1ee', deep: '#1f4d43' }, // teal
+      { accent: '#b6862c', tint: '#fbf1df', deep: '#7a5a1a' }, // amber
+      { accent: '#5b5bd6', tint: '#eeeefb', deep: '#3a3aa6' }  // violet
+    ];
+
+    var students = [];          // [{rosterRow, studentFirst, studentLast, grade, guardians, colorIndex}]
+    var schedules = {};         // rosterRow -> {grid, classes, bookings}
+    var selectedClasses = {};   // rosterRow -> {classKey: true}, starts blank per child
+    // Single-date filter, shared across every class. Null = all dates.
+    var globalDateFilter = null;
+    // key "rosterRow|date|start" -> booking object, one pending pick per
+    // class (picking a different time for the same class just replaces
+    // the entry — a class can only be booked once).
+    var pendingBookings = {};
+    // Same key shape as pendingBookings — a booking already saved (this
+    // visit or a prior one). Keyed by rosterRow (not just date+start) so
+    // two siblings booked at the same time don't collide on one key.
+    var bookedThisVisit = {};
+    // rosterRow+'|'+classKey of the one sheet currently brought to front
+    // (shown enlarged in the overlay). Null when nothing is in front.
+    var frontKey = null;
+    var verifiedEmail = '';
+    var SESSION_KEY = 'ptc_session_token';
+
+    var PAPER_RATIO = 8.5 / 11; // US Letter, portrait — every sheet holds this ratio
+
+    // Sheet width/font shrink as more classes are shown at once; height
+    // always follows the letter-paper ratio from the width.
+    function sheetSizeFor(count) {
+      var w = count <= 2 ? 300 : count <= 4 ? 250 : count <= 6 ? 210 : count <= 8 ? 180 : count <= 12 ? 155 : 135;
+      var fs = count <= 2 ? 14 : count <= 4 ? 12.5 : count <= 6 ? 11 : count <= 8 ? 9.5 : count <= 12 ? 8.5 : 8;
+      return { w: w, h: Math.round(w / PAPER_RATIO), fs: fs };
+    }
+    var FRONT_SHEET_SIZE = { w: 320, h: Math.round(320 / PAPER_RATIO), fs: 15 };
+
+    function colorFor(student) { return STUDENT_COLORS[student.colorIndex % STUDENT_COLORS.length]; }
+    function studentByRosterRow(rosterRow) {
+      return students.filter(function (s) { return s.rosterRow === rosterRow; })[0];
+    }
+
+    function formatTime12(hhmm) {
+      var parts = String(hhmm).split(':');
+      var h = parseInt(parts[0], 10);
+      var m = parts[1];
+      var ampm = h >= 12 ? 'PM' : 'AM';
+      var h12 = h % 12; if (h12 === 0) h12 = 12;
+      return h12 + ':' + m + ' ' + ampm;
+    }
+
+    // No AM/PM — used inside the small sheet-grid cells, where the full
+    // formatTime12() string doesn't fit once a sheet has shrunk down past
+    // a few classes. The full time is still on the cell's title/tooltip.
+    function formatTimeShort(hhmm) {
+      var parts = String(hhmm).split(':');
+      var h = parseInt(parts[0], 10);
+      var h12 = h % 12; if (h12 === 0) h12 = 12;
+      return h12 + ':' + parts[1];
+    }
+
+    function formatDateLong(dateStr) {
+      var parts = dateStr.split('-').map(Number);
+      var d = new Date(parts[0], parts[1] - 1, parts[2]);
+      return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    }
+
+    function setMsg(el, text, type) {
+      if (!text) { el.className = ''; el.innerHTML = ''; return; }
+      if (type === 'saving') {
+        el.className = 'status-chip saving';
+        el.innerHTML = '<span class="spinner"></span>' + text;
+      } else if (type === 'error') {
+        el.className = 'notice warn';
+        el.textContent = text;
+      } else {
+        el.className = 'status-chip ' + type;
+        el.textContent = text;
+      }
+    }
+
+    // Shows the "sign in through the Parent Portal" message — the only way in now that
+    // PTC's own email/code login has been removed in favor of the custom-forms SSO
+    // handoff (?ssoToken=).
+    function showAccessMessage() {
+      document.getElementById('lookupFormEmail').style.display = '';
+    }
+
+    // Guardians are stored "Last First" (see HANDOFF.md) — flip to
+    // "First Last" for display next to the sign-out button.
+    function displayGuardianName_(name) {
+      var parts = String(name).trim().split(/\s+/);
+      return parts.length === 2 ? parts[1] + ' ' + parts[0] : name;
+    }
+
+    function onLoggedIn(email, studentList) {
+      verifiedEmail = email;
+      document.getElementById('lookupFormEmail').style.display = 'none';
+      document.getElementById('signoutRow').style.display = '';
+      var matchedGuardian = null;
+      studentList.some(function (s) {
+        return (s.guardians || []).some(function (g) {
+          if (g.email && g.email.toLowerCase() === email.toLowerCase()) { matchedGuardian = g; return true; }
+          return false;
+        });
+      });
+      var displayName = matchedGuardian ? displayGuardianName_(matchedGuardian.name) : email;
+      document.getElementById('signedInName').textContent = displayName;
+      document.getElementById('topBarName').textContent = displayName;
+      document.getElementById('topBarInitial').textContent = displayName.trim().charAt(0).toUpperCase();
+      document.getElementById('topBarUser').style.display = '';
+      var emailField = document.getElementById('confirmEmail');
+      emailField.value = email;
+      emailField.readOnly = true;
+      if (!studentList.length) {
+        setMsg(document.getElementById('lookupMsg'), 'No students found for that email.', 'error');
+        return;
+      }
+      students = studentList;
+      students.forEach(function (s, i) { s.colorIndex = i; });
+      loadAllSchedules();
+    }
+
+    function signOut() {
+      localStorage.removeItem(SESSION_KEY);
+      // Strip ?ssoToken= (and any other params) — otherwise reloading the same URL
+      // would immediately sign back in via the handoff ticket, making "sign out" a no-op.
+      history.replaceState(null, '', location.pathname);
+      location.reload();
+    }
+
+    function restoreSession() {
+      var token = localStorage.getItem(SESSION_KEY);
+      if (!token) { showAccessMessage(); return; }
+      google.script.run
+        .withSuccessHandler(function (result) {
+          if (!result.valid) { localStorage.removeItem(SESSION_KEY); showAccessMessage(); return; }
+          onLoggedIn(result.email, result.students);
+        })
+        .withFailureHandler(function () { localStorage.removeItem(SESSION_KEY); showAccessMessage(); })
+        .loadStudentsFromSession(token);
+    }
+
+    // The only way in now: a custom-forms Parent Portal link, ?ssoToken= carries a
+    // short-lived signed ticket. Any failure (expired/tampered/absent) falls back to
+    // restoreSession (an existing local session from a prior visit), and if that's not
+    // there either, shows the "sign in through the Portal" message.
+    function bootSession() {
+      var ssoToken = SSO_TOKEN;
+      if (!ssoToken) { restoreSession(); return; }
+      google.script.run
+        .withSuccessHandler(function (result) {
+          if (!result.success) { restoreSession(); return; }
+          localStorage.setItem(SESSION_KEY, result.token);
+          onLoggedIn(result.email, result.students);
+        })
+        .withFailureHandler(function () { restoreSession(); })
+        .ssoLogin(ssoToken);
+    }
+    bootSession();
+
+    // Fetches every child's own availability grid in parallel, then builds
+    // the shared calendar once all of them are in — a combined view needs
+    // the full set before it can compute a unified time/date axis.
+    function loadAllSchedules() {
+      document.getElementById('classBoxesContainer').innerHTML =
+        '<div class="status-chip saving"><span class="spinner"></span>Loading schedules...</div>';
+      var remaining = students.length;
+      var loadErrors = [];
+      students.forEach(function (s) {
+        selectedClasses[s.rosterRow] = {};
+        google.script.run
+          .withSuccessHandler(function (schedule) {
+            schedules[s.rosterRow] = schedule;
+            // Seed already-saved bookings (this visit or a prior one) so
+            // they show as cancelable right away, even after a reload.
+            (schedule.bookings || []).forEach(function (b) {
+              bookedThisVisit[s.rosterRow + '|' + b.date + '|' + b.start] = {
+                rosterRow: s.rosterRow, teacherName: b.teacherName, teacherEmail: b.teacherEmail,
+                subject: b.subject, date: b.date, start: b.start, end: b.end
+              };
+            });
+            remaining--;
+            if (remaining === 0) onSchedulesLoaded(loadErrors);
+          })
+          .withFailureHandler(function (err) {
+            loadErrors.push(s.studentFirst + ': ' + err.message);
+            remaining--;
+            if (remaining === 0) onSchedulesLoaded(loadErrors);
+          })
+          .getStudentAvailabilityGrid(s.rosterRow);
+      });
+    }
+
+    function onSchedulesLoaded(loadErrors) {
+      if (loadErrors.length) {
+        document.getElementById('classBoxesContainer').innerHTML =
+          '<div class="notice warn">Error loading schedule — ' + loadErrors.join('; ') + '</div>';
+      }
+      document.getElementById('classBoxesHelp').style.display = '';
+      document.getElementById('scheduleSummary').style.display = '';
+      buildClassPickers();
+      refreshRangeOptions();
+      renderClassBoxes();
+      renderScheduleSummary();
+    }
+
+    // A live review of every pending (not-yet-saved) pick, across every
+    // child, in date/time order — regardless of which class box it came
+    // from. Already-saved bookings aren't listed here; each one's own
+    // class box already shows it as a cancelable "Booked" row.
+    function renderScheduleSummary() {
+      var list = document.getElementById('scheduleList');
+      list.innerHTML = '';
+      // Both not-yet-saved picks and already-confirmed bookings (this visit
+      // or a prior one) belong here — otherwise a booking made last week
+      // simply wouldn't appear until you picked something new.
+      var entries = Object.keys(pendingBookings).map(function (k) { return { kind: 'pending', b: pendingBookings[k] }; })
+        .concat(Object.keys(bookedThisVisit).map(function (k) { return { kind: 'booked', b: bookedThisVisit[k] }; }));
+      entries.sort(function (x, y) { return (x.b.date + x.b.start).localeCompare(y.b.date + y.b.start); });
+
+      if (!entries.length) {
+        list.innerHTML = '<div class="schedule-empty">Nothing booked or picked yet — choose a time from a class box above.</div>';
+        return;
+      }
+      entries.forEach(function (entry) {
+        var p = entry.b;
+        var student = studentByRosterRow(p.rosterRow);
+        var color = student ? colorFor(student) : STUDENT_COLORS[0];
+        var studentFirst = p.studentFirst || (student && student.studentFirst) || '';
+        var item = document.createElement('div');
+        item.className = 'schedule-item';
+        var initial = document.createElement('span');
+        initial.className = 'initial';
+        initial.style.background = color.accent;
+        initial.textContent = (studentFirst.charAt(0) || '?').toUpperCase();
+        var when = document.createElement('span');
+        when.className = 'when';
+        when.textContent = formatDateLong(p.date) + ' · ' + formatTime12(p.start);
+        var what = document.createElement('span');
+        what.className = 'what';
+        what.innerHTML = '<b>' + (p.subject || p.teacherName) + '</b> with ' + p.teacherName + ' — ' + studentFirst +
+          (entry.kind === 'booked' ? ' <i>(confirmed)</i>' : '');
+        var remove = document.createElement('button');
+        remove.className = 'remove';
+        remove.type = 'button';
+        remove.textContent = '✕';
+        if (entry.kind === 'pending') {
+          remove.title = 'Remove this pick';
+          remove.onclick = function () {
+            delete pendingBookings[p.rosterRow + '|' + p.date + '|' + p.start];
+            refreshAllGrids();
+          };
+        } else {
+          remove.title = 'Cancel this booking';
+          remove.onclick = function () {
+            cancelBookedSlot(p.date, { start: p.start }, p, remove);
+          };
+        }
+        item.appendChild(initial);
+        item.appendChild(when);
+        item.appendChild(what);
+        item.appendChild(remove);
+        list.appendChild(item);
+      });
+    }
+
+    // The date filter is shared across every child — the dropdown is
+    // (re)built from the union of every child's conference dates.
+    function refreshRangeOptions() {
+      var picker = document.getElementById('rangePicker');
+      var seenDates = {};
+      var dates = [];
+      students.forEach(function (s) {
+        var sc = schedules[s.rosterRow];
+        if (!sc) return;
+        sc.grid.forEach(function (day) {
+          if (!seenDates[day.date]) { seenDates[day.date] = true; dates.push(day.date); }
+        });
+      });
+      if (!dates.length) { picker.style.display = 'none'; return; }
+      dates.sort();
+
+      var dateSelect = document.getElementById('dateFilter');
+      var prevDate = dateSelect.value || globalDateFilter || '';
+      dateSelect.innerHTML = '';
+      var allOpt = document.createElement('option');
+      allOpt.value = '';
+      allOpt.textContent = 'All dates';
+      dateSelect.appendChild(allOpt);
+      dates.forEach(function (d) {
+        var opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = formatDateLong(d);
+        dateSelect.appendChild(opt);
+      });
+      dateSelect.value = dates.indexOf(prevDate) !== -1 ? prevDate : '';
+      picker.style.display = '';
+    }
+
+    function applyGlobalDateFilter() {
+      globalDateFilter = document.getElementById('dateFilter').value || null;
+      refreshAllGrids();
+    }
+
+    // One picker group per child (label + color dot), chips start
+    // unselected — the parent picks which classes to see boxes for rather
+    // than being shown every class at once (some students have a dozen+).
+    // A class that's already booked or picked always shows regardless of
+    // its toggle, so an in-progress pick never silently disappears.
+    function buildClassPickers() {
+      var container = document.getElementById('classPickers');
+      container.innerHTML = '';
+      students.forEach(function (student) {
+        var schedule = schedules[student.rosterRow];
+        if (!schedule || !schedule.classes.length) return;
+        var color = colorFor(student);
+
+        var picker = document.createElement('div');
+        picker.className = 'teacher-picker';
+
+        var pickerLabel = document.createElement('div');
+        pickerLabel.className = 'picker-label';
+        var dot = document.createElement('span');
+        dot.className = 'student-dot';
+        dot.style.background = color.accent;
+        pickerLabel.appendChild(dot);
+        pickerLabel.appendChild(document.createTextNode(
+          student.studentFirst + ' ' + student.studentLast + ' (Grade ' + student.grade + '): show classes'));
+        picker.appendChild(pickerLabel);
+
+        var optionGrid = document.createElement('div');
+        optionGrid.className = 'teacher-option-grid';
+        schedule.classes.forEach(function (c) {
+          var option = document.createElement('button');
+          option.type = 'button';
+          option.className = 'teacher-option';
+          option.title = 'Taught by ' + c.teacherName;
+          var box = document.createElement('span');
+          box.className = 'box';
+          var label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = c.subject || c.teacherName;
+          option.appendChild(box);
+          option.appendChild(label);
+
+          var setActive = function (active) {
+            option.style.borderColor = active ? color.accent : '';
+            option.style.background = active ? color.tint : '';
+            option.style.color = active ? color.deep : '';
+            box.style.background = active ? color.accent : '';
+            box.style.borderColor = active ? color.accent : '';
+            box.textContent = active ? '✓' : '';
+          };
+          setActive(!!selectedClasses[student.rosterRow][c.classKey]);
+
+          option.onclick = function () {
+            var next = !selectedClasses[student.rosterRow][c.classKey];
+            if (next) selectedClasses[student.rosterRow][c.classKey] = true;
+            else delete selectedClasses[student.rosterRow][c.classKey];
+            setActive(next);
+            renderClassBoxes();
+          };
+          optionGrid.appendChild(option);
+        });
+        picker.appendChild(optionGrid);
+        container.appendChild(picker);
+      });
+    }
+
+    // A sibling already at this date+time — whether that's just picked
+    // (pending) or already confirmed (bookedThisVisit) — so the "you'll be
+    // at both at once" warning fires either way, not just for picks.
+    function otherStudentConflict(date, start, rosterRow) {
+      var match = Object.keys(pendingBookings).map(function (k) { return pendingBookings[k]; })
+        .concat(Object.keys(bookedThisVisit).map(function (k) { return bookedThisVisit[k]; }))
+        .filter(function (b) { return b.date === date && b.start === start && b.rosterRow !== rosterRow; })[0];
+      if (!match) return null;
+      var otherStudent = studentByRosterRow(match.rosterRow);
+      return { studentFirst: match.studentFirst || (otherStudent && otherStudent.studentFirst) || 'another child' };
+    }
+
+    // Same child, a *different* class already at this exact date+time —
+    // e.g. picking 3:00 for Math while English is already at 3:00 for the
+    // same kid. Checked separately from otherStudentConflict, which only
+    // looks at other children.
+    function sameStudentOverlap(date, start, rosterRow, teacherEmail, subject) {
+      var match = Object.keys(pendingBookings).map(function (k) { return pendingBookings[k]; })
+        .concat(Object.keys(bookedThisVisit).map(function (k) { return bookedThisVisit[k]; }))
+        .filter(function (b) {
+          return b.date === date && b.start === start && b.rosterRow === rosterRow &&
+            !(b.teacherEmail === teacherEmail && b.subject === subject);
+        })[0];
+      return match || null;
+    }
+
+    // A class that's already been saved (server-confirmed) can't be picked
+    // again without canceling it first. A class that's only pending (not
+    // yet saved) can be freely switched to a different time chip instead —
+    // selectPending below handles clearing the old pending pick for that
+    // same class.
+    function classAlreadyBooked(rosterRow, teacherEmail, subject) {
+      return Object.keys(bookedThisVisit).some(function (k) {
+        var b = bookedThisVisit[k];
+        return b.rosterRow === rosterRow && b.teacherEmail === teacherEmail && b.subject === subject;
+      });
+    }
+
+    // Finds the pending/booked entry for one specific class (a class can
+    // only have one booking, so rosterRow+teacherEmail+subject is enough
+    // to identify it regardless of which date/time it landed on).
+    function findClassBooking(map, rosterRow, teacherEmail, subject) {
+      var keys = Object.keys(map);
+      for (var i = 0; i < keys.length; i++) {
+        var b = map[keys[i]];
+        if (b.rosterRow === rosterRow && b.teacherEmail === teacherEmail && b.subject === subject) return b;
+      }
+      return null;
+    }
+
+    // Every open date+time for one class — the server already excludes
+    // times taken by anyone else, so this is simply "what's left."
+    // Every slot on every (non-filtered-out) conference date for this class —
+    // not just the open ones, so the grid can show taken times grayed out in
+    // place instead of skipping over them.
+    function allSlotsForClass(rosterRow, classKey) {
+      var sc = schedules[rosterRow];
+      var out = [];
+      sc.grid.forEach(function (day) {
+        if (globalDateFilter && day.date !== globalDateFilter) return;
+        day.slots.forEach(function (slot) {
+          var match = slot.teachers.filter(function (t) { return t.classKey === classKey; })[0];
+          out.push({ date: day.date, start: slot.start, end: slot.end, open: !!match });
+        });
+      });
+      return out;
+    }
+
+    // One paper sheet per bookable class, across every child under this
+    // guardian — no separate "show classes" step, since a sheet already is
+    // one class. Sheets in the grid are never interactive/resized directly;
+    // clicking one sets frontKey and the overlay renders the live,
+    // bookable copy on top.
+    function shownClassEntries() {
+      var out = [];
+      students.forEach(function (student) {
+        var sc = schedules[student.rosterRow];
+        if (!sc) return;
+        sc.classes.forEach(function (cls) {
+          var selected = !!selectedClasses[student.rosterRow][cls.classKey];
+          var committed = findClassBooking(bookedThisVisit, student.rosterRow, cls.teacherEmail, cls.subject) ||
+            findClassBooking(pendingBookings, student.rosterRow, cls.teacherEmail, cls.subject);
+          if (!selected && !committed) return; // toggled off and nothing picked yet — stay hidden
+          out.push({ student: student, cls: cls });
+        });
+      });
+      return out;
+    }
+
+    function renderClassBoxes() {
+      var container = document.getElementById('classBoxesContainer');
+      container.innerHTML = '';
+      var anyClasses = students.some(function (s) { return schedules[s.rosterRow] && schedules[s.rosterRow].classes.length; });
+      var entries = shownClassEntries();
+
+      if (!anyClasses) { container.innerHTML = '<div class="empty-state">No bookable classes found.</div>'; renderSheetOverlay(); return; }
+      if (!entries.length) { container.innerHTML = '<div class="empty-state">Select a class above to see its available times.</div>'; renderSheetOverlay(); return; }
+
+      var size = sheetSizeFor(entries.length);
+      // Bringing a sheet to front is only useful once sheets have actually
+      // shrunk enough to need it — with 4 or fewer shown, they're already
+      // big enough to book directly in the grid.
+      var useOverlay = entries.length > 4;
+      if (!useOverlay) frontKey = null;
+
+      entries.forEach(function (e) {
+        var key = e.student.rosterRow + '|' + e.cls.classKey;
+        var sheet = buildClassSheet(e.student, e.cls, size, !useOverlay);
+        if (useOverlay) {
+          sheet.classList.add('front-clickable');
+          sheet.classList.toggle('picked-front', frontKey === key);
+          sheet.onclick = function () { frontKey = (frontKey === key) ? null : key; renderClassBoxes(); };
+        }
+        container.appendChild(sheet);
+      });
+
+      renderSheetOverlay();
+    }
+
+    function renderSheetOverlay() {
+      var backdrop = document.getElementById('sheetBackdrop');
+      var stage = document.getElementById('sheetOverlayStage');
+      stage.innerHTML = '';
+      var entry = frontKey && shownClassEntries().filter(function (e) {
+        return (e.student.rosterRow + '|' + e.cls.classKey) === frontKey;
+      })[0];
+      if (!entry) {
+        backdrop.classList.remove('visible');
+        stage.classList.remove('visible');
+        frontKey = null;
+        return;
+      }
+      backdrop.classList.add('visible');
+      stage.classList.add('visible');
+      stage.appendChild(buildClassSheet(entry.student, entry.cls, FRONT_SHEET_SIZE, true));
+    }
+
+    function closeSheetOverlay() { if (frontKey !== null) { frontKey = null; renderClassBoxes(); } }
+    document.getElementById('sheetBackdrop').onclick = closeSheetOverlay;
+    // The overlay stage is a full-viewport box (so the sheet can be centered),
+    // which sits on top of the backdrop — clicking it never reaches the
+    // backdrop's own handler. Close whenever the click lands on the stage
+    // itself rather than the sheet it's centering.
+    document.getElementById('sheetOverlayStage').addEventListener('click', function (e) {
+      if (e.target === e.currentTarget) closeSheetOverlay();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheetOverlay(); });
+
+    function buildClassSheet(student, cls, size, interactive) {
+      var color = colorFor(student);
+      var sheet = document.createElement('div');
+      sheet.className = 'class-sheet';
+      sheet.style.setProperty('--sheet-tone', color.accent);
+      sheet.style.width = size.w + 'px';
+      sheet.style.height = size.h + 'px';
+      sheet.style.fontSize = size.fs + 'px';
+      if (interactive) sheet.onclick = function (e) { e.stopPropagation(); };
+
+      var pin = document.createElement('span');
+      pin.className = 'sheet-pin';
+      sheet.appendChild(pin);
+
+      var head = document.createElement('div');
+      head.className = 'sheet-head';
+      head.innerHTML = '<div class="sheet-subject">' + (cls.subject || cls.teacherName) + '</div>' +
+        '<div class="sheet-meta">' + student.studentFirst + ' ' + student.studentLast + ' (Grade ' + student.grade + ') &middot; ' + cls.teacherName + '</div>';
+      sheet.appendChild(head);
+
+      var body = document.createElement('div');
+      body.className = 'sheet-body';
+
+      var bookedEntry = findClassBooking(bookedThisVisit, student.rosterRow, cls.teacherEmail, cls.subject);
+
+      if (bookedEntry) {
+        var bookedPanel = document.createElement('div');
+        bookedPanel.className = 'sheet-booked';
+        bookedPanel.innerHTML = '<div>Booked</div>' +
+          '<div class="when">' + formatDateLong(bookedEntry.date) + '<br>' + formatTime12(bookedEntry.start) + '</div>' +
+          (interactive ? '<div class="cancel-hint">Tap to cancel</div>' : '');
+        if (interactive) {
+          bookedPanel.onclick = function () {
+            cancelBookedSlot(bookedEntry.date, { start: bookedEntry.start, end: bookedEntry.end }, bookedEntry, bookedPanel);
+          };
+        }
+        body.appendChild(bookedPanel);
+      } else {
+        var pendingEntry = findClassBooking(pendingBookings, student.rosterRow, cls.teacherEmail, cls.subject);
+        var allSlots = allSlotsForClass(student.rosterRow, cls.classKey);
+        // The already-picked slot might have been filtered out by the date
+        // filter above — still show it so it stays visibly picked (and
+        // un-pickable) even while filtered.
+        if (pendingEntry && !allSlots.some(function (s) { return s.date === pendingEntry.date && s.start === pendingEntry.start; })) {
+          allSlots = allSlots.concat([{ date: pendingEntry.date, start: pendingEntry.start, end: pendingEntry.end, open: true }]);
+        }
+
+        if (!allSlots.length) {
+          var empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No times.';
+          body.appendChild(empty);
+        } else {
+          var byDate = {};
+          var dateOrder = [];
+          allSlots.forEach(function (s) {
+            if (!byDate[s.date]) { byDate[s.date] = []; dateOrder.push(s.date); }
+            byDate[s.date].push(s);
+          });
+          dateOrder.sort();
+          dateOrder.forEach(function (date) {
+            var group = document.createElement('div');
+            group.className = 'sheet-date-group';
+            var label = document.createElement('div');
+            label.className = 'sheet-date-label';
+            label.textContent = formatDateLong(date);
+            group.appendChild(label);
+
+            var grid = document.createElement('div');
+            grid.className = 'sheet-grid';
+            byDate[date].sort(function (a, b) { return a.start.localeCompare(b.start); }).forEach(function (s) {
+              var isPicked = pendingEntry && pendingEntry.date === date && pendingEntry.start === s.start;
+              var isBookable = interactive && (s.open || isPicked);
+              var cell = document.createElement('span');
+              cell.className = 'sheet-cell' + (isPicked ? ' picked' : (!s.open ? ' taken' : '')) + (isBookable ? ' bookable' : '');
+              cell.textContent = formatTimeShort(s.start);
+              cell.title = formatTime12(s.start) + (isPicked ? ' — tap to un-pick' : (!s.open ? ' — already taken' : ''));
+              if (isBookable) {
+                cell.onclick = isPicked
+                  ? function () {
+                    delete pendingBookings[student.rosterRow + '|' + date + '|' + s.start];
+                    refreshAllGrids();
+                  }
+                  : function () {
+                    selectPending(date, { start: s.start, end: s.end },
+                      { classKey: cls.classKey, teacherEmail: cls.teacherEmail, teacherName: cls.teacherName, subject: cls.subject },
+                      student);
+                  };
+              }
+              grid.appendChild(cell);
+            });
+            group.appendChild(grid);
+            body.appendChild(group);
+          });
+        }
+      }
+
+      sheet.appendChild(body);
+      return sheet;
+    }
+
+    // Custom in-page confirm, replacing the native browser confirm() dialog.
+    function showConfirmModal(message, onConfirm) {
+      var overlay = document.getElementById('confirmModal');
+      document.getElementById('confirmModalMsg').textContent = message;
+      var yes = document.getElementById('confirmModalYes');
+      var no = document.getElementById('confirmModalNo');
+      var cleanup = function () {
+        overlay.classList.remove('visible');
+        yes.onclick = null;
+        no.onclick = null;
+      };
+      yes.onclick = function () { cleanup(); onConfirm(); };
+      no.onclick = cleanup;
+      overlay.classList.add('visible');
+    }
+
+    // Custom in-page notice, replacing the native browser alert() — message
+    // may contain simple markup (e.g. <br> for a list), since every caller
+    // builds it from trusted roster/schedule data, never free-text input.
+    function showInfoModal(message) {
+      var overlay = document.getElementById('infoModal');
+      document.getElementById('infoModalMsg').innerHTML = message;
+      var ok = document.getElementById('infoModalOk');
+      var cleanup = function () { overlay.classList.remove('visible'); ok.onclick = null; };
+      ok.onclick = cleanup;
+      overlay.classList.add('visible');
+    }
+
+    // Confirm always picks one specific class's chosen time directly — no
+    // popover needed, since a box already is one class/teacher (unlike the
+    // old shared-grid cell, which could have more than one teacher open at
+    // the same slot).
+    function selectPending(date, slot, teacher, student) {
+      if (classAlreadyBooked(student.rosterRow, teacher.teacherEmail, teacher.subject)) {
+        showInfoModal('You already have a saved meeting for ' + (teacher.subject || teacher.teacherName) + '. Cancel it first if you want a different time.');
+        return;
+      }
+      var selfOverlap = sameStudentOverlap(date, slot.start, student.rosterRow, teacher.teacherEmail, teacher.subject);
+      if (selfOverlap) {
+        showConfirmModal(
+          'Heads up: ' + student.studentFirst + ' already has another meeting at ' + formatTime12(slot.start) + ' on ' + formatDateLong(date) +
+          ' (' + (selfOverlap.subject || selfOverlap.teacherName) + ' with ' + selfOverlap.teacherName + '). Pick this time anyway?',
+          function () { commitPending(date, slot, teacher, student); }
+        );
+        return;
+      }
+      var conflict = otherStudentConflict(date, slot.start, student.rosterRow);
+      if (conflict) {
+        showConfirmModal(
+          'Heads up: you already have a meeting at ' + formatTime12(slot.start) + ' on ' + formatDateLong(date) + ' for ' + conflict.studentFirst + '. Pick this time anyway?',
+          function () { commitPending(date, slot, teacher, student); }
+        );
+        return;
+      }
+      commitPending(date, slot, teacher, student);
+    }
+
+    function commitPending(date, slot, teacher, student) {
+      // Clicking a different chip for the same class replaces its pick —
+      // a class can only have one pending time at once.
+      Object.keys(pendingBookings).forEach(function (k) {
+        var b = pendingBookings[k];
+        if (b.rosterRow === student.rosterRow && b.teacherEmail === teacher.teacherEmail && b.subject === teacher.subject) {
+          delete pendingBookings[k];
+        }
+      });
+      var pendingKey = student.rosterRow + '|' + date + '|' + slot.start;
+      pendingBookings[pendingKey] = {
+        rosterRow: student.rosterRow, date: date, start: slot.start, end: slot.end,
+        teacherEmail: teacher.teacherEmail, teacherName: teacher.teacherName, subject: teacher.subject,
+        studentFirst: student.studentFirst, studentLast: student.studentLast, grade: student.grade
+      };
+      refreshAllGrids();
+    }
+
+    function refreshAllGrids() {
+      renderClassBoxes();
+      renderScheduleSummary();
+      updateSaveBar();
+    }
+
+    function updateSaveBar() {
+      var keys = Object.keys(pendingBookings);
+      var bar = document.getElementById('saveBar');
+      var count = document.getElementById('pendingCount');
+      document.getElementById('saveBarError').style.display = 'none';
+      if (!keys.length) {
+        bar.classList.remove('visible');
+        return;
+      }
+      // Start collapsed each time the bar goes from hidden to visible (e.g.
+      // the very first pick, or right after a save/discard) — only matters
+      // on mobile, where collapsed is a thin handle instead of the full bar.
+      if (!bar.classList.contains('visible')) bar.classList.add('collapsed');
+      bar.classList.add('visible');
+      count.textContent = keys.length + (keys.length === 1 ? ' time' : ' times') + ' picked, not yet saved';
+    }
+
+    function toggleSaveBar() {
+      document.getElementById('saveBar').classList.toggle('collapsed');
+    }
+
+    function discardPending() {
+      pendingBookings = {};
+      var emailField = document.getElementById('confirmEmail');
+      if (!emailField.readOnly) emailField.value = '';
+      refreshAllGrids();
+    }
+
+    // Cancels an already-saved booking so the time (and that teacher, since
+    // they can only be booked once per visit) becomes available again.
+    function cancelBookedSlot(date, slot, visit, cell) {
+      showConfirmModal(
+        'Cancel the conference for ' + (visit.subject || visit.teacherName) + ' with ' + visit.teacherName + ' at ' + formatTime12(slot.start) + '?',
+        function () {
+          cell.onclick = null;
+          cell.textContent = 'Canceling...';
+          google.script.run
+            .withSuccessHandler(function (result) {
+              if (!result.success) { cell.textContent = result.message; return; }
+              delete bookedThisVisit[visit.rosterRow + '|' + date + '|' + slot.start];
+              refreshAllGrids();
+            })
+            .withFailureHandler(function (err) { cell.textContent = 'Error: ' + err.message; })
+            .cancelBooking(date, slot.start, visit.teacherEmail, visit.rosterRow);
+        }
+      );
+    }
+
+    function savePending() {
+      var email = document.getElementById('confirmEmail').value.trim();
+      var errorEl = document.getElementById('saveBarError');
+      if (!email || email.indexOf('@') === -1) {
+        errorEl.textContent = 'Enter a valid email to save your picked times.';
+        errorEl.style.display = 'block';
+        document.getElementById('confirmEmail').focus();
+        return;
+      }
+      errorEl.style.display = 'none';
+
+      var bookings = Object.keys(pendingBookings).map(function (k) {
+        var b = pendingBookings[k];
+        var student = studentByRosterRow(b.rosterRow);
+        var matched = student && (student.guardians || []).filter(function (g) {
+          return g.email.toLowerCase() === email.toLowerCase();
+        })[0];
+        return {
+          rosterRow: b.rosterRow, date: b.date, start: b.start, end: b.end,
+          teacherEmail: b.teacherEmail, teacherName: b.teacherName, subject: b.subject,
+          studentFirst: b.studentFirst, studentLast: b.studentLast, grade: b.grade,
+          parentName: matched ? matched.name : '', parentEmail: email
+        };
+      });
+
+      var saveBtn = document.getElementById('saveBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+      google.script.run
+        .withSuccessHandler(function (result) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Times';
+          result.results.forEach(function (r) {
+            var key = r.rosterRow + '|' + r.date + '|' + r.start;
+            if (r.success) {
+              bookedThisVisit[r.rosterRow + '|' + r.date + '|' + r.start] = {
+                rosterRow: r.rosterRow, teacherName: r.teacherName, teacherEmail: r.teacherEmail,
+                subject: r.subject, date: r.date, start: r.start
+              };
+            }
+            delete pendingBookings[key];
+          });
+          if (!result.success) {
+            var failed = result.results.filter(function (r) { return !r.success; });
+            showInfoModal('Some times could not be saved (likely just taken):<br>' +
+              failed.map(function (r) { return formatTime12(r.start) + ': ' + r.message; }).join('<br>'));
+          }
+          refreshAllGrids();
+        })
+        .withFailureHandler(function (err) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Times';
+          errorEl.textContent = 'Error saving: ' + err.message;
+          errorEl.style.display = 'block';
+        })
+        .submitBookings(bookings);
+    }
+  </script>
+</body>
+</html>

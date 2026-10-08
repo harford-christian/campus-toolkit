@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Parent-Teacher Conferences — Showcase demo</title>
+<style>
+  :root { --maroon:#8f1b1b; --maroon-hi:#B22222; --gold:#D4AF37; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #201f22; }
+  .bar {
+    flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 10px 16px; color: #fff;
+    background: linear-gradient(120deg, #6d1414 0%, #8f1b1b 55%, #B22222 100%);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35); z-index: 2;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; }
+  .brand .logo { font-size: 1.5rem; }
+  .brand small { display: block; font-weight: 600; font-size: .72rem; opacity: .85; }
+  .seg { display: inline-flex; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+  .seg button {
+    border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: .86rem;
+    color: #fff; background: transparent; padding: 8px 13px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 6px; transition: background .12s;
+  }
+  .seg button:hover { background: rgba(255,255,255,.16); }
+  .seg button.active { background: var(--gold); color: #3a2b00; }
+  .who { display: none; align-items: center; gap: 8px; font-size: .82rem; font-weight: 700; }
+  .who.show { display: inline-flex; }
+  .who select { font: inherit; font-weight: 700; font-size: .82rem; border-radius: 999px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.14); color: #fff; padding: 6px 10px; }
+  .who select option { color: #222; }
+  .spacer { flex: 1; }
+  .hint { font-size: .78rem; opacity: .85; max-width: 26rem; line-height: 1.35; }
+  .outbox { font-size: .78rem; font-weight: 700; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 6px 11px; white-space: nowrap; }
+  .outbox:empty { display: none; }
+  .back, .reset { color: #fff; text-decoration: none; font-weight: 700; font-size: .86rem; opacity: .9; border: 1px solid rgba(255,255,255,.3); padding: 7px 12px; border-radius: 999px; background: none; cursor: pointer; font-family: inherit; }
+  .back:hover, .reset:hover { background: rgba(255,255,255,.12); }
+  .stage { flex: 1; position: relative; }
+  .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #201f22; }
+  @media (max-width: 1180px) { .hint { display: none; } }
+  @media (max-width: 980px) { .brand small { display: none; } .seg button { padding: 8px 10px; font-size: .8rem; } }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🗓️</span>
+      <span>Parent-Teacher Conferences<small>One sign-up for every child &middot; teachers block their own time</small></span>
+    </div>
+    <div class="seg" role="tablist" aria-label="Choose a screen">
+      <button data-src="parent.html" class="active" aria-selected="true">👪 Parent</button>
+      <button data-src="teacher.html" aria-selected="false">🍎 Teacher</button>
+    </div>
+    <label class="who" id="who">Signed in as
+      <select id="teacher" aria-label="Which teacher is signed in">
+        <option value="mduvall@example.edu">Marta Duvall &middot; 7th/8th English</option>
+        <option value="irasmussen@example.edu">Iris Rasmussen &middot; Mathematics</option>
+        <option value="enakamura@example.edu">Ellis Nakamura &middot; 9th English</option>
+        <option value="ydelacroix@example.edu">Yvette Delacroix &middot; World Language</option>
+        <option value="rsandoval@example.edu">Rico Sandoval &middot; PE &amp; Athletics</option>
+        <option value="gsowell@example.edu">Gina Sowell &middot; 3rd Grade</option>
+      </select>
+    </label>
+    <span class="spacer"></span>
+    <span class="hint" id="hint">Pick <b>English - 7th Grade</b> for Wren and tap a time, then <b>Save Times</b> &mdash;
+      then switch to the Teacher screen and that slot reads <b>booked</b> with her name.</span>
+    <span class="outbox" id="outbox" title="Confirmation emails the app would have sent this visit"></span>
+    <button class="reset" id="reset" type="button" title="Forget this visit's bookings and blocks">↻ Reset</button>
+    <a class="back" href="../../index.html" target="_top">← Gallery</a>
+  </div>
+  <div class="stage">
+    <iframe id="screen" src="parent.html" title="Parent-Teacher Conferences screen"></iframe>
+  </div>
+<script>
+  // One Apps Script project in production, two pages: ?view=parent (reached from the school's
+  // parent portal with a signed ticket) and ?view=teacher (the teacher's own Google sign-in).
+  // The demo keeps its bookings and blocks in sessionStorage, shared by both frames, so a
+  // parent's save shows on the teacher's grid and a teacher's block greys out for the parent.
+  var frame = document.getElementById('screen');
+  var who = document.getElementById('who');
+  var teacherSel = document.getElementById('teacher');
+  var hint = document.getElementById('hint');
+  var btns = [].slice.call(document.querySelectorAll('.seg button'));
+  var HINTS = {
+    'parent.html': 'Pick <b>English - 7th Grade</b> for Wren and tap a time, then <b>Save Times</b> &mdash; then switch to the Teacher screen and that slot reads <b>booked</b> with her name.',
+    'teacher.html': 'Tap open times to block them (shift-click sweeps a range), <b>Save Changes</b>, then switch back to the Parent screen: those times are greyed out on every sheet this teacher appears on.'
+  };
+
+  function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } }
+  try { var saved = JSON.parse(sessionStorage.getItem('ptc-demo-teacher') || 'null'); if (saved) teacherSel.value = saved; } catch (e) {}
+
+  function activate(btn) {
+    btns.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    var src = btn.getAttribute('data-src');
+    who.classList.toggle('show', src === 'teacher.html');
+    hint.innerHTML = HINTS[src];
+    frame.src = src;
+  }
+  btns.forEach(function (btn) { btn.addEventListener('click', function () { activate(btn); }); });
+
+  teacherSel.addEventListener('change', function () {
+    try { sessionStorage.setItem('ptc-demo-teacher', JSON.stringify(teacherSel.value)); } catch (e) {}
+    frame.src = 'teacher.html';
+  });
+
+  document.getElementById('reset').addEventListener('click', function () {
+    try { ['ptc-demo-state-v1', 'ptc-demo-outbox', 'ptc-demo-teacher', 'ptc_demo_out'].forEach(function (k) { sessionStorage.removeItem(k); }); } catch (e) {}
+    try { localStorage.removeItem('ptc_session_token'); } catch (e) {}
+    teacherSel.value = 'mduvall@example.edu';
+    frame.src = frame.src.split('?')[0];
+  });
+
+  // The confirmation emails the app would have sent — counted from the mock's outbox.
+  var outbox = document.getElementById('outbox');
+  setInterval(function () {
+    var n = 0;
+    try { n = (JSON.parse(sessionStorage.getItem('ptc-demo-outbox') || '[]')).length; } catch (e) {}
+    outbox.textContent = n ? '✉ ' + n + (n === 1 ? ' confirmation emailed' : ' confirmations emailed') : '';
+  }, 800);
+</script>
+</body>
+</html>

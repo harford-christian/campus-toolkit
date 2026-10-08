@@ -1,6 +1,6 @@
 // build-demo.mjs — assemble a standalone demo HTML from a real Apps Script template.
 // Usage: node tools/build-demo.mjs <config.json>
-// Config: { src, dst, includeDir?, replace?: [[find,repl],...], demoName }
+// Config: { src, dst, includeDir?, replace?: [[find,repl],...], replaceRegex?: [[pattern,flags,repl],...], demoName }
 // Steps: inline <?!= include('X') ?> · apply literal replacements (GAS tokens / scrubs)
 //        · strip control scriptlets <? ... ?> (keep inner content) · inject demo <head> block.
 import fs from 'node:fs';
@@ -20,6 +20,9 @@ if (cfg.includeDir) {
 
 // 2. Literal replacements: GAS output tokens (<?= x ?>) and private-data scrubs.
 for (const [find, repl] of (cfg.replace || [])) html = html.split(find).join(repl);
+// 2a. Pattern replacements, for the one case a literal cannot express: a value too large or too variable to
+//     quote in a config (an embedded 400 KB logo, say). [pattern, flags, replacement] — JavaScript RegExp syntax.
+for (const [pattern, flags, repl] of (cfg.replaceRegex || [])) html = html.replace(new RegExp(pattern, flags), repl);
 
 // 2b. ALWAYS-ON privacy scrub — by pattern, not by config.
 //

@@ -1,0 +1,9 @@
+{
+  "_note": "Config for tools/build-demo.mjs — see build.parent.json for the order. Teacher.html has no template tokens: production identifies the teacher from the signed-in Google account (Session.getActiveUser), which the mock answers with the teacher chosen in the switcher bar. Same two markup edits as the parent page: _self base target, and the shared dataset + logic.js pulled in ahead of the shim.",
+  "src": "../parent-teacher-conference-scheduling/Teacher.html",
+  "dst": "demos/conferences/teacher.html",
+  "demoName": "Parent-Teacher Conferences",
+  "replace": [
+    ["<base target=\"_top\">", "<meta charset=\"utf-8\">\n  <base target=\"_self\">\n  <script src=\"../facts-directory/data.js\"></script>\n  <script src=\"logic.js\"></script>"]
+  ]
+}

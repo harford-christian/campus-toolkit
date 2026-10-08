@@ -1,0 +1,13 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/conferences/build-logic.mjs && node tools/build-demo.mjs demos/conferences/build.parent.json && node tools/build-demo.mjs demos/conferences/build.teacher.json. The source page is a complete document with one template token (the SSO hand-off ticket doGet injects). Demo-only edits, all markup or that token line, never the app's logic: (1) base target becomes _self because the switcher's iframe is this page's intended home; (2) the Directory Search demo's dataset and logic.js are pulled in ahead of the shim so the mock can run the app's real server code on the shared fictional school; (3) the ticket is a constant unless the visitor pressed Sign out this visit, so Sign out really signs out instead of bouncing straight back in; (4) the portal's product name in the one sign-in message, and the sibling project's repo name in two comments, are generic.",
+  "src": "../parent-teacher-conference-scheduling/Parent.html",
+  "dst": "demos/conferences/parent.html",
+  "demoName": "Parent-Teacher Conferences",
+  "replace": [
+    ["<base target=\"_top\">", "<meta charset=\"utf-8\">\n  <base target=\"_self\">\n  <script src=\"../facts-directory/data.js\"></script>\n  <script src=\"logic.js\"></script>"],
+    ["var SSO_TOKEN = \"<?= ssoToken ?>\";", "var SSO_TOKEN = sessionStorage.getItem('ptc_demo_out') ? '' : 'demo-ticket'; // demo: production injects the portal's signed ticket here"],
+    ["localStorage.removeItem(SESSION_KEY);\n      // Strip", "localStorage.removeItem(SESSION_KEY); sessionStorage.setItem('ptc_demo_out', '1');\n      // Strip"],
+    ["sign in through the HCS Forms Parent Portal", "sign in through the school's Parent Portal"],
+    ["hcs-custom-forms", "custom-forms"]
+  ]
+}
