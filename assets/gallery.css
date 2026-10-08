@@ -112,6 +112,42 @@ a { color: var(--maroon); }
 .card.soon .icon { filter: grayscale(.35); }
 .soon-note { font-weight: 700; font-size: .9rem; color: var(--ink-soft); }
 
+/* ---------- Jump nav + themed groups ---------- */
+.jump {
+  position: sticky; top: 0; z-index: 5; margin: 22px -22px 6px; padding: 10px 22px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+  background: rgba(250,247,242,.92); backdrop-filter: blur(8px); border-bottom: 1px solid transparent;
+}
+.jump.stuck { border-bottom-color: var(--line); }
+.jump a {
+  display: inline-flex; align-items: center; gap: 7px; text-decoration: none;
+  font-weight: 700; font-size: .86rem; color: var(--ink); white-space: nowrap;
+  background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px;
+  transition: background .12s, color .12s, border-color .12s, transform .1s;
+}
+.jump a:hover { border-color: #e3cf9e; transform: translateY(-1px); }
+.jump a.active { background: var(--maroon); color: #fff; border-color: var(--maroon); }
+.jump a.active .jump-n { background: rgba(255,255,255,.22); color: #fff; }
+.jump-n {
+  font-size: .72rem; font-weight: 800; background: var(--cream); color: #5a4712;
+  border-radius: 999px; padding: 2px 7px; min-width: 20px; text-align: center;
+}
+.jump-n:empty { display: none; }
+.group { scroll-margin-top: 72px; margin-top: 44px; }
+.group:first-of-type { margin-top: 26px; }
+.group-head { display: flex; align-items: flex-start; gap: 16px; }
+.group-icon {
+  width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.45rem; flex: none;
+  background: linear-gradient(160deg, #fff4dc, var(--cream)); border: 1px solid #e6d5a4;
+}
+.group-head h2 { margin: 2px 0 0; font-size: 1.4rem; font-weight: 800; letter-spacing: -.3px; }
+.group-head p { margin: 4px 0 0; color: var(--ink-soft); font-size: .98rem; max-width: 70ch; }
+.group .grid { margin-top: 20px; }
+@media (max-width: 560px) {
+  .jump { position: static; margin: 18px 0 0; padding: 0; background: none; backdrop-filter: none; }
+  .jump a { font-size: .8rem; padding: 7px 11px; }
+}
+
 /* ---------- Footer ---------- */
 .foot {
   margin-top: 64px; border-top: 1px solid var(--line); background: #fff;

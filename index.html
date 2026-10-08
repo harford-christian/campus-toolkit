@@ -21,7 +21,7 @@
       demo</b> running on realistic sample data. Click in and try them.
     </p>
     <div class="hero-stats">
-      <div class="hero-stat"><div class="n">19</div><div class="l">Operational tools</div></div>
+      <div class="hero-stat"><div class="n" data-tool-count>16</div><div class="l">Operational tools</div></div>
       <div class="hero-stat"><div class="n">$0</div><div class="l">Added license cost</div></div>
       <div class="hero-stat"><div class="n">100%</div><div class="l">Google Workspace-native</div></div>
     </div>
@@ -35,21 +35,23 @@
        no student, staff, or family records are included.</p>
   </div>
 
-  <div class="grid">
+  <nav class="jump" aria-label="Jump to a group">
+    <a href="#safety"><span aria-hidden="true">🛡️</span> Safety & Facilities <span class="jump-n" data-count="safety"></span></a>
+    <a href="#students"><span aria-hidden="true">🎒</span> Students, Families & the School Day <span class="jump-n" data-count="students"></span></a>
+    <a href="#athletics"><span aria-hidden="true">🦅</span> Athletics, Events & Competitions <span class="jump-n" data-count="athletics"></span></a>
+    <a href="#office"><span aria-hidden="true">🗂️</span> Business Office & Staff <span class="jump-n" data-count="office"></span></a>
+    <a href="#services"><span aria-hidden="true">🏫</span> Campus Services & Displays <span class="jump-n" data-count="services"></span></a>
+  </nav>
 
-    <!-- LIVE -->
-    <article class="card live" data-tool="library">
-      <button class="info" data-tool="library" aria-label="Quick summary of Library Catalog">i</button>
-      <div class="icon">📚</div>
-      <h3>Library Catalog</h3>
-      <p class="desc">A kid-friendly catalog with instant search, browse-by-genre and reading level,
-        staff picks, self-service checkout, and student &amp; parent reading dashboards.</p>
-      <div class="replaces"><b>Replaces:</b> handwritten checkout cards tucked in each book cover.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="library">Why we built it →</button>
-        <a class="launch" href="demos/library/index.html">Launch demo →</a>
+  <section class="group" id="safety">
+    <div class="group-head">
+      <span class="group-icon" aria-hidden="true">🛡️</span>
+      <div>
+        <h2>Safety & Facilities</h2>
+        <p>Doors, lockdown, bells, sensors and who is on campus right now — one master schedule, one event log.</p>
       </div>
-    </article>
+    </div>
+    <div class="grid">
 
     <article class="card live" data-tool="campus-control">
       <button class="info" data-tool="campus-control" aria-label="Quick summary of Campus Control">i</button>
@@ -65,113 +67,34 @@
       </div>
     </article>
 
-    <article class="card live" data-tool="athletics">
-      <button class="info" data-tool="athletics" aria-label="Quick summary of Athletics Logistics">i</button>
-      <div class="icon">🦅</div>
-      <h3>Athletics Logistics</h3>
-      <p class="desc">Rosters, attendance, and travel manifests for every team — coaches see who's
-        missing and who rides the bus; parents manage pickups.</p>
-      <div class="replaces"><b>Replaces:</b> spreadsheets, group texts, and clipboard checklists.</div>
+    <article class="card live" data-tool="campus-presence">
+      <button class="info" data-tool="campus-presence" aria-label="Quick summary of Campus Presence">i</button>
+      <div class="icon">🪪</div>
+      <h3>Campus Presence</h3>
+      <p class="desc">Sign-in / sign-out on two iPad kiosks at the visitor entrances, and the live
+        answer to <b>who is on campus right now</b>. Visitors badge themselves in; students sign in
+        late or out early; a hard <b>authorised-pickup check</b> turns a stranger&rsquo;s attempt
+        into an office flag rather than a sign-out. Presence is derived from an append-only event
+        log, so the board, the printable muster and the lockdown screens all read one source.</p>
+      <div class="replaces"><b>Replaces:</b> a paper clipboard at each entrance, a phone call to the classroom, and somebody&rsquo;s memory of who is allowed to collect which child.</div>
       <div class="card-foot">
-        <button class="learn" data-tool="athletics">Why we built it →</button>
-        <a class="launch" href="demos/talon-hub/index.html">Launch demo →</a>
+        <button class="learn" data-tool="campus-presence">Why we built it →</button>
+        <a class="launch" href="demos/campus-presence/index.html">Launch demo →</a>
       </div>
     </article>
 
-    <article class="card live" data-tool="purchasing">
-      <button class="info" data-tool="purchasing" aria-label="Quick summary of Purchasing">i</button>
-      <div class="icon">🧾</div>
-      <h3>Purchasing &amp; Procurement</h3>
-      <p class="desc">A catalog-based purchase-request portal with role-based approval routing,
-        PO generation, and spend analytics.</p>
-      <div class="replaces"><b>Replaces:</b> paper POs and manual budget tracking.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="purchasing">Why we built it →</button>
-        <a class="launch" href="demos/purchasing/index.html">Launch demo →</a>
-      </div>
-    </article>
+    </div>
+  </section>
 
-    <article class="card live" data-tool="leave-sub">
-      <button class="info" data-tool="leave-sub" aria-label="Quick summary of Leave & Substitute Tracker">i</button>
-      <div class="icon">📆</div>
-      <h3>Leave &amp; Substitute Tracker</h3>
-      <p class="desc">Staff absence requests with substitute coverage, a coverage heatmap, and
-        forecasting for administrators.</p>
-      <div class="replaces"><b>Replaces:</b> paper leave slips and sub phone trees.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="leave-sub">Why we built it →</button>
-        <a class="launch" href="demos/leave-sub/index.html">Launch demo →</a>
+  <section class="group" id="students">
+    <div class="group-head">
+      <span class="group-icon" aria-hidden="true">🎒</span>
+      <div>
+        <h2>Students, Families & the School Day</h2>
+        <p>Built on the SIS export: where every student is this period, how they get home, and how families meet their teachers.</p>
       </div>
-    </article>
-
-    <article class="card live" data-tool="concessions">
-      <button class="info" data-tool="concessions" aria-label="Quick summary of Concessions Ordering System">i</button>
-      <div class="icon">🍿</div>
-      <h3>Concessions Ordering System</h3>
-      <p class="desc">One ordering system, three synced screens — an order kiosk, a live TV menu
-        board, and a kitchen display — all driven by a single Google Sheet. Switch between them
-        right inside the demo.</p>
-      <div class="replaces"><b>Replaces:</b> cash boxes and handwritten orders.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="concessions">Why we built it →</button>
-        <a class="launch" href="demos/pos/index.html">Launch demo →</a>
-      </div>
-    </article>
-
-    <article class="card live" data-tool="lobby-tv">
-      <button class="info" data-tool="lobby-tv" aria-label="Quick summary of Lobby Display TV">i</button>
-      <div class="icon">📺</div>
-      <h3>Lobby Display TV</h3>
-      <p class="desc">A front-desk TV that rotates announcement slides, photo carousels, and live
-        game streams — pushed from a one-click control dashboard and updated in ~20 seconds.</p>
-      <div class="replaces"><b>Replaces:</b> a static printed sign or a TV updated by hand with a laptop.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="lobby-tv">Why we built it →</button>
-        <a class="launch" href="demos/lobby-tv/index.html">Launch demo →</a>
-      </div>
-    </article>
-
-    <article class="card live" data-tool="custom-forms">
-      <button class="info" data-tool="custom-forms" aria-label="Quick summary of Custom Forms">i</button>
-      <div class="icon">📝</div>
-      <h3>Custom Forms</h3>
-      <p class="desc">A school-owned form builder that replaces JotForm — 18+ field types, conditional
-        logic, e-signatures, file uploads, and approval routing. Parents verify by email and forms
-        auto-fill their own children from the student directory.</p>
-      <div class="replaces"><b>Replaces:</b> JotForm / Google Forms and hand-typed student info.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="custom-forms">Why we built it →</button>
-        <a class="launch" href="demos/custom-forms/index.html">Launch demo →</a>
-      </div>
-    </article>
-
-    <article class="card live" data-tool="gym-tv">
-      <button class="info" data-tool="gym-tv" aria-label="Quick summary of Gym Display TV">i</button>
-      <div class="icon">🏀</div>
-      <h3>Gym Display TV</h3>
-      <p class="desc">An unattended gym TV that flips itself to game mode from the athletics calendar —
-        showing the live concession menu (stock + specials) on game nights and a photo/announcement
-        carousel the rest of the time.</p>
-      <div class="replaces"><b>Replaces:</b> a second display someone had to switch on and load by hand.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="gym-tv">Why we built it →</button>
-        <a class="launch" href="demos/gym-tv/index.html">Launch demo →</a>
-      </div>
-    </article>
-
-    <article class="card live" data-tool="lunch-inventory">
-      <button class="info" data-tool="lunch-inventory" aria-label="Quick summary of Lunch Inventory">i</button>
-      <div class="icon">🍎</div>
-      <h3>Lunch Inventory</h3>
-      <p class="desc">A count kiosk, shipment intake with per-batch expiry tracking, and an admin
-        dashboard — reorder lists, expiry alerts, pizza sell-through, and usage-trend charts, all
-        on one Google Sheet.</p>
-      <div class="replaces"><b>Replaces:</b> paper counts, guesswork reordering, and untracked expiry dates.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="lunch-inventory">Why we built it →</button>
-        <a class="launch" href="demos/lunch-inventory/index.html">Launch demo →</a>
-      </div>
-    </article>
+    </div>
+    <div class="grid">
 
     <article class="card live" data-tool="facts-directory">
       <button class="info" data-tool="facts-directory" aria-label="Quick summary of Directory Search">i</button>
@@ -189,31 +112,20 @@
       </div>
     </article>
 
-    <article class="card live" data-tool="facts-provisioning">
-      <button class="info" data-tool="facts-provisioning" aria-label="Quick summary of Account Provisioning">i</button>
-      <div class="icon">🔑</div>
-      <h3>Account Provisioning</h3>
-      <p class="desc">New enrollments flow from the FACTS SIS into auto-created Google Workspace
-        accounts (email, org-unit, password) — which then drive Microsoft 365 license assignment.
-        A dry-run → create → sync console.</p>
-      <div class="replaces"><b>Replaces:</b> IT hand-creating every student's Google &amp; Microsoft account from spreadsheets.</div>
+    <article class="card live" data-tool="student-portal">
+      <button class="info" data-tool="student-portal" aria-label="Quick summary of Student Portal">i</button>
+      <div class="icon">🎒</div>
+      <h3>Student Portal</h3>
+      <p class="desc">A phone-first app each student signs into with their school account. One list of
+        <b>what is due</b>, built from homework the teacher typed in prose, lesson plans and the gradebook,
+        with every item given a date (&ldquo;due Thursday&rdquo;, &ldquo;quiz 9/29&rdquo;, or the next school
+        day). The week&rsquo;s schedule with the class meeting <b>right now</b>, bell delays and closed days
+        honoured; scores and class averages; attendance; and for athletes, today&rsquo;s game with the
+        dismissal time read out of the coach&rsquo;s calendar note.</p>
+      <div class="replaces"><b>Replaces:</b> a student checking six class pages in the SIS, a homework note that vanished by Tuesday, and asking a coach what time the bus leaves.</div>
       <div class="card-foot">
-        <button class="learn" data-tool="facts-provisioning">Why we built it →</button>
-        <a class="launch" href="demos/facts-provisioning/index.html">Launch demo →</a>
-      </div>
-    </article>
-
-    <article class="card live" data-tool="staff-onboarding">
-      <button class="info" data-tool="staff-onboarding" aria-label="Quick summary of Staff Onboarding">i</button>
-      <div class="icon">🎓</div>
-      <h3>Staff Onboarding</h3>
-      <p class="desc">Every new staff account automatically receives an onboarding email linking to a
-        role-picker page — fulltime staff, teacher, sub, coach, or support staff each see their own
-        setup instructions, edited by a non-technical owner in Google Docs.</p>
-      <div class="replaces"><b>Replaces:</b> HR hand-writing a different instruction email for every single hire.</div>
-      <div class="card-foot">
-        <button class="learn" data-tool="staff-onboarding">Why we built it →</button>
-        <a class="launch" href="demos/staff-onboarding/index.html">Launch demo →</a>
+        <button class="learn" data-tool="student-portal">Why we built it →</button>
+        <a class="launch" href="demos/student-portal/index.html">Launch demo →</a>
       </div>
     </article>
 
@@ -251,23 +163,230 @@
       </div>
     </article>
 
-    <article class="card live" data-tool="campus-presence">
-      <button class="info" data-tool="campus-presence" aria-label="Quick summary of Campus Presence">i</button>
-      <div class="icon">🪪</div>
-      <h3>Campus Presence</h3>
-      <p class="desc">Sign-in / sign-out on two iPad kiosks at the visitor entrances, and the live
-        answer to <b>who is on campus right now</b>. Visitors badge themselves in; students sign in
-        late or out early; a hard <b>authorised-pickup check</b> turns a stranger&rsquo;s attempt
-        into an office flag rather than a sign-out. Presence is derived from an append-only event
-        log, so the board, the printable muster and the lockdown screens all read one source.</p>
-      <div class="replaces"><b>Replaces:</b> a paper clipboard at each entrance, a phone call to the classroom, and somebody&rsquo;s memory of who is allowed to collect which child.</div>
+    <article class="card live" data-tool="conferences">
+      <button class="info" data-tool="conferences" aria-label="Quick summary of Parent-Teacher Conferences">i</button>
+      <div class="icon">🗓️</div>
+      <h3>Parent-Teacher Conferences</h3>
+      <p class="desc">One sign-up for the whole family. A parent arrives from the school portal already
+        signed in, sees every child's classes as paper-style sheets, picks times across all of
+        them with a warning if two children collide, and saves once. Who they should meet is
+        worked out from the SIS by grade: the classroom teacher in K&ndash;3, the core teachers in
+        4&ndash;6, every class in 7&ndash;12. Teachers block their own unavailable times on a grid
+        that refuses to block a slot a parent already holds.</p>
+      <div class="replaces"><b>Replaces:</b> a paper sign-up sheet outside each classroom door, and a parent of three juggling thirteen teachers by email.</div>
       <div class="card-foot">
-        <button class="learn" data-tool="campus-presence">Why we built it →</button>
-        <a class="launch" href="demos/campus-presence/index.html">Launch demo →</a>
+        <button class="learn" data-tool="conferences">Why we built it →</button>
+        <a class="launch" href="demos/conferences/index.html">Launch demo →</a>
       </div>
     </article>
 
-  </div>
+    </div>
+  </section>
+
+  <section class="group" id="athletics">
+    <div class="group-head">
+      <span class="group-icon" aria-hidden="true">🦅</span>
+      <div>
+        <h2>Athletics, Events & Competitions</h2>
+        <p>Game-day logistics, concessions and the gym display, plus the competitions the school hosts.</p>
+      </div>
+    </div>
+    <div class="grid">
+
+    <article class="card live" data-tool="athletics">
+      <button class="info" data-tool="athletics" aria-label="Quick summary of Athletics Logistics">i</button>
+      <div class="icon">🦅</div>
+      <h3>Athletics Logistics</h3>
+      <p class="desc">Rosters, attendance, and travel manifests for every team — coaches see who's
+        missing and who rides the bus; parents manage pickups.</p>
+      <div class="replaces"><b>Replaces:</b> spreadsheets, group texts, and clipboard checklists.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="athletics">Why we built it →</button>
+        <a class="launch" href="demos/talon-hub/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="concessions">
+      <button class="info" data-tool="concessions" aria-label="Quick summary of Concessions Ordering System">i</button>
+      <div class="icon">🍿</div>
+      <h3>Concessions Ordering System</h3>
+      <p class="desc">One ordering system, three synced screens — an order kiosk, a live TV menu
+        board, and a kitchen display — all driven by a single Google Sheet. Switch between them
+        right inside the demo.</p>
+      <div class="replaces"><b>Replaces:</b> cash boxes and handwritten orders.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="concessions">Why we built it →</button>
+        <a class="launch" href="demos/pos/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="gym-tv">
+      <button class="info" data-tool="gym-tv" aria-label="Quick summary of Gym Display TV">i</button>
+      <div class="icon">🏀</div>
+      <h3>Gym Display TV</h3>
+      <p class="desc">An unattended gym TV that flips itself to game mode from the athletics calendar —
+        showing the live concession menu (stock + specials) on game nights and a photo/announcement
+        carousel the rest of the time.</p>
+      <div class="replaces"><b>Replaces:</b> a second display someone had to switch on and load by hand.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="gym-tv">Why we built it →</button>
+        <a class="launch" href="demos/gym-tv/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="macs">
+      <button class="info" data-tool="macs" aria-label="Quick summary of MACS Fine Arts">i</button>
+      <div class="icon">🎭</div>
+      <h3>MACS Fine Arts</h3>
+      <p class="desc">Registration for a multi-school fine arts competition the school hosts. Each school
+        signs in with a one-time emailed code, enters its students and groups across 70-plus Bible, music,
+        speech and art categories (with rosters for ensembles and PDF uploads for art), and submits once. The
+        admin console edits every category, field template, room, judge and school the form is built from,
+        shows each submission with its automatic cross-references, and archives the year.</p>
+      <div class="replaces"><b>Replaces:</b> a JotForm with free-text "also entered in" boxes and a staff member rebuilding the day grid by hand.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="macs">Why we built it →</button>
+        <a class="launch" href="demos/macs/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    </div>
+  </section>
+
+  <section class="group" id="office">
+    <div class="group-head">
+      <span class="group-icon" aria-hidden="true">🗂️</span>
+      <div>
+        <h2>Business Office & Staff</h2>
+        <p>Purchasing, leave, forms, and every account a new hire or new student needs on day one.</p>
+      </div>
+    </div>
+    <div class="grid">
+
+    <article class="card live" data-tool="purchasing">
+      <button class="info" data-tool="purchasing" aria-label="Quick summary of Purchasing">i</button>
+      <div class="icon">🧾</div>
+      <h3>Purchasing &amp; Procurement</h3>
+      <p class="desc">A catalog-based purchase-request portal with role-based approval routing,
+        PO generation, and spend analytics.</p>
+      <div class="replaces"><b>Replaces:</b> paper POs and manual budget tracking.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="purchasing">Why we built it →</button>
+        <a class="launch" href="demos/purchasing/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="leave-sub">
+      <button class="info" data-tool="leave-sub" aria-label="Quick summary of Leave & Substitute Tracker">i</button>
+      <div class="icon">📆</div>
+      <h3>Leave &amp; Substitute Tracker</h3>
+      <p class="desc">Staff absence requests with substitute coverage, a coverage heatmap, and
+        forecasting for administrators.</p>
+      <div class="replaces"><b>Replaces:</b> paper leave slips and sub phone trees.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="leave-sub">Why we built it →</button>
+        <a class="launch" href="demos/leave-sub/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="custom-forms">
+      <button class="info" data-tool="custom-forms" aria-label="Quick summary of Custom Forms">i</button>
+      <div class="icon">📝</div>
+      <h3>Custom Forms</h3>
+      <p class="desc">A school-owned form builder that replaces JotForm — 18+ field types, conditional
+        logic, e-signatures, file uploads, and approval routing. Parents verify by email and forms
+        auto-fill their own children from the student directory.</p>
+      <div class="replaces"><b>Replaces:</b> JotForm / Google Forms and hand-typed student info.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="custom-forms">Why we built it →</button>
+        <a class="launch" href="demos/custom-forms/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="staff-onboarding">
+      <button class="info" data-tool="staff-onboarding" aria-label="Quick summary of Staff Onboarding">i</button>
+      <div class="icon">🎓</div>
+      <h3>Staff Onboarding</h3>
+      <p class="desc">Every new staff account automatically receives an onboarding email linking to a
+        role-picker page — fulltime staff, teacher, sub, coach, or support staff each see their own
+        setup instructions, edited by a non-technical owner in Google Docs.</p>
+      <div class="replaces"><b>Replaces:</b> HR hand-writing a different instruction email for every single hire.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="staff-onboarding">Why we built it →</button>
+        <a class="launch" href="demos/staff-onboarding/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="facts-provisioning">
+      <button class="info" data-tool="facts-provisioning" aria-label="Quick summary of Account Provisioning">i</button>
+      <div class="icon">🔑</div>
+      <h3>Account Provisioning</h3>
+      <p class="desc">New enrollments flow from the FACTS SIS into auto-created Google Workspace
+        accounts (email, org-unit, password) — which then drive Microsoft 365 license assignment.
+        A dry-run → create → sync console.</p>
+      <div class="replaces"><b>Replaces:</b> IT hand-creating every student's Google &amp; Microsoft account from spreadsheets.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="facts-provisioning">Why we built it →</button>
+        <a class="launch" href="demos/facts-provisioning/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    </div>
+  </section>
+
+  <section class="group" id="services">
+    <div class="group-head">
+      <span class="group-icon" aria-hidden="true">🏫</span>
+      <div>
+        <h2>Campus Services & Displays</h2>
+        <p>The library, the lunch room and the front-desk TV.</p>
+      </div>
+    </div>
+    <div class="grid">
+
+    <article class="card live" data-tool="library">
+      <button class="info" data-tool="library" aria-label="Quick summary of Library Catalog">i</button>
+      <div class="icon">📚</div>
+      <h3>Library Catalog</h3>
+      <p class="desc">A kid-friendly catalog with instant search, browse-by-genre and reading level,
+        staff picks, self-service checkout, and student &amp; parent reading dashboards.</p>
+      <div class="replaces"><b>Replaces:</b> handwritten checkout cards tucked in each book cover.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="library">Why we built it →</button>
+        <a class="launch" href="demos/library/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="lunch-inventory">
+      <button class="info" data-tool="lunch-inventory" aria-label="Quick summary of Lunch Inventory">i</button>
+      <div class="icon">🍎</div>
+      <h3>Lunch Inventory</h3>
+      <p class="desc">A count kiosk, shipment intake with per-batch expiry tracking, and an admin
+        dashboard — reorder lists, expiry alerts, pizza sell-through, and usage-trend charts, all
+        on one Google Sheet.</p>
+      <div class="replaces"><b>Replaces:</b> paper counts, guesswork reordering, and untracked expiry dates.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="lunch-inventory">Why we built it →</button>
+        <a class="launch" href="demos/lunch-inventory/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    <article class="card live" data-tool="lobby-tv">
+      <button class="info" data-tool="lobby-tv" aria-label="Quick summary of Lobby Display TV">i</button>
+      <div class="icon">📺</div>
+      <h3>Lobby Display TV</h3>
+      <p class="desc">A front-desk TV that rotates announcement slides, photo carousels, and live
+        game streams — pushed from a one-click control dashboard and updated in ~20 seconds.</p>
+      <div class="replaces"><b>Replaces:</b> a static printed sign or a TV updated by hand with a laptop.</div>
+      <div class="card-foot">
+        <button class="learn" data-tool="lobby-tv">Why we built it →</button>
+        <a class="launch" href="demos/lobby-tv/index.html">Launch demo →</a>
+      </div>
+    </article>
+
+    </div>
+  </section>
+
 </main>
 
 <footer class="foot">

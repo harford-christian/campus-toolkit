@@ -179,6 +179,46 @@
         '<p>Two Apps Script projects, not one: the driver app is anonymous and the office console is staff-only, deployed separately because anything sharing a project with them is reachable from a browser whatever the page chooses to show. Read-only against every source &mdash; the only thing it writes anywhere is the tick list, to its own sheet.</p>'
     },
 
+    'macs': {
+      icon: '🎭', title: 'MACS Fine Arts', launch: 'demos/macs/index.html',
+      summary: 'Registration and administration for a multi-school fine arts competition: a verified sign-in per school, structured entries across 70+ categories with group rosters, one submission per school, and an admin console that owns the rules and the data.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>The competition ran on a JotForm. Schools typed students into free-text boxes and listed &ldquo;other events&rdquo; from memory, so nobody could tell which student was in which group act until a scheduling conflict surfaced on the day. Staff then built the day grid by hand &mdash; eight rooms in two buildings, fifteen-minute slots, students, accompanists, conductors and judges who must not be double-booked, a walking buffer between buildings, and lunch and ceremonies to work around.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>Each school signs in with a one-time code emailed to an address on the association&rsquo;s own allowlist, so a submission provably comes from the school it claims. The form is built from the admin&rsquo;s configuration: every category with its own field template, per-school caps, group rosters for ensembles and debate teams, PDF uploads for art, an autosaved draft, judging-sheet and fee-line summaries. Submitting is one-time by design. On the server every entry gets an id baked from the school code, and the same student appearing in a solo and on a roster is cross-referenced <b>automatically</b> &mdash; the data the scheduler&rsquo;s conflict graph runs on.</p>' +
+        '<p>The admin console edits categories, field templates (with a live preview of the form), rooms and buildings, judging sheets, settings, judges and schools; shows registrations and every submission with inline edit and delete; and archives the year into Drive and resets the live sheet in one action. A greedy scheduler with a repair pass then builds the conflict-free grid from the Sheet menu.</p>' +
+        '<h4>In the demo</h4>' +
+        '<p>The demo runs the app&rsquo;s own server code over an in-memory spreadsheet and Drive, on eight fabricated schools. The one-time code is always 123456 and lands in an outbox in the bar. Sign in as Riverbend Baptist School, enter a few students, submit, then open the admin console&rsquo;s Submissions tab and see the ids and cross-references the real write path produced. The scheduler itself runs from the Sheet, not the web app, so it is described here rather than demonstrated.</p>'
+    },
+
+    'student-portal': {
+      icon: '🎒', title: 'Student Portal', launch: 'demos/student-portal/index.html',
+      summary: 'A phone-first student app: everything due across every class with a real date on each item, the schedule with NOW marked and bell days honoured, scores, attendance, reminder emails, and game-day dismissal times read from the team calendars.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>The SIS stores classic homework as a block of text per class per day with no due date. If a teacher typed &ldquo;due in 2 weeks&rdquo; on Monday, the note was gone by Tuesday. Gradebook assignments have dates, but only when teachers create them ahead of time. A student had no single list across their classes, no way to sort or filter it, and nothing on their phone that said which class was next or when the bus left for the game.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>Students open the portal with their school account and see <b>one due list</b> merged from homework text, lesson plans and the gradebook. Every item gets a date by a fixed rule &mdash; the gradebook&rsquo;s date first, then a date written in the text (&ldquo;due Thursday&rdquo;, &ldquo;quiz 9/29&rdquo;, &ldquo;tomorrow&rdquo;), then the next school day &mdash; and the same line a teacher re-types three days running collapses into one item. Weekends and closed days are skipped, with closures read from the school&rsquo;s own calendar so a snow day moves deadlines without anyone editing a list.</p>' +
+        '<p>The <b>Schedule</b> tab shows the week with the class meeting right now, honours the reverse-order Friday, takes delay and exam-day times from the bell system, and refuses to list classes on a closed day. <b>Grades</b> load on demand with scores and the class average exactly as the SIS records it. <b>More</b> holds attendance for the quarter, email reminders the student turns on themselves, and, for athletes, their games with the dismissal and bus time parsed from the coach&rsquo;s calendar note &mdash; a called-off game is flagged, and a game with nothing posted says so rather than inventing a time.</p>' +
+        '<p>Every endpoint is self-only: the student id comes from the signed-in account&rsquo;s directory record, never from the page, so no other student&rsquo;s rows ever leave the server. The first payload rides inside the page, so it renders with no second round trip.</p>' +
+        '<h4>In the demo</h4>' +
+        '<p>The demo runs the app&rsquo;s real engines and endpoints in the browser on the same fictional school as the Directory Search demo, with a pinned clock (Wednesday 2026-09-23, third period). The homework is typed the way teachers type it and the dates you see were produced by the app&rsquo;s own parser; the game card&rsquo;s 2:00 dismissal came out of a fabricated calendar feed the same way. Switch students in the bar to see a 9th grader on two soccer calendars or a kindergartener&rsquo;s elementary view.</p>'
+    },
+
+    'conferences': {
+      icon: '🗓️', title: 'Parent-Teacher Conferences', launch: 'demos/conferences/index.html',
+      summary: 'Conference sign-ups for the whole family in one visit — the right teachers per grade pulled from the SIS, sibling clashes flagged, teachers blocking their own time — with every booking locked and re-checked on the server.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Conference sign-ups ran on paper and email. A parent with children in three grades had to find three sheets, or trade messages with up to thirteen teachers for one high-schooler, and still ended up double-booked across their own kids. Teachers had no way to mark the times they were on bus duty or coaching, so bookings landed on slots they could not keep.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>Parents reach the scheduler from the school portal already signed in and see <b>every child at once</b>. Who they should meet is worked out from the SIS export by grade band &mdash; the classroom teacher for K&ndash;3, the distinct core teachers for 4&ndash;6, every class except Homeroom and Study Hall for 7&ndash;12 &mdash; so a parent never has to know that rule. Each class is a letter-size &ldquo;sheet&rdquo; of open times; picks are local until <b>Save Times</b>, with a heads-up if a sibling is already booked at that minute. The server takes a lock and re-checks every slot before writing it, so two families cannot land on one time, and a confirmation email goes out per booking with a reminder the day before.</p>' +
+        '<p>Teachers get their own grid for the two conference evenings: tap to block, shift-click to sweep a range, save once. A slot a parent already holds is shown green with the student&rsquo;s name and simply cannot be blocked. The whole thing is one Google Sheet and one Apps Script project; the roster and schedules sync from FACTS with a menu click.</p>' +
+        '<h4>In the demo</h4>' +
+        '<p>The demo runs the app&rsquo;s own server code in the browser against an in-memory copy of the spreadsheet, on the same fictional school as the Directory Search demo &mdash; each child&rsquo;s conference list is produced by the real grade-tier sync, not typed in. Book a time on the Parent screen, switch to the Teacher screen, and it is there.</p>'
+    },
+
     'campus-presence': {
       icon: '🪪', title: 'Campus Presence', launch: 'demos/campus-presence/index.html',
       summary: 'Sign-in and sign-out on two iPad kiosks at the visitor entrances, and the live answer to &ldquo;who is on campus right now?&rdquo; Visitors badge themselves in, students sign in late or out early, and a hard authorised-pickup check turns a stranger&rsquo;s attempt into an office flag rather than a sign-out. Presence is never stored &mdash; it is derived from an append-only event log, which is the one input the lockdown system never had.',
@@ -240,6 +280,39 @@
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
     modal.querySelector('.sc-modal-close').addEventListener('click', closeModal);
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+
+
+    // ---- Group counts, hero tool count, active jump chip ----
+    var countEl = document.querySelector('[data-tool-count]');
+    if (countEl) countEl.textContent = String(document.querySelectorAll('.card.live').length);
+    var groups = Array.prototype.slice.call(document.querySelectorAll('.group'));
+    groups.forEach(function (g) {
+      var n = document.querySelector('.jump-n[data-count="' + g.id + '"]');
+      if (n) n.textContent = String(g.querySelectorAll('.card.live').length);
+    });
+    var jump = document.querySelector('.jump');
+    if (jump && groups.length) {
+      var links = {};
+      jump.querySelectorAll('a[href^="#"]').forEach(function (a) { links[a.getAttribute('href').slice(1)] = a; });
+      var setActive = function (id) {
+        Object.keys(links).forEach(function (k) { links[k].classList.toggle('active', k === id); });
+      };
+      var onScroll = function () {
+        var line = jump.getBoundingClientRect().bottom + 24, current = null;
+        groups.forEach(function (g) { if (g.getBoundingClientRect().top <= line) current = g.id; });
+        setActive(current);
+        jump.classList.toggle('stuck', jump.getBoundingClientRect().top <= 0 && window.scrollY > 10);
+      };
+      // The chips wrap to two rows on narrower screens, so a jump has to clear the bar's real height.
+      var onResize = function () {
+        var sticky = window.getComputedStyle(jump).position === 'sticky';
+        var m = sticky ? (jump.offsetHeight + 14) + 'px' : '';
+        groups.forEach(function (g) { g.style.scrollMarginTop = m; });
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onResize);
+      onResize(); onScroll();
+    }
 
     // ---- Wire cards ----
     document.querySelectorAll('.info, .learn').forEach(function (el) {

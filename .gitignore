@@ -2,3 +2,7 @@
 tools/portfolio-status.json
 *.bak
 .tmp/
+
+# Personal Claude Code files (never commit)
+.claude/settings.local.json
+CLAUDE.local.md
