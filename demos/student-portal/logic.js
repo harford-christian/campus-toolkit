@@ -1932,7 +1932,7 @@ function athleticsForStudentId_(tabs, studentId, fromIso, toIso) {
      the failure, "0 events, ok:true" renders as "nothing scheduled in the next three weeks" — a confident
      statement that their season is empty, built on a 429. This project's rule is that a failed sweep is never
      shown as "no games", and until now that only held when ALL 21 calendars failed at once.
-     Found 2026-09-27: a student's soccer games vanished this way. */
+     Found 2026-09-27: NJM's soccer games vanished this way. */
   var failedIds = range.failedIds || [];
   var mineFailed = (joined.teams || []).filter(function (t) { return failedIds.indexOf(t.id) !== -1; });
   if (mineFailed.length) {

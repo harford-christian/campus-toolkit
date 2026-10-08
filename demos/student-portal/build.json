@@ -18,7 +18,7 @@
     ["<?= boot.ou || '—' ?>", ""],
     ["<?= boot.lookupError ? 'failed: ' + boot.lookupError : 'ok' ?>", ""],
     ["<?= boot.serverTime ?>", ""],
-    ["<div class=\"credit\">by Noah May</div>", ""],
+    ["<div class=\"credit\">by NJM</div>", ""],
     ["var BOOT = <?!= bootJson ?>;", "var BOOT = window.PORTAL_DEMO.boot();"],
     ["var BOOT_DATA = <?!= dataJson ?>;", "var BOOT_DATA = window.PORTAL_DEMO.bootData();"]
   ]
