@@ -490,7 +490,7 @@
     }
 
     function signOut() {
-      localStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY); sessionStorage.setItem('ptc_demo_out', '1');
       // Strip ?ssoToken= (and any other params) — otherwise reloading the same URL
       // would immediately sign back in via the handoff ticket, making "sign out" a no-op.
       history.replaceState(null, '', location.pathname);

@@ -8,13 +8,15 @@ import path from 'node:path';
 import { aliasStaffNames } from './staff-aliases.mjs';
 
 const cfg = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-let html = fs.readFileSync(cfg.src, 'utf8');
+// Sources are read as LF whatever the checkout's line endings (a CRLF checkout must not change a build).
+const lf = (s) => s.replace(/\r\n?/g, '\n');
+let html = lf(fs.readFileSync(cfg.src, 'utf8'));
 
 // 1. Inline includes (one pass; door's includes don't nest).
 if (cfg.includeDir) {
   html = html.replace(/<\?!=\s*include\('([^']+)'\)\s*;?\s*\?>/g, (_m, name) => {
     const p = path.join(cfg.includeDir, name + '.html');
-    return fs.readFileSync(p, 'utf8');
+    return lf(fs.readFileSync(p, 'utf8'));
   });
 }
 

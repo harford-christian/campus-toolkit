@@ -59,7 +59,7 @@ const tabsOf = (names) => names.map((n) => ({ name: n, values: T[n] || [] }));
 check('the EVENTS header is EXACTLY schema.js SCHEMA.EVENTS, in column order',
   D.eventsHeader.join('|') === Schema.SCHEMA.EVENTS.cols.map((c) => c.name).join('|'));
 check('every DB tab the app reads is present',
-  ['EVENTS', 'BADGES', 'SETTINGS', 'PERMISSIONS', 'WORK_RELEASE', 'STATIONS']
+  ['EVENTS', 'BADGES', 'SETTINGS', 'PERMISSIONS', 'WORK_RELEASE', 'HOMESCHOOL', 'STATIONS']
     .every((n) => Array.isArray(T[n]) && T[n].length > 1));
 check('every FACTS tab the app reads is present, plus the ELC side-car',
   ['Sheet1', 'PickupContacts', 'Student Schedules', 'Staff', 'K5-6 Teachers']
@@ -95,7 +95,9 @@ check('every event row has a well-formed id, day key and timestamp string',
   evRows.every((e) => /^E-\d{8}-\d{6}-\d{4}$/.test(e.EventID) &&
                       /^\d{4}-\d{2}-\d{2}$/.test(e.Date) &&
                       /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(e.Timestamp) &&
-                      e.Timestamp.slice(0, 10) === e.Date));
+                      // the ONE forward-datable type (2026-09-28 upstream): a plan for a later day
+                      (e.Timestamp.slice(0, 10) === e.Date ||
+                       (e.Type === 'dismissal_planned' && e.Date > e.Timestamp.slice(0, 10)))));
 check('event ids are unique across the log',
   new Set(evRows.map((e) => e.EventID)).size === evRows.length);
 check('the log is chronological, as an append-only sheet is',
@@ -127,7 +129,7 @@ check('...the exact off-campus set, derived and not stored',
   offIds.join(',') === '400109,400113,400115,400150,400155,400175,400176,400184');
 check('...spread across the buildings the grade map puts those children in',
   Object.keys(presence.counts.byBuilding).sort().join(',') ===
-    'Bus Barn,Elementary,High School,Kindergarten');
+    'Elementary,High School,Kindergarten,Nurse');   // 'Nurse' replaced 'Bus Barn' in BUILDINGS (2026-09-09 upstream)
 check('a student signed out and signed back in reads as PRESENT, not off campus',
   today.some((e) => e.PersonKey === '400126' && e.Type === 'student_early_out') &&
   today.some((e) => e.PersonKey === '400126' && e.Type === 'student_return_in') &&
@@ -275,11 +277,19 @@ const notifyCtx = {
 check('the configured mode is office_alert, so a dismissal lands on the board as pending',
   Notify.resolveFollowUp({ 'dismissal.followup.mode': 'office_alert' }, roster[0], notifyCtx)
     .pending === true);
-check('in email_teacher mode a 12th-grader resolves to the Staff tab address',
+// 2026-09-15 upstream: only the front line and K4-6 teachers are emailed. A 12th-grader's dismissal
+// degrades to a board alert rather than mailing a teacher who is out of mail scope.
+check('in email_teacher mode a 12th-grader is OUT of mail scope: the board alerts instead, degraded and pending',
   (() => {
     const f = Notify.resolveFollowUp({ 'dismissal.followup.mode': 'email_teacher' },
       roster.find((s) => s.id === '400101'), notifyCtx);
-    return f.sendEmail && f.sendEmail.to === 'd.whitfield@example.edu';
+    return f.mode === 'office_alert' && f.pending === true && f.degraded === 'grade-out-of-mail-scope';
+  })());
+check('...and a 3rd-grader resolves to the Staff tab address, through the forgiving name matcher',
+  (() => {
+    const f = Notify.resolveFollowUp({ 'dismissal.followup.mode': 'email_teacher' },
+      roster.find((s) => s.id === '400113'), notifyCtx);
+    return f.sendEmail && f.sendEmail.to === D.demo.staffEmail;   // the demo sign-in IS the 3rd-grade teacher
   })());
 check('...and a K5 child, whose teacher is missing from Staff, falls through to the ELC side-car',
   (() => {
@@ -377,7 +387,7 @@ check('every {op} the pages send is handled (' +
 // because the mock documents the whole server surface.
 check('the ops behind the surfaces this demo leaves out are implemented too',
   MB.officeApi({ op: 'getSettings' }).ok === true &&
-  MB.officeApi({ op: 'listPermissions' }).people.length === 5 &&
+  MB.officeApi({ op: 'listPermissions' }).people.length === 6 &&
   MB.kioskApi({ op: 'ping', station: 'hs' }).ok === true &&
   MB.kioskApi({ op: 'checkPickup', station: 'hs', studentId: '400140',
                 typedName: 'Tabitha Gaskill' }).match === true);
@@ -505,7 +515,8 @@ check('the switcher frames all five surfaces and links back to the gallery',
 check('no real spreadsheet ids, deployment ids or Google URLs leaked into any file',
   ['data.js', 'mock.js', 'logic.js', 'index.html'].concat(Object.keys(html))
     .every((f) => {
-      const s = read(f);
+      // The kiosk ships an inline PNG background (base64), which the id pattern matches by chance.
+      const s = read(f).replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, 'data:image/…');
       return !/AKfycb|docs\.google\.com\/spreadsheets/.test(s) && !/1[A-Za-z0-9_-]{30,}/.test(s);
     }));
 check('every email in the dataset is an example.com / example.edu address',
@@ -516,6 +527,61 @@ check('every email in the dataset is an example.com / example.edu address',
   })());
 check('the Metrics page still loads Chart.js pinned, from the one CDN it is allowed',
   /cdn\.jsdelivr\.net\/npm\/chart\.js@4\.4\.6\//.test(html['metrics.html']));
+
+/* ======================================================================================
+   9. what changed upstream in September: planned pickups, the third kiosk, movement, group sign-out
+   ==================================================================================== */
+const O = (op, extra) => MB.officeApi(Object.assign({ op }, extra || {}));
+const K = (op, extra) => MB.kioskApi(Object.assign({ op, station: 'hs', key: 'demo-device-key' }, extra || {}));
+const boot = O('bootstrap');
+check('the office bootstrap names the KG and nurse stations and carries the plan reasons',
+  boot.stationNames.kg === 'KG' && boot.stationNames.nurse === 'Nurse' && boot.planReasons.join('|') === 'Dr/Dentist|Family Event|Other');
+const snap = O('getBoardSnapshot');
+check('the board shows ONE expected-pickup card for the two Fairbanks children, at the HS desk',
+  snap.planFamilies.length === 1 && snap.planFamilies[0].students.length === 2 &&
+  snap.planFamilies[0].desks.join() === 'hs' && snap.planFamilies[0].guardianName === 'Greta Fairbanks' &&
+  snap.planFamilies[0].expectedAt === '15:05');
+check('a plan is NOT a sign-out: both children are still counted present',
+  !snap.presence.studentsOff.some((x) => x.id === '400106' || x.id === '400107'));
+check('open flags and pending alerts now carry the desk they route to',
+  snap.openFlags.every((f) => ['el', 'kg', 'hs'].includes(f.desk)) && snap.openFlags[0].studentId);
+const lp = O('listPlanned');
+check('the "coming up" list has tomorrow\'s plan for a kindergartener, routed to the KG desk',
+  lp.upcoming.length === 1 && lp.upcoming[0].date === '2026-09-16' && lp.upcoming[0].desks.join() === 'kg' && /Wednesday, September 16/.test(lp.upcoming[0].dayLabel));
+check('the kiosk hands the plan back: Owen is planned, with his sister as the sibling on the same plan',
+  (() => { const p = K('plannedFor', { studentId: '400106' }); return p.planned && p.at === '3:05 PM' && p.siblings.length === 1 && p.siblings[0].id === '400107' && p.chipReason === 'Medical appointment'; })());
+check('a 10th-grader at the HS kiosk is offered self sign-out; a 3rd-grader is not',
+  K('studentOptions', { studentId: '400105' }).selfSignOut === true && K('studentOptions', { studentId: '400113' }).selfSignOut === false);
+const grp = K('earlyOutGroup', { studentIds: ['400106', '400107'], typedName: 'Greta Fairbanks', relationship: 'Mother', reason: 'Medical appointment' });
+check('the group sign-out dismisses both children on one typed name, through the real pickup check',
+  grp.ok && grp.matched.length === 2 && grp.flagged.length === 0 && grp.skipped === 0);
+check('...each dismissal links back to the plan, and the plan is no longer outstanding',
+  O('getBoardSnapshot').planFamilies.length === 0 && K('plannedFor', { studentId: '400106' }).planned === false);
+check('a stranger in the group sign-out is flagged, not signed out, and nobody else is touched',
+  (() => { const before = O('getBoardSnapshot').presence.studentsOff.length;
+    const r = K('earlyOutGroup', { studentIds: ['400119'], typedName: 'Nobody Known', relationship: 'Other' });
+    return r.flagged.length === 1 && r.matched.length === 0 && O('getBoardSnapshot').presence.studentsOff.length === before; })());
+const mv = K('movementOut', { studentId: '400110', toBuilding: 'Elementary', reason: 'Music lesson', expectedBack: '14:40' });
+check('a between-buildings movement is recorded and reads back as out',
+  mv.ok && mv.expectedBack === '2:40 PM' && K('movementOpenList').out.some((m) => m.id === '400110' && m.to === 'Elementary'));
+check('...and the walk back closes it', K('movementBack', { studentId: '400110' }).ok === true && !K('movementOpenList').out.some((m) => m.id === '400110'));
+// Freya (K4, present today) — a plan for a child already signed out is never "outstanding".
+const plan = O('planDismissal', { students: [{ id: '400122' }], expectedAt: '14:15', reason: 'Family Event', guardianName: 'Annika Bergstrom', forDay: '' });
+check('the office can take a plan over the phone; the KG desk and the in-scope teacher are on the notify list',
+  plan.ok && plan.planned.length === 1 && plan.notified.includes('kg.desk@example.edu') && plan.notified.includes('h.prewitt@example.edu'), JSON.stringify(plan.notified));
+check('a plan cannot be made for a weekend', O('planDismissal', { students: [{ id: '400122' }], forDay: '2026-09-19' }).ok === false);
+check('cancelling the group retires it; signing out against a plan is an office override',
+  O('cancelPlanned', { groupId: plan.groupId }).cancelled === 1 &&
+  (() => { const p2 = O('planDismissal', { students: [{ id: '400118' }], expectedAt: '14:30', reason: 'Other' });
+    const so = O('signOutPlanned', { groupId: p2.groupId }); return so.ok && so.count === 1 && O('getBoardSnapshot').presence.studentsOff.some((x) => x.id === '400118'); })());
+const hist = O('getHistory', { preset: 'week', studentId: '400106' });
+check('history for one child this week is grouped by day with a readable timeline',
+  hist.ok && hist.days.length >= 1 && hist.days[0].people[0].timeline.some((t) => /Signed out/.test(t.text)));
+const pc = O('getPickupContacts', { studentId: '400101' });
+check('the front desk sees who may collect a child, with phone numbers, in FACTS sort order',
+  pc.ok && pc.contacts.length === 3 && pc.contacts[0].relationship === 'Mother' && pc.contacts[0].phones.length >= 1);
+check('a homeschool student may sign out on their schedule; anyone else is refused that door',
+  K('earlyOut', { studentId: '400175', mode: 'homeschool' }).homeschool === true && K('earlyOut', { studentId: '400101', mode: 'homeschool' }).denied === 'homeschool');
 
 console.log(fail ? `\n${fail} FAILURE(S)` : '\nall demo checks passed');
 process.exit(fail ? 1 : 0);

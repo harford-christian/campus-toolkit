@@ -191,6 +191,93 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
 .pend-card .pend-body{flex:1;min-width:220px;}
 .pend-card .pend-kind{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hcs-warn);}
 .pend-card .who{font-weight:800;}
+/* Self sign-out: a student has already walked out and someone needs to check a
+   parent is really here. Red, so it reads as an action rather than a record. */
+.pend-card.selfout{border-color:var(--hcs-red);background:var(--hcs-red-soft);}
+.pend-card.selfout .pend-kind{color:var(--hcs-red);}
+/* Alert scope toggle + the note that says what is being hidden. Alerts from
+   the other building are out of sight by default so a desk is not reading
+   another building's work, but the count of what is hidden is always shown —
+   quietly dropping items with no trace would be worse than showing them. */
+.alert-h{display:flex;align-items:center;gap:10px;}
+.alert-h .alert-scope{margin-left:auto;font-size:.72rem;}
+.alert-hidden-note{font-size:.82rem;color:var(--hcs-muted);padding:8px 2px 0;}
+/* Authorised pickup contacts, revealed on demand from a flag card. Guardian PII
+   on a screen a visitor may be able to read, so it is never rendered by
+   default and collapses again on a second click. */
+.pickup-box{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-left:4px solid var(--hcs-ok);border-radius:10px;padding:10px 12px;margin:8px 0;
+}
+.pickup-h{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--hcs-muted);margin-bottom:6px;}
+.pickup-row{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:4px 0;
+  border-top:1px solid var(--hcs-line);}
+.pickup-row:first-of-type{border-top:0;}
+.pickup-name{font-weight:800;}
+.pickup-rel{font-size:.78rem;color:var(--hcs-muted);}
+.pickup-tel{font-weight:700;text-decoration:none;color:var(--hcs-red);
+  background:var(--hcs-red-soft);border-radius:7px;padding:2px 8px;font-variant-numeric:tabular-nums;}
+.pickup-tel:hover{text-decoration:underline;}
+.pickup-lbl{font-size:.66rem;color:var(--hcs-muted);margin-left:5px;text-transform:uppercase;}
+.pickup-em{font-size:.8rem;color:var(--hcs-muted);}
+.pickup-note{font-size:.78rem;color:var(--hcs-muted);width:100%;}
+@media print{ .pickup-box{display:none !important;} }
+
+/* Planned early dismissals: expected, not departed. Gold like "between
+   buildings" rather than red, because nobody has left and nothing is wrong. */
+.plan-wrap{margin:18px 0 4px;}
+.plan-wrap .section-h .btn{margin-left:auto;}
+.plan-card-row{border-left-color:var(--hcs-ok);}
+.plan-desk{font-size:.66rem;font-weight:800;letter-spacing:.05em;margin-left:8px;
+  background:var(--hcs-surface-2);color:var(--hcs-muted);border-radius:6px;padding:2px 7px;}
+.plan-row-actions{display:flex;gap:8px;margin-top:8px;}
+.plan-kids{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+.plan-kid{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;
+  background:var(--hcs-surface-2);opacity:.55;}
+/* Children this desk is responsible for are full strength; the rest stay
+   visible but recede, so the card still tells the truth about the whole trip. */
+.plan-kid.mine{opacity:1;background:var(--hcs-ok-bg);}
+.plan-kid-name{font-weight:700;font-size:.9rem;flex:1;min-width:0;}
+.plan-kid .btn{margin-left:auto;}
+.plan-desk.multi{background:var(--hcs-warn-bg);color:var(--hcs-warn);}
+/* Coming up — pickups planned ahead for a later day (2026-09-28). Quieter than today's list. */
+.plan-ahead{margin-top:14px;}
+.plan-ahead-h{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:.8rem;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;opacity:.75;}
+.plan-ahead-row{border-left-color:var(--hcs-line);}
+.plan-day{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.03em;margin-right:8px;
+  padding:1px 7px;border-radius:6px;background:var(--hcs-warn-bg);color:var(--hcs-warn);}
+.plan-day-hint{margin-top:3px;min-height:16px;}
+.plan-day-hint.ahead{color:var(--hcs-warn);font-weight:800;opacity:1;}
+
+
+.plan-modal{position:fixed;inset:0;background:rgba(20,20,30,.45);z-index:2500;
+  display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
+.plan-card{background:var(--hcs-surface);border-radius:var(--hcs-radius-lg);
+  padding:20px 22px;width:min(560px,100%);box-shadow:0 12px 40px rgba(0,0,0,.25);}
+.plan-card h3{margin:0 0 4px;font-size:1.1rem;}
+.plan-card .f-label{display:block;margin:12px 0 4px;font-size:.72rem;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--hcs-muted);}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.plan-results{max-height:150px;overflow:auto;margin-top:6px;}
+.plan-hit{display:block;width:100%;text-align:left;border:1px solid var(--hcs-line);
+  background:var(--hcs-surface);border-radius:9px;padding:7px 10px;margin-bottom:4px;
+  font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;}
+.plan-hit:hover{border-color:var(--hcs-gold);background:var(--hcs-gold-soft);}
+.plan-chosen{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:26px;}
+.plan-chip{background:var(--hcs-ok-bg);border:1px solid var(--hcs-ok-line);color:#14532d;
+  border-radius:999px;padding:3px 6px 3px 11px;font-size:.85rem;font-weight:700;
+  display:inline-flex;align-items:center;gap:4px;}
+.plan-chip-x{border:0;background:transparent;cursor:pointer;font-size:1.05rem;
+  line-height:1;color:inherit;padding:0 4px;}
+.plan-err{color:var(--hcs-red);font-weight:700;min-height:20px;margin-top:10px;font-size:.88rem;}
+.plan-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px;}
+@media (max-width:520px){ .plan-grid{grid-template-columns:1fr;} }
+@media print{ .plan-wrap,.plan-modal{display:none !important;} }
+
+
+
 .pend-card .meta{font-size:.82rem;color:#4b4f57;margin-top:2px;}
 .pend-card .btn{flex:none;}
 .pend-card.page{background:var(--hcs-red-soft);border-color:#f2c7c7;border-left-color:var(--hcs-red);}
@@ -525,6 +612,7 @@ details.mx-data .mx-scroll{max-height:300px;overflow:auto;margin-top:8px;}
       <a data-nav="board" href="board.html">Board</a>
       <a data-nav="muster" href="muster.html">Muster</a>
       <!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->
+      <!-- History: not a separate surface in this demo — the board asks for a child's history inline -->
       <a data-nav="metrics" class="current" href="metrics.html">Metrics</a>
       <span id="navSettings" hidden><!-- Settings: not part of this demo --></span>
     </nav>
@@ -743,6 +831,76 @@ details.mx-data .mx-scroll{max-height:300px;overflow:auto;margin-top:8px;}
 <script>
 'use strict';
 /**
+ * ids.js — event IDs + timestamp strings. Pure: every function takes a Date
+ * (callers pass new Date()) so tests are deterministic and Sheets' date
+ * coercion never enters the picture (we only ever WRITE strings).
+ */
+
+var Ids = (function () {
+  function pad2(n) { return ('0' + n).slice(-2); }
+
+  /** 'yyyy-MM-dd' (local time of the passed Date — GAS server runs America/New_York). */
+  function dayKey(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  /** 'yyyy-MM-dd HH:mm:ss' string — the ONLY timestamp format written to the DB. */
+  function timestamp(d) {
+    return dayKey(d) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+
+  /** 'HH:mm' display time. */
+  function hhmm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+  /**
+   * A stored time, written the way the front desk says it out loud: 2:05 PM.
+   *
+   * DISPLAY ONLY. Everything stored, sorted or compared stays 24-hour — 'HH:mm'
+   * sorts as a string, '2:05 PM' does not — so this is called at the edge, on
+   * the way to a screen or an email, and never on the way into the sheet.
+   *
+   * No timezone conversion happens here and none should: GAS runs this project
+   * in America/New_York and every timestamp was written in that zone, so the
+   * clock time is already Eastern. Shifting it again would move every time by
+   * hours.
+   *
+   * Takes a full 'yyyy-MM-dd HH:mm:ss' timestamp or a bare 'HH:mm'. Anything
+   * else is handed back untouched — a label is never worth throwing for.
+   */
+  function h12(value) {
+    var s = String(value == null ? '' : value).trim();
+    var h, mi;
+    var full = /^\d{4}-\d{2}-\d{2}[ T](\d{1,2}):(\d{2})/.exec(s);
+    if (full) { h = Number(full[1]); mi = Number(full[2]); }
+    else {
+      var bare = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(s);
+      if (!bare) return s;
+      h = Number(bare[1]); mi = Number(bare[2]);
+    }
+    if (h > 23 || mi > 59) return s;
+    var hour = h % 12;
+    if (hour === 0) hour = 12;              // midnight and noon are both 12
+    return hour + ':' + pad2(mi) + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+
+  /**
+   * Event ID: E-20260804-134210-4821. The 4-digit disambiguator is caller-supplied
+   * (GAS: Math.floor(Math.random()*10000)); same-second collisions at 10–30
+   * events/day are already vanishingly rare, the suffix makes them ignorable.
+   */
+  function makeEventId(d, disambig) {
+    var n = ('000' + (disambig == null ? 0 : disambig)).slice(-4);
+    return 'E-' + dayKey(d).replace(/-/g, '') + '-' +
+      pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()) + '-' + n;
+  }
+
+  return { dayKey: dayKey, timestamp: timestamp, hhmm: hhmm, h12: h12, makeEventId: makeEventId };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Ids;
+
+'use strict';
+/**
  * fuzzy.js — edit-distance matching primitives shared by search.js (student
  * lookup) and pickup.js (authorized-pickup hard check).
  * Lifted verbatim from FACTS\facts-directory-search\Search.gs (2026-08-04).
@@ -928,6 +1086,214 @@ var Search = (function () {
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Search;
+
+'use strict';
+/**
+ * history.js — querying the EVENTS log for the front desk's "what happened?"
+ * questions, and for OTHER APPS that read this data (Josh, 2026-09-12).
+ *
+ * PURE: no GAS globals, no I/O. That is the point — the office History page,
+ * any future JSON endpoint, and any sibling project that vendors this file all
+ * answer a question the SAME way, instead of three subtly different filters
+ * drifting apart. Anything reading EVENTS should reach for this, not re-derive.
+ *
+ * The log is append-only and nothing is ever overwritten, so a student's day is
+ * the full sequence of what happened, in order — a late arrival, a walk to
+ * another building, the walk back, an early dismissal are four rows, not one
+ * row updated four times. These helpers reassemble that story.
+ */
+
+var History = (function () {
+
+  /** Event types a human would call "something happened to this student". */
+  var STUDENT_TYPES = {
+    student_late_in: 1, student_early_out: 1, student_return_in: 1,
+    movement: 1, pickup_flag: 1
+  };
+
+  /** 'yyyy-MM-dd' from a Date, in no particular timezone — callers pass day keys. */
+  function dayOf(value) {
+    var s = String(value == null ? '' : value);
+    var m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+    return m ? m[1] : '';
+  }
+
+  function shiftDays(dayKey, n) {
+    var p = String(dayKey).split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() + n);
+    var mm = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+  }
+
+  /**
+   * A named range → { from, to } inclusive day keys.
+   * Weeks run Monday–Sunday, which is how a school week is spoken about.
+   * @param {string} preset today|yesterday|week|lastweek|month|last30|all
+   * @param {string} todayKey 'yyyy-MM-dd'
+   */
+  function rangeFor(preset, todayKey) {
+    var p = String(preset || 'today').toLowerCase();
+    var parts = String(todayKey).split('-');
+    var dow = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getDay(); // 0=Sun
+    var sinceMonday = (dow === 0) ? 6 : dow - 1;
+
+    if (p === 'today') return { from: todayKey, to: todayKey, label: 'Today' };
+    if (p === 'yesterday') {
+      var y = shiftDays(todayKey, -1);
+      return { from: y, to: y, label: 'Yesterday' };
+    }
+    if (p === 'week') {
+      return { from: shiftDays(todayKey, -sinceMonday), to: todayKey, label: 'This week' };
+    }
+    if (p === 'lastweek') {
+      var lastMon = shiftDays(todayKey, -sinceMonday - 7);
+      return { from: lastMon, to: shiftDays(lastMon, 6), label: 'Last week' };
+    }
+    if (p === 'month') {
+      return { from: todayKey.slice(0, 8) + '01', to: todayKey, label: 'This month' };
+    }
+    if (p === 'last30') return { from: shiftDays(todayKey, -29), to: todayKey, label: 'Last 30 days' };
+    if (p === 'all') return { from: '', to: '', label: 'All time' };
+    return { from: todayKey, to: todayKey, label: 'Today' };
+  }
+
+  /** Inclusive day-range test; blank bounds mean unbounded. */
+  function inRange(dayKey, from, to) {
+    if (!dayKey) return false;
+    if (from && dayKey < from) return false;
+    if (to && dayKey > to) return false;
+    return true;
+  }
+
+  /**
+   * One event → a sentence a person can read without knowing the schema.
+   * Kept here rather than in a template so every surface says the same thing.
+   */
+  function describe(e) {
+    var t = e.Type;
+    var reason = String(e.Reason || '').trim();
+    if (t === 'student_late_in') {
+      return 'Arrived late' + (reason ? ' — ' + reason : '');
+    }
+    if (t === 'student_early_out') {
+      var who = String(e.GuardianName || '').trim();
+      return 'Signed out' + (reason ? ' — ' + reason : '') +
+        (who ? ' (' + who + ')' : '');
+    }
+    if (t === 'student_return_in') return 'Came back on campus';
+    if (t === 'movement') {
+      if (reason === 'returned' || reason === 'arrived') {
+        return 'Back in ' + (e.ToBuilding || 'their building');
+      }
+      return 'Walked to ' + (e.ToBuilding || '?') + (reason ? ' — ' + reason : '');
+    }
+    if (t === 'pickup_flag') {
+      return 'PICKUP FLAG — "' + String(e.GuardianName || '').trim() + '" did not match' +
+        (String(e.FlagStatus || '') === 'resolved' ? ' (resolved)' : ' (open)');
+    }
+    if (t === 'visitor_in') return 'Visitor signed in' + (reason ? ' — ' + reason : '');
+    if (t === 'visitor_out') return 'Visitor signed out';
+    return t;
+  }
+
+  /** 'yyyy-MM-dd HH:mm:ss' → 'HH:mm'. */
+  function timeOf(ts) {
+    var m = /\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/.exec(String(ts || ''));
+    return m ? m[1] : '';
+  }
+
+  /**
+   * Filter the log. Every criterion is optional and they AND together.
+   * @param {Array<Object>} events raw EVENTS rows
+   * @param {Object} q { from, to, studentId, types, station, personType }
+   */
+  function filter(events, q) {
+    q = q || {};
+    var wantTypes = (q.types && q.types.length)
+      ? q.types.reduce(function (m, t) { m[t] = 1; return m; }, {}) : null;
+    return (events || []).filter(function (e) {
+      if (!inRange(dayOf(e.Date), q.from, q.to)) return false;
+      if (q.studentId && String(e.PersonKey) !== String(q.studentId)) return false;
+      if (q.personType && String(e.PersonType || '') !== q.personType) return false;
+      if (q.station && String(e.Station || '') !== q.station) return false;
+      if (wantTypes && !wantTypes[e.Type]) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Everything that happened, grouped day → student, each student's events in
+   * time order. This is the shape both questions want: "show me this student"
+   * is one student across days, "show me last Tuesday" is one day across
+   * students — same structure, read differently.
+   */
+  function groupByDay(events) {
+    var days = {};
+    (events || []).forEach(function (e) {
+      var d = dayOf(e.Date);
+      if (!d) return;
+      var day = days[d] || (days[d] = {});
+      var key = String(e.PersonKey || '') || ('_' + e.EventID);
+      var person = day[key] || (day[key] = {
+        personKey: String(e.PersonKey || ''), name: e.PersonName || '',
+        grade: e.Grade || '', personType: e.PersonType || '', events: []
+      });
+      person.events.push(e);
+    });
+    return Object.keys(days).sort().reverse().map(function (d) {
+      var people = Object.keys(days[d]).map(function (k) {
+        var p = days[d][k];
+        p.events.sort(function (a, b) {
+          return String(a.Timestamp) < String(b.Timestamp) ? -1 : 1;
+        });
+        p.timeline = p.events.map(function (e) {
+          return { at: timeOf(e.Timestamp), type: e.Type, text: describe(e),
+                   station: e.Station || '', eventId: e.EventID };
+        });
+        return p;
+      });
+      people.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+      return { date: d, people: people, count: people.length };
+    });
+  }
+
+  /** Distinct students appearing in a set of events, for a picker. */
+  function studentsIn(events) {
+    var seen = {};
+    (events || []).forEach(function (e) {
+      if (String(e.PersonType || '') !== 'student' || !e.PersonKey) return;
+      var k = String(e.PersonKey);
+      if (!seen[k]) seen[k] = { id: k, name: e.PersonName || '', grade: e.Grade || '', count: 0 };
+      seen[k].count++;
+    });
+    return Object.keys(seen).map(function (k) { return seen[k]; })
+      .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+
+  /** Per-type totals for the header strip. */
+  function counts(events) {
+    var out = { total: (events || []).length };
+    (events || []).forEach(function (e) { out[e.Type] = (out[e.Type] || 0) + 1; });
+    return out;
+  }
+
+  return {
+    STUDENT_TYPES: STUDENT_TYPES,
+    rangeFor: rangeFor,
+    inRange: inRange,
+    dayOf: dayOf,
+    shiftDays: shiftDays,
+    timeOf: timeOf,
+    describe: describe,
+    filter: filter,
+    groupByDay: groupByDay,
+    studentsIn: studentsIn,
+    counts: counts
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = History;
 
 </script>
 
@@ -1563,7 +1929,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
     return hh + ampm;
   }
   function stationLabel(s) {
-    var m = { hs: 'HS kiosk', el: 'EL kiosk', office: 'Office', mobile: 'Mobile' };
+    var m = { hs: 'HS kiosk', el: 'EL kiosk', kg: 'Kindergarten kiosk',
+              office: 'Office', mobile: 'Mobile', nurse: 'Nurse' };
     return m[String(s).toLowerCase()] || String(s);
   }
 

@@ -28,6 +28,7 @@ window.DISMISSAL_DATA = (function () {
     email: 'demo.staff@example.edu',            // the signed-in demo account (fabricated)
     teacherName: 'Sowell Gina',                 // ...who is also the 3rd-grade homeroom teacher
     date: '2026-09-15', dayName: 'Tue',
+    now: '2026-09-15 14:52',                    // the pinned clock: a Tuesday, ten minutes before the ramp
     fridaySim: '2026-09-18 15:00'
   };
 
@@ -409,12 +410,16 @@ window.DISMISSAL_DATA = (function () {
     return out;
   }
   var earlyBird = earlyBirdSet(gradeById, familyById);
+  // Afternoon Enrichment: the K4/K5 children who stay past the midday release (producer's trEnrichmentSet_).
+  // On a 2- or 3-hour delay the OTHER K4/K5 children read NO SCHOOL; these two still come in.
+  var enrichment = { '400122': true, '400131': true };
 
   /* ---------- assemble the Roster exactly as the producer does ---------- */
   var ROSTER_HEADER = ['Student ID', 'Student Name', 'Grade', 'Session', 'Type',
                        'Route Code', 'Route Name', 'Vehicle', 'Split',
                        'Building', 'Pickup', 'Pickup Basis', 'Walk To',
-                       'Family ID', 'Homeroom', 'Homeroom Teacher', 'Source', 'Note'];
+                       'Family ID', 'Homeroom', 'Homeroom Teacher', 'Source', 'Note',
+                       'Enrichment'];   // appended 2026-09-16 upstream: K4/K5 children who stay past the midday release
   function pickupFor(grade, sibGrades) {
     var fixed = PICKUP_BY_GRADE[grade];
     if (fixed) return { pickup: fixed, basis: 'grade' };
@@ -449,7 +454,8 @@ window.DISMISSAL_DATA = (function () {
                        route.split ? 'Y' : '', building, pk.pickup, pk.basis, '', fid, hrCode, hrTeacher,
                        'course-enrollment',
                        route.split ? 'SPLIT: rides ' + route.split.join(' or ') + ' on different days ' +
-                                     '(e.g. split custody) — confirm which today' : '']);
+                                     '(e.g. split custody) — confirm which today' : '',
+                       enrichment[sid] ? 'Y' : '']);
           });
           return;
         }
@@ -466,17 +472,20 @@ window.DISMISSAL_DATA = (function () {
             : (walkTo ? 'walk to ' + walkTo + ' (parent: ' + kid.parentName + ')' + basis
                       : 'same building as parent (' + kid.parentName + ')' + basis);
           rows.push([sid, name, grade, sess, 'Staff Kid', '', '', '', '', building, pk.pickup, pk.basis,
-                     walkTo, fid, hrCode, hrTeacher, 'parent-link', note]);
+                     walkTo, fid, hrCode, hrTeacher, 'parent-link', note,
+                     enrichment[sid] ? 'Y' : '']);
           return;
         }
         if (earlyBird[sid]) {                             // 3. Early Bird
           rows.push([sid, name, grade, sess, 'Early Bird', '', '', '', '', building, pk.pickup, pk.basis,
-                     '', fid, hrCode, hrTeacher, 'family-rule', 'every enrolled sibling is in grades 1-3']);
+                     '', fid, hrCode, hrTeacher, 'family-rule', 'every enrolled sibling is in grades 1-3',
+                     enrichment[sid] ? 'Y' : '']);
           return;
         }
         rows.push([sid, name, grade, sess, 'Car', '', '', '', '', building, pk.pickup, pk.basis,   // 4. Car
                    '', fid, hrCode, hrTeacher, 'residual-default',
-                   'assumed: no route, no staff parent, not Early Bird']);
+                   'assumed: no route, no staff parent, not Early Bird',
+                   enrichment[sid] ? 'Y' : '']);
       });
     });
     return rows;
@@ -505,32 +514,39 @@ window.DISMISSAL_DATA = (function () {
   // means the child is back. A PickupMatch of 'mismatch' is a stranger's FAILED attempt, not a
   // sign-out, and must never remove a child from the board.
   function eventsValues() {
-    var H = ['Timestamp', 'Date', 'Type', 'PersonKey', 'GuardianName', 'PickupMatch'];
+    var H = ['Timestamp', 'Date', 'Type', 'PersonKey', 'GuardianName', 'PickupMatch', 'Reason', 'FlagStatus', 'ExpectedBack'];
     var D = DEMO.date;
     return [H,
-      [D + ' 10:40:00', D, 'student_early_out', '400126', 'Quintero Rosario',   'matched'],  // out for an appointment...
-      [D + ' 11:35:00', D, 'student_return_in', '400126', 'Quintero Rosario',   'n/a'],      // ...and back — still expected
-      [D + ' 13:04:00', D, 'student_early_out', '400115', 'Marlowe Hesper',     'matched'],  // gone for the day
-      [D + ' 14:10:00', D, 'student_early_out', '400150', 'Whitfield Aurelio',  'override'], // a walker, collected early
-      [D + ' 14:22:00', D, 'student_early_out', '400140', 'unrecognised adult', 'mismatch'], // a stranger turned away — NOT a sign-out
-      [D + ' 14:22:00', D, 'pickup_flag',       '400140', 'unrecognised adult', 'mismatch']  // the open flag the office sees
+      // A parent rang the office at 9:40 and has not collected yet: the board reads "Coming up" on the card
+      // and counts it as PLANNED, never as a departure (dsBuildCalledAhead).
+      [D + ' 09:40:00', D, 'dismissal_planned', '400144', 'Kowalczyk Danuta', 'n/a', 'Dr/Dentist', '', '15:10'],
+      [D + ' 10:40:00', D, 'student_early_out', '400126', 'Quintero Rosario',   'matched', 'Medical appointment', '', ''],  // out for an appointment...
+      [D + ' 11:35:00', D, 'student_return_in', '400126', 'Quintero Rosario',   'n/a', '', '', ''],      // ...and back — still expected
+      [D + ' 13:04:00', D, 'student_early_out', '400115', 'Marlowe Hesper',     'matched', 'Family', '', ''],  // gone for the day
+      [D + ' 14:10:00', D, 'student_early_out', '400150', 'Whitfield Aurelio',  'override', 'Family', '', ''], // a walker, collected early
+      [D + ' 14:22:00', D, 'student_early_out', '400140', 'unrecognised adult', 'mismatch', '', '', ''], // a stranger turned away — NOT a sign-out
+      [D + ' 14:22:00', D, 'pickup_flag',       '400140', 'unrecognised adult', 'mismatch', '', 'open', '']  // the open flag the office sees
     ];
   }
 
   // APPEND-ONLY, today-only. Every row records who changed it and when.
   var OVERRIDES_HEADER = ['Date', 'Student ID', 'Student Name', 'Type', 'Route Code', 'Note',
-                          'By', 'At', 'Destination'];
+                          'By', 'At', 'Destination', 'Entered'];   // Entered appended 2026-10-07 upstream
   function overridesValues() {
     return [OVERRIDES_HEADER.slice(),
       // bus -> car: the office took the call, and the card says who she is handed to
       [DEMO.date, '400118', 'Tennant Rosalind', 'Car', '', 'mum called at 1pm — grandma collecting',
-       'office.demo@example.edu', '13:02', 'Tennant, Beatrix (Grandmother)'],
+       'office.demo@example.edu', '13:02', 'Tennant, Beatrix (Grandmother)', DEMO.date + ' 13:02'],
       // staff kid -> car: recorded at the ramp by the person holding the child
       [DEMO.date, '400154', 'Marchetti Bianca', 'Car', '', 'dad in a meeting — mum collecting at the ramp',
-       'ramp.lead@example.edu', '14:31', 'Marchetti, Serena (Mother)'],
+       'ramp.lead@example.edu', '14:31', 'Marchetti, Serena (Mother)', DEMO.date + ' 14:31'],
       // an Occasional walker confirmed for today
       [DEMO.date, '400160', 'Vandermeer Ida', 'Staff Kid', '', 'dad confirmed — walking up today',
-       'walkup.demo@example.edu', '07:55', '']
+       'walkup.demo@example.edu', '07:55', '', DEMO.date + ' 07:55'],
+      // A change PLANNED for Friday on Sunday's email (2026-09-16 upstream: one row per date, dated the
+      // day it applies). It is not today's, so today's board ignores it; the Planned list shows it.
+      ['2026-09-18', '400110', 'Iverson Maeve', 'Car', '', 'Friday: dad collecting for a dentist appointment',
+       'office.demo@example.edu', '09:12', 'Iverson, Bram (Father)', '2026-09-13 09:12']
     ];
   }
 
@@ -539,7 +555,7 @@ window.DISMISSAL_DATA = (function () {
   // (already in a special up by the HS); Except Destination = where they go instead, if standing.
   function walkersValues() {
     var H = ['Student ID', 'Student Name', 'Grade', 'Teacher', 'Frequency', 'Destination',
-             'Except Day', 'Except Reason', 'Except Destination', 'Note'];
+             'Except Day', 'Except Reason', 'Except Destination', 'Note', 'Only Days', 'By', 'At', 'Status'];
     var rows = [
       ['400150', 'Daily',      '',                    '',    '',         '',                        ''],
       ['400151', 'Daily',      '',                    'Fri', 'Art',      '',                        ''],
@@ -552,15 +568,17 @@ window.DISMISSAL_DATA = (function () {
     ];
     return [H].concat(rows.map(function (w) {
       var sid = w[0];
-      return [sid, nameById[sid], gradeById[sid], homeroomById[sid].teacher, w[1], w[2], w[3], w[4], w[5], w[6]];
+      return [sid, nameById[sid], gradeById[sid], homeroomById[sid].teacher, w[1], w[2], w[3], w[4], w[5], w[6],
+              '', 'walkup.demo@example.edu', '2026-09-04 15:10', ''];
     }));
   }
 
   function routesValues() {
-    var H = ['Route Code', 'Route Name', 'Colour', 'Vehicle', 'Session', 'Driver', 'Phone', 'Days', 'Note'];
+    var H = ['Route Code', 'Route Name', 'Colour', 'Vehicle', 'Session', 'Driver', 'Phone', 'Days', 'Note',
+             'From', 'Through'];   // appended 2026-09-22 upstream: a row dated for a cover week applies on those days only
     return [H].concat(ROUTE_ROWS.map(function (r) {
       var rt = ROUTES[r[0]];
-      return [r[0], rt.name, rt.colour, rt.vehicle, r[1], r[2], r[3], r[4], r[5]];
+      return [r[0], rt.name, rt.colour, rt.vehicle, r[1], r[2], r[3], r[4], r[5], '', ''];
     }));
   }
 
@@ -618,25 +636,81 @@ window.DISMISSAL_DATA = (function () {
   // STANDING per-child answers that are not walk-ups and do not expire (office-owned). The real
   // one (2026-09-06): a driver's children derived as "walk to the High School" from the parent's
   // placement code — and the office said no, she drives a MORNING route; they are car pickups.
-  var STANDING_HEADER = ['Student ID', 'Student Name', 'Type', 'Route Code', 'Destination', 'Note', 'By', 'Since', 'Days'];
+  var STANDING_HEADER = ['Student ID', 'Student Name', 'Type', 'Route Code', 'Destination', 'Note', 'By', 'Since', 'Days',
+                         'Every', 'From'];   // a row that alternates weeks (2026-09-21 upstream)
   function standingValues() {
     return [STANDING_HEADER.slice(),
       ['400156', 'Ashby Clover', 'Car', '', '',
        'EL ramp, north lot. Dad drives an AM van route only — not a dismissal route. Not a walk-up.',
-       'office.demo@example.edu', '2026-09-06', '']];
+       'office.demo@example.edu', '2026-09-06', '', '', ''],
+      // Every Friday Pippa is a car rider (her gran collects) — a standing pattern with Days.
+      ['400130', 'Winslow Pippa', 'Car', '', 'Winslow, Cordelia (Mother)', 'Fridays: gran collects — car',
+       'office.demo@example.edu', '2026-09-12', 'Fri', '', '']];
   }
 
   // TEMPORARY pickup authorizations (2026-09-15): a parent's email lets someone not on the FACTS
   // list collect the child for a window of days. One row per person; an Auth ID groups them. The
   // demo ships one live example so the PICKUP+ badge and the card section have something to show.
   var PICKUP_AUTH_HEADER = ['Auth ID', 'Student ID', 'Student Name', 'Person', 'Relationship', 'Start', 'End',
-                            'Method', 'Note', 'Status', 'Created By', 'Created At', 'Updated By', 'Updated At'];
+                            'Method', 'Note', 'Status', 'Created By', 'Created At', 'Updated By', 'Updated At',
+                            'Requested By', 'Requested Email'];   // who asked, so the confirmation goes back to them
   function pickupAuthValues() {
     return [PICKUP_AUTH_HEADER.slice(),
       ['demo1', '400156', 'Ashby Clover', 'Marisol Vega', 'Aunt', DEMO.date, DEMO.fridaySim.slice(0, 10), 'Email',
-       "mom's email — grandparents' week", 'Active', 'office.demo@example.edu', DEMO.date + ' 07:52', '', '']];
+       "mom's email — grandparents' week", 'Active', 'office.demo@example.edu', DEMO.date + ' 07:52', '', '',
+       'Ashby Wendell', 'w.ashby@example.edu']];
   }
 
+  // Standing facts about a child, one per row (Notes tab, 2026-09-21 upstream). Office-kept; removable one at a time.
+  var NOTES_HEADER = ['Note ID', 'Student ID', 'Student Name', 'Note', 'Status', 'By', 'At', 'Removed By', 'Removed At'];
+  function notesValues() {
+    return [NOTES_HEADER.slice(),
+      ['n1a2b3c4', '400118', 'Tennant Rosalind', 'Grandma (Beatrix) collects most Wednesdays — ask, do not assume the bus.',
+       'Active', 'office.demo@example.edu', '2026-09-09 08:14', '', ''],
+      ['n5d6e7f8', '400140', 'Gaskill Wyatt', 'Only the two guardians on file may collect — see the open flag from 15 Sept.',
+       'Active', 'office.demo@example.edu', DEMO.date + ' 14:30', '', ''],
+      ['n9g0h1i2', '400118', 'Tennant Rosalind', 'Has an inhaler in her bag.', 'Removed', 'office.demo@example.edu',
+       '2026-09-02 09:01', 'office.demo@example.edu', '2026-09-09 08:15']];
+  }
+  // Which homerooms are in an 8th-period SPECIAL on which day (office-kept; FACTS has no period data).
+  // Friday 4th-grade specials are why the walk-up list excepts those children on Fridays.
+  var SPECIALS_HEADER = ['Homeroom Teacher', 'Grade', 'Day', 'Special', 'Teacher', 'From', 'Note'];
+  function specialsValues() {
+    return [SPECIALS_HEADER.slice(),
+      ['Quon Beatrix', '4', 'Fri', 'Art', 'Marchetti Dov', '14:15', 'walk straight from the art room'],
+      ['Larkin Moses', '4', 'Fri', 'Gym', 'Hensley Bartholomew', '14:15', ''],
+      ['', '3', 'Fri', 'Computer', 'Ostrowski Renata', '14:20', 'all 3rd grade']];
+  }
+  // The campus-control master schedule: today is a normal day, so the delay feed reads KNOWN, 0 minutes.
+  function scheduleValues() {
+    return [['Date', 'DayType', 'BellSchedule', 'Reason'],
+      [DEMO.date, 'Normal', 'Normal', ''], ['2026-09-16', 'Normal', 'Normal', ''], ['2026-09-17', 'Normal', 'Normal', ''],
+      ['2026-09-18', 'Normal', 'Normal', '']];
+  }
+  // The FACTS roster on the staging sheet: guardian emails live here (pickup-authorisation confirmations).
+  function sheet1Values() {
+    var H = ['Student ID (System)', 'LastName FirstName', 'Email', 'Status', 'Grade Level',
+             'LastName FirstName 1', 'Email 1', 'Email2', 'Homeroom', 'Homeroom Teacher', 'Gender'];
+    var rows = [H];
+    FAMILIES.forEach(function (f) {
+      f.kids.forEach(function (k) {
+        f.guardians.forEach(function (g) {
+          rows.push([String(k[0]), f.last + ' ' + k[1], '', 'Enrolled', k[2], f.last + ' ' + g[0], g[3] || '', '',
+                     homeroomById[String(k[0])].code, homeroomById[String(k[0])].teacher, '']);
+        });
+      });
+    });
+    return rows;
+  }
+  // The sports feed facts-directory-search publishes nightly: who has a POSTED dismissal today. The
+  // Varsity Girls Soccer game is the same one the Directory and Student Portal demos show.
+  var SPORTS_FEED = {
+    date: DEMO.date, ok: true, generatedAt: DEMO.date + ' 06:05', teamsFailed: [],
+    students: {
+      '400101': [{ team: 'Varsity Girls Soccer', title: 'Varsity Girls Soccer @ Rising Sun', dismiss: '14:00', depart: '14:15', location: 'Rising Sun High School' }],
+      '400103': [{ team: 'Varsity Girls Soccer', title: 'Varsity Girls Soccer @ Rising Sun', dismiss: '14:00', depart: '14:15', location: 'Rising Sun High School' }]
+    }
+  };
   var tabs = {
     'Roster': rosterValues(),
     'Attendance Today': attendanceValues(),
@@ -648,20 +722,25 @@ window.DISMISSAL_DATA = (function () {
     'Roles': rolesValues(),
     'PickupContacts': pickupValues(),
     'Staff': staffValues(),
-    'EVENTS': eventsValues()
+    'Sheet1': sheet1Values(),
+    'EVENTS': eventsValues(),
+    'Notes': notesValues(),
+    'Specials': specialsValues(),
+    'Schedule': scheduleValues()
   };
 
   return {
     demo: DEMO,
     tabs: tabs,
     roleViews: ROLE_VIEWS,
+    sportsFeed: SPORTS_FEED,
     students: students,
     // exactly the inputs the real producer's assembleTransportationRows() takes — verify.mjs
     // feeds these to facts-api-sync/Transportation.gs and checks its output equals tabs.Roster
     producerInputs: {
       routesByStudent: routesByStudent, staffChild: staffChild, earlyBird: earlyBird,
       familyById: familyById, nameById: nameById, gradeById: gradeById, homeroomById: homeroomById,
-      teacherBuildings: teacherBuildings
+      teacherBuildings: teacherBuildings, enrichment: enrichment
     }
   };
 })();

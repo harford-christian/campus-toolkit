@@ -20,8 +20,8 @@ const DST = path.join(HERE, 'logic.js');
 // Load order = dependency order for readability; at runtime every module resolves the others
 // through globals at CALL time, so the order is not load-bearing.
 export const ORDER = ['schema.js', 'ids.js', 'fuzzy.js', 'namerules.js', 'directory.js',
-                      'events.js', 'badges.js', 'pickup.js', 'presence.js', 'search.js',
-                      'metrics.js', 'notify.js'];
+                      'events.js', 'family.js', 'planned.js', 'history.js', 'badges.js', 'pickup.js',
+                      'presence.js', 'search.js', 'metrics.js', 'notify.js'];
 
 // The ONE scrub applied to the copied source: schema.js's SETTINGS_DEFAULTS ships the school's
 // real FACTS-Finder /exec deployment URL as the default deep-link target, and no deployment URL
@@ -53,7 +53,7 @@ export function assemble(srcDir) {
 `;
   for (const f of ORDER) {
     out += `\n/* ===================== logic/${f} ===================== */\n` +
-      fs.readFileSync(path.join(srcDir, f), 'utf8');
+      fs.readFileSync(path.join(srcDir, f), 'utf8').replace(/\r\n?/g, '\n');
   }
   for (const [find, repl] of SCRUB) out = out.replace(find, repl);
   return out;

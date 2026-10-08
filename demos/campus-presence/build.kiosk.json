@@ -6,7 +6,7 @@
   "demoName": "Campus Presence — Kiosk",
   "replace": [
     ["<base target=\"_top\">", "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\">\n<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n<title>Campus Presence — Kiosk</title>\n<script src=\"logic.js\"></script>"],
-    ["var STATION = '<?= station ?>';", "var STATION = (new URLSearchParams(location.search).get('station') === 'el' ? 'el' : 'hs'); // doGet reads ?station= the same way; the demo shim's google.script.url is always empty"],
+    ["var STATION = '<?= station ?>';", "var STATION = (function () { var s = new URLSearchParams(location.search).get('station'); return (s === 'el' || s === 'kg') ? s : 'hs'; })(); // doGet reads ?station= the same way; the demo shim's google.script.url is always empty"],
     ["var URL_KEY = '<?= urlKey ?>';", "var URL_KEY = 'demo-device-key'; // production: the per-device key from Script Properties, re-checked on every call"]
   ]
 }

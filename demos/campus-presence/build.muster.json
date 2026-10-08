@@ -5,14 +5,45 @@
   "includeDir": "../campus-sign-in-out-system/apps/office",
   "demoName": "Campus Presence — Muster",
   "replace": [
-    ["<base target=\"_top\">", "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Campus Presence — Muster</title>\n<script src=\"logic.js\"></script>"],
-    ["<?= me ?>", "demo.staff@example.edu"],
-    ["<?= isAdmin ?>", "1"],
-    ["<?= execUrl ?>", ""],
-    ["href=\"?page=board\"", "href=\"board.html\""],
-    ["href=\"?page=muster\"", "href=\"muster.html\""],
-    ["href=\"?page=metrics\"", "href=\"metrics.html\""],
-    ["<a data-nav=\"flags\" href=\"?page=flags\">Flags</a>", "<!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->"],
-    ["<a data-nav=\"settings\" id=\"navSettings\" class=\"hidden\" href=\"?page=settings\">Settings</a>", "<span id=\"navSettings\" hidden><!-- Settings: not part of this demo --></span>"]
+    [
+      "<base target=\"_top\">",
+      "<base target=\"_self\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Campus Presence — Muster</title>\n<script src=\"logic.js\"></script>"
+    ],
+    [
+      "<?= me ?>",
+      "demo.staff@example.edu"
+    ],
+    [
+      "<?= isAdmin ?>",
+      "1"
+    ],
+    [
+      "<?= execUrl ?>",
+      ""
+    ],
+    [
+      "href=\"?page=board\"",
+      "href=\"board.html\""
+    ],
+    [
+      "href=\"?page=muster\"",
+      "href=\"muster.html\""
+    ],
+    [
+      "href=\"?page=metrics\"",
+      "href=\"metrics.html\""
+    ],
+    [
+      "<a data-nav=\"flags\" href=\"?page=flags\">Flags</a>",
+      "<!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on the board -->"
+    ],
+    [
+      "<a data-nav=\"settings\" id=\"navSettings\" class=\"hidden\" href=\"?page=settings\">Settings</a>",
+      "<span id=\"navSettings\" hidden><!-- Settings: not part of this demo --></span>"
+    ],
+    [
+      "<a data-nav=\"history\" href=\"?page=history\">History</a>",
+      "<!-- History: not a separate surface in this demo — the board asks for a child's history inline -->"
+    ]
   ]
 }

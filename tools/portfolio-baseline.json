@@ -302,15 +302,25 @@
   },
   "transportation": {
     "files": [
+      "FACTS/transportation/Code.gs",
+      "FACTS/transportation/Config.gs",
       "FACTS/transportation/DismissalClient.html",
-      "FACTS/transportation/Index.html"
+      "FACTS/transportation/Index.html",
+      "FACTS/transportation/Roles.gs",
+      "FACTS/transportation/Routes.gs",
+      "FACTS/transportation/Walkers.gs"
     ],
     "missing": [],
     "gsr": [
       "dismissalApi",
+      "historyApi",
+      "noteAdd",
+      "noteDelete",
+      "pickupAuthContacts",
       "pickupAuthDelete",
       "pickupAuthSave",
       "plannedApi",
+      "removeWalker",
       "rolesApi",
       "saveRoleView",
       "saveView",
@@ -318,7 +328,7 @@
       "setStanding"
     ],
     "ops": [],
-    "hash": "ba586549bc0ee974"
+    "hash": "f1b9380e6d920a35"
   },
   "campus-presence": {
     "files": [
@@ -362,7 +372,7 @@
       "visitorOpenList",
       "visitorOut"
     ],
-    "hash": "52bed083808774a4"
+    "hash": "368fc846eae06d58"
   },
   "transpo-routes": {
     "files": [

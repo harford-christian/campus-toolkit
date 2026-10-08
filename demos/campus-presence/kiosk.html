@@ -171,6 +171,10 @@ input{-webkit-user-select:text;user-select:text;}
   display:flex;align-items:center;justify-content:center;padding:10px 12px;transition:.1s;text-align:center;
 }
 .choice:active{transform:scale(.98);}
+/* glyph in a destination pill (e.g. the red cross on Nurse) — decorative only,
+   so it must never contribute text: setChoiceSelected() matches on the label. */
+.choice .ch-ico{flex:none;display:block;margin-right:8px;line-height:0;}
+.choice .ch-ico svg{display:block;}
 .choice.selected{border-color:var(--hcs-red);background:var(--hcs-red-soft);color:var(--hcs-red);box-shadow:0 0 0 2px rgba(178,34,34,.15);}
 
 .results{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
@@ -184,6 +188,16 @@ input{-webkit-user-select:text;user-select:text;}
   background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-radius:6px;padding:3px 8px;flex:none;}
 .result-btn .result-meta{margin-left:auto;font-size:.9rem;font-weight:700;color:var(--hcs-muted);flex:none;}
 .results-hint{color:var(--hcs-muted);font-size:1rem;margin-top:12px;min-height:24px;}
+
+/* A dismissal the parent rang in this morning, shown back to them. Calm green,
+   not a warning: this is the expected path working, and the only thing it asks
+   of them is to confirm what they already said. */
+.plan-note{
+  background:var(--hcs-ok-bg);border:1px solid var(--hcs-ok-line);border-left:6px solid var(--hcs-ok);
+  border-radius:var(--hcs-radius);padding:14px 16px;margin:0 0 4px;
+  font-size:1.05rem;font-weight:800;color:var(--hcs-ink);line-height:1.4;
+}
+.plan-note .plan-sub{display:block;font-weight:600;color:var(--hcs-muted);font-size:.95rem;margin-top:5px;}
 
 .kp-error{color:var(--hcs-red);font-weight:700;text-align:center;min-height:26px;margin-top:10px;font-size:1rem;}
 .kp-error.warn{color:var(--hcs-warn);}
@@ -298,6 +312,60 @@ input{-webkit-user-select:text;user-select:text;}
 }
 </style>
 
+<style>
+/* Role-first home + the between-buildings flow. These live here (not in
+   KioskStyles.html) because they belong to the screens added in this page;
+   they only use the Eagle Eye tokens the style partial already defines. */
+.role-grid{display:flex;flex-direction:column;gap:14px;margin-top:18px;}
+.role-btn{
+  width:100%;min-height:106px;border-radius:var(--hcs-radius-lg);
+  border:1px solid var(--hcs-line);border-left:6px solid var(--hcs-gold);
+  background:var(--hcs-surface);cursor:pointer;font-family:inherit;text-align:left;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;
+  padding:18px 22px;box-shadow:0 1px 2px rgba(20,20,40,.04);transition:.12s;
+}
+.role-btn:active{transform:scale(.99);}
+.role-btn.out{border-left-color:var(--hcs-red);}
+/* Role accents (Josh, 2026-09-11): Student blue, Parent yellow, Visitor black.
+   Three differently-coloured spines, so the right button is findable from a
+   queue before anyone has read a word. */
+.role-btn.role-student{border-left-color:#2a78d6;}
+.role-btn.role-parent {border-left-color:#eda100;}
+.role-btn.role-visitor{border-left-color:#1d1d1f;}
+
+/* The Eagles mark, filling the space below the three buttons on an iPad.
+   Inlined as a data URI: the source art is 2833x2244 and 1.58 MB, which would
+   be absurd here, so it is trimmed of its transparent margin, resized to 400px
+   and quantised to 64 colours — about 21 KB, carried inside the page HTML so
+   it costs no extra request and cannot delay first paint. Hidden on a short
+   screen rather than squeezing the buttons. */
+.home-logo{
+  margin:24px auto 0;width:min(260px,52vw);aspect-ratio:400/252;
+  background:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAAD8CAMAAABuIAJrAAAAwFBMVEXf2NctJhqjnp5dXV6jYWJlVg3SshWqkRKHJifOra74317y0S1PKBGLdBD56Z39+eb9/vv666D//3789tf//wD88K++wsPOvsE9PUCWgnr/f3//AAD14XWSPUF9fYG9vcGffoE9QUN9gYL/fwD7+ar/qqp/f3//qlW9wL6w//99gX1IPkB/fwDOuFGqqqo9QD4A//9////AfHx//3//AP+qqlUAAAB9FBUFBgf8/Pz90hN4CAoXFQ+BFBbvyRT+//4brPoWAAAAQHRSTlP+/v////7+/v//9v7+/u9dLqECnQFw/////gIBs////////wILAwID/wP//wLdA/8BAv8CAQMA//7//v/+//4Gc7TFKQAAPnRJREFUeNrtfQl747a1NkGKWqnVcuzZZ5JJ0rS97b3fIskWl///r+7ZsJEgRcn2RG6M50nrsSUSwIuzL4h2/zFjtar+A1YR/YegUe2qm2i5q94AuZLx6265WNzstm+AXMn4fXc7nd5Ur59E/kMAqbbVejZdvwFyPSJkNX2cLVbbN0CuRaSvZ+XjdLnbVtUbIH/y2G5+2VXL6XA4BBKBf2+qN0D+RNqoNmiCrKfDNJ0PZ9MlGiO/vGIyiV41FhtUc6vV7XQ4SpXK0tFwOl0vKyKb6nVSyusEpHrPWCAqy4/T2XCe5YdDrrL5aDabLm7FZv8AH3ttxBK9LpoAotj8LlgAaSxv11OgjnmaHfIkSVSu0vloiGSyXhpPyvZ3IJZXg8vrAQSwMD+vBIvZbAjMKlNAHvdxHCc5Ukk6Gg1nQCiIytL6t355HTwsei1o/MIkslotAQrAAigDSSMlOFSSxFEUxUnKkICAR1TwU4v17S1SS8UKWfUGyHOgsSVn7nK9wC2ezcoSwEA0kDRQdgAcDzgAEv7VQTEmw2FZIrEgLkItrVLlOthadEUCYvv/v/9W25Nt9b76hTWpj8KhmCwyBUP2PomBPB4EEYDkwCjByIRYABlE5SNrYCFMqs2vbxTSYuaRCAb1CIS3aFIrkBdDjYWmC972nLjVgx1AJEAlzieIgxlUFoKJfc9m8+vv2zcKCTijloaruL8n6T0jTQppAsfBDpc6NCJEJc6H8CtELqiBzQiTZiirQoZ4s/rznZPXAsgG4xlTra+i8F7dwlgb4Z2pgz9gk5MmHAaSRLmgMHpZSlrxTESKHkt6z2KxiFa792+A2IjfAoQE6as88GdkVMCjGnt7QLsjiIaDyb06NL+mWNg77+E3TRfRVUQcr0iGVEsgkdljCQQBDH80Z4GBcMgBB4qwI+6AQ0MSu19QRtjLc+dzfA+QTPmINBOBcNm+yRCXRnYrJJIS3VKqThTIoGIzok4s6rDw+JwEngkjHYHffhGB/Ni9CfWa3otsCyABROrcP/lMKJjx0He4X4rjvycNSYQOSYjGA3lch9F4XWpvtYyiBdJIrtUj1pB8zfbyEbGwz62ypkYoPZZvlnpwrNYgWZlGciSLftLiLEQcyYLEwvQRoTtmWb2xrEYYdkraJ5odsFuJERgPzzmMWAFXpMKY1mJBCvdiudu8AdLIU0AFFNVdECPJmeLiTLnyJclRoKP2C6pdOVss3yikZhpWi5LUULASwPrIn0twtIoTFOgluWTQMHkDJJQ5Mgf/CFnTwzQHRF4QkLsEJAiBAZZONh9eS1LXFQn1ze4WpDl6A9EdCEJEvSCJRLFCq13iKSjbb65ChFyVHbKDXJ65a7u9HNOKKLpoXpSCrrWsfnsDpMmzRsrzV70QIoSHY7HPy2l0JWmo12SHbJFExCZkV/s5TOscjQwYFlucOUcXR7PFzRsgQcUX1CsJc4hVGPXe4/iMz2qTkwhFoXV4LbUlVxYxXM+IRJBXabPwjD3ujYh+NgGSowS5mkqG6OpypkeY86bQPj+DCbGQPoOe6NFRBLpvns3BWl9dSyFDdHVVBcMLNN6IUxvOdULC11CCoFFYbXZvgIQjuVOUIupddJZ3SpSmM9WyCGHMRldVehVdX6FHCYm65+xs5OQ05PfnQAK61gGN9OthWNeXBrRBuT4HKzqJovNsColwINuKehIWMqz51XixrhKQX6kUiphWT09WFKdiTMw50AiZWouoL8MC/+IMy3w2mzdAQuTxYffHEqMhGR11VoQ6Va0IorKSDTfSadcnZDvGcunB4M2iCO5senNFhVfX5DrZUimUCakDImRedLAgrV2hg7gsMV8lPaVtoQaAOlwkjE5R0HBJkLwB4iXXcmWa7CklXiEguSRgRUHjPGGfLaby4CgxiyvLKWkrChMHRtUP+GSblj2nwivIZryGGt7ryVzECC7Ic525m7NtGFNlVJBMxM7OmDpKhKR8LGeAqJsQXyMOhiGhR2vdDCEpmXFVb6mkmltBHe10ZOEQCIixcIZcLbhOrOfA1MHkIYOoRJHiXP+8yW0gQAgem844Qw/8n8+3oqvhVhi2NdRhCj4QENpG3GF3i4k+lGFW7qAnobX/JXKZFTlXYOQMiDzDUMlo9kiQ/Ml8K7oKOCoUHqIjHTiHWm97LuknSe5yLjIG6Vw38UAiIdZnYRVepSTZRAPiUgnpadCdY7X7cyH5swH5fwjHcloOjRXhWXYCSIRWNccQmZMxHnCoaf9FgtgfHh+JSBgRkuQ58cFIBE/iUZqERXIqV5iiwvW++qsCQnB8xLJmTR2+RkWAoP7LfieNl+BhdatRySgM8Vck3suh0IjZcXLHNACRehKdh61Fyfu/JCAky5lbmYKPmjZF1pvinZQoYhKzOB8ZOCBPfog/jlI2SFiSCI1gWYLJR40IVxUHtC+2KYlvISS/VH89QDbGEFRCHXcN5ZY2kM+2UZPu2echG8/MCf9VzimZXYt5oBFCOVcSHkTGR3gkUcBAESrJjO2++YsBgtzqdjpjQzBvrYbCkAVzMs7/5ApCsD6GIj+GWI2LgJRlikbi3AACAB0OkiTMAUL2C4eMRjYZ7xWrwGAoIt+q/kqAgJ9kuRYFFXbhc5uDhKQIa8IMCJGTmjvyA3LdFHIqkBop/kugAuJJlVHb+Lv5IUQgDiZiKA4fqWfK5q9EIStRdQ+nnE9G4nIdVC55CaWmkCEquQxIhjmP1jJhL6X+amI44wnXmKsC/1UA+QCqLtVKOUGMqDVs0awwVCPXPJ9RYRoyr2HNHkmbNYZJ1OEGZhrKSYVjO/GvAQjW3AIgVOycS/1ga4IJcJJG9WbmAQKkQICM5qcAyVtpkbVfxoO9x4+kblWvFhAqwt9iIf7plkiQzIA1GTOqP9e70ObUJV3VLw+0OpYPyMgH5LEGCKoOURtx6EAwZ3tjke6CCkFP98TBUtHt9pk6QUXP1anHL2Ddvj81vdXyhgoKh8aFJXZIWwzDB8TfeZQciO4JQNrCu5FT1o7Miqp4bm6WyxO9st/XVr378PTuNs8BSPWL9EKACvzbJS6DZ3VqchW3k5mZEEh71oj1OcmuBQEZ1j2NHiAq6Xi644kn2rg5SRsVxDd1qwkYt3rZH6o/GRAM9OGsPtpCfOzysqz+e7f7rerqNWMwKW2QMO4I9LUAUpITC7bRerKsDFFe5nabPDcEmBJ1RATHtvpedZpR6Gb4KH0HZjO97CeGHqPniLtSbxiq9acxoqZu3OZl090gjjEBRJQOSrWVoMVuwnpWl94ECHuxvN/Prexh933UxrN0GvxswbpVN8dFq3a1prYfetV62berJ1FJ9HTX+S0J51R7zymmymJxfdJNR3SC+aNpi8nGWIiFbus5Rg2vOwHS8MNLgbWW6Il0HYjCxg77FjFrrpvbIo9eUUuckdNogjt0SejxYhd+9HTvBzn3vNYL3L6CbauTER+gkylmYgUKdNifQSad//x02BMQebDTuCEJRB810wIKocqdE/qIjv5T2w//+bTsKZmU1Q8HhHy1H0lxlQZIerAxzeGFk3ODqhBNID4eOiPhEDALZ80w4WIaClWxrV7/frOrU8S2DtW2deeV4rJvTTJGY+W8bGR7l/Gt6Em9SdZTivNRKyo75qk4qCTFpupiW7B6qdKpSXTxt4f2syZBaExBhW7i8QiRlsAT8locjJiWGDjTRScgtGzyUOeGT3krpxyx2cVEEj2hinnJ/YulbrZ0AqjcbizHIJz4slvn9h5LPdmDFEdtWpXtREZ8IRBHB0AWIUDKEca+bNczl696vgFxmWGrjWWn0JRl04GjDqjlzF059Vkjdt19EJ8bkA3GwckXlaWchmN1HPwXTS2nPDT0QFCfw22YQD6KcupKEGsJehxBWpCVYUAeH4PxdW5/5jEWayfWbRHMLW3mXld6fGANBJ8gx7B04saPsnDF6sHNJe7i6HI8yMSmnKbWjdCnRXvpPmy3219+2Th9jan+INMR77rWk0lfKztGYTjaAREPvfsMLoauM0nx86dEIhuDxL9050ceWCicmuy8Weh9si/ArdcXZNVHF+OBkpgD27UNMiemlHQcZlvVH/9da3ZJPdqr25lkS8d1EUtejDI0QoBEi1kLIM0x1HEYl2mxWAeGOJWrkzbvP+jZ/s8ff1TVH2h6kN6mMmfdZeAEQEFFOr8IkejCQidNH2HycKkkF/V+TQMbKRovA5AK3IzD/o28cVrDSVdtr0JA+n9azoqf7cCWZyZNHSrtGCHPyPrjGts3z0hJCB3Deq6e4vYQZyMSXdwEg+hjGDyOzqHBpiWyAB7S7BCaXVb/wzyANVOPfRA/T8lVWLaOHhTS8VW2GT0pYsT6uiKBB24d6sjofHFE9JE6andwMoQI0cjZtVnRhfc9Eb+aD8vmyRu5GpewLd3mUJodShtwbEC6XEhYTzUELFFfyb4J3SSRdcymFxHswiig91I4cSQixDZapFyhJiBxKoDQvTArIojhaO5OPaOaK5ct8IqtWHcEiWKr5jyjPbqsBYbWJGrHgysCfMk7HKlaUCKTNuDUqqpmpUeSB6cppNQ7kvGQXW3I9gAgJYPZ/DYDgjnZ8laTWCpWDmisdGXPSBS0elNAq1QxYHOXt2oxBW40/Oj0zPKs6BKBTopqrk2i4dBT+0bU0QdowJwgVes7afoaD2fSGsvZGjIOSKgzZyhLfcipp7XuiqxSP/YRAkR308xz7jMz19RVPuoEiIQzGwkRDQhU5YK8+C+2KGSynt+GGRZRmazV03yHYiXSHsGzzmNa5wJSfQfHAZu/mWYA3mHljom2hMYEO9iKkMavrMiTWTUygLCvJJZU0YNV4UphPXxe81BIZLZoAKJ97+xj4tb8Q5JwdGx0vhcXBfHlCpoCyFHFtp+ZtHkzWYO8OFEiy0fXCBMtO5U/ohJdvQwgFV3hgcQsgfBMTKOAi5V2c2jrC8SO4qFRog+JQzaRPB02R5hpMayzmeEEs6HsFO2bi8ds8VAHZCSzJNxnhrfOmM8oyyZjxWlhBhAdxESjlzefJp1mxvGCHADzX+lglHVOORzqOhfFdubun5tNz3zhqP8lQxIXvFloV4dQQRl2sSpjf+nSMU1LpXaucKlmpnPedTGNDhHe5+TJn7t8sTSQqLnHsQKAKANHaUS8dGjO3C7+uihInANpKtTBX3WnrGyETE+8qfgbQ4cQgUZDOvr4YdODVPoBUv1TrlPB+N6Mm1rl6WjYouSPVKDDt76goCxlzsyr6g5EY7AD/7oXkSGamfbQyGJTVK9LC0hUByR3LAbNPonz5JwirBWsOK/5gjV1DMtHwzEJSLcBvbjHmo41hnAmykpKVzKsjelVPQMgEqSle21m3A8Rt7jNbCsf63pVbjkxqSRa/ZoTt6o5dI2tJtEQxaBkVkFCYQpgpo+dgJSjPNcalahqdL+CjlQZX28UB1zK1vajiqy0LkjMmLscwvuZD1wqd5eg6UWXlZ1gXVHPkoG13KZC6kMWyDNoMIsAGKweWQN82Oxh7RvPD9GXmDsfO3wPV42HInW8Fk1AkE4p0kukYbIoYD73tVKsYCIeH3zNfJQv3N37SeatJjtbOpzdyvQtMdROKol6cCss/yOmn2XWW9rGsHxAMqNrDi0DT51KgiYitftZpPWxacifafMkawCyqAt11H9K9ojbxJN69lfAz48xe00ec234uItI7bTnrQ4bTrEQbzUZQRSwO5HFHfUKQ5kUQ9ujWzaVdYqhq/oaGaJUw1cultRI19U8hvq8f+m8D4RDcqDUjhqA+DHDIWT0PDpl1sqtlWsEQmoRMF33g4D4vgcT9uDpON6KUm+G4XXKxHEOTgy1s4d2dNJtJWGonHcYR26FmTGknWo/PRHSDeuWvJ60/XDauHclDqc62JrZjPIUhycAKeElTiEpoLEIpTc081SVU2IitktzESIAXaGuN2MuVnGp90F8LhRDnXNY+/1lgHBHMfIj6svoRiOtPTBzTjWHZSov9R7nnguu4WIqa7LPZ1ot9+bozJNcXtYNCFocuq1/uNL9oZZd5MkPA2qHR9dl3VyO7UbRBJBU34ZCCh7abth+aHMJIJXExxybAyTTSANij59H5yzMevvOh808hJaUz8g2xqqreE1ASlYaBOLPLQ+MA/yqO6TgRod5Z4aBdeC+zxiQfD6zQZiMXd8diEQn8DBhQbMBs2HGuItoU7oeX2sm5OjK5n1jGV56oc36TNzbW8yteIZxZfMTgJAsk+QJB1+d5xU3k730Vo7KvjMnd5WkwNDLvpnWBLRncwHEcQyn7Pxq76MdnXSzIx68uSXbPEPeEdOSRPxAOdMIS5CsroO1xPnwobNRGsotsVcceYqRPtSZBzi4spqAMH04FmBkbqtIQ5eGWR9ZeK5e4gB+hp1ErPZRSynZCtkZkbZzcp9pF491y4cRiU662SnsUVp9yqR9HpxSG54GkAU6e/O6g8cJ4pRtpB9M1tG+XdeSQyLJ63ZQCBCmvMzpHoBYfNOX7wXhaGaphpfhmhrstaOSX32VTyInSvQwrYiaYCK55cOIRCcSppgTlezMkeQjFbIaSFvJRsJXR6Xr1xka06jWlkSUgHkYkHqljQNJTnm4PiAPvgzhg6PexU4ByOH0MOp8barGrT50/akcYQfuhMzL3wvnidY0FBGrgrktJwDZQsLUXOl4jHiCSItwt8k6hBKxgozILd3cE99EdzwNZS1i0o6IyW2TviUuFQYAGUpEMPIr0XsD0vCYyjoyNyDFNVrcI9uppfCw11qoNmdwuZhKsTxPhvwGHVuJL46Mt5P2Nq+pQ/XGoE7Bmc2YU6yFWz+W0X75zPQ5uk6PIDiC97mXwNgEBGM2cl6iqCUlNfQKrZnUTEEuTwUGqqMr8veZw26VQyJJTRwa9yjxUogDA4kEeVYrIL/sbpEeMX7G0txNn2nYcNFnBw9k76VOUAIYjOpxUB6HBgtHfIU9d8vWCEbJvRcRqQPCGpbgESe9aMMBBLtuDR9dWylTOoGe3J2ULlrPrz+4t1Y3PZWlTgCB6HHOkattf0AwoxAjPOyfq6VTNCSIf9sAq6TUTyZL8MI7vkaQmEbqIAKLYdulPyDSQ4CZgpNkQYA43kVigzn3KYuTMx7PgCBlW0CoWlg5qjgtRSxC74Qq02bIqy7ysiJmBCIGgoOqb9RxUwHuE6d+eM2oHBGchPDIJV0EVxH/pI0Idn6ApWrtd/Siz88FRAdeUW6mdUA8E8G0SDnr4QxI6h4c08Ymcvw4SmLrvgA0FS6xW8wylLBK+ShCE1nPvAxeQxZ12IRp7gfEyrqvQweTfP8cA4KklEigXEtWSmi3u4hPSs8HRCw9VrMNIA8+ICBB1M/xGcLDA2SUaUBKUteMbUnLAZcYRQVknd7aNRM3/QNDJjI1Jk7DPKsdkCl7QIalzTfzDC4rQmr+OVkTaGSfhb6Nk5Vv4vIAGZ4PCDNrYNPWFqkDgoeJPnPuk3ny0MXGYI3nWX22YUwxVflsNbOchGmZNysj6awUISbTwrNaAVnNDCAUBRi6B9vrtB7V/HO0JjoESmqfnNZuiRP5xQdl5JI9e9vwyCZOQ4caIFinI22czgYEz8vcwRq2z2r3XLSisCERp101AZFDagExQtjYh0MWBsPpqjcgWNY0V66rcm5qQFxAQg7snBzBaVA7jj1A4A3oY+ljGDaJ5CteNaHZgQtIyTwBhfD5jyUeXc4dX0MdELtOtLcavlFV2xQBhLMk9D7ObYZQX0CqJXselIQsKUOJybgBSNKkeuNn9avPkZZMuJCqyDObmXUuIlQQNAoCwolI/ZXdWnBqmDrExyLYIOKXy4+aRXNa1773Krg5EGzSAyTNPiBEIuzC0BxAIRw5ysX+Zk1vbrNizWFoRHgksampekQ/eQY2LUXReblk57gVVsoJ2T4gZXrhEyUaQp3PnHkqx0XkskFU4hvkzdcIGFJiCqFYyX0i7gJ2ZxAgHxqAfGgRIjcmlJffi0M3TlKKm54ABFP75l7FfmSVsdwWbGrCbbbsOWNkbPx6gJRPeqIaEXk7yod3xYy3XOWv1OEHPiCkcuImxvE7R7gEAYEEn9X37yt3YIcMyDKx/S50eXecUCqfzuBrA0QpL4HJW0quszBGFK1BH/VFDMvp09QQ6h6/PJ/uZEZ2oiM3zdFjWrm/UkesO4DM6TZRbQHYfI2wrR6tPk6lMcTUdInA4dSvSm13hDqSSp1SeQLklCqjfOvRSQryEs4uBYTFug/I/CkQmxnlTvoSncsv0UNAqTx0A0ILznRHVONEYi1ruW0Csn7UeSO1YQhBGknG7OfPbVKSBqTH/Nx7V3Tp5eE5hnAWD5BR+kzPNsXnuas/RScWzF1trTpG2gVcakIuUZ3TlVOh37J5cUn0ET3koeGzEhQE9YSZXoDkdUvpmYeiCKkPyMu8KQ/bwScBsXcLOF/EiEiwj3a01pl5zVFT5hoTIUDsJQMt0xMP+BPwyPOOEB+3znIAATX18DIjrxt9rUewZrDkzRNNfhdJm/OsQwBkrurV4M2Sbupt9Dm3VNwOiF/gYuykpPGS/AQKSmxiZ7itOxw9ywdklLasJ+/Dn1THTriLaXwrDwGSywIkVmYByTm1HhOxkUo2HiC57sEaGEnuOI/MBz8nxjDkYqfcy6qKbQRC6RIMdpy7T1YnnSMwJpE7FoFcEcqncABBHSu4nnddb2zfAXe+pngl8C0VAoTTHjgFJLHdKXTSHLcSREhMvm/0EQFB9O4mzUlMtCimp93jBCYwTHN7oZDcZW9J5ORP6Uo1ueTA3dw46QIjif1P23FnIhJO5xMXEMwDGAS+HJ8AJOock4G9VkHny8NEJxF0477DDyQ1QKQubKJfnSex3hbpWcsh1KFQiRBJhEWXSIpw/CaNYVaBgCS0UP7DQNnu9lj15KjmMfmotVWZ2CLOJHYfHEWtgFBaG+09QD9wBxwRTTKGCikuoQGR7snuq+wbuwHBTe8a3KVcCN4C0lyOsoCofwx4ARl/Vw5ybKYvcS7u0FNpQEinnQzCI7OAINnJbxPlXjeQO248eO3k3cCsnWn86z3q4+5jJ22ASBAFNoA+92nsDo0LbUEc/0xKPepZBhBONsma64i7Acng74PukSnjvjOewyywHOcyB5XxvDP6bqz52GByJwnkue7RYboHGUAG+2N46K4gdA3jfu//loKpLiAI0iDbGxMm0T0SVOY+dAxLSNpZB6AxbpsPjP14IMKFji14nXTEEMuR8eA1vzPuBuT+5+hufOwemWnGYThyFliO7Iqyf4bhAAKlCYSg7tusKIRFRFK5gBQ4H+880qtkHopKItUef4v/7ZXmlvjUxJ1NNODvGH8wy/29ffzxWMCMAvpynnyNkV0PxuPiONYbNB7vcfCP9JuCiAVBQaeqBgSTHCj7B8C3m0vvG58DyDgw6M2mGUdkruU58sNdQJz7Z/jP8NU9AyJks8fpfwUynxDn4hrSKffhsIBk+5ahSYR2tSj0bzVDwo11AEHSPxZNbxc+Xr5cFLCjccAFAbDfIR649/b95pX4895gA6AOWOmgfkOSucgpnYG1DE6wrM9RNN6fGJmqOUbgRQXOxgACfgwBxP65wAVkCAivOJOzxVROVELp/I90J68FpH06rC8kDIjelkw73HxAEgJkf3TbvpI6kO3dfR3DBjW1noTIY1zgEovuvUHEiE4yxffZCiDkgQudrcFpof7p+FRAYL0JS1bmTfYcZXoL+TtI9cV4PphoFYwyhSDh94MDSGgLCrP3ZPlk9IvC/FaFAJkAhewFkM+ReE2yvQfI8ThoWP65+pnwIOpgsijCc7J0UuA0FFW6CiApge++DJ9SHPsAAltQtB0EequqOUZwc4vCsCxMPE/IJKe/Z0cfEJUZDJFLsOxhTZYa+ZSYXnoCEIc96fe7hEP6MgJilpr8LZqMgWUpaxYiW6kzkRAgKvkJ8PAo6cSgyWDtw8gUfVLQq/E5eGEPQAYn3kaHMACIoRBWbFn1PPiEasKK7mEBRjEe6IR5bvTGhmEnIIWQiA9IQWeTU58S5QASESAyAQHkW64aHAf5/z/qnqIJKldnApJxo0RurUFKbwCQYy9AipNvCwBiWRY9I8M1s83ikrh7ph3ODVtFfOvv/0aPQz9A9oUWIzVAmC+iSZQoBxBkOoVgKICA97527sdHMgxqXkigj2NR9AeEJpJRxj92FsILMOYqIEL6UsgpQPCcea5DPu7CssgUhwyEWNRK3HqtxugzrfYuNy2ImR4z0k0IkBX7sk6wLEMjPsvSUsTNnc1/hl0tLCCf2UZSNUCQ7dYAIW8Z0sd5eOxJXKV4l+10JvUaxxcBpOCDLv6iACB8othllfuCrHA2sKmeFOcCYnVfHxBiWt9c/TWnSe0tIFjiHCVZfSIkB31AWD077vf7FiHSylEzZSovS6wWCulY4+On5wFE1QHZW0DoaGbiZPIUC94PVdc2RN+4CJA9NQ2oA5wp0SwcORCzGLD3PUU/Z6Bv1J4ua/B8kqCetWu5x2OHWq7T2so0bxohBR/iJwt1XrByAOFXsVAHuUESBL2itFN1xgq/Cy6hOO4tIMu+gJDIyJoUl3FCWl7nOwKIHKcscGiL8QSl/cEXPsFziceIRsvBVeaCF0qoCvH+YtyHZY2LUxrFUQARl+veAQTaoE3GmfoHeXIbh+KoshbL+3JAgoyDynFyVxAMyGjbK+OKxmSV5hdlGp5IbwGEnFfk3CqCMyM9y2R6ZSFpPGZtsDvSTMy2ww5BDRdI4CeTSs2SUQOCC8i4GXwW5rfBM1UH5LYny2oX937GjxYEola0A3L0hA/qvMEDir8ZD76iHz7bH9uECBfRUbFYnYoL4Y8nMq9JO+kAhL2axyxLjKfKB+QB1RkrKor6HATT5wOklWlkmYmp0jlnS1tIhJNVstAC3Si9Jq3AfFlkRtaID5GIlECkdZeANkImkDV5IoRLR2LfJcTI45vREcutCLGAxIMjdtoM8pJ2GRgChGQxaKttzgoDSPh5mUlrTjQgVlMmMynLAhTi2uoY4hsE54xurwn1xtRYNy0RLMafY311FlJkgm6B5vjWwjRxrgVHYsCOQ0B8HUs0FAAEuWrQ4QOeOXD5FuNjSFcMAkInmxjGuWYAPg82M3bt9KNjTDLWYUAmDiCW19UV1nFGpMSfGIfO7njAtRrkeQ8suR8gKmkHhGkUojQZxWu+3jOBFDVA2tg6yUBUGXoBUko1Hnk8Lhgc28g1INo56JAIbmdolyAecBqQI6lj4A0DT9dg3wIIIJINMUk45HjvD0gUZor4hgU1k50kBEjiiHQXED4vhe/YLBAO9CFOkMJ6aFkzqTZCQIrnA6TQ/hskkSAgn2KbBNgKyFEbLK1yDh+Eqj+0FsmaOu8zAfJOKvNiPLqxOnjOdQcQ4useIGj4ScqFSIXTgFDeDBuqxZMAyRPPfX7UxuGXRAV32poG/QB5l4WFfjyBPeL6/MsByTsphG4bTaIkN7phZiW3QyH1M006Hql4cQsT8ix1ACSaYtSTj0dbAEJ0ifAfLCBaFMmfrMsXpfoxAGR/QHLRwwJhb/bCfPPF7EsAgrNMlPZLSDTQBySotSMgd0kuTOgkhUAUwQJybHPiZGOtuBUNHcYCwprj0fmalDOQN6shKUk4nABk7AMSTD7QbrE8e2FAcrcFQk3oWxnS2HARgrjEfV9AchSZYUBYRSClLxCrOB4tIJRNZJ5RGE1LfUOW0zCWZKJnAIJiMZSgw0k44MMJa0nPBgin8OV1PLoAKSwgwoSeDkjGdpnvWSjElYB0YwCBXX1nV2QRwczGpgWNcYAv5wESx8EcNo5hJ5g81ALI3fMAchA3UW0xXYAUzw8Ie85i31QWZk4WE2yIAWRQzxcxFUYNBygKM62e9QMkmkwm4UTPWGmNIgzI5O55ADlwL9DsSApVTwopMCX327MCAgsmH8jAYVpHcjINKB/aAFI3ptGvoTsINeLqjr7cC5B4Mbm7u/sSTIVWHYadb4M+DRBZB3zMYcAnhPqeoqNJT0Bu+gEi6aZ7nYFGWNgDmxzCgNCGxnFm8sqsZl1YXncaEEroTjpG3gpI8WRACjY9+eZCHvt9Ta1gSz1oNYBvSTt/Bnr3vADVRYCIDiVOy2w80Mmc0d9ifdEDhsz8LZHNwJih0n7Qms9FHdqw9ADh4pBv/z4JSBEG5CksqyBvHdeGG0XC5DSiKNW+rCLsQRTXC3wCv8Yw7ItnAiTTSZyRbjitq1UCK9KAQPKCPlm++qbzSU8A0lqb4MiQF6QQOOIDPHZ3TnWCSYqXVG709rbYDcTbYcvQQ4+VA5y3rIXQ0wCBd78TRiUXsNR9DyGVs2Whe2urnwQkeujC44GTcDoAeSKFfBqwgheoG9GK3gNx9HZ3xkB/GTGEnDxtaT8JELMBf4uTe1Wr+lOxuHqbgECk4Bhy358BSFexACWwdAMyeQIgFPRxqiGYIqj9798Weke6AWG+BiQm/bbgZGdH8TFdBMjX2s2xoeibdlAWdUBkqo0IF+V3xkk/QCbzccvY9wEkehIgNsGKX/mJ0rxl/N30e47Hx64I11hXtjw8SIq/ZI1frGVpfKPgHSgsY4r6hiIgUfDsiMnUExDjxmp+wgXk2AFI3tWxt5tCrFZ0PAaqKXIdwehOENeVLbSPZMeSjnYBICJWSSTRP1tioA1AjntM0ugAJOoLyL4FkGNfQPKkVtg5cOt7+wHieotUgEGc+uJxbypbEBIqWxvPLwDkQUujsbhKAoDEUI+5bwTFxhPq07o/tnh5zgCkCCYD9QZEdWgGQKe9AdEmrQrFU06lJdiKK+ZctKlnAlKQBRiz7g3hh6IVEJZqXtkBAoKvbTyaNPCxflQvQNrOXX9AYPlaW21UoD4VEApdtYt1kwZk6GRiJcCZgIwlwM8SqA0QFQCEtvPhS9wJSP7DAMEsvoCONpk8ByB2A07n7BsqCQGyOAEIZWKO6X9IZnUAQtptM7zUup0U3CTh+HyAjNsBeYcRlaI+8LAS4xRAiksBybHeKNPWxYlwOO3ngEo0E+j1kKpDf0C0NNXhsTAgOZTqNKs7aLNYRwpOayyVbRqQohOQ4mkU8o5SjUIBrslFgORNNfPOHImih26AL/6JGmTkh8NZFOKmZbUAomOONUBMLCXs5tFVAr0ACafqnQtIg28KIPmTAYGIDLlIx31rXApOOeMH9QbEkt9pQJrZVwaQcSsgcX8KeQlA9v0A4YxvLyKRh4rsqQjs2AsPvThyJGdY49ITkNDxCJmFUMZaBCIRjEdYIdS2eg9Axk8W6u/C2ZF9ASlOAsINOmgfe5KIOMO5XRMAclOd1rL6A9JMqqBIAutoRQsgk96AtDzjhwBSkzqUvBfKFUYauaNpHLsTon2tB1snYv+sCwApzgKEnHL7Y3u5jTYN+zkXx/viSYBMglHW04AUY3ZiGcu0+NQCCNNIbDL6eiTnjlmMQHN+7EexOhuQNjukKxm1nafqUsOTgLA/7okUcikgSOdsTTqJLs3Gbblp1jKZSK+W/X5/AhJ2fICmxQ1CLgFk7AHCnd/yQ3d2cGvVhY6YtwFytAGqh3D7jzNZ1vmAOAUR0sOKs0qT+m1DMO7lYqYoZjY9PtmTwmRwkpZ1PiCSFhSbFr335LJL8rYAajfFing8BQimccJVJH8uIF57O7LovLaBHC6aUNyOHbEc8ziBCOyPpAlhP4rzAGHrkBzIMV2DnZgWy0luChpaauHaRqbT+toBiUzm4hMB+dtlLEtrpxSAsPEoXPrPxltsw3fmMkxy5lLnlm6vPKdDQc9vbD/TD5BCN+c4ZnN2v/PNy05MO1zuctJEwgBWFyC4GXc2lfQCQPbWl/VTHy2rlUqlOQ6Mu1DXQe4rZVre/aQ7AxqVq+iUIuD/n2Ozk9OAaJfxUTz5Or8B+CnN7uvXCQMStyVdnAZEdaq90XMB8qULkMNpQO7jSey1G7TeYm3+irdy4gbdGZPWs8nZN99IrE+XfQAR3jJ4J8EuHRdmlzxlHcXdDZ7aWZfk3fYFZPwkQKIultUDEMrjN9WGOsj+jg4pRX0y7Vs34oZv7aN61TZE8KSjWM/p/s8e7vf92KKu4SAs5qSasxr8c9xRd59lWQeFTLoAseUIyHD2x8sBSZKWKsUzAIE0fmMjigOcQ+wDDsNxG7zCNryT/UI1ODu2FUSNxV+B/YBu+gACr1tETkB94rZEZEMxgpuyWvswZEq1Nl1i30E7IHvt7gECWbSJfQbkcycgnJ08fhKF5E5JUFE4Bvx+TIYSJjnoGNQRGytONJlgY9BsH1K4CptbgHrWaUAK2XBKjQIt/Csn7eEsvb8vGo0x9MyOoY5Jte28l1TSwITRTWGqcFtZ1j8OTrVQKPtdasrG7bZQQjvaBchBergZh0iheywJhWitpsCGcQXxtJiTtgCS/zM+hj16OpSNgKz7Zp1QrjAF1cc214C8CAwIeHBqp4/+SD1SqT/noEXE8GKx4XBnWXR7nbpAqqT1QLhOWJIMO43Tb1BeewKQQ/hoMSDYQ+RY939BG7/B14WefxGseQJAIGMrwQYh/QFRHBHUPf6c/wSQSf10FZIdPxhwv1s838HWGOMJq+4tFAK14ZQtOYDtHLfSGOngg6DyAJBm7IkK6xZ6u7+1sSyv62iojDEMyF7XvOkaQ6SR0PyM8wMasfUFhN1NnEdkwxIeIDUrhGpDBrojNPaAbqGAI0dpUEdp8dXsMwnqB21eC8gkDIiO4xz9GoJ6Y6KEs9PDLMX6rroACSgdY867mvws1QNFsKhNCjMuAqRu9QkgDyFAxgPbcj1pSyBgW5zy/oo2tVuc3kU7IBEpnW11xEVXMwrTfoyCS/sOxaKNRLDrbUsqqUl2ogqqd+OQqlXoGD3c33QOIPiJcQsgDw9NOx3+OhA8sGVQlrUaI+M4/ASnArjDg8+AkNFXdIHR5uY07ceQyYejIcUnMAnBI/tvFSz1FS2rCQj38BtzQT7x/EB7G93G+GxAJg0W6wASON8FxwMzql5V+aHdFtlj96SHtjBvd8aAdAuM4smgs39muw/HANIeLyyoYgdLPmt9RU9RCAGScYgh1932gqYeOZDOAiTke3MAGYTDT5NY97MNt70w88EFjY/n91rRFIJKw4W9QXoAQg31+LpXr0K9H8tiCmnzv0phBjqQ5sP+gOShSnYNyEPIKUHpA7EBRJrvhbkKZWSzzCsuBmT/UoDojr2xA0hPGbIXCvl7JyDF+YBwVW8WMjOLwR1yrFCKWlFkcskDKSldgESx9Ng7p20vV2a/NCBFsTf3f4RNkW5A9u9Ih3pmQMJJDAyIVnqLhonB11rk6p1p1Rke6F1jB37/TS04J7PgcN6LsqxMmTttGJCiPyDWvf6cgMQq2DuFAUEre3/cBwAxHZ0TqdTNWgHR3VlOhTyLwm/HKOHVODZ9DYqQIC/a0w16AEJU/lNk25zs621vGZDi2OpepxBD3ELFhQj1noBg6AOjhM33aUDaT6fTXMaIkcCEBuKcick109VesCicFohjqQYGNOOwjtOtp9FjfUCKULNeyV3Q6bwBQCbtgHBLVI7DtzA1ub0DALntA4hUlwzCkUQEpPNsmWv3KAEr61AyxDY7tiqq1rAj//dY31QDX530yjwPYdMJiMgPmX/eCkgHhcgWRlFLfx9jh6Da2wcQcoCAK6kYtwAyaQfENNawK2r07Cw0ILmXQRP0xdtMtQFl5ujbwXKm0t7Du/WiExCHPhIV6qgvpm0nIMUnciKFDc+ikCoAdJ30AWT/ia7EOh6LdkDCLKuwgGiaDyBSiF3Ely0gkXwaZ5ZF1SJthXZry4V0nI2TQzwmDlWEFpLdNrb1BzUeeOwCZB+gjwAgnUJd8lYounos2lPd8p6A8A4UxXh/NstyATmY643l1g2vFlKqEri0FMIuMfWMbF4GNnZD1neQ9KGbFsQtt97FE7me8d3Aa8LgPnzvAHIMLKBGH167xV6AII0UbXvYBKQkQELFBBpe5hJt+cICSKN/M/6/ql/Ahgea5QgtXpziukwkJxvSuTWvdl8eJxDqZJuvzq0MbfdC3uG9j5AncmcQit27EeXhAgh5ixGsvblOLIiHufpJN6nyAQm4D4tWZ1zhpEsDIEvouYh3PHQBciqRpxUQ3XXRvxKPEHF4OTMgWjH2Q+HrXZ2cjUWjgQLdg2pu1RZAuq5ObWvqRIAxxIn6G6p4WS2xOmMFsX6BmfK17zog+zOyoQrHGZLBDevUclG1lNv0bIIZa9Wo4VDNVPNia7qRavzJHNKvuGF3fOvPPM3o7nGTgNdAgq9dbbYt6O4VBOPnGkhffvIeDYA8LCZxrfwQerk7txI6bzvW/N4mpl7s267NKrpMUx3CBUA+0qU0FJ3Z7y/r2zvxKcTJ+s7qtwXyJWIQHGkee/Buz4dwt3tKQpq7Mbl3A/MFsnn+lPu3ZSiB751+OAISezXTzOLgBlm+BK/2ViV5J0bzGNO3yTI4+0wXe5vkoAERO/z5AHHuxmzeNH6vOb633Zi6N4SbOuF6d33ooV+1nO8063Hj91nQcBejzKSC5i76hmEmAkjtykW+UrWw3I26bzevYOy7hSYNCADB+9TlPq7j+dgaO8R0/xcfxdG/m8y5IJ56KrjHPtEbreZ8xUF6+LGDhZGhG5cwEz3nmgzRHM20n4+172cv7a3PgINceX/He4JKBiTXF+Ocg0VhVQymEK+uldWir4O6liX3yEKfUqgEpjOv0cD7xaGqCwHJfiwecD2wvt9B+BkN03GDLyv1pEgWL4yabepFkkR7Go7nAFLozMUDp5KaC132Fw5sLI3FwFL0LZl8nPnq1HLnjAdpWbWlE2+CgRwL7+pUP5Y+4LrmeSo8UUbuNKlRsdxA7jBM5emB1BdCkvnayym7KqDc3N71Uy50YQOFANljBtLASz52L6dSksvPBjkDkM7n8xGOoYwS70M3MuSHAWLeP+IB06LppRndVuNO3SwH+w0Kb5PsRLKwki+aSI77fsXRRaHd83ANOZYjXHjDjs5vxTRWseKQKBY1BTWv2QlJQjeIMxK0CTM9pjhms8fR84nuvoBAuaUepYsNIcP3noGe7CzHnDIjcbSjjogEfdZ4W0jRk2XBEf45p/tK19WFgLi+jLheKsEdI/Oa4aaV1mwOokKGwDCFWyFxRHg55Dz/0TI9nfEEZC4Ay6Od4Qg4aC5auHNUpKLQ6NHaNsoTqWg7g0hsBRVW4Z4ExHHzuU6lsW7cwuUrC09rIlPCVVRz/SPW/2oUBAYA4ubmZrlcVdXqZjr80ToW3scOF7fCBG5u9IT0BPmuSuUvgbrMp3Nhahn/Wv/vQRwNkANNDrOxvuGgJZhQmBrD9Kxb2myzJ3LIs7f1zvVlYMEjuKJYYB80Y0rr25vxLamIwRIwABB47HhUi9GPBwR4BRxNfDuN1Wq1pHHD1+sGtAzcvNlwRpyNFIJc62tK861Ilwh0O5+MBCEd69TFktpHbRxPpkBoogscpcjuntkReKmstCZePPf6lqZo+ywiJAYNgYwt7cX71XSeeRbCi5kert47H05vVpvv211tVMsbvmA3zXKPx82Hj47EIWlD64af8KOKkselxtAm+TmJk/Lj8WiSIjO8Pfam2p6mEL40xibXe2ThcFJWXhkI4MI0Y7pw3josYCHAp25WAsH3yg7egT/WQ1fHUtkLCfjcs/qRi8LZrHZ2Or9+//7rhiBZA5HMhujQybUBiQXMyG9Z3uAy4T/CBT0NuGC8BViKclkL1vGXwuucgltOrTUUShAo+Vzuqi5AvCiE1WdFVvxDMVWwDmv1JiOqF3x/84hVSPgE/BnJQxa+a4xqt5yOXMtl/lIqMBwN/0VgAATmg5OslrDxJTrZ5nohiAfJvZv12ogcwgTVAHLHsbczjk0tbtvNJ4DHHdkgI+p00gaISAs29JxSz0j7ncj/J0SRMn8qrfbKghrZMEPCtgZe6EzkEcBCdmDt6Fh4aIZhQPKnAzIappZGchTrVWheCMkK+NaU2RMthKhjWWmhAxLnZr1w6AXjGZnIktgUYzqNyY0JrTM0cuSaWKQOU/ABsaxN8LNQTLQ6S3RBQju1RFHibk89lYkWBGrTTPRH/PMNkMe2DY/NbjXFC8rMsR2WYUDCTkbV9uswIHBOrGBAnrXcvQ8eEuBcqyXu98xZB3LdrZU51Qp1tBshl5mmklw51eO2L7nTWVAaQuBakWHBu2oX3LMjqhClVtjUT5ouRL8jyS1gGJNusVjfiNqkNxiENFO8UA2h1EoeMJvbmRHpKG+ACYQAydOW37b8OgjIkAWD0bNArO+2LfPasng3C7lhrmvUMpI29C/Uz4BcBBK8JzgnSOKf/IbxNBYmQwNNEGRY+EwXEIe1WeHNDfeNa0eRKsFEAX4ONqkitiKsyvR+I7j8hmvB0yM0s2nHA0hnPcwcOTubBgHBVl9ZUCyEAFGjkWoBZDqznn4t1lsgqYQKcNA63tfJqNpsHXJZTB9RmIxSsgQIlXeNiBue8ntiNkQfN8wzLSB4E+147BKTKLVIGLkShVaThaaKtWVPuw8Iw3tfXFebmpDsIJCVFukocxHqICAg6oOAjFp+HXwGAnCzno4ERMiImoFY/611cu4yWLLsgkpA9a/NB+TUa8O5gG6V9ITB8VU3cR5wFAYNhZGDxy6aWgoB96BPGVqnJTSILvCSbJEWHlXACWnb7ar6vtlsfv21Ew1azZpNMDTmcYpw+U9oM1O60rNp3YV/DblnVi65gIDOX62nwxHLdoiNIYlsOuf36/fff/9eVScWAp/8J4kdtPOBMSLousV5Xo/CKFrr48zgYQGhFsML08/GSAyjRYm4QLnlSO3t5vQMew3UedGKJJ7I+li1bO5lnpGsD5x5WH+ahwCZjbI8AAgKAjAyUC1X5EGYLp9lIbQYETtEJqickc6cOZ59raCy9mnxMIDogPIXkhmWMOZzo9Fqya3pYvtMUAgeoPOmigh4hmo+2gXL5s4D9y9DgGQjmNy7LA8A8tiks5wAgXeiJT5ELTVr1XwvG5sNCRNiXWSiDI05jxfbsD1Dl8DPxDaTL0YzDcgddqf/tzgEkUeJHmU1WkdcbJ4RC6HzW1R7yHhEqwvU41+BQrKQrzwACPwe6Hba5HAq+HlwdU/5UCK3580CQ+BmVz3nitj7shaVeehGXST+U4pN4yifBAg7/MXeY72WuNSjpgsHi227tHgiw0K1hKyuiKxHpJlhfYPTOZ63/2oSDhDIcrkeBQDBRTRiLIq1quoD6uW4YSNyIyy7pMgFkGwYEyIUazg6ESDWoV0tgQChJAzWa5UoUsYGcoT3h/cvgYVhWPJCgmOLx3c1rW8wBtWm0/U6BMgNGAEhpPAbw8aDyBIk3c4w+/IR4kO7Z16gYLIi33FtoMcbj/l7950MCPvbMs3YjANkfaMJo6peCAtDIJoUSecnVX9ZB4S64OEJSZuSBQj/+2rd4Fm480ACdTGSz2fCs6rfLGOZLpYvQf3V1pqN7uCtrZlmCIhibUrsvUdNShqLTbV5STAYkBWZl/RG8a1sd+taJCKnroSofaWN+ASyG9A136UB3gQ+jVnNTQlqrpHhyLjwDOMRvnl2EtHHeRO2hRs7Gz2SO5YFuJYYljA21UtjYc3bSqZouNhH/1xTrHFB2mpaF+lD3koIp4R4E2g7dURQqbKmuWUsL7faCs/1xo4WnhOhZ5m4lPhBjFq7rX4UGGa4Vj4Z7u55zym4RSLwYxqSCCh31iFhsUJlqoZISqZ55Z7h7e4aRoROF0exrYwT5AdPpA7/RgxF12MuBtSqJrvRzIv4uC/rwoIB+RXQ9RHBWFndnYhn+M8HZCp8SnPw3Y8njOD4AIaJs4O5xaO6rTmt0DEV4V+2qAekAeKBnQa12kUEE5uj1a7aXduI1q6Vsd1cywz/L+Q7OPYcBjAYD+JLWSNrhKHCiIqfRqQ4gaHa1hHJGKnrA6QyVsZ1UIbVu6Zm33OLB3hknT9o42TBh528U74RqAGpkHpmI5utoGpC5GoAMZrtVU2LzHQnWmEd1MSWspoE0WedSMRXzUYSGkVEFjOn2AF8Jevq+hCJqs2mur5zAixmKk5aDEgNp6zvIiHX7UXKqlqJ8fK+LkXUSOu3gMhqMSVPovaKTVcfNtdJIdcHyG45S014Vby/cm6Wnr2IiaBWOgOQay8ZFXOutMGxQUSQSHKd2XCzu7rDeJ2AsBEisUNyl6y093RXeQZ8nvrCuaqZL7kDCDyWIyCc+IbJzdenZ0XXSR+46xjPkRwoGy/whIuwJNffAaxr7Zb85F60vKKkC8jTwcS3jKOE1RsgPQQIGNacjjqTpJvKYvXR0V7RnPCd5pWXTFQDZCdpVjNKfJtT/v+H6g2QE2O7u6WgkaSkrdxcLgDEVWxRMkNCrLun2z+WM8u08lrKFTp3JfNtiB4jDBxWb4B0e7RAU4JSKhu+cbmK70AkkV2LKiFkTvyD00QrVz7Z2Cr4767NOoyuUoDohDT0H/zmnWDKhci9bJ76Cd8ggRmuhlrYsv4GgwnGJ6/LGLlGQFY3EQbTqlBmHbAz61FJR7OAQwq129IyrcyX+uyu+4UjRlijEy3fADnp+LVhyoZ4QSXLZv9OQxxnu4NCLJP7A4AELHIdMdJxmDdATgn2f7VULKyMJS5Fec3kbdTSpsZYQW9WS2b7ptrs3iz1frGRlr/8jiIkswH2sAcdI8ImDRUtlXauVF2bF+9aKaQ1IftWNloCuuG8HUJkZD6I1sZrWeHrAoRcKiQcdMCqavvgcipNU9ASuUa37n8EIOBCn3FCNoZguzTWbQWCfZ5xqlnZnUf9BsjToiQ5C4ZZZwiWUu/EqZU+Zx71GyCe+sQ6FtIH4NFpQDAic3brDl8PibwyCiGRjuU1p/BgXzvTiFSDVG+AvIhIp3J3xqM6mQ7JFTmYEvxaSCR6TQyLYlOs7/ZxeHCEEBChCwJfiaL1egAB/xNkamVUfohZJpteJAURQir0azq03gB5cpUYmBapRNh7BvqwRgqLEVKkqteBSPRq5DmZeiMTYe8rdipK/oFRvg5EolcjP26xxKoWYe8F5IoSG7jZzvUjEr0e+nh8LOsR9j5ffc+lnVReuV5dPSLR69B3waR4pKJsbmtx5reRSLAVGTaZvHbt9xUAUv3OeAgc559x0AewZg1rLhGRbfUGyBPZFRR3UMVErWD1rGdUnNdApW/VGyBPcigup7NA/fDZReNcbWuShN8AeUIOisDxlOAeRWtX1GTpqpWt6BXgwaXru39Vz9BaASFZRFesbF09y1pGC+4k8CwdbrBPDyQZXTEiVw/I6kQfugs0rhUkfb2xrCcqWs/7sCuOjfwvtESgLgQy6IcAAAAASUVORK5CYII=) center/contain no-repeat;
+  opacity:.92;
+}
+@media (max-height:700px){ .home-logo{display:none;} }
+/* The 9-12 self sign-out: an exception, and it should look like one. Red
+   throughout rather than a red edge, so it is never the button you hit by
+   habit — the front desk has to confirm a parent before the student leaves. */
+.role-btn.danger{
+  border-color:var(--hcs-red);border-left-color:var(--hcs-red);
+  background:var(--hcs-red-soft);
+}
+.role-btn.danger .role-title{color:var(--hcs-red);}
+.role-btn.danger .role-desc{color:var(--hcs-red);opacity:.85;}
+.role-btn .role-title{font-size:1.5rem;font-weight:800;color:var(--hcs-ink);line-height:1.15;}
+.role-btn .role-desc{font-size:1rem;font-weight:600;color:var(--hcs-muted);line-height:1.35;}
+
+/* two-line rows in the "coming back" picker (reuses .result-btn) */
+.result-btn .rb-col{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;}
+.result-btn .rb-sub{font-size:.92rem;font-weight:600;color:var(--hcs-muted);line-height:1.3;}
+
+@media (max-height:620px){
+  .role-btn{min-height:84px;padding:12px 18px;}
+  .role-btn .role-title{font-size:1.3rem;}
+}
+</style>
 <!-- ===== Showcase demo shim (standalone build) ===== -->
 <link rel="stylesheet" href="../../assets/demo-banner.css">
 <script>window.DEMO_META = { name: "Campus Presence — Kiosk" };</script>
@@ -318,15 +386,75 @@ input{-webkit-user-select:text;user-select:text;}
 
 <main class="kiosk-main" id="kioskMain"><div class="kiosk-col">
 
-  <!-- ============ HOME ============ -->
+  <!-- ============ HOME — role first, then "what do you need?" ============ -->
   <section class="kiosk-screen is-active" id="scr-home">
     <h1 class="kiosk-h1">Welcome</h1>
-    <p class="kiosk-sub">Tap what you need to do.</p>
-    <div class="home-grid">
-      <button type="button" class="home-btn" data-action="start" data-flow="vin">Visitor<span>Sign In</span><span class="dir">I just arrived</span></button>
-      <button type="button" class="home-btn out" data-action="start" data-flow="vout">Visitor<span>Sign Out</span><span class="dir">I&rsquo;m leaving</span></button>
-      <button type="button" class="home-btn" data-action="start" data-flow="sin">Student<span>Sign In</span><span class="dir">Late arrival or return</span></button>
-      <button type="button" class="home-btn out" data-action="start" data-flow="sout">Student<span>Sign Out</span><span class="dir">Early dismissal</span></button>
+    <p class="kiosk-sub">Who are you?</p>
+    <div class="role-grid">
+      <button type="button" class="role-btn role-student" data-action="role" data-role="student">
+        <span class="role-title">I&rsquo;m a Student</span>
+        <span class="role-desc">Arriving late, leaving early, or moving between buildings</span>
+      </button>
+      <button type="button" class="role-btn role-parent" data-action="role" data-role="parent">
+        <span class="role-title">I&rsquo;m a Parent</span>
+        <span class="role-desc">Dropping off or picking up my student</span>
+      </button>
+      <button type="button" class="role-btn role-visitor" data-action="role" data-role="visitor">
+        <span class="role-title">I&rsquo;m a Visitor</span>
+        <span class="role-desc">Here to visit, deliver, or volunteer &mdash; you&rsquo;ll get a badge</span>
+      </button>
+    </div>
+    <div class="home-logo" role="img" aria-label="Harford Christian School Eagles"></div>
+  </section>
+
+  <!-- Students identify themselves FIRST (straight to the shared search), and
+       this menu is built from the server's answer for that ONE student, so
+       nobody is offered a flow they aren't eligible for. Work Release in
+       particular is never rendered unless the student is on the list — the
+       roster itself never leaves the server (op: studentOptions). -->
+  <section class="kiosk-screen" id="scr-student-menu">
+    <h1 class="kiosk-h1">What do you need?</h1>
+    <p class="kiosk-sub">Signing in as <b id="stuMenuWho">&hellip;</b> &mdash; tap Back if that isn&rsquo;t you.</p>
+    <div class="role-grid" id="stuMenuBtns"></div>
+    <div class="kp-error warn" id="stuMenuHint"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back grow" data-action="back" data-target="search">Back</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-role-parent">
+    <h1 class="kiosk-h1">What do you need?</h1>
+    <p class="kiosk-sub">Tap the one that fits.</p>
+    <div class="role-grid">
+      <button type="button" class="role-btn" data-action="need" data-need="dropoff">
+        <span class="role-title">Dropping my student off</span>
+        <span class="role-desc">A late arrival, or back from an appointment</span>
+      </button>
+      <button type="button" class="role-btn out" data-action="need" data-need="pickup">
+        <span class="role-title">Picking my student up</span>
+        <span class="role-desc">Early dismissal &mdash; we&rsquo;ll check the authorized list</span>
+      </button>
+    </div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back grow" data-action="back" data-target="home">Back</button>
+    </div>
+  </section>
+
+  <section class="kiosk-screen" id="scr-role-visitor">
+    <h1 class="kiosk-h1">What do you need?</h1>
+    <p class="kiosk-sub">Tap the one that fits.</p>
+    <div class="role-grid">
+      <button type="button" class="role-btn" data-action="need" data-need="vin">
+        <span class="role-title">Signing in</span>
+        <span class="role-desc">I just arrived &mdash; I&rsquo;ll take a badge</span>
+      </button>
+      <button type="button" class="role-btn out" data-action="need" data-need="vout">
+        <span class="role-title">Signing out</span>
+        <span class="role-desc">I&rsquo;m leaving &mdash; I&rsquo;ll return my badge</span>
+      </button>
+    </div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back grow" data-action="back" data-target="home">Back</button>
     </div>
   </section>
 
@@ -440,27 +568,94 @@ input{-webkit-user-select:text;user-select:text;}
   <!-- ============ STUDENT OUT (one completion screen) ============ -->
   <section class="kiosk-screen" id="scr-sout-form">
     <h1 class="kiosk-h1" id="soutTitle">Early dismissal</h1>
-    <p class="kiosk-sub">Type <b>your own</b> first and last name. For student safety the authorized pickup list is never shown.</p>
-    <label class="section-label" for="soutName">Your name</label>
-    <input id="soutName" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Your first and last name">
-    <div class="section-label">Relationship</div>
-    <div class="choice-grid" id="soutRelGrid"></div>
-    <div class="section-label">Reason</div>
-    <div class="choice-grid" id="soutReasons"></div>
-    <div class="section-label">Returning today?</div>
-    <div class="choice-grid" id="soutReturning">
-      <button type="button" class="choice" data-ret="yes">Yes, back later today</button>
-      <button type="button" class="choice" data-ret="no">No, gone for the day</button>
-    </div>
-    <div class="kp-error" id="soutErr"></div>
-    <div class="nav-row">
-      <button type="button" class="btn btn-back" data-action="back" data-target="search">Back</button>
-      <button type="button" class="btn btn-hcs grow" data-action="soutComplete">Complete sign-out</button>
+    <p class="kiosk-sub hidden" id="soutSelfSub"></p>
+    <div id="soutPickupWrap">
+      <!-- Called ahead this morning? The office already took the details, so the
+           screen hands them BACK rather than asking a second time. The caller's
+           name is never shown: it is the exact string that passes the pickup
+           check, so the adult still types their own and the check still runs. -->
+      <div class="plan-note hidden" id="soutPlanned"></div>
+      <div class="hidden" id="soutSibsWrap">
+        <div class="section-label">Also collecting — tap a name to leave them out</div>
+        <div class="choice-grid" id="soutSibs"></div>
+      </div>
+      <p class="kiosk-sub">Type <b>your own</b> first and last name. For student safety the authorized pickup list is never shown.</p>
+      <label class="section-label" for="soutName">Your name</label>
+      <input id="soutName" class="form-control big-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false" placeholder="Your first and last name">
+      <div class="section-label">Relationship</div>
+      <div class="choice-grid" id="soutRelGrid"></div>
+      <div class="section-label">Reason</div>
+      <div class="choice-grid" id="soutReasons"></div>
+      <div class="section-label">Returning today?</div>
+      <div class="choice-grid" id="soutReturning">
+        <button type="button" class="choice" data-ret="yes">Yes, back later today</button>
+        <button type="button" class="choice" data-ret="no">No, gone for the day</button>
+      </div>
+      <div class="kp-error" id="soutErr"></div>
+      <div class="nav-row">
+        <button type="button" class="btn btn-back" data-action="back" data-target="search">Back</button>
+        <button type="button" class="btn btn-hcs grow" data-action="soutComplete">Complete sign-out</button>
+      </div>
     </div>
     <div id="soutWrWrap" class="wr-wrap hidden">
-      <div class="divider-label">Student with Work Release?</div>
+      <div class="divider-label" id="soutWrLabel">Student with Work Release?</div>
       <button type="button" class="btn btn-plain w-100" data-action="soutWorkRelease">Work-Release self sign-out</button>
       <div class="kp-error warn" id="soutWrErr"></div>
+    </div>
+    <div class="nav-row hidden" id="soutSelfNav">
+      <button type="button" class="btn btn-back grow" data-action="stuBack">Back</button>
+    </div>
+  </section>
+
+  <!-- ============ BETWEEN BUILDINGS — out ============ -->
+  <!-- NOT a departure: no pickup check, no flag, never the "see office staff"
+       screen. A student walking to another building UNESCORTED signs out here
+       and back in on return (policy: Coreen Forloine, 2026-09-08). -->
+  <section class="kiosk-screen" id="scr-mv-dest">
+    <h1 class="kiosk-h1">Where are you going?</h1>
+    <p class="kiosk-sub" id="mvDestSub">&hellip;</p>
+    <div class="choice-grid" id="mvBuildings"></div>
+    <div class="kp-error" id="mvDestErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back grow" data-action="stuBack">Back</button>
+    </div>
+  </section>
+
+  <!-- The reason IS the last tap: students don't know when they'll be back, and
+       the return leg timestamps itself when they sign in again (Josh,
+       2026-09-09 — we no longer ask for an expected return time). -->
+  <section class="kiosk-screen" id="scr-mv-reason">
+    <h1 class="kiosk-h1">Why are you going?</h1>
+    <p class="kiosk-sub" id="mvReasonSub">&hellip;</p>
+    <div class="choice-grid" id="mvReasons"></div>
+    <div class="kp-error" id="mvReasonErr"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back grow" data-action="mvReasonBack">Back</button>
+    </div>
+  </section>
+
+  <!-- ============ BETWEEN BUILDINGS — back ============ -->
+  <section class="kiosk-screen" id="scr-mv-back">
+    <h1 class="kiosk-h1">Coming back</h1>
+    <p class="kiosk-sub">Tap your name to sign back into your building.</p>
+    <div class="results" id="mvBackList"></div>
+    <div class="results-hint" id="mvBackHint"></div>
+    <div class="nav-row">
+      <button type="button" class="btn btn-back" data-action="back" data-target="home">Cancel</button>
+      <button type="button" class="btn btn-plain grow" data-action="mvBackSearch">Find my name instead</button>
+    </div>
+  </section>
+
+  <!-- calm redirect: a younger student needs the grown-up with them -->
+  <section class="kiosk-screen" id="scr-need-adult">
+    <div class="info-card">
+      <div class="info-ico">i</div>
+      <h2 class="info-title" id="needAdultTitle">An adult needs to sign in a younger student</h2>
+      <p class="info-text" id="needAdultText"></p>
+      <button type="button" class="btn btn-hcs info-ok" id="needAdultBtn" data-action="needAdultParent">I&rsquo;m the grown-up &mdash; continue</button>
+      <div class="nav-row">
+        <button type="button" class="btn btn-back grow" data-action="goHome">Cancel</button>
+      </div>
     </div>
   </section>
 
@@ -543,7 +738,7 @@ input{-webkit-user-select:text;user-select:text;}
 'use strict';
 // Template globals — Router.js validated station+key BEFORE rendering; every
 // kioskApi call re-sends them and the server re-validates (throws DENIED).
-var STATION = (new URLSearchParams(location.search).get('station') === 'el' ? 'el' : 'hs'); // doGet reads ?station= the same way; the demo shim's google.script.url is always empty
+var STATION = (function () { var s = new URLSearchParams(location.search).get('station'); return (s === 'el' || s === 'kg') ? s : 'hs'; })(); // doGet reads ?station= the same way; the demo shim's google.script.url is always empty
 var URL_KEY = 'demo-device-key'; // production: the per-device key from Script Properties, re-checked on every call
 </script>
 
@@ -577,10 +772,33 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
 
   var STATION_INFO = {
     hs: { label: 'HS Office', brand: 'HS', building: 'High School' },
-    el: { label: 'EL Entrance', brand: 'EL', building: 'Elementary' }
+    el: { label: 'EL Entrance', brand: 'EL', building: 'Elementary' },
+    kg: { label: 'Kindergarten', brand: 'KG', building: 'Kindergarten' }
   };
-  var ST = STATION_INFO[STATION] || { label: 'Front Office', brand: 'CP', building: 'Other' };
+  // The fallback used to hand out building:'Other', which is a LEGAL value — so an unlisted station
+  // would record every visitor into a bogus building, silently, forever (2026-09-16). The server
+  // already refuses an unknown station, so reaching this means a station was added to Config.js and
+  // not here: say so on the page rather than writing wrong data.
+  var ST = STATION_INFO[STATION] ||
+    { label: 'Station not configured', brand: '?', building: '', unconfigured: true };
   var RELATIONSHIPS = ['Mother', 'Father', 'Grandparent', 'Other'];
+  // Only used if a DB Settings tab predates 'movement.reasons' (schema default
+  // is the same list) — an empty grid would dead-end the flow.
+  var MOVE_REASONS_FALLBACK = ['Music lesson', 'ELC services', 'Teacher’s Aide', 'Office errand', 'Other'];
+  // Destinations that answer "why?" by themselves — picking one records this
+  // Reason and submits immediately, with no reason screen in between.
+  var IMPLIED_REASON = { 'Nurse': 'Nurse visit' };
+
+  // What the shared search screen says, per role-first intent.
+  var SEARCH_COPY = {
+    'student-menu':     { title: 'I’m a Student',                  sub: 'Find your name first. ' },
+    'student-late':     { title: 'Arriving late',                  sub: 'Find your name. ' },
+    'student-earlyout': { title: 'Leaving early',                  sub: 'Find your name. ' },
+    'movement-out':     { title: 'Moving to another building',     sub: 'Find your name. ' },
+    'movement-back':    { title: 'Coming back to my building',     sub: 'Find your name. ' },
+    'parent-dropoff':   { title: 'Dropping my student off',        sub: 'Find your student. ' },
+    'parent-pickup':    { title: 'Picking my student up',          sub: 'Find your student. ' }
+  };
 
   // ====================================================================
   // state
@@ -594,7 +812,13 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
   function resetFlow(keepGuardian) {
     var g = (keepGuardian && flow) ? flow.guardian : { name: '', relationship: '' };
     flow = {
-      searchMode: 'in',                                        // 'in' | 'out'
+      // What the person told us they are here to do (home screen = role, then
+      // "what do you need?"). Every downstream screen routes off this.
+      intent: '',              // student-menu | student-late | student-earlyout |
+                               // movement-out | movement-back | parent-dropoff | parent-pickup
+      options: null,           // studentOptions answer — booleans only, one student
+      searchMode: 'in',        // 'in' | 'out' | 'student' | 'moveback' (Back target only)
+      needKind: 'in',          // which redirect the need-adult screen offers
       visitor: { name: '', org: '', reason: '', reasonOther: '', building: '' },
       voutPick: null,                                          // {visitKey, name, badge}
       student: null,                                           // {id, name, grade, parentDriven} — never more
@@ -602,7 +826,10 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
       guardianKept: !!keepGuardian,
       forceGuardian: false,                                    // server said guardian-required
       sinReason: '',                                           // retained across a guardian-required retry
-      sout: { relationship: '', reason: '', returning: null }
+      sout: { relationship: '', reason: '', returning: null },
+      plan: null,              // plannedFor answer — reason/time/siblings, never a caller name
+      sibs: [],                // sibling ids currently ticked for a family collection
+      move: { to: '', reason: '' }  // between buildings (no return time asked)
     };
   }
   resetFlow(false);
@@ -632,6 +859,7 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     clearSearch();
     clearSinInputs();
     clearSoutInputs();
+    clearMoveInputs();
     vinPad.clear();
     voutPad.clear();
     go('home');
@@ -815,6 +1043,15 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
   // ====================================================================
   // choice grids + keypads
   // ====================================================================
+  // A destination or two reads faster with a glyph than as words. The SVG adds
+  // no text of its own, so the pill's textContent stays the bare label and
+  // setChoiceSelected() keeps matching.
+  var CHOICE_ICONS = {
+    'Nurse': '<span class="ch-ico" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24" width="26" height="26" focusable="false">' +
+      '<path fill="#c1272d" d="M9.4 2h5.2v7.4H22v5h-7.4V22H9.4v-7.6H2v-5h7.4z"/></svg></span>'
+  };
+
   function buildChoices(containerId, values, onPick) {
     var box = $(containerId);
     box.innerHTML = '';
@@ -823,7 +1060,8 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'choice';
-        b.textContent = v;
+        if (CHOICE_ICONS[v]) b.innerHTML = CHOICE_ICONS[v] + '<span>' + esc(v) + '</span>';
+        else b.textContent = v;
         b.addEventListener('click', function () {
           var all = box.querySelectorAll('.choice');
           for (var j = 0; j < all.length; j++) all[j].classList.remove('selected');
@@ -902,6 +1140,18 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     $('soutName').value = ''; $('soutErr').textContent = ''; $('soutWrErr').textContent = '';
     clearChoiceSelection('soutRelGrid'); clearChoiceSelection('soutReasons');
     clearChoiceSelection('soutReturning');
+    clearPlanBanner();
+  }
+  function clearPlanBanner() {
+    $('soutPlanned').classList.add('hidden');
+    $('soutPlanned').innerHTML = '';
+    $('soutSibsWrap').classList.add('hidden');
+    $('soutSibs').innerHTML = '';
+  }
+  function clearMoveInputs() {
+    $('mvDestErr').textContent = ''; $('mvReasonErr').textContent = '';
+    clearChoiceSelection('mvBuildings'); clearChoiceSelection('mvReasons');
+    $('mvBackList').innerHTML = ''; $('mvBackHint').textContent = '';
   }
 
   // ====================================================================
@@ -1033,10 +1283,10 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
   function enterSearch(mode) {
     flow.searchMode = mode;
     flow.student = null;
-    $('searchTitle').textContent = mode === 'in' ? 'Student Sign In' : 'Student Sign Out';
-    $('searchSub').textContent = (mode === 'in'
-      ? 'Late arrival or returning from an appointment. '
-      : 'Early dismissal. ') + 'Type at least 3 letters of the student’s name, then tap it.';
+    flow.options = null;   // any new search invalidates the previous menu
+    var copy = SEARCH_COPY[flow.intent] || { title: 'Find the student', sub: '' };
+    $('searchTitle').textContent = copy.title;
+    $('searchSub').textContent = copy.sub + 'Type at least 3 letters of the student’s name, then tap it.';
     clearSearch();
     go('search');
     $('searchInput').focus();
@@ -1077,16 +1327,31 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     // is derived here from the boundary delivered at bootstrap (the server keeps
     // enforcing the guardian requirement in lateIn regardless).
     flow.student = { id: r.id, name: r.name, grade: r.grade, parentDriven: studentIsParentDriven(r.grade) };
-    if (flow.searchMode === 'out') { enterSoutForm(); return; }
+
+    // A student identified themselves — ask the server what THIS student may do
+    // and build the menu from the answer (never offer a flow they'd be denied).
+    if (flow.intent === 'student-menu') { fetchStudentOptions(); return; }
+
+    if (flow.intent === 'movement-out') { enterMvDest(); return; }
+    if (flow.intent === 'movement-back') { submitMovementBack(flow.student.id); return; }
+
+    if (flow.intent === 'parent-pickup') { enterSoutForm(); return; }
+    if (flow.intent === 'student-earlyout') {
+      // Only Work Release lets a student sign themselves off campus, and that
+      // starts at grade 7 — a younger student needs the grown-up with them.
+      if (flow.student.parentDriven) { showNeedAdult('out'); return; }
+      enterSoutForm();
+      return;
+    }
+
     // sign IN — the server auto-detects an open early-out and converts to return-in
-    if (flow.student.parentDriven) {
+    if (flow.intent === 'student-late' && flow.student.parentDriven) {
+      showNeedAdult('in');   // friendly hand-off to "I'm a Parent" — never a dead end
+      return;
+    }
+    if (flow.intent === 'parent-dropoff' || flow.student.parentDriven) {
       if (flow.guardianKept && flow.guardian.name) { enterSinReason(); return; }
-      $('sinAdultSub').textContent = 'Signing in ' + displayStudent(r.name, r.grade) + '.';
-      $('sinAdultName').value = flow.guardian.name || '';
-      $('sinAdultErr').textContent = '';
-      clearChoiceSelection('sinRelGrid');
-      go('sin-adult');
-      if (!flow.guardian.name) $('sinAdultName').focus();
+      enterSinAdult();
     } else {
       flow.guardian = { name: '', relationship: '' };
       enterSinReason();
@@ -1094,8 +1359,273 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
   }
 
   // ====================================================================
+  // PER-STUDENT MENU — identify first, then show only what applies.
+  // Josh, 2026-09-08: "Leaving early" is Work Release only; offering it to all
+  // 656 students and denying 644 of them is worse than not offering it. The
+  // server answers with BOOLEANS for one student (op: studentOptions,
+  // rate-limited 30/min per station) — the Work Release roster never leaves the
+  // server and nothing is cached client-side. Narrowing the menu is UX; the
+  // real gates still live in earlyOut (denied:'workrelease') and lateIn
+  // (error:'guardian-required').
+  // ====================================================================
+  function fetchStudentOptions() {
+    var s = flow.student;
+    if (!s) return;
+    submitCall({ op: 'studentOptions', studentId: s.id }, function (res) {
+      if (res && res.ok) { enterStudentMenu(res); return; }
+      if (res && res.reason === 'limited') {
+        // Stay on the search screen — nothing was recorded, they can just re-tap.
+        $('searchHint').textContent = 'One moment — please pause a few seconds, then tap your name again.';
+        return;
+      }
+      showSplash({
+        warn: true,
+        title: 'That didn’t work',
+        sub: 'We couldn’t load your options — please try again, or see the office.',
+        autoMs: 4000
+      });
+    });
+  }
+
+  /** One big role-style button (title + description) wired to a callback. */
+  function addMenuButton(box, item) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'role-btn' + (item.out ? ' out' : '') + (item.danger ? ' danger' : '');
+    var t = document.createElement('span');
+    t.className = 'role-title';
+    t.textContent = item.title;
+    var d = document.createElement('span');
+    d.className = 'role-desc';
+    d.textContent = item.desc;
+    b.appendChild(t);
+    b.appendChild(d);
+    b.addEventListener('click', function () { if (!submitting && !DEAD) item.cb(); });
+    box.appendChild(b);
+  }
+
+  function enterStudentMenu(o) {
+    var s = flow.student;
+    flow.options = o;
+    // The server re-read the roster, so trust its name/grade/boundary over ours.
+    if (o.name) s.name = o.name;
+    if (o.grade) s.grade = o.grade;
+    s.parentDriven = !!o.parentDriven;
+
+    $('stuMenuWho').textContent = displayStudent(s.name, s.grade);
+    $('stuMenuHint').textContent = o.parentDriven
+      ? 'A grown-up has to sign you in or out — but you can still sign yourself between buildings.'
+      : '';
+
+    var box = $('stuMenuBtns');
+    box.innerHTML = '';
+
+    // Already out between buildings → coming back is the likely tap, so first.
+    if (o.currentlyOut) {
+      addMenuButton(box, {
+        title: 'Coming back to my building',
+        desc: 'You’re at ' + (o.outTo === 'Nurse' ? 'the Nurse' : (o.outTo || 'another building')) +
+          (o.expectedBack ? ', due back ' + o.expectedBack : '') + '.',
+        cb: function () { flow.intent = 'movement-back'; submitMovementBack(s.id); }
+      });
+    }
+
+    if (o.parentDriven) {
+      // No late-arrival button for a younger student: route to the friendly
+      // hand-off screen that carries them into the parent flow instead.
+      addMenuButton(box, {
+        title: 'An adult needs to sign me in',
+        desc: 'Bring the grown-up with you — they can finish it right here.',
+        cb: function () { showNeedAdult('in'); }
+      });
+    } else if (o.offCampus) {
+      // Signed out earlier today — lateIn converts this to a return-in.
+      addMenuButton(box, {
+        title: 'Coming back from an appointment',
+        desc: 'You were signed out earlier today — this signs you back in.',
+        cb: studentLateFromMenu
+      });
+    } else {
+      addMenuButton(box, {
+        title: 'Arriving late',
+        desc: 'You got to school after the bell.',
+        cb: studentLateFromMenu
+      });
+    }
+
+    if (!o.currentlyOut) {
+      addMenuButton(box, {
+        title: 'Moving to another building',
+        desc: 'Walking over on your own — lesson, ELC, Teacher’s Aide, errand.',
+        cb: function () { flow.intent = 'movement-out'; enterMvDest(); }
+      });
+    }
+
+    // Part-time students: arriving and leaving mid-day IS their timetable, so
+    // they get their own two buttons and neither is treated as an exception.
+    if (o.homeschool) {
+      if (o.offCampus) {
+        addMenuButton(box, {
+          title: 'Homeschool Sign-In',
+          desc: 'Arriving for your class — this signs you in.',
+          cb: function () { submitHomeschool('in'); }
+        });
+      } else {
+        addMenuButton(box, {
+          title: 'Homeschool Sign-Out',
+          desc: 'Finished for today — this signs you out.',
+          cb: function () { submitHomeschool('out'); }
+        });
+        addMenuButton(box, {
+          title: 'Homeschool Sign-In',
+          desc: 'Arriving for a class later in the day.',
+          cb: function () { submitHomeschool('in'); }
+        });
+      }
+    }
+
+    // ONLY for students actually on the Work Release list.
+    if (o.workRelease) {
+      // REVERSE SCHEDULE (Fridays): the seniors come in late instead of leaving
+      // early, and their homeroom teacher has already marked them absent. This
+      // is an approved ARRIVAL — it stamps the time, puts them back to present
+      // in FACTS, and shows them on campus on the board. Offered whenever they
+      // have not arrived yet, so no day of the week is hard-coded.
+      if (!o.arrivedToday) {
+        addMenuButton(box, {
+          title: 'Arriving (Work Release)',
+          desc: 'Reverse schedule — this signs you in and marks you present.',
+          cb: function () { submitWorkReleaseArrival(); }
+        });
+      }
+      addMenuButton(box, {
+        title: 'Leaving early (Work Release)',
+        desc: 'Sign yourself out for your shift.',
+        out: true,
+        cb: function () { flow.intent = 'student-earlyout'; enterSoutForm(); }
+      });
+    }
+
+    // EXCEPTION path, HS desk only, grades 9-12: the student signs themselves
+    // out and the front desk is alerted to confirm a parent is on campus. Red,
+    // and last in the list, because it should never be the obvious choice.
+    if (o.selfSignOut && !o.offCampus) {
+      addMenuButton(box, {
+        title: 'Sign myself out',
+        desc: 'Only if a parent is here for you. The front desk will check.',
+        danger: true,
+        cb: function () { submitSelfSignOut(); }
+      });
+    }
+
+    go('student-menu');
+  }
+
+  /** Part-time arrival/departure — one tap, no reason, no pickup check. */
+  function submitHomeschool(direction) {
+    var s = flow.student;
+    if (!s) return;
+    var call = (direction === 'in')
+      ? { op: 'lateIn', studentId: s.id, reason: 'Homeschool' }
+      : { op: 'earlyOut', studentId: s.id, mode: 'homeschool' };
+    submitCall(call, function (res) {
+      if (res && res.ok) {
+        showSplash({
+          title: direction === 'in'
+            ? 'Welcome, ' + firstNameOf(s.name) + '!'
+            : firstNameOf(s.name) + ' is signed out',
+          sub: direction === 'in' ? 'You’re signed in. Have a good class.'
+                                  : 'See you next time.',
+          autoMs: 3000
+        });
+        return;
+      }
+      showSplash({ warn: true, title: 'That didn’t save',
+        sub: 'Please see the front desk.', autoMs: 4000 });
+    });
+  }
+
+  /** Reverse-schedule arrival for a Work Release senior. One tap, no reason. */
+  function submitWorkReleaseArrival() {
+    var s = flow.student;
+    if (!s) return;
+    submitCall({ op: 'lateIn', studentId: s.id, reason: 'Work Release' }, function (res) {
+      if (res && res.ok) {
+        showSplash({
+          title: 'Welcome, ' + firstNameOf(s.name) + '!',
+          sub: 'You’re signed in and marked present.',
+          autoMs: 3000
+        });
+        return;
+      }
+      showSplash({ warn: true, title: 'That didn’t save',
+        sub: 'Please see the front desk.', autoMs: 4000 });
+    });
+  }
+
+  /** The 9-12 exception path. The office confirms the parent, not the kiosk. */
+  function submitSelfSignOut() {
+    var s = flow.student;
+    if (!s) return;
+    submitCall({ op: 'earlyOut', studentId: s.id, mode: 'self' }, function (res) {
+      if (res && res.ok) {
+        kioskAlertTone();          // the iPad half of the ding; the board does the rest
+        showSplash({
+          title: firstNameOf(s.name) + ' is signed out',
+          sub: 'Please wait here — the front desk will confirm your ride.',
+          autoMs: 6000
+        });
+        return;
+      }
+      showSplash({
+        warn: true,
+        title: 'Please see the front desk',
+        sub: (res && res.denied === 'self')
+          ? 'This option is only for grades 9–12 at the high school office.'
+          : 'That didn’t save — please ask the front desk to sign you out.',
+        autoMs: 5000
+      });
+    });
+  }
+
+  function studentLateFromMenu() {
+    flow.intent = 'student-late';
+    flow.guardian = { name: '', relationship: '' };
+    enterSinReason();
+  }
+
+  // ====================================================================
   // STUDENT IN
   // ====================================================================
+  function enterSinAdult() {
+    var s = flow.student;
+    $('sinAdultSub').textContent = 'Signing in ' + displayStudent(s.name, s.grade) + '.';
+    $('sinAdultName').value = flow.guardian.name || '';
+    $('sinAdultErr').textContent = '';
+    clearChoiceSelection('sinRelGrid');
+    go('sin-adult');
+    if (!flow.guardian.name) $('sinAdultName').focus();
+  }
+
+  /**
+   * A younger student tapped a student-only flow. Never dead-end them: name the
+   * boundary, then hand straight over to the parent flow with the student they
+   * already picked, so nobody has to search twice.
+   */
+  function showNeedAdult(kind) {
+    var s = flow.student;
+    if (!s) { goHome(); return; }
+    flow.needKind = (kind === 'out') ? 'out' : 'in';
+    $('needAdultTitle').textContent = flow.needKind === 'out'
+      ? 'An adult needs to sign out a younger student'
+      : 'An adult needs to sign in a younger student';
+    $('needAdultText').textContent = 'Please ask the grown-up with you to tap “I’m a Parent”. ' +
+      'They can finish signing ' + firstNameOf(s.name) + ' ' +
+      (flow.needKind === 'out' ? 'out' : 'in') + ' right here.';
+    $('needAdultBtn').textContent = 'I’m the grown-up — continue';
+    go('need-adult');
+  }
+
   function enterSinReason() {
     var s = flow.student;
     $('sinReasonSub').textContent = flow.guardian.name
@@ -1123,13 +1653,14 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
         var opts = res.welcomeBack
           ? { title: 'Welcome back, ' + first + '!', sub: 'The earlier sign-out has been closed.' }
           : { title: 'You’re signed in — head to class', sub: '' };
-        if ((s.parentDriven || flow.forceGuardian) && flow.guardian.name) {
+        if ((flow.intent === 'parent-dropoff' || s.parentDriven || flow.forceGuardian) && flow.guardian.name) {
           opts.sub = (opts.sub ? opts.sub + '  ' : '') + 'Signing in another child?';
           opts.actions = [
             { label: 'Sign in another child', primary: true, cb: function () {
                 var g = flow.guardian;
                 resetFlow(true);
                 flow.guardian = g;
+                flow.intent = 'parent-dropoff';
                 enterSearch('in');
               } },
             { label: 'Done', cb: goHome }
@@ -1166,7 +1697,10 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
   // ====================================================================
   function enterSoutForm() {
     var s = flow.student;
-    $('soutTitle').textContent = 'Signing out ' + displayStudent(s.name, s.grade);
+    // 'self' = the student tapped "I'm a Student → Leaving early": only the
+    // Work-Release block applies, so the pickup half of this screen is hidden.
+    var self = flow.intent === 'student-earlyout';
+    $('soutTitle').textContent = (self ? 'Leaving early — ' : 'Signing out ') + displayStudent(s.name, s.grade);
     $('soutName').value = '';
     $('soutErr').textContent = '';
     $('soutWrErr').textContent = '';
@@ -1174,9 +1708,320 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     clearChoiceSelection('soutRelGrid');
     clearChoiceSelection('soutReasons');
     clearChoiceSelection('soutReturning');
-    $('soutWrWrap').classList.toggle('hidden', gradeNum(s.grade) < 7);
+    $('soutPickupWrap').classList.toggle('hidden', self);
+    $('soutSelfNav').classList.toggle('hidden', !self);
+    $('soutSelfSub').classList.toggle('hidden', !self);
+    $('soutSelfSub').textContent = self
+      ? 'Work Release students sign themselves out.'
+      : '';
+    $('soutWrLabel').textContent = self ? 'Work Release' : 'Student with Work Release?';
+    $('soutWrWrap').classList.toggle('hidden', self ? false : gradeNum(s.grade) < 7);
+    flow.plan = null;
+    flow.sibs = [];
+    clearPlanBanner();
     go('sout-form');
-    $('soutName').focus();
+    if (!self) { $('soutName').focus(); fetchPlanned(s.id); }
+  }
+
+  /**
+   * PLANNED EARLY DISMISSAL — the morning phone call, handed back.
+   *
+   * Fired AFTER the form is already on screen, deliberately never before it:
+   * the plan is a convenience, and making an adult at the counter wait on a
+   * round trip for a convenience is the wrong trade. If the answer is slow, or
+   * never lands at all, this screen behaves exactly as it always has.
+   */
+  function fetchPlanned(studentId) {
+    rawCall({ op: 'plannedFor', studentId: studentId }, function (res) {
+      if (!res || !res.ok || !res.planned) return;
+      if (!flow.student || flow.student.id !== studentId) return;   // they moved on
+      if (current !== 'sout-form') return;                          // …or left the screen
+      flow.plan = res;
+      var note = $('soutPlanned');
+      note.innerHTML = 'Called ahead this morning' +
+        (res.at ? ' — expected at ' + esc(res.at) : '') + '.' +
+        '<span class="plan-sub">' +
+        (res.reason ? 'Reason: ' + esc(res.reason) +
+          (res.chipReason ? ', filled in below. ' : '. ') : '') +
+        'Please still type your own name — we check it against the pickup list every time.' +
+        '</span>';
+      note.classList.remove('hidden');
+      // Never overwrite a reason they already tapped: this answer arrives after
+      // the form is live, so a quick parent can beat it to the screen.
+      // chipReason is the office reason translated into THIS list's wording;
+      // when it comes back empty nothing is selected and they just tap one.
+      if (res.chipReason && !flow.sout.reason) {
+        setChoiceSelected('soutReasons', res.chipReason);
+        if ($('soutReasons').querySelector('.choice.selected')) flow.sout.reason = res.chipReason;
+      }
+      if (res.siblings && res.siblings.length) renderSiblings(res.siblings);
+    }, function () { /* silent: the form stands on its own */ });
+  }
+
+  /**
+   * The other children on the same call. Pre-selected, because the parent
+   * already told the office they were collecting them — tapping one leaves them
+   * out. Each is still pickup-checked on its own server-side: siblings do not
+   * always share an authorised-pickup list.
+   */
+  function renderSiblings(list) {
+    var box = $('soutSibs');
+    box.innerHTML = '';
+    flow.sibs = [];
+    list.forEach(function (k) {
+      flow.sibs.push(k.id);
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'choice selected';
+      b.textContent = displayStudent(k.name, k.grade);
+      b.addEventListener('click', function () {
+        if (submitting || DEAD) return;
+        var on = b.classList.toggle('selected');
+        var i = flow.sibs.indexOf(k.id);
+        if (on && i < 0) flow.sibs.push(k.id);
+        if (!on && i >= 0) flow.sibs.splice(i, 1);
+      });
+      box.appendChild(b);
+    });
+    $('soutSibsWrap').classList.remove('hidden');
+  }
+
+  /** "A", "A and B", "A, B and C" — reads the way a person would say it. */
+  function nameList(names) {
+    var n = (names || []).filter(function (x) { return x; });
+    if (n.length < 2) return n[0] || '';
+    return n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
+  }
+
+  /**
+   * A whole family in one go. One typed name, one pickup check PER CHILD — so
+   * a mixed answer is possible and has to be shown honestly: whoever passed is
+   * signed out, whoever did not is named and sent to the window. Saying "done"
+   * over a partial result would send a parent away without a child.
+   */
+  /**
+   * ALSO COLLECTING? (Josh, 2026-09-16)
+   *
+   * Offered only after this adult has passed the pickup check for the first child, and every name
+   * here has passed that same check — the server decides that, not this page. So a parent taps once
+   * more instead of running the whole flow three times, and an adult cleared for one child but not
+   * their sibling simply never sees the other one.
+   *
+   * "All of them" is the common case and leads; a single child can still be picked on their own,
+   * because a parent collecting one of three is a real afternoon.
+   */
+  function offerSiblings(leadName, sibs, typed) {
+    var acts = [];
+    if (sibs.length > 1) {
+      acts.push({ label: 'All of them (' + sibs.length + ')', primary: true, cb: function () {
+        submitGroupSignOut(sibs.map(function (x) { return x.id; }), typed, [leadName]);
+      } });
+    }
+    sibs.forEach(function (sb) {
+      acts.push({
+        label: (sibs.length > 1 ? 'Just ' : '') + firstNameOf(sb.name) + ' (' + sb.grade + ')',
+        primary: sibs.length === 1,
+        cb: function () { submitGroupSignOut([sb.id], typed, [leadName]); }
+      });
+    });
+    acts.push({ label: 'No, that’s all', cb: function () {
+      showSplash({
+        title: 'The office has been notified',
+        sub: firstNameOf(leadName) + ' will meet you here at the ' + ST.label + '.',
+        autoMs: 3500
+      });
+    } });
+    showSplash({
+      title: firstNameOf(leadName) + ' is signed out',
+      sub: 'Are you collecting anyone else today?',
+      actions: acts,
+      // Never leave a question on the screen for the next family: if nobody answers, the trip ends
+      // with the one child already signed out, which is the safe outcome.
+      autoMs: 30000
+    });
+  }
+
+  function submitGroupSignOut(ids, typed, alreadyDone) {
+    var done = alreadyDone || [];
+    submitCall({
+      op: 'earlyOutGroup',
+      studentIds: ids,
+      typedName: typed,
+      relationship: flow.sout.relationship,
+      reason: flow.sout.reason,
+      returning: flow.sout.returning === 'yes'
+    }, function (res) {
+      if (!res || !res.ok) {
+        showInfo('Please see office staff',
+          (res && res.error === 'no-plan')
+            ? 'We couldn’t match that to this morning’s call — office staff at the window can finish it.'
+            : ((res && res.error) || 'The sign-out could not be completed at the kiosk.'));
+        return;
+      }
+      if (res.limited) {
+        showInfo('One moment', 'Please see office staff to complete this sign-out.');
+        return;
+      }
+      var ok = (res.matched || []).concat(done);   // the lead was signed out a moment ago
+      var no = res.flagged || [];
+      if (no.length && !ok.length) {
+        showInfo('Please see office staff',
+          'We couldn’t verify that name for ' + nameList(no) + '. Nothing has been signed out — ' +
+          'office staff at the window can finish it right away.');
+        return;
+      }
+      if (no.length) {
+        showInfo('Partly done — please see office staff',
+          nameList(ok) + (ok.length > 1 ? ' are' : ' is') + ' signed out. We couldn’t verify that ' +
+          'name for ' + nameList(no) + ' — office staff at the window can finish that one.');
+        return;
+      }
+      showSplash({
+        title: 'The office has been notified',
+        sub: nameList(ok.map(firstNameOf)) + ' will meet you here at the ' + ST.label + '.',
+        autoMs: 3500
+      });
+    });
+  }
+
+  // ====================================================================
+  // BETWEEN BUILDINGS — a campus-internal trip, NOT a departure.
+  // No pickup check, no flag, no "see office staff" screen: the student is
+  // still on campus, just in a different building. (Policy: Coreen Forloine,
+  // 2026-09-08 — unescorted moves sign out and back in; a class moving with a
+  // teacher signs nothing. Before this existed Teacher's Aides used Student
+  // Sign Out and flagged the front desk every single time.)
+  // ====================================================================
+  function enterMvDest() {
+    var s = flow.student;
+    flow.move = { to: '', reason: '' };
+    $('mvDestSub').textContent = displayStudent(s.name, s.grade) +
+      ' — which building are you walking to?';
+    $('mvDestErr').textContent = '';
+    clearChoiceSelection('mvBuildings');
+    go('mv-dest');
+  }
+  function enterMvReason() {
+    $('mvReasonSub').textContent = 'Going to ' + flow.move.to +
+      ' — tap the reason and you’re signed out.';
+    $('mvReasonErr').textContent = '';
+    clearChoiceSelection('mvReasons');
+    go('mv-reason');
+  }
+
+  function submitMovementOut() {
+    var s = flow.student;
+    if (!s) return;
+    submitCall({
+      op: 'movementOut',
+      studentId: s.id,
+      toBuilding: flow.move.to,
+      reason: flow.move.reason
+    }, function (res) {
+      if (res && res.ok) {
+        var to = res.to || flow.move.to;
+        showSplash({
+          // Name the reason they actually picked — "Teacher's Aide", "Music
+          // lesson" — not a generic word. Josh, 2026-09-11: the confirmation has
+          // to echo the exact item chosen so the student can see it took the
+          // right one before they walk off.
+          title: firstNameOf(res.name || s.name) + ' → ' + to +
+            (flow.move.reason ? ' (' + flow.move.reason + ')' : ''),
+          sub: 'When you get back, tap “I’m a Student” → “Coming back to my building”.',
+          autoMs: 4500
+        });
+        return;
+      }
+      var code = res && res.error;
+      if (code === 'same-building' || code === 'destination-required') {
+        flow.move.to = '';
+        clearChoiceSelection('mvBuildings');
+        $('mvDestErr').textContent = (code === 'same-building')
+          ? 'That’s the building you’re already in — pick a different one.'
+          : 'Please pick the building you’re walking to.';
+        go('mv-dest');
+        return;
+      }
+      // Never the "see office staff" screen — this was never a departure.
+      showSplash({
+        warn: true,
+        title: 'That didn’t save',
+        sub: (code === 'unknown student')
+          ? 'We couldn’t find that name on the roster — please try again.'
+          : 'Please try again, or tell your teacher.',
+        autoMs: 4000
+      });
+    });
+  }
+
+  function enterMvBack() {
+    flow.intent = 'movement-back';
+    flow.searchMode = 'moveback';
+    flow.student = null;
+    flow.options = null;
+    $('mvBackList').innerHTML = '';
+    $('mvBackHint').innerHTML = '<span class="spin"></span> Checking who is out…';
+    go('mv-back');
+    submitCall({ op: 'movementOpenList' }, function (res) {
+      var list = (res && res.ok && res.out) || [];
+      var box = $('mvBackList');
+      box.innerHTML = '';
+      if (!list.length) {
+        $('mvBackHint').textContent = 'Nobody is signed out between buildings right now. ' +
+          'If you signed out earlier, tap “Find my name instead”.';
+        return;
+      }
+      $('mvBackHint').textContent = '';
+      for (var i = 0; i < list.length; i++) {
+        (function (m) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'result-btn';
+          b.innerHTML = '<span class="rb-col">' +
+            '<span>' + esc(displayStudent(m.name, m.grade)) + '</span>' +
+            '<span class="rb-sub">&rarr; ' + esc(m.to || '?') +
+              (m.at ? ' &middot; out ' + esc(m.at) : '') +
+              (m.expectedBack ? ' &middot; back by ' + esc(m.expectedBack) : '') +
+              (m.reason ? ' &middot; ' + esc(m.reason) : '') +
+            '</span></span>';
+          b.addEventListener('click', function () { submitMovementBack(m.id); });
+          box.appendChild(b);
+        })(list[i]);
+      }
+    });
+  }
+
+  function submitMovementBack(studentId) {
+    if (!studentId) return;
+    submitCall({ op: 'movementBack', studentId: studentId }, function (res) {
+      if (res && res.ok) {
+        showSplash({
+          title: 'Welcome back!',
+          sub: 'You’re signed back in' + (res.to ? ' at ' + res.to : '') + '.',
+          autoMs: 2500
+        });
+        return;
+      }
+      if (res && res.error === 'not-out') {
+        showSplash({
+          warn: true,
+          title: 'You’re not signed out right now',
+          sub: 'There’s nothing to sign back in — you’re already counted in your building.',
+          actions: [
+            { label: 'See who’s out', cb: enterMvBack },
+            { label: 'Done', primary: true, cb: goHome }
+          ],
+          autoMs: 9000
+        });
+        return;
+      }
+      showSplash({
+        warn: true,
+        title: 'That didn’t save',
+        sub: 'Please try again, or tell your teacher.',
+        autoMs: 4000
+      });
+    });
   }
 
   // Audible cue at the kiosk itself, so the desk beside it looks up when a
@@ -1219,25 +2064,55 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
   // delegated static actions (data-action) — dynamic buttons (choices,
   // results, keypad, splash actions) wire their own listeners above.
   // ====================================================================
+  function startFlow(which) {
+    if (!BOOT || DEAD) return;
+    if (which === 'vin') {
+      clearVisitorInputs();
+      // No default when the station is unconfigured — the visitor picks, rather than being filed
+      // under a building nobody chose.
+      flow.visitor.building = ST.building || '';
+      if (ST.building) setChoiceSelected('vinBuildings', ST.building);
+      go('vin-name');
+      $('vinName').focus();
+    } else if (which === 'vout') {
+      voutPad.clear();
+      $('voutBadgeErr').textContent = '';
+      go('vout-badge');
+    } else if (which === 'sin') {
+      flow.intent = 'parent-dropoff';
+      enterSearch('in');
+    } else if (which === 'sout') {
+      flow.intent = 'parent-pickup';
+      enterSearch('out');
+    }
+  }
+
   var ACTIONS = {
-    start: function (el) {
+    start: function (el) { startFlow(el.getAttribute('data-flow')); },
+
+    // home screen: pick a role. Parents and visitors get a "what do you need?"
+    // chooser; a STUDENT identifies themselves first and the menu is then built
+    // from studentOptions, so they only ever see flows they qualify for.
+    role: function (el) {
       if (!BOOT || DEAD) return;
-      var which = el.getAttribute('data-flow');
-      if (which === 'vin') {
-        clearVisitorInputs();
-        flow.visitor.building = ST.building; // default destination = this station's building
-        setChoiceSelected('vinBuildings', ST.building);
-        go('vin-name');
-        $('vinName').focus();
-      } else if (which === 'vout') {
-        voutPad.clear();
-        $('voutBadgeErr').textContent = '';
-        go('vout-badge');
-      } else if (which === 'sin') {
-        enterSearch('in');
-      } else if (which === 'sout') {
-        enterSearch('out');
-      }
+      var r = el.getAttribute('data-role');
+      if (r === 'student') { flow.intent = 'student-menu'; enterSearch('student'); return; }
+      if (r === 'parent' || r === 'visitor') go('role-' + r);
+    },
+
+    need: function (el) {
+      if (!BOOT || DEAD) return;
+      var n = el.getAttribute('data-need');
+      if (n === 'dropoff') { flow.intent = 'parent-dropoff'; enterSearch('in'); }
+      else if (n === 'pickup') { flow.intent = 'parent-pickup'; enterSearch('out'); }
+      else if (n === 'vin' || n === 'vout') { startFlow(n); }
+    },
+
+    // Back from a student-branch screen: to their own menu when we still have
+    // it (no re-typing), otherwise to the search that produced it.
+    stuBack: function () {
+      if (flow.options && flow.student) { go('student-menu'); return; }
+      enterSearch(flow.searchMode);
     },
 
     back: function (el) {
@@ -1306,12 +2181,32 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     },
 
     sinReasonBack: function () {
-      if (flow.student && (flow.student.parentDriven || flow.forceGuardian) && !flow.guardianKept) {
+      if (flow.student && !flow.guardianKept &&
+          (flow.intent === 'parent-dropoff' || flow.student.parentDriven || flow.forceGuardian)) {
         go('sin-adult');
+      } else if (flow.options && flow.student) {
+        go('student-menu');   // student branch — back to their own menu
       } else {
         enterSearch('in');
       }
     },
+
+    // "I'm the grown-up" — carry the already-picked student into the parent flow
+    needAdultParent: function () {
+      if (!flow.student) { goHome(); return; }
+      if (flow.needKind === 'out') {
+        flow.intent = 'parent-pickup';
+        flow.searchMode = 'out';
+        enterSoutForm();
+      } else {
+        flow.intent = 'parent-dropoff';
+        flow.searchMode = 'in';
+        enterSinAdult();
+      }
+    },
+
+    mvReasonBack: function () { enterMvDest(); },
+    mvBackSearch: function () { flow.intent = 'movement-back'; enterSearch('moveback'); },
 
     soutComplete: function () {
       var s = flow.student;
@@ -1322,6 +2217,11 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
       if (!flow.sout.reason) { $('soutErr').textContent = 'Please tap a reason.'; return; }
       if (flow.sout.returning === null) { $('soutErr').textContent = 'Returning today? Please tap yes or no.'; return; }
       $('soutErr').textContent = '';
+      // Siblings still ticked from this morning's call → one trip, one call.
+      if (flow.sibs && flow.sibs.length) {
+        submitGroupSignOut([s.id].concat(flow.sibs), typed);
+        return;
+      }
       submitCall({
         op: 'earlyOut',
         studentId: s.id,
@@ -1332,6 +2232,9 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
         returning: flow.sout.returning === 'yes'
       }, function (res) {
         if (res && res.ok && res.match) {
+          // Siblings this same adult is cleared for and who are still here — ask before closing.
+          var also = res.alsoHere || [];
+          if (also.length) { offerSiblings(s.name, also, typed); return; }
           showSplash({
             title: 'The office has been notified',
             sub: firstNameOf(s.name) + ' will meet you here at the ' + ST.label + '.',
@@ -1369,7 +2272,7 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
       }, function (res) {
         if (res && res.ok) {
           showSplash({
-            title: 'Signed out — your guardians have been notified',
+            title: 'Signed out',
             sub: 'Have a good shift!',
             autoMs: 2500
           });
@@ -1471,6 +2374,34 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     buildChoices('sinReasons', BOOT.reasons.late || [], function (v) { submitLateIn(v); });
     buildChoices('soutRelGrid', RELATIONSHIPS, function (v) { flow.sout.relationship = v; });
     buildChoices('soutReasons', BOOT.reasons.dismissal || [], function (v) { flow.sout.reason = v; });
+    // Between buildings: every building is offered (the server rejects a move to
+    // the student's own building, and the reason grid comes from settings).
+    buildChoices('mvBuildings', BOOT.buildings || [], function (v) {
+      flow.move.to = v;
+      $('mvDestErr').textContent = '';
+      // A destination that IS its own reason skips the reason screen — a kid
+      // walking to the Nurse shouldn't have to pick from lesson/ELC/TA/errand
+      // (Josh, 2026-09-09). One tap: building, then done.
+      if (IMPLIED_REASON[v]) {
+        flow.move.reason = IMPLIED_REASON[v];
+        submitMovementOut();
+        return;
+      }
+      enterMvReason();
+    });
+    var mvReasons = (BOOT.reasons.movement && BOOT.reasons.movement.length)
+      ? BOOT.reasons.movement : MOVE_REASONS_FALLBACK;
+    // The reason is the last tap — submit straight away. No return time is
+    // asked for: the student's sign-back-in records the real time.
+    buildChoices('mvReasons', mvReasons, function (v) {
+      flow.move.reason = v;
+      if (!flow.move.to) {
+        $('mvDestErr').textContent = 'Please pick the building you’re walking to.';
+        go('mv-dest');
+        return;
+      }
+      submitMovementOut();
+    });
     $('genAt').textContent = BOOT.generatedAt || 'unknown';
   }
   function boot() {

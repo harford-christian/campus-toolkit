@@ -1,272 +1,220 @@
-/* mock.js — Dismissal Board demo backend.
+/* mock.js — the Dismissal Board demo's stand-in for Google.
 
-   The real app is a thin server over PURE logic: Dismissal.gs runs unchanged on the server, in
-   Node and in the browser (it is inlined into this page as DismissalClient). So this mock reads
-   the fabricated tabs in data.js and hands them to the SAME ds* functions the production server
-   calls — dsBuildRoster, dsBuildBoard, dsBuildSignedOut, dsWalkUpList, dsPermissions,
-   dsCanChange, dsBuildStaffDirectory — and the app's own untouched JavaScript renders the
-   result. What you see is the real classification.
+   The page is the real Index.html; its pure logic (Dismissal.gs) is inlined as DismissalClient; and
+   logic.js is the app's own SERVER layer, vendored verbatim by build-logic.mjs — the fifteen-odd
+   google.script.run endpoints, the bundle assembly, the cache, the publish step. What this file
+   supplies is the Google underneath them, over plain JavaScript:
 
-   Backend methods the client calls (every one re-checks permission server-side in production;
-   the same pure checks are applied here):
-     dismissalApi(sim)      the whole board in one call; ?sim=YYYY-MM-DD[ HH:MM] time-travels
-     pickupsApi()           who may collect each child (phase 2, after the board has painted)
-     setOverride(...)       a TODAY-ONLY change — appends to the Overrides tab, returns the board
-     saveView(view)         remember this person's filters
-     rolesApi()             role membership, shared views and the staff directory, for the gear
-     addRoleMember / removeRoleMember / saveRoleView
-   State lives in this tab only; refresh to reset the demo. */
-window.MOCK_BACKEND = (function () {
+     SpreadsheetApp   four in-memory workbooks: the FACTS staging sheet, Dismissal_WORKING, the
+                      kiosk's SignInOut_DB and the campus-control master schedule
+     DriveApp         the shared folder (ramp/driver JSON files land here) and the sports feed file
+     CacheService     with real TTLs, so the 60 s short cache and the 3-minute board cache behave
+     PropertiesService  the script properties the real deployment carries, fabricated values
+     Session / Utilities / MailApp / LockService / Logger
+     a PINNED CLOCK   "now" is Tuesday 2026-09-15 14:52 plus however long the page has been open,
+                      applied uniformly to every Date the server formats, so attendance, sign-outs
+                      and freshness all land on the dataset's day. ?sim= still time-travels the
+                      BOARD exactly as it does in production (the server reads it, not the clock).
+
+   Everything the real app would WRITE (Overrides, Standing, PickupAuth, Walkers, Roles, Notes,
+   saved views, role views) persists in sessionStorage for the visit; a new tab starts clean.
+   window.DISMISSAL_DEMO exposes the outbox and a reset for the verifier and the curious. */
+(function () {
   'use strict';
+  var D = window.DISMISSAL_DATA, L = window.DISMISSAL_LOGIC, T = D.tabs;
+  var STORE_KEY = 'dismissal-demo-v2';
 
-  var D = window.DISMISSAL_DATA;
-  var T = D.tabs;
-  var clone = function (x) { return JSON.parse(JSON.stringify(x)); };
+  function store() { try { return window.sessionStorage; } catch (e) { return null; } }
+  function readStore() { var s = store(); if (!s) return null; try { return JSON.parse(s.getItem(STORE_KEY) || 'null'); } catch (e) { return null; } }
+  function writeStore(v) { var s = store(); if (!s) return; try { s.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {} }
+  function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
-  // Mutable demo state — everything the real app would WRITE.
-  var state = {
-    overrides: clone(T.Overrides),
-    pickupAuth: clone(T.PickupAuth),   // temporary pickup authorizations (the app's second write target)
-    roles: clone(T.Roles),
-    savedViews: {},                    // {email: view}
-    roleViews: clone(D.roleViews)      // {role: view}
+  /* ---------- the pinned clock ---------- */
+  var pm = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(D.demo.now);
+  var pinnedUtcMs = Date.UTC(+pm[1], +pm[2] - 1, +pm[3], pm[4] === undefined ? 12 : +pm[4], pm[5] === undefined ? 0 : +pm[5]);
+  var loadedAt = Date.now();
+  var OFFSET = pinnedUtcMs - loadedAt;
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  function p2(n) { return (n < 10 ? '0' : '') + n; }
+  /** A Date as the demo's wall clock: a UTC Date whose UTC fields ARE school time. A real-clock
+      instant (now, a Drive modified-time — anything within a day of the real clock) is shifted onto
+      the pinned day, so ages stay true; any other Date was CONSTRUCTED from calendar fields (a ?sim=
+      day at noon, say) and is read as those fields. */
+  function wall(date) {
+    var t = date.getTime();
+    if (Math.abs(t - Date.now()) < 86400000) return new Date(t + OFFSET);
+    return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds()));
+  }
+  function formatDate(date, tz, fmt) {
+    var w = wall(date);
+    var y = w.getUTCFullYear(), mo = w.getUTCMonth() + 1, d = w.getUTCDate(), H = w.getUTCHours(),
+        m = w.getUTCMinutes(), s = w.getUTCSeconds(), dow = w.getUTCDay();
+    return String(fmt).replace(/'([^']*)'|yyyy|MM|dd|HH|mm|ss|EEE|u/g, function (tok, lit) {
+      if (lit !== undefined) return lit;
+      switch (tok) {
+        case 'yyyy': return String(y); case 'MM': return p2(mo); case 'dd': return p2(d);
+        case 'HH': return p2(H); case 'mm': return p2(m); case 'ss': return p2(s);
+        case 'EEE': return DOW[dow]; case 'u': return String(dow === 0 ? 7 : dow);
+      }
+      return tok;
+    });
+  }
+  function minutesAgo(n) { return loadedAt - n * 60000; }
+
+  /* ---------- in-memory Sheets ---------- */
+  function blank(v) { return v === '' || v === null || v === undefined; }
+  function Sheet(name, values) { this.name = name; this.v = (values || []).map(function (r) { return r.slice(); }); }
+  Sheet.prototype.getName = function () { return this.name; };
+  Sheet.prototype.getLastRow = function () {
+    for (var r = this.v.length - 1; r >= 0; r--) if ((this.v[r] || []).some(function (c) { return !blank(c); })) return r + 1;
+    return 0;
   };
-
-  /* ---------- clock (mirrors Code.gs dsTodayKey_ / dsDayName_) ---------- */
-  function todayKey(sim) {
-    var s = String(sim || '').trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    return D.demo.date;                // pinned to a school day, not the visitor's calendar
-  }
-  function dayNameOf(dayKey) {
-    var p = dayKey.split('-');
-    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(+p[0], +p[1] - 1, +p[2], 12).getDay()];
-  }
-  function pad2(n) { return ('0' + n).slice(-2); }
-  function hhmm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
-  function stamp(d) {
-    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' + hhmm(d);
-  }
-
-  /* ---------- permissions (mirrors Roles.gs dsMyPermissions_ / dsEffectiveView_) ----------
-     Holding a homeroom on today's roster IS the Teacher role, so the roster's homeroom-teacher
-     set goes in alongside the Roles tab. */
-  function myPerm() {
-    var staffNames = dsBuildStaffNames(T.Staff);
-    return dsPermissions(D.demo.email, dsBuildRoles(state.roles), staffNames[D.demo.email] || '',
-                         dsHomeroomTeacherSet(dsBuildRoster(T.Roster)));
-  }
-  function effectiveView(perm) {
-    var personal = state.savedViews[D.demo.email];
-    if (personal) return { view: personal, from: 'personal' };
-    for (var i = 0; i < perm.roles.length; i++) {
-      if (state.roleViews[perm.roles[i]]) return { view: state.roleViews[perm.roles[i]], from: perm.roles[i] };
+  Sheet.prototype.getLastColumn = function () {
+    var w = 0;
+    this.v.forEach(function (row) { for (var c = row.length - 1; c >= 0; c--) if (!blank(row[c])) { if (c + 1 > w) w = c + 1; break; } });
+    return w;
+  };
+  Sheet.prototype.getMaxRows = function () { return Math.max(this.v.length, 1000); };
+  Sheet.prototype.setFrozenRows = function () { return this; };
+  Sheet.prototype.appendRow = function (row) { this.v[this.getLastRow()] = row.slice(); return this; };
+  Sheet.prototype.deleteRow = function (r) { this.v.splice(r - 1, 1); return this; };
+  Sheet.prototype.getDataRange = function () { return this.getRange(1, 1, Math.max(this.getLastRow(), 1), Math.max(this.getLastColumn(), 1)); };
+  Sheet.prototype.getRange = function (r, c, n, m) {
+    var self = this; n = n || 1; m = m || 1;
+    function cell(i, j) { var row = self.v[r - 1 + i]; var x = row ? row[c - 1 + j] : ''; return blank(x) ? '' : x; }
+    function put(i, j, x) {
+      var ri = r - 1 + i, ci = c - 1 + j;
+      while (self.v.length <= ri) self.v.push([]);
+      while (self.v[ri].length < ci) self.v[ri].push('');
+      self.v[ri][ci] = x;
     }
-    return { view: null, from: '' };
-  }
-  function occasionalToday(overrides) {
-    var out = {};
-    Object.keys(overrides).forEach(function (id) { if (overrides[id].type === 'Staff Kid') out[id] = true; });
-    return out;
-  }
-  // The staff directory for the settings add box: ACTIVE staff on the caller's own domain
-  // (mirrors Roles.gs dsStaffDirectory_).
-  function staffDirectory() {
-    return dsBuildStaffDirectory(T.Staff, String(D.demo.email).split('@')[1] || '');
-  }
-
-  // How current the inputs are. The attendance feed refreshes every 15 minutes in production;
-  // the demo says it was pulled a few minutes ago. The sign-out feed's state rides along so the
-  // page can say "2 signed out today" next to the attendance line.
-  function freshness(attendance, signedOut) {
-    var now = new Date(), synced = new Date(now.getTime() - 9 * 60000);
-    return { attendanceRows: Object.keys(attendance).length, rosterAt: '04:06',
-             syncedAt: hhmm(synced), syncedAgeMin: 9, syncStale: false,
-             signOutActive: true, signOutCount: Object.keys(signedOut).length };
-  }
-
-  function dismissalApi(sim) {
-    var dayKey = todayKey(sim), dayName = dayNameOf(dayKey);
-    var roster = dsBuildRoster(T.Roster);
-    var attendance = dsBuildAttendance(T['Attendance Today']);
-    var todayOverrides = dsBuildOverrides(state.overrides, dayKey);
-    // The office's STANDING answers sit under today's call-ins (today wins) — mirrors dismissalApi.
-    var overrides = dsMergeOverrides(dsBuildStanding(T.Standing, dayName), todayOverrides);
-    var signedOut = dsBuildSignedOut(T.EVENTS, dayKey);     // the app's own fold, real kiosk columns
-    var walkers = dsBuildWalkers(T.Walkers);
-    var routes = dsBuildRoutes(T.Routes);
-    var board = dsBuildBoard({ roster: roster, attendance: attendance, signedOut: signedOut, overrides: overrides },
-                             { session: 'PM', routes: routes, pickupAuth: dsBuildPickupAuth(state.pickupAuth, dayKey) });
-    // Only TODAY's overrides feed the walk-up list; then the approved walkers are MARKED on the board.
-    var walkUp = dsWalkUpList(dsFlatList(board), walkers, attendance, signedOut, dayName,
-                              occasionalToday(todayOverrides), todayOverrides);
-    dsApplyWalkUps(board, walkUp);
-    var perm = myPerm(), eff = effectiveView(perm);
-    var fresh = freshness(attendance, signedOut);
     return {
-      ok: true, board: board, routes: routes,
-      walkUp: walkUp,
-      dayKey: dayKey, dayName: dayName, sim: String(sim || ''),
-      perm: perm,
-      savedView: eff.view, viewFrom: eff.from,
-      freshness: fresh,
-      signOutActive: fresh.signOutActive,
-      serverNow: stamp(new Date())
+      getValues: function () { var out = []; for (var i = 0; i < n; i++) { var row = []; for (var j = 0; j < m; j++) row.push(cell(i, j)); out.push(row); } return out; },
+      getValue: function () { return cell(0, 0); },
+      setValues: function (vals) { for (var i = 0; i < n; i++) for (var j = 0; j < m; j++) put(i, j, vals[i][j]); return this; },
+      setValue: function (x) { put(0, 0, x); return this; },
+      setNumberFormat: function () { return this; },
+      clearContent: function () { for (var i = 0; i < n; i++) for (var j = 0; j < m; j++) put(i, j, ''); return this; }
+    };
+  };
+  function Workbook(id, tabs) { this.id = id; this.sheets = {}; var self = this; Object.keys(tabs).forEach(function (n) { self.sheets[n] = new Sheet(n, tabs[n]); }); }
+  Workbook.prototype.getId = function () { return this.id; };
+  Workbook.prototype.getSheetByName = function (n) { return this.sheets[n] || null; };
+  Workbook.prototype.insertSheet = function (n) { this.sheets[n] = new Sheet(n, []); return this.sheets[n]; };
+  Workbook.prototype.getSheets = function () { var s = this.sheets; return Object.keys(s).map(function (n) { return s[n]; }); };
+
+  var WRITABLE = ['Overrides', 'Standing', 'PickupAuth', 'Walkers', 'Roles', 'Notes'];
+  var saved = readStore() || {};
+  var staging = new Workbook('staging-demo', { 'Attendance Today': T['Attendance Today'], 'PickupContacts': T.PickupContacts, 'Staff': T.Staff, 'Sheet1': T.Sheet1 });
+  var dismissal = new Workbook('dismissal-demo', { 'Roster': T.Roster, 'Overrides': T.Overrides, 'Standing': T.Standing, 'PickupAuth': T.PickupAuth,
+    'Walkers': T.Walkers, 'Routes': T.Routes, 'Roles': T.Roles, 'Notes': T.Notes, 'Specials': T.Specials });
+  var signinout = new Workbook('signinout-demo', { 'EVENTS': T.EVENTS });
+  var cms = new Workbook('cms-demo', { 'Schedule': T.Schedule });
+  if (saved.dismissal) Object.keys(saved.dismissal).forEach(function (n) { dismissal.sheets[n] = new Sheet(n, saved.dismissal[n]); });
+  var WORKBOOKS = { 'staging-demo': staging, 'dismissal-demo': dismissal, 'signinout-demo': signinout, 'cms-demo': cms };
+  // Drive modified-times, on the REAL clock so ages compute, displayed through the pinned one:
+  // attendance pulled 9 minutes ago, the roster produced at 04:06, the kiosk log a minute ago.
+  var STAMPS = { 'staging-demo': minutesAgo(9), 'dismissal-demo': minutesAgo(10 * 60 + 46), 'signinout-demo': minutesAgo(1), 'cms-demo': minutesAgo(90) };
+
+  /* ---------- Drive: the shared folder and the sports feed ---------- */
+  var files = { 'sports-feed-demo': { id: 'sports-feed-demo', name: 'Sports_Dismissals_TODAY.json', content: JSON.stringify(D.sportsFeed), updated: minutesAgo(8 * 60 + 47) } };
+  var nextFile = 1;
+  function fileObj(f) {
+    return {
+      getId: function () { return f.id; }, getName: function () { return f.name; },
+      getLastUpdated: function () { return new Date(f.updated); },
+      getBlob: function () { return { getDataAsString: function () { return f.content; } }; },
+      setContent: function (c) { f.content = String(c); f.updated = Date.now(); return this; }
     };
   }
+  function iterator(list) { var i = 0; return { hasNext: function () { return i < list.length; }, next: function () { return list[i++]; } }; }
+  function byName(name) { return Object.keys(files).filter(function (id) { return files[id].name === name; }).map(function (id) { return fileObj(files[id]); }); }
+  var folder = {
+    getFilesByName: function (name) { return iterator(byName(name)); },
+    createFile: function (name, content, mime) { var id = 'shared-file-' + (nextFile++); files[id] = { id: id, name: name, content: String(content), mime: mime, updated: Date.now() }; return fileObj(files[id]); }
+  };
+  var DriveApp = {
+    getFileById: function (id) {
+      if (WORKBOOKS[id]) return { getId: function () { return id; }, getName: function () { return id; }, getLastUpdated: function () { return new Date(STAMPS[id]); } };
+      if (files[id]) return fileObj(files[id]);
+      throw new Error('File not found: ' + id);
+    },
+    getFolderById: function () { return folder; },
+    getFilesByName: function (name) { return iterator(byName(name)); }
+  };
 
-  return {
-    dismissalApi: dismissalApi,
+  /* ---------- cache (with TTLs) and script properties ---------- */
+  var cacheStore = {};
+  function alive(k) { var e = cacheStore[k]; if (!e) return false; if (e.until && e.until < Date.now()) { delete cacheStore[k]; return false; } return true; }
+  var cache = {
+    get: function (k) { return alive(k) ? cacheStore[k].v : null; },
+    put: function (k, v, ttl) { cacheStore[k] = { v: String(v), until: ttl ? Date.now() + ttl * 1000 : 0 }; },
+    remove: function (k) { delete cacheStore[k]; },
+    getAll: function (keys) { var o = {}; (keys || []).forEach(function (k) { if (alive(k)) o[k] = cacheStore[k].v; }); return o; },
+    putAll: function (obj, ttl) { var self = this; Object.keys(obj).forEach(function (k) { self.put(k, obj[k], ttl); }); },
+    removeAll: function (keys) { (keys || []).forEach(function (k) { delete cacheStore[k]; }); }
+  };
+  var propStore = saved.props || {
+    STAGING_SHEET_ID: 'staging-demo', DISMISSAL_SHEET_ID: 'dismissal-demo', DB_SHEET_ID: 'signinout-demo', CMS_SHEET_ID: 'cms-demo',
+    SPORTS_FEED_FILE_ID: 'sports-feed-demo', ALLOWED_EMAILS: D.demo.email, PRESENCE_URL: '../campus-presence/index.html',
+    PICKUP_AUTH_NOTIFY: 'office.demo@example.edu', ROLE_VIEWS: JSON.stringify(D.roleViews)
+  };
+  var props = {
+    getProperty: function (k) { return Object.prototype.hasOwnProperty.call(propStore, k) ? propStore[k] : null; },
+    setProperty: function (k, v) { propStore[k] = String(v); return this; },
+    deleteProperty: function (k) { delete propStore[k]; return this; },
+    getProperties: function () { return clone(propStore); }
+  };
 
-    // PHASE 2: enrolled students only, [name, relationship, one phone] per contact.
-    pickupsApi: function () {
-      var enrolled = {};
-      dsBuildRoster(T.Roster).forEach(function (r) { enrolled[r.id] = 1; });
-      var full = dsBuildPickups(T.PickupContacts), out = {};
-      Object.keys(full).forEach(function (sid) {
-        if (!enrolled[sid]) return;
-        out[sid] = full[sid].map(function (p) { return [p.name, p.rel || '', p.cell || p.home || p.work || '']; });
-      });
+  /* ---------- the rest ---------- */
+  var outbox = saved.outbox || [];
+  var uuidN = 0;
+  L.bind({
+    SpreadsheetApp: { openById: function (id) { if (!WORKBOOKS[id]) throw new Error('Unknown spreadsheet ' + id); return WORKBOOKS[id]; }, flush: function () {} },
+    DriveApp: DriveApp,
+    CacheService: { getScriptCache: function () { return cache; } },
+    PropertiesService: { getScriptProperties: function () { return props; } },
+    Session: {
+      getActiveUser: function () { return { getEmail: function () { return D.demo.email; } }; },
+      getEffectiveUser: function () { return { getEmail: function () { return 'itscripts@example.edu'; } }; },
+      getScriptTimeZone: function () { return 'America/New_York'; }
+    },
+    Utilities: {
+      formatDate: formatDate,
+      getUuid: function () { uuidN++; var r = Math.random().toString(16).slice(2, 10); return (r + '00000000').slice(0, 8) + '-demo-4000-8000-' + ('000000000000' + uuidN).slice(-12); },
+      formatString: function (f) { var a = [].slice.call(arguments, 1), i = 0; return String(f).replace(/%[sd]/g, function () { return String(a[i++]); }); },
+      sleep: function () {}
+    },
+    MailApp: { sendEmail: function (opts) { outbox.push(clone(opts)); } },
+    ScriptApp: { getService: function () { return { getUrl: function () { return ''; } }; }, getProjectTriggers: function () { return []; } },
+    LockService: { getScriptLock: function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {}, hasLock: function () { return true; } }; } },
+    HtmlService: null,
+    AdminDirectory: { Users: { get: function () { throw new Error('the demo has no directory — the allowlist decides'); } } },
+    Logger: { log: function () { if (window.console && window.DISMISSAL_DEBUG) console.log.apply(console, ['[Logger]'].concat([].slice.call(arguments))); } }
+  });
+
+  /* ---------- persistence and the page's methods ---------- */
+  function persist() {
+    var tabs = {};
+    WRITABLE.forEach(function (n) { if (dismissal.sheets[n]) tabs[n] = dismissal.sheets[n].v; });
+    writeStore({ dismissal: tabs, props: propStore, outbox: outbox });
+  }
+  var METHODS = ['dismissalApi', 'pickupsApi', 'setOverride', 'setOverrides', 'plannedApi', 'historyApi', 'setStanding', 'setWalker',
+    'removeWalker', 'pickupAuthContacts', 'pickupAuthSave', 'pickupAuthDelete', 'noteAdd', 'noteDelete', 'saveView', 'rolesApi',
+    'saveRoleView', 'addRoleMember', 'removeRoleMember'];
+  var backend = {};
+  METHODS.forEach(function (name) {
+    backend[name] = function () {
+      var out;
+      try { out = L[name].apply(null, arguments); }
+      finally { persist(); }
       return out;
-    },
-
-    // A TODAY-ONLY change. Permission is enforced HERE with the same pure rule the page uses to
-    // hide the button, and the row records who and when.
-    setOverride: function (studentId, type, routeCode, note, sim, destination) {
-      studentId = String(studentId || '').trim();
-      if (!studentId) throw new Error('A student id is required.');
-      var allowed = ['Bus', 'Car', 'Early Bird', 'Staff Kid'];
-      type = String(type || '').trim();
-      if (allowed.indexOf(type) === -1) throw new Error('Type must be one of: ' + allowed.join(', '));
-      var subject = null;
-      dsBuildRoster(T.Roster).forEach(function (r) { if (!subject && r.id === studentId) subject = r; });
-      var verdict = dsCanChange(myPerm(), subject, !!dsBuildWalkers(T.Walkers)[studentId]);
-      if (!verdict.ok) throw new Error(verdict.why);
-      state.overrides.push([todayKey(sim), studentId, subject ? subject.name : '', type,
-                            String(routeCode || '').trim(), String(note || '').trim(),
-                            D.demo.email, hhmm(new Date()), String(destination || '').trim()]);
-      return dismissalApi(sim);
-    },
-
-    // TEMPORARY PICKUP AUTHORIZATIONS — mirrors pickupAuthSave / pickupAuthDelete in Code.gs. The demo
-    // writes rows to its in-memory tab and reports the mail as "sent" to a fabricated address; the real
-    // app mails the guardians on file and the office mailbox.
-    pickupAuthSave: function (payload, sim) {
-      payload = payload || {};
-      if (!myPerm().canAuthorizePickup) throw new Error('Pickup authorizations are recorded by the office. Tell them and they will add it.');
-      var dayKey = todayKey(sim);
-      var v = dsPickupAuthValidate(payload, dayKey);
-      if (v.error) throw new Error(v.error);
-      var studentId = String(payload.studentId || '').trim();
-      var subject = null;
-      dsBuildRoster(T.Roster).forEach(function (r) { if (!subject && r.id === studentId) subject = r; });
-      var name = subject ? subject.name : String(payload.studentName || '');
-      var now = stamp(new Date());
-      var authId = String(payload.id || '').trim();
-      var kind = 'created';
-      if (authId) {
-        state.pickupAuth.forEach(function (row, i) {
-          if (i && String(row[0]) === authId && (!row[9] || String(row[9]).toLowerCase() === 'active')) { row[9] = 'Superseded'; row[12] = D.demo.email; row[13] = now; }
-        });
-        kind = 'updated';
-      } else {
-        authId = 'demo' + String(state.pickupAuth.length);
-      }
-      v.people.forEach(function (p) {
-        state.pickupAuth.push([authId, studentId, name, p.name, p.rel, v.start, v.end, v.method, v.note, 'Active', D.demo.email, now, '', '']);
-      });
-      var res = dismissalApi(sim);
-      res.authId = authId;
-      res.mail = { to: ['guardian.demo@example.edu', 'office.demo@example.edu'], sent: true, error: '' };
-      return res;
-    },
-    pickupAuthDelete: function (authId, sim) {
-      if (!myPerm().canAuthorizePickup) throw new Error('Pickup authorizations are removed by the office.');
-      authId = String(authId || '').trim();
-      var now = stamp(new Date()), n = 0;
-      state.pickupAuth.forEach(function (row, i) {
-        if (i && String(row[0]) === authId && (!row[9] || String(row[9]).toLowerCase() === 'active')) { row[9] = 'Deleted'; row[12] = D.demo.email; row[13] = now; n++; }
-      });
-      if (!n) throw new Error('That authorization no longer exists — reload and try again.');
-      var res = dismissalApi(sim);
-      res.authId = authId;
-      res.mail = { to: ['guardian.demo@example.edu', 'office.demo@example.edu'], sent: true, error: '' };
-      return res;
-    },
-
-    saveView: function (view) {
-      if (!myPerm().roles.length) throw new Error('You have no dismissal role yet — ask the office to add you.');
-      if (view === null || view === undefined) { delete state.savedViews[D.demo.email]; return null; }
-      state.savedViews[D.demo.email] = {
-        mode: String(view.mode || 'ramp'), scope: String(view.scope || ''),
-        types: (view.types || []).map(String).slice(0, 8), type: String(view.type || ''),
-        route: String(view.route || ''), pickup: String(view.pickup || ''),
-        grades: (view.grades || []).map(String).slice(0, 16),
-        excludeTypes: (view.excludeTypes || []).map(String).slice(0, 8),
-        savedAt: stamp(new Date())
-      };
-      return clone(state.savedViews[D.demo.email]);
-    },
-
-    rolesApi: function () {
-      var perm = myPerm();
-      if (!perm.canManageRoles && !perm.roles.length) {
-        return { ok: true, perm: perm, roles: DS_ROLES, members: [], views: {}, staff: [] };
-      }
-      return {
-        ok: true, perm: perm, roles: DS_ROLES,
-        members: dsBuildRoles(state.roles).filter(function (r) {
-          return perm.isAdmin || perm.adminOf.indexOf(r.role) !== -1;
-        }),
-        views: clone(state.roleViews),
-        staff: perm.canManageRoles ? staffDirectory() : []
-      };
-    },
-
-    addRoleMember: function (role, email, asAdmin, note) {
-      var perm = myPerm();
-      if (DS_ROLES.indexOf(role) === -1) throw new Error('Unknown role: ' + role);
-      if (perm.adminOf.indexOf(role) === -1) throw new Error('You are not an administrator of the "' + role + '" role.');
-      if (asAdmin && !perm.isAdmin) throw new Error('Only an Admin can grant administrator rights on a role.');
-      var e = String(email || '').trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('That does not look like an email.');
-      var dup = dsBuildRoles(state.roles).some(function (r) { return r.role === role && r.email === e; });
-      if (dup) throw new Error(e + ' is already in the "' + role + '" role.');
-      state.roles.push([role, e, asAdmin ? 'Y' : '',
-                        String(note || '').trim() || ('added by ' + perm.email + ' on ' + todayKey(''))]);
-      return this.rolesApi();
-    },
-
-    removeRoleMember: function (role, email) {
-      var perm = myPerm();
-      if (perm.adminOf.indexOf(role) === -1) throw new Error('You are not an administrator of the "' + role + '" role.');
-      var e = String(email || '').trim().toLowerCase();
-      var rows = dsBuildRoles(state.roles);
-      if (role === 'Admin' && rows.filter(function (r) { return r.role === 'Admin'; }).length <= 1) {
-        throw new Error('That is the last Admin — removing it would lock everyone out of role management. ' +
-                        'Add another Admin first.');
-      }
-      for (var i = state.roles.length - 1; i >= 1; i--) {
-        if (String(state.roles[i][0]).trim() === role && String(state.roles[i][1]).trim().toLowerCase() === e) {
-          state.roles.splice(i, 1); break;
-        }
-      }
-      return this.rolesApi();
-    },
-
-    saveRoleView: function (role, view) {
-      var perm = myPerm();
-      if (perm.adminOf.indexOf(role) === -1) throw new Error('You are not an administrator of the "' + role + '" role.');
-      if (DS_ROLES.indexOf(role) === -1) throw new Error('Unknown role: ' + role);
-      state.roleViews[role] = {
-        mode: String((view && view.mode) || 'ramp'), scope: String((view && view.scope) || ''),
-        route: String((view && view.route) || ''),
-        types: ((view && view.types) || []).map(String).slice(0, 8),
-        grades: ((view && view.grades) || []).map(String).slice(0, 16),
-        excludeTypes: ((view && view.excludeTypes) || []).map(String).slice(0, 8),
-        savedBy: perm.email, savedAt: stamp(new Date())
-      };
-      return clone(state.roleViews[role]);
-    }
+    };
+  });
+  window.MOCK_BACKEND = backend;
+  window.DISMISSAL_DEMO = {
+    outbox: outbox, workbooks: WORKBOOKS, props: propStore, files: files,
+    pinnedNow: function () { return formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd HH:mm'); },
+    reset: function () { var s = store(); if (s) s.removeItem(STORE_KEY); window.location.reload(); }
   };
 })();

@@ -37,7 +37,7 @@ export const EXPORTS = [
 
 export function buildLogic() {
   const parts = FILES.map((f) => {
-    let body = readFileSync(path.join(SRC, f), 'utf8');
+    let body = readFileSync(path.join(SRC, f), 'utf8').replace(/\r\n?/g, '\n');
     // Real staff first names in source comments become role aliases — the one deliberate
     // departure from verbatim (verify.mjs applies the same transform before comparing).
     body = aliasStaffNames(body).text;

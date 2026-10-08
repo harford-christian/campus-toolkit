@@ -204,7 +204,7 @@ var DEFAULT_FIELD_TEMPLATES = [
 // Default general settings — key/value pairs, seeded once, editable after.
 var DEFAULT_SETTINGS = [
   ['Competition Year', ''],
-  ['Admin Emails', 'admin@example.edu'],
+  ['Admin Emails', ''],
   ['Payment PDF Link (MACS Schools)', ''],
   ['Payment PDF Link (Non-MACS Schools)', ''],
   ['Day Start Time', '08:30'],
@@ -699,7 +699,7 @@ function doGet(e) {
  */
 function isAuthorizedAdmin_(email) {
   if (!email) return false;
-  ensureSettingExists_('Admin Emails', 'admin@example.edu');
+  ensureSettingExists_('Admin Emails', '');
   var sheet = getOrCreateSheet_(SHEETS.SETTINGS);
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
@@ -1152,7 +1152,9 @@ function notifyUnconfiguredSchool_(schoolName) {
     var key = 'unconfiguredNotified:' + String(schoolName).trim().toLowerCase();
     if (cache.get(key)) return;
     cache.put(key, '1', 3600);
-    MailApp.sendEmail(getAdminNotifyAddress_(),
+    var notifyTo = getAdminNotifyAddress_();
+    if (!notifyTo) { Logger.log('[notifyUnconfiguredSchool_] no Admin Emails setting — nobody to notify about ' + schoolName); return; }
+    MailApp.sendEmail(notifyTo,
       'MACS Fine Arts: "' + schoolName + '" cannot sign in',
       'Someone at "' + schoolName + '" tried to sign in to the Fine Arts registration form, but that ' +
       'school has no allowlist entry in MACS\'s _System spreadsheet, so it cannot submit.\n\n' +
@@ -1166,9 +1168,9 @@ function notifyUnconfiguredSchool_(schoolName) {
   }
 }
 
-/** First address on the Admin Emails setting — the same allowlist the admin page uses. */
+/** First address on the Admin Emails setting — the same allowlist the admin page uses. '' when unset. */
 function getAdminNotifyAddress_() {
-  ensureSettingExists_('Admin Emails', 'admin@example.edu');
+  ensureSettingExists_('Admin Emails', '');
   var data = getOrCreateSheet_(SHEETS.SETTINGS).getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (data[i][0] === 'Admin Emails') {
@@ -1176,7 +1178,7 @@ function getAdminNotifyAddress_() {
       if (first) return first;
     }
   }
-  return 'admin@example.edu';
+  return '';
 }
 
 // ---------- public endpoints (called from Form.html) ----------
@@ -1445,7 +1447,7 @@ function admin_uploadJudgingSheetFile(base64Data, filename, mimeType) {
 function admin_getSettings() {
   requireAdmin_();
   ensureSettingExists_('Competition Year', '');
-  ensureSettingExists_('Admin Emails', 'admin@example.edu');
+  ensureSettingExists_('Admin Emails', '');
   ensureSettingExists_('Payment PDF Link (MACS Schools)', '');
   ensureSettingExists_('Payment PDF Link (Non-MACS Schools)', '');
   var sheet = getOrCreateSheet_(SHEETS.SETTINGS);
@@ -1782,6 +1784,7 @@ function seedTestData() {
  */
 function seedHistoricalTestData() {
   requireAdmin_();
+  loadHistoricalData_();   // the private Sheet, see HistoricalSource.js
   var config = readCategoryConfig_();
 
   var bySchool = {};
@@ -1986,6 +1989,7 @@ function clearPriorTestRows_(codeOrCodes) {
 function clearTestData_() {
   var TEST_CODE = 'TEST';
   var historicalCodes = {};
+  try { loadHistoricalData_(); } catch (e) { /* no historical Sheet configured: only the TEST school is cleared */ }
   HISTORICAL_ENTRIES.forEach(function (rec) { historicalCodes[rec.id.slice(0, 2) + '00'] = true; });
   var codes = [TEST_CODE].concat(Object.keys(historicalCodes));
 

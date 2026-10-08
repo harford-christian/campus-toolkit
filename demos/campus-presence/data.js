@@ -59,8 +59,10 @@ window.CAMPUS_PRESENCE_DATA = (function () {
     '10': 'High School', '11': 'High School', '12': 'High School'
   };
   // Which front desk coordinates the dismissal call. Distinct from the physical map above.
+  // 2026-09-16 upstream: the Kindergarten building got its own iPad and desk ('kg'), so K4, K5
+  // and 5th (who meet in that building) are its desk; grades 1-4 stay with the Elementary desk.
   var DESK = {
-    'K4': 'el', 'K5': 'el', '1': 'el', '2': 'el', '3': 'el', '4': 'el', '5': 'el',
+    'K4': 'kg', 'K5': 'kg', '1': 'el', '2': 'el', '3': 'el', '4': 'el', '5': 'kg',
     '6': 'hs', '7': 'hs', '8': 'hs', '9': 'hs', '10': 'hs', '11': 'hs', '12': 'hs'
   };
 
@@ -426,6 +428,9 @@ window.CAMPUS_PRESENCE_DATA = (function () {
     ['dismissal.reasons', 'Medical appointment|Family|Sports dismissal|Illness|Homeschool|Other'],
     ['building.grade.map', JSON.stringify(GRADE_BUILDING)],
     ['desk.grade.map', JSON.stringify(DESK)],
+    // The board's Dismissal button (2026-09-16 upstream) deep-links to the FACTS Dismissal board;
+    // here it opens the sibling demo, which is the same fictional school on the same Tuesday.
+    ['dismissal.url', '../transportation/index.html'],
     ['presence.doorsheet.enabled', 'false'],
     ['kiosk.idle.warn.seconds', '45'],
     ['kiosk.idle.reset.seconds', '10'],
@@ -447,13 +452,22 @@ window.CAMPUS_PRESENCE_DATA = (function () {
      Stand-alone and fail-CLOSED: no row means no access. AlertStation scopes only the CHIME —
      every listed person still sees the whole campus on the board. */
   function permissionValues() {
-    return [['Email', 'FrontOffice', 'Admin', 'Notes', 'AlertStation'],
-      [DEMO.staffEmail, 'Y', 'Y', 'demo sign-in — front office + settings', 'all'],
-      ['office.demo@example.edu', 'Y', '', 'HS front desk', 'hs'],
-      ['l.pruitt@example.edu', 'Y', '', 'HS office', 'hs'],
-      ['c.ybarra@example.edu', 'Y', '', 'EL entrance desk', 'el'],
-      ['r.ostrowski@example.edu', 'Y', '', 'reads the board at muster; chime off', 'none']
+    return [['Email', 'FrontOffice', 'Admin', 'Notes', 'AlertStation', 'Nurse'],
+      [DEMO.staffEmail, 'Y', 'Y', 'demo sign-in — front office + settings', 'all', 'Y'],
+      ['office.demo@example.edu', 'Y', '', 'HS front desk', 'hs', ''],
+      ['l.pruitt@example.edu', 'Y', '', 'HS office', 'hs', ''],
+      ['c.ybarra@example.edu', 'Y', '', 'EL entrance desk', 'el', ''],
+      ['r.ostrowski@example.edu', 'Y', '', 'reads the board at muster; chime off', 'none', ''],
+      ['t.calloway@example.edu', '', '', 'school nurse — her own sign-out desk only (2026-09-16)', 'none', 'Y']
     ];
+  }
+  // Part-time students whose arrivals and departures are SCHEDULED (schema HOMESCHOOL tab, 2026-09-10
+  // upstream): they get their own kiosk buttons and are never pushed to FACTS attendance.
+  function homeschoolValues() {
+    var H = ['StudentID', 'StudentName', 'Grade', 'Classes', 'AddedBy', 'Expires', 'Notes'];
+    return [H].concat(enrolled.filter(function (s) { return s.hs; }).map(function (s) {
+      return [s.id, s.name, s.grade, '2', 'auto', '', 'seeded from Student Schedules'];
+    }));
   }
 
   /* ---------- SignInOut_DB: WORK_RELEASE ----------
@@ -479,8 +493,10 @@ window.CAMPUS_PRESENCE_DATA = (function () {
     return [['StationID', 'Name', 'Building', 'Enabled'],
       ['hs', 'HS Main Office', 'High School', 'Y'],
       ['el', 'EL Entrance', 'Elementary', 'Y'],
+      ['kg', 'Kindergarten', 'Kindergarten', 'Y'],       // the third iPad (2026-09-16 upstream)
       ['office', 'Office (manual entries)', 'High School', 'Y'],
-      ['mobile', 'Movement devices', 'Other', 'Y']
+      ['mobile', 'Movement devices', 'Other', 'Y'],
+      ['nurse', 'Nurse sign-out desk', 'Nurse', 'Y']     // a real station, not a building
     ];
   }
 
@@ -507,7 +523,8 @@ window.CAMPUS_PRESENCE_DATA = (function () {
   var EVENTS_HEADER = ['EventID', 'Timestamp', 'Date', 'Type', 'PersonType', 'PersonKey',
     'PersonName', 'Grade', 'HomeBuilding', 'Station', 'FromBuilding', 'ToBuilding', 'BadgeID',
     'Reason', 'GuardianName', 'Relationship', 'PickupContactID', 'PickupMatch', 'FlagStatus',
-    'FlagNote', 'RelatedEventID', 'FollowUpMode', 'FollowUpStatus', 'Notes', 'Source'];
+    'FlagNote', 'RelatedEventID', 'FollowUpMode', 'FollowUpStatus', 'Notes', 'Source',
+    'ExpectedBack'];   // appended 2026-09-14 upstream: a movement's or a planned pickup's time
 
   function lcg(seed) {
     var s = seed >>> 0;
@@ -552,7 +569,7 @@ window.CAMPUS_PRESENCE_DATA = (function () {
   var LATE_REASONS = ['Appointment', 'Overslept', 'Car trouble', 'Family', 'Other'];
   var DISMISS_REASONS = ['Medical appointment', 'Family', 'Sports dismissal', 'Illness', 'Other'];
   var VISITOR_DESTS = ['High School', 'High School', 'Elementary', 'Elementary', 'Kindergarten',
-                       '6th Grade', 'Bus Barn'];
+                       '6th Grade', 'Nurse'];
 
   var homeschoolIds = enrolled.filter(function (s) { return s.hs; }).map(function (s) { return s.id; });
   var pickable = enrolled.filter(function (s) { return !s.hs && s.guardians.length; });
@@ -837,6 +854,32 @@ window.CAMPUS_PRESENCE_DATA = (function () {
       FollowUpMode: 'office_alert', FollowUpStatus: 'pending'
     });
 
+    /* ---- planned dismissals (2026-09-14 upstream): a parent rang ahead ----
+       Not a departure: never touches presence, never a sign-out. One group id for a family, so the
+       board's "expected pickups" shows one card for the two Fairbanks children, and the kiosk hands
+       the plan back when Greta arrives. A plan for TOMORROW is taken today (Timestamp today, Date
+       tomorrow — the one type allowed to be forward-dated), so the "Coming up" list has a row. */
+    var planGroup = 'G-20260915113712-417';
+    push(DEMO.date, 11 * 60 + 37, 'dismissal_planned', {
+      PersonKey: '400106', PersonName: 'Fairbanks, Owen', Grade: '9', HomeBuilding: 'High School',
+      Station: 'office', Reason: 'Dr/Dentist', GuardianName: 'Greta Fairbanks', RelatedEventID: planGroup,
+      ExpectedBack: '15:05', FollowUpMode: 'record_only', FollowUpStatus: 'n/a', Source: 'office',
+      Notes: 'planned by ' + DEMO.staffEmail + ' - orthodontist, both children'
+    });
+    push(DEMO.date, 11 * 60 + 37, 'dismissal_planned', {
+      PersonKey: '400107', PersonName: 'Fairbanks, Wren', Grade: '7', HomeBuilding: 'High School',
+      Station: 'office', Reason: 'Dr/Dentist', GuardianName: 'Greta Fairbanks', RelatedEventID: planGroup,
+      ExpectedBack: '15:05', FollowUpMode: 'record_only', FollowUpStatus: 'n/a', Source: 'office',
+      Notes: 'planned by ' + DEMO.staffEmail + ' - orthodontist, both children'
+    });
+    var tomorrowPlan = push(DEMO.date, 9 * 60 + 12, 'dismissal_planned', {
+      PersonKey: '400112', PersonName: 'Kirkwood, Tess', Grade: 'K5', HomeBuilding: 'Kindergarten',
+      Station: 'office', Reason: 'Family Event', GuardianName: 'Helena Kirkwood', RelatedEventID: 'G-20260915091203-088',
+      ExpectedBack: '13:30', FollowUpMode: 'record_only', FollowUpStatus: 'n/a', Source: 'office',
+      Notes: 'planned by ' + DEMO.staffEmail + ' - for tomorrow'
+    });
+    tomorrowPlan.Date = '2026-09-16';
+
     // Append order in the real sheet IS chronological (rows are appended as they happen), and
     // presence's "latest wins" rules read the log in that order — so sort before serialising.
     // Array.prototype.sort is stable, so same-second rows keep the order they were written in
@@ -861,6 +904,7 @@ window.CAMPUS_PRESENCE_DATA = (function () {
     'SETTINGS': settingsValues(),
     'PERMISSIONS': permissionValues(),
     'WORK_RELEASE': workReleaseValues(),
+    'HOMESCHOOL': homeschoolValues(),
     'STATIONS': stationValues()
   };
 

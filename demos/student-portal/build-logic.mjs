@@ -44,7 +44,7 @@ export const EXPORTS = ['bootApi', 'athleticsApi', 'gradesApi', 'savePrefsApi', 
 
 export function buildLogic() {
   const parts = FILES.map((f) => {
-    let body = readFileSync(path.join(SRC, f), 'utf8');
+    let body = readFileSync(path.join(SRC, f), 'utf8').replace(/\r\n?/g, '\n');
     body = body.replace(/^if \(typeof module !== 'undefined' && module\.exports\) module\.exports = \w+;\s*$/m, '');
     // The same always-on privacy scrub build-demo.mjs applies to HTML: the real school domain never lands in
     // the public repo, even inside a source comment. (The domain is split so tools/ itself scans clean.)

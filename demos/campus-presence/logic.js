@@ -41,10 +41,14 @@
 
 var TIER = { KIOSK: 0, OFFICE: 1, SYSTEM: 2 };
 
-// Verbatim from campus-control monitoring (Monitor.js MONITOR_BUILDINGS +
+// Taken from campus-control monitoring (Monitor.js MONITOR_BUILDINGS +
 // Dashboard.html BUILDING_ORDER) so presence reads consistently with the
-// Monitoring board and the lockdown surfaces.
-var BUILDINGS = ['High School', 'Elementary', 'Kindergarten', '6th Grade', 'Modular', 'Bus Barn', 'Other'];
+// Monitoring board and the lockdown surfaces — with one deliberate difference:
+// 'Bus Barn' was never somewhere a student walks to during the day, so Josh
+// swapped it for 'Nurse' (2026-09-09), which is a real destination on the
+// between-buildings screen. This list drives the kiosk destination pills, the
+// board/muster count strips, and the presence fold's buckets.
+var BUILDINGS = ['High School', 'Elementary', 'Kindergarten', '6th Grade', 'Modular', 'Nurse', 'Other'];
 
 // Grade token (as it appears in FACTS 'Grade Level': K4, K5, 1..12 unpadded) → PHYSICAL building
 // (what matters for presence/muster/lockdown). Corrected per Josh at CP0 (2026-08-04);
@@ -62,8 +66,12 @@ var DEFAULT_GRADE_BUILDING_MAP = {
 // Grade token → CONTROLLING front desk (which office coordinates the dismissal call — a parent
 // may sign out ALL their kids at either kiosk; the desks phone the buildings). Distinct from the
 // physical map above: 5th is KG-building/EL-desk, 6th is modular/HS-desk.
+// 2026-09-16: K4, K5 and 5 move to their OWN desk ('kg') now the Kindergarten building is staffed.
+// Grades 1-4 stay with the Elementary desk. THIS DEFAULT ONLY APPLIES TO A FRESH BOOTSTRAP — the
+// live Settings value 'desk.grade.map' wins at runtime, so the change takes effect when it is
+// updated in Settings → Advanced.
 var DEFAULT_DESK_GRADE_MAP = {
-  'K4': 'el', 'K5': 'el', '1': 'el', '2': 'el', '3': 'el', '4': 'el', '5': 'el',
+  'K4': 'kg', 'K5': 'kg', '1': 'el', '2': 'el', '3': 'el', '4': 'el', '5': 'kg',
   '6': 'hs', '7': 'hs', '8': 'hs', '9': 'hs', '10': 'hs', '11': 'hs', '12': 'hs'
 };
 
@@ -75,6 +83,15 @@ var EVENT_TYPES = {
   STUDENT_RETURN_IN: 'student_return_in',
   MOVEMENT: 'movement',
   PICKUP_FLAG: 'pickup_flag',          // an open mismatch — NEVER affects presence, NEVER a completed sign-out
+  // A parent rang ahead: the office records the dismissal BEFORE it happens
+  // (Josh, 2026-09-14). Not a departure — it never touches presence and never
+  // counts as a sign-out. The kiosk offers it back to the parent on arrival so
+  // nobody retypes what was already said on the phone, and an unclaimed plan
+  // simply expires at the end of the day, logged and silent.
+  // Reuses ExpectedBack for the expected pickup time ('HH:mm') and
+  // RelatedEventID for the sibling-group id, so a parent collecting three
+  // children is one plan, not three unrelated rows.
+  DISMISSAL_PLANNED: 'dismissal_planned',
   // Reserved for later revisions (no v1 flow renders or accepts them):
   VOLUNTEER_IN: 'volunteer_in',
   VOLUNTEER_OUT: 'volunteer_out',
@@ -88,7 +105,18 @@ var PICKUP_MATCH = ['matched', 'mismatch', 'override', 'n/a'];
 
 var FOLLOWUP_MODES = ['email_teacher', 'office_alert', 'page_student', 'record_only'];
 
-var STATION_IDS = ['hs', 'el', 'office', 'mobile']; // office = manual entries on the board; mobile = doPost movement devices
+// office = manual entries on the board; mobile = doPost movement devices;
+// nurse = the nurse's own sign-out desk (Josh, 2026-09-16) — a real station, not a building, so
+// her departures are distinguishable in history and metrics from a lobby iPad's.
+// kg = the Kindergarten building's own iPad and desk (Josh, 2026-09-16) — K4, K5 and 5th are
+// already 'Kindergarten' in the building map below; what was missing was a desk of their own.
+// APPEND ONLY: metrics and the alert picker read the earlier positions.
+var STATION_IDS = ['hs', 'el', 'office', 'mobile', 'nurse', 'kg'];
+
+// The desks a dismissal call can be routed to — the subset of STATION_IDS that is a staffed front
+// office, in the order a multi-desk family should be told about them. Anything else in
+// desk.grade.map is a typo, and Planned.deskFor refuses it rather than inventing a desk.
+var DESK_IDS = ['el', 'kg', 'hs'];
 
 var SCHEMA = {
   // Append-only event log. Presence is ALWAYS derived by folding today's rows —
@@ -121,7 +149,12 @@ var SCHEMA = {
       { name: 'FollowUpMode', tier: 'OFFICE' },   // snapshot of the mode in force at event time
       { name: 'FollowUpStatus', tier: 'OFFICE' }, // 'n/a' | 'pending' | 'sent' | 'done'   (updatable; 'pending' rows are the cross-script alert bus)
       { name: 'Notes', tier: 'OFFICE' },
-      { name: 'Source', tier: 'SYSTEM' }          // 'kiosk' | 'office' | 'system' | 'api'
+      { name: 'Source', tier: 'SYSTEM' },         // 'kiosk' | 'office' | 'system' | 'api'
+      // 'HH:mm' a between-buildings mover is expected back (Lisa Cope's ask,
+      // 2026-09-08) — the board highlights them once it passes. APPENDED at the
+      // END: the transportation Dismissal board parses EVENTS by header name, so
+      // a new trailing column is invisible to it. Never insert above this.
+      { name: 'ExpectedBack', tier: 'OFFICE' }
     ]
   },
 
@@ -176,7 +209,12 @@ var SCHEMA = {
       // doesn't interrupt the HS desk. '' or 'all' = every alert (default),
       // 'hs' | 'el' = that kiosk only, 'none' = never chime.
       // APPENDED 2026-09-05 — append-only, so existing rows keep working.
-      { name: 'AlertStation', tier: 'SYSTEM' }
+      { name: 'AlertStation', tier: 'SYSTEM' },
+      // 'Y' → the nurse's sign-out page (?page=nurse) and nothing else. Deliberately INDEPENDENT of
+      // FrontOffice: the nurse signs children out but has no business on the board, and a
+      // front-office account does not get her door for free. Admin implies it, so Josh can test.
+      // APPENDED 2026-09-16 — append-only; existing rows read blank and are unaffected.
+      { name: 'Nurse', tier: 'SYSTEM' }
     ]
   },
 
@@ -192,6 +230,30 @@ var SCHEMA = {
       { name: 'Expires', tier: 'SYSTEM' },        // 'yyyy-MM-dd'; blank = school year
       { name: 'Notes', tier: 'SYSTEM' }
     ]
+  },
+
+  // Part-time / homeschool students, who attend for a class or two and whose
+  // arrivals and departures are SCHEDULED rather than exceptions. They get their
+  // own kiosk buttons (Josh, 2026-09-10) and are excluded from the FACTS
+  // attendance push, because marking a scheduled part-day student late or absent
+  // every day would be wrong.
+  //
+  // Seeded by RUN_seedHomeschoolFromSchedules (SheetGateway.js) from the FACTS
+  // 'Student Schedules' tab — grades 1-12 carrying 4 or fewer real classes,
+  // excluding Work Release. K4/K5 are excluded wholesale: their day is not
+  // scheduled as classes at all, so a class count says nothing about them.
+  // Auto-seeding only ADDS; removing a student is a deliberate human act.
+  HOMESCHOOL: {
+    key: ['StudentID'],
+    cols: [
+      { name: 'StudentID', tier: 'SYSTEM' },      // FACTS 'Student ID (System)'
+      { name: 'StudentName', tier: 'SYSTEM' },
+      { name: 'Grade', tier: 'SYSTEM' },
+      { name: 'Classes', tier: 'SYSTEM' },        // class count when seeded — audit trail
+      { name: 'AddedBy', tier: 'SYSTEM' },        // 'auto' | an email
+      { name: 'Expires', tier: 'SYSTEM' },        // 'yyyy-MM-dd'; blank = school year
+      { name: 'Notes', tier: 'SYSTEM' }
+    ]
   }
 };
 
@@ -199,11 +261,30 @@ var SCHEMA = {
 var SETTINGS_DEFAULTS = {
   'dismissal.followup.mode': 'office_alert',      // FOLLOWUP_MODES — Josh picks the live mode at M6
   'dismissal.followup.cc': '',                    // fallback + cc address(es), comma-separated
+  // Teachers ABOVE this grade are not emailed — their dismissals alert the
+  // board instead (Josh, 2026-09-15: "for now, I only want the emails going to
+  // the front line employees and the k4 thru 6th grade teachers"). Set it to
+  // '12' to email every homeroom teacher.
+  'dismissal.followup.maxgrade': '6',
   'dismissal.pickup.ui': 'type',                  // 'type' (never display contacts) | 'list'
   'late.parentdriven.maxgrade': '5',              // ≤ this grade token = parent signs the student in (Josh 2026-08-05: 6th self-serves like HS)
   'visitor.reasons': 'Meeting|Delivery|Maintenance|Family visit|Other',
-  'late.reasons': 'Appointment|Overslept|Car trouble|Family|Other',
-  'dismissal.reasons': 'Medical appointment|Family|Sports dismissal|Illness|Other',
+  // 'Late Bus' added 2026-09-11 (Josh): the bus was late, which is not the
+  // student's doing — it maps to LA in FACTS, never a tardy.
+  'late.reasons': 'Appointment|Late Bus|Overslept|Car trouble|Family|Other',
+  // The PLANNED-pickup dialog has its own short list (Josh, 2026-09-14): a
+  // parent ringing ahead is answering 'why', not choosing from the full
+  // dismissal picklist the kiosk shows.
+  'plan.reasons': 'Dr/Dentist|Family Event|Other',
+  // The nurse's own list — why a child is going home from HER office, which is a different
+  // question from the front desk's early-dismissal picklist (Josh, 2026-09-16).
+  'nurse.reasons': 'Illness|Fever|Vomiting|Injury|Headache|Other',
+  'dismissal.reasons': 'Medical appointment|Family|Sports dismissal|Illness|Homeschool|Other',
+  // Between-buildings moves. Per Coreen Forloine 2026-09-08: a student moving
+  // UNESCORTED (lessons, ELC, TA duties) signs out and back in; a class moving
+  // together or escorted by a teacher does not. This is NOT leaving campus, so
+  // it never runs the pickup check and never raises a flag.
+  'movement.reasons': "Music lesson|ELC services|Teacher's Aide|Office errand|Other",
   'building.grade.map': JSON.stringify(DEFAULT_GRADE_BUILDING_MAP),
   'desk.grade.map': JSON.stringify(DEFAULT_DESK_GRADE_MAP),
   'presence.doorsheet.enabled': 'false',          // v1 is STANDALONE (Josh, CP0): no Door-Sheet write until he flips this
@@ -221,6 +302,11 @@ var SETTINGS_DEFAULTS = {
   // OWN staff allowlist — we link out rather than copy directory data in here.
   // Blank disables the links.
   'factsfinder.url': '',
+  // Deep-link target for the FACTS Dismissal board (../FACTS/transportation) — the
+  // "how does this child go home today" question the front line asks next. Same
+  // shape as factsfinder.url: Dismissal applies its OWN staff gate, we only point at
+  // it. Blank hides the button; set it from Settings → Board (Josh, 2026-09-15).
+  'dismissal.url': '',
   'kiosk.flows.enabled': JSON.stringify(['visitor', 'student_in', 'student_out']) // volunteer bolts on here later
 };
 
@@ -236,6 +322,7 @@ if (typeof module !== 'undefined' && module.exports) {
     PICKUP_MATCH: PICKUP_MATCH,
     FOLLOWUP_MODES: FOLLOWUP_MODES,
     STATION_IDS: STATION_IDS,
+    DESK_IDS: DESK_IDS,
     SCHEMA: SCHEMA,
     SETTINGS_DEFAULTS: SETTINGS_DEFAULTS
   };
@@ -266,6 +353,37 @@ var Ids = (function () {
   function hhmm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
 
   /**
+   * A stored time, written the way the front desk says it out loud: 2:05 PM.
+   *
+   * DISPLAY ONLY. Everything stored, sorted or compared stays 24-hour — 'HH:mm'
+   * sorts as a string, '2:05 PM' does not — so this is called at the edge, on
+   * the way to a screen or an email, and never on the way into the sheet.
+   *
+   * No timezone conversion happens here and none should: GAS runs this project
+   * in America/New_York and every timestamp was written in that zone, so the
+   * clock time is already Eastern. Shifting it again would move every time by
+   * hours.
+   *
+   * Takes a full 'yyyy-MM-dd HH:mm:ss' timestamp or a bare 'HH:mm'. Anything
+   * else is handed back untouched — a label is never worth throwing for.
+   */
+  function h12(value) {
+    var s = String(value == null ? '' : value).trim();
+    var h, mi;
+    var full = /^\d{4}-\d{2}-\d{2}[ T](\d{1,2}):(\d{2})/.exec(s);
+    if (full) { h = Number(full[1]); mi = Number(full[2]); }
+    else {
+      var bare = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(s);
+      if (!bare) return s;
+      h = Number(bare[1]); mi = Number(bare[2]);
+    }
+    if (h > 23 || mi > 59) return s;
+    var hour = h % 12;
+    if (hour === 0) hour = 12;              // midnight and noon are both 12
+    return hour + ':' + pad2(mi) + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+
+  /**
    * Event ID: E-20260804-134210-4821. The 4-digit disambiguator is caller-supplied
    * (GAS: Math.floor(Math.random()*10000)); same-second collisions at 10–30
    * events/day are already vanishingly rare, the suffix makes them ignorable.
@@ -276,7 +394,7 @@ var Ids = (function () {
       pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()) + '-' + n;
   }
 
-  return { dayKey: dayKey, timestamp: timestamp, hhmm: hhmm, makeEventId: makeEventId };
+  return { dayKey: dayKey, timestamp: timestamp, hhmm: hhmm, h12: h12, makeEventId: makeEventId };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Ids;
@@ -487,12 +605,62 @@ var Directory = (function () {
   }
 
   /**
-   * Staff email lookup by teacher display name. Staff tab has First/Last/Email;
-   * teacher names elsewhere are 'Last, First'. Returns a matcher fn.
+   * Strip accents, punctuation and case, so 'Bueché' and 'Bueche' are one name
+   * and a trailing middle initial cannot change the answer.
+   */
+  function foldName(value) {
+    var t = String(value == null ? '' : value);
+    if (t.normalize) t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return t.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * The (surname, forename) pairs a teacher name could mean.
+   *
+   * FACTS writes teacher names TWO different ways and neither field announces
+   * which: the 7-12 'Homeroom' cell holds 'Burge, Angela L.' while the Student
+   * Schedules HR rows hold 'Burge Angela' with no comma at all. A resolver that
+   * understands only the comma form silently matches nobody — which is exactly
+   * how all 25 elementary homerooms came back unreachable on 2026-09-15, after
+   * the mail had already been switched live.
+   *
+   * Order matters: the comma form is unambiguous, so it is tried first. The
+   * space form is read as FACTS writes it (Last First) before the human order
+   * (First Last), because the former is what the export actually contains.
+   */
+  function teacherNameParts(name) {
+    var raw = String(name == null ? '' : name);
+    var out = [];
+    if (raw.indexOf(',') >= 0) {
+      var bits = raw.split(',');
+      out.push([foldName(bits[0]), foldName(bits[1]).split(' ')[0]]);
+    }
+    var t = foldName(raw).split(' ');
+    if (t.length >= 2) {
+      out.push([t[0], t[1]]);                        // 'Burge Angela' — FACTS HR rows
+      out.push([t[t.length - 1], t[0]]);             // 'Angela Burge' — typed the other way
+    }
+    return out.filter(function (pr) { return pr[0] && pr[1]; });
+  }
+
+  /** The lookup keys a staff record should answer to. */
+  function teacherKeys(last, first) {
+    var L = foldName(last), F = foldName(first).split(' ')[0];
+    return (L && F) ? [L + '|' + F] : [];
+  }
+
+  /**
+   * Staff email lookup by teacher display name — forgiving about the name form,
+   * never about ambiguity.
+   *
+   * A surname alone resolves ONLY when exactly one member of staff carries it.
+   * With mail live, guessing between two Wilsons does not send a slightly wrong
+   * email, it sends a child's early-dismissal notice to a stranger — so an
+   * ambiguous surname returns nothing and the plan still reaches the desk.
    */
   function staffEmailResolver(tabs) {
     var staff = tabByName(tabs, ['Staff']);
-    var byKey = {};
+    var byFull = {}, bySurname = {};
     if (staff && (staff.values || []).length > 1) {
       var h = headerMap(staff.values[0]);
       for (var r = 1; r < staff.values.length; r++) {
@@ -500,14 +668,36 @@ var Directory = (function () {
         var first = cellToString(row[h['First Name']]).trim();
         var last = cellToString(row[h['Last Name']]).trim();
         var email = cellToString(row[h['Email']]).trim();
+        if (h['Active'] !== undefined &&
+            cellToString(row[h['Active']]).toLowerCase() === 'false') continue;
         if (!last || !email) continue;
-        byKey[(last + ',' + first).toLowerCase().replace(/\s+/g, '')] = email;
+        teacherKeys(last, first).forEach(function (k) { if (!byFull[k]) byFull[k] = email; });
+        var L = foldName(last);
+        if (L) {
+          bySurname[L] = bySurname[L] || [];
+          if (bySurname[L].indexOf(email) < 0) bySurname[L].push(email);
+        }
       }
     }
-    /** @param {string} teacherName 'Last, First' */
+    /** @param {string} teacherName 'Last, First M.' OR 'Last First' */
     return function (teacherName) {
-      var key = String(teacherName || '').toLowerCase().replace(/\s+/g, '');
-      return byKey[key] || '';
+      var parts = teacherNameParts(teacherName);
+      for (var i = 0; i < parts.length; i++) {
+        var hit = byFull[parts[i][0] + '|' + parts[i][1]];
+        if (hit) return hit;
+      }
+      // NO surname fallback when a forename was supplied and did not match.
+      // facts-api-sync's watcher does fall back that way, and for an "attendance
+      // is late" nudge that is a fair trade. This is not that: it carries a named
+      // child's dismissal, so 'Smith John' quietly resolving to the only Smith on
+      // staff - Jane - would hand one family's business to a stranger. A supplied
+      // forename that misses is evidence of a DIFFERENT person, so we refuse and
+      // let RUN_planTeacherCheck name the room for a human to fix.
+      var solo = foldName(teacherName);
+      if (solo && solo.indexOf(' ') < 0 && bySurname[solo] && bySurname[solo].length === 1) {
+        return bySurname[solo][0];
+      }
+      return '';
     };
   }
 
@@ -525,9 +715,31 @@ var Directory = (function () {
       var row = tt.values[r];
       var name = cellToString(row[h['Teacher']]).trim();
       var email = cellToString(row[h['Email']]).trim();
-      if (name && email) out[name.toLowerCase().replace(/\s+/g, '')] = email;
+      if (!name || !email) continue;
+      // Register EVERY form the caller might arrive with, for the same reason
+      // staffEmailResolver does: this tab is hand-kept, so 'Burge Angela',
+      // 'Burge, Angela' and 'Angela Burge' are all plausible spellings of one
+      // teacher and none of them should decide whether she is told.
+      out[name.toLowerCase().replace(/\s+/g, '')] = out[name.toLowerCase().replace(/\s+/g, '')] || email;
+      teacherNameParts(name).forEach(function (pr) {
+        var k = pr[0] + '|' + pr[1];
+        if (!out[k]) out[k] = email;
+      });
     }
     return out;
+  }
+
+  /** The ELC side-car lookup, tried in the same forms the staff tab accepts. */
+  function elcEmailFor(elcEmails, teacherName) {
+    var map = elcEmails || {};
+    var flat = String(teacherName || '').toLowerCase().replace(/\s+/g, '');
+    if (map[flat]) return map[flat];
+    var parts = teacherNameParts(teacherName);
+    for (var i = 0; i < parts.length; i++) {
+      var hit = map[parts[i][0] + '|' + parts[i][1]];
+      if (hit) return hit;
+    }
+    return '';
   }
 
   /**
@@ -581,7 +793,8 @@ var Directory = (function () {
     byId: byId,
     homeroomTeacherByStudent: homeroomTeacherByStudent,
     staffEmailResolver: staffEmailResolver,
-    elcTeacherEmails: elcTeacherEmails
+    elcTeacherEmails: elcTeacherEmails,
+    foldName: foldName, teacherNameParts: teacherNameParts, elcEmailFor: elcEmailFor
   };
 })();
 
@@ -634,6 +847,13 @@ var Events = (function () {
     e.EventID = R.Ids.makeEventId(now, disambig);
     e.Timestamp = R.Ids.timestamp(now);
     e.Date = R.Ids.dayKey(now);
+    // A planned dismissal may be FOR a later day (Josh, 2026-09-28): its Date is the day it
+    // applies, so every Date-filtered reader finds it then; Timestamp still records when it was
+    // taken. No other type may be back- or forward-dated — a departure happens when it is written.
+    if (type === 'dismissal_planned' && fields && /^\d{4}-\d{2}-\d{2}$/.test(String(fields.Date || '')) &&
+        String(fields.Date) > e.Date) {
+      e.Date = String(fields.Date);
+    }
     e.Type = type;
     if (type === 'visitor_in' && !e.PersonKey) e.PersonKey = e.EventID; // visit-scoped identity
     if (!e.PersonType) e.PersonType = type.indexOf('visitor') === 0 ? 'visitor' : 'student';
@@ -663,6 +883,683 @@ var Events = (function () {
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Events;
+
+/* ===================== logic/family.js ===================== */
+'use strict';
+/**
+ * family.js — which enrolled children belong to the same family.
+ *
+ * WHY THIS EXISTS. A parent collecting three children had to run the whole sign-out three times,
+ * typing their name each time (Josh, 2026-09-16). The planned-pickup path already handled a family
+ * in one go, but only when somebody had rung ahead that morning; a walk-up got nothing.
+ *
+ * FACTS gives this project no family id — the directory tab is one row per student+guardian — so
+ * the link is the GUARDIAN: two children are siblings when they share a guardian. An email is the
+ * strong key (exact, and a parent has one address across their children); a folded guardian NAME is
+ * the fallback for the families whose rows carry no address.
+ *
+ * THIS MODULE ANSWERS "WHO IS RELATED", NEVER "WHO MAY BE COLLECTED". The caller must still run the
+ * authorized-pickup check per child before a sibling's name is shown to anyone or acted on —
+ * custody arrangements mean an adult cleared for one child may not be cleared for another, and the
+ * kiosk is an anonymous device. Being someone's sibling is not permission.
+ */
+
+var Family = (function () {
+  /** Fold a guardian name to surname + first forename, so "Smith, Jane A." keys with "Smith Jane". */
+  function nameKey(s) {
+    var t = String(s == null ? '' : s);
+    if (typeof t.normalize === 'function') t = t.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    var toks = t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+    return toks.slice(0, 2).join(' ');
+  }
+
+  /**
+   * The keys that identify this student's family. Emails win; a name is used only when a guardian
+   * row carries no address at all, so a common surname never merges two unrelated families that
+   * both have emails on file.
+   * @return {Array<string>} prefixed keys ('e:' email, 'n:' folded name)
+   */
+  function guardianKeys(student) {
+    var out = [], seen = {};
+    ((student && student.guardians) || []).forEach(function (g) {
+      var emails = (g && g.emails) || [];
+      var any = false;
+      emails.forEach(function (e) {
+        var k = 'e:' + String(e || '').trim().toLowerCase();
+        if (k !== 'e:' && !seen[k]) { seen[k] = 1; out.push(k); any = true; }
+      });
+      if (!any) {
+        var n = nameKey(g && g.name);
+        var k2 = 'n:' + n;
+        if (n && !seen[k2]) { seen[k2] = 1; out.push(k2); }
+      }
+    });
+    return out;
+  }
+
+  /**
+   * Every OTHER enrolled student who shares a guardian with this one.
+   * @param students Directory.buildStudents output
+   * @param studentId the child already identified
+   * @return {Array<{id,name,grade}>} alphabetical; [] when the child or their family is unknown
+   */
+  function siblingsOf(students, studentId) {
+    var id = String(studentId == null ? '' : studentId);
+    var self = null;
+    (students || []).forEach(function (st) { if (String(st.id) === id) self = st; });
+    if (!self) return [];
+    var keys = {};
+    guardianKeys(self).forEach(function (k) { keys[k] = 1; });
+    if (!Object.keys(keys).length) return [];   // no guardian on file = no family link to draw
+
+    var out = [];
+    (students || []).forEach(function (st) {
+      if (String(st.id) === id) return;
+      var hit = false;
+      guardianKeys(st).forEach(function (k) { if (keys[k]) hit = true; });
+      if (hit) out.push({ id: String(st.id), name: st.name, grade: st.grade });
+    });
+    out.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+    return out;
+  }
+
+  return { nameKey: nameKey, guardianKeys: guardianKeys, siblingsOf: siblingsOf };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Family;
+
+/* ===================== logic/planned.js ===================== */
+'use strict';
+/**
+ * planned.js — planned early dismissals: a parent rings ahead, the office
+ * records it, and the kiosk hands it back when they arrive (Josh, 2026-09-14).
+ *
+ * PURE: no GAS globals, no I/O. Shared by the office (create, list, notify) and
+ * the kiosk (recognise on arrival), so both agree on what "still outstanding"
+ * means instead of two filters drifting apart.
+ *
+ * A plan is NOT a departure. It never touches presence, never counts as a
+ * sign-out, and the pickup check still runs when the adult actually turns up —
+ * the plan says a dismissal is expected, not that whoever arrives is authorised
+ * (Josh, decision 3).
+ */
+
+var Planned = (function () {
+
+  // The staffed front desks, in the order a multi-desk family should be told about them. Mirrors
+  // DESK_IDS in schema.js; kept local because this module is pure and imports nothing.
+  var DESK_ORDER_ = ['el', 'kg', 'hs'];
+
+  /**
+   * Which front desk coordinates this student's dismissal?
+   *
+   * This is the routing key for the ARRIVAL alert, deliberately NOT the kiosk
+   * the parent happens to be standing at (Josh, decision 2). A parent at the EL
+   * iPad collecting a 4th grader AND a 10th grader must ring a bell at BOTH
+   * desks — the HS desk is the one that has to walk the 10th grader down, and
+   * routing by station would have left them unaware anyone was there.
+   *
+   * @param {Object} deskMap grade token -> 'hs' | 'el' (Settings desk.grade.map)
+   * MAP-DRIVEN, not a two-desk whitelist (Josh, 2026-09-16). This used to hard-code 'hs'/'el' and
+   * return '' for anything else, so the day the Kindergarten building got its own desk every KG
+   * flag and pending alert would have carried desk:'' — a silent empty string that renders as '?'
+   * on the board, routes to nobody, and makes isMultiDesk read false. Now any desk the map names
+   * is honoured, and only a desk that is not a known station is refused.
+   *
+   * @return {string} a DESK_ORDER_ value, or '' when the grade is unknown or the map names no desk
+   */
+  function deskFor(deskMap, grade) {
+    var g = String(grade == null ? '' : grade).trim().toUpperCase();
+    if (!g) return '';
+    var m = deskMap || {};
+    var hit = m[g] || m[g.toLowerCase()] || m[String(grade).trim()];
+    var d = String(hit == null ? '' : hit).trim().toLowerCase();
+    return DESK_ORDER_.indexOf(d) === -1 ? '' : d;   // a typo in Settings is not a new desk
+  }
+
+  /** The distinct desks a group of students touches, in a stable order. */
+  function desksFor(deskMap, students) {
+    var seen = {};
+    (students || []).forEach(function (s) {
+      var d = deskFor(deskMap, s && s.grade);
+      if (d) seen[d] = true;
+    });
+    return DESK_ORDER_.filter(function (d) { return seen[d]; });
+  }
+
+  /** True when a group spans more than one desk — both need telling. */
+  function isMultiDesk(deskMap, students) {
+    return desksFor(deskMap, students).length > 1;
+  }
+
+  /**
+   * Outstanding plans for today: a plan is CLAIMED once the student has an
+   * early-out (or a pickup flag — someone is clearly at the desk for them), and
+   * CANCELLED when the office says so. Anything left at the end of the day
+   * simply expires, logged and silent (Josh, decision 4) — no chasing, no
+   * red banner for a parent whose plans changed.
+   *
+   * @param {Array<Object>} events today's EVENTS rows
+   * @return {Array<Object>} the still-outstanding plan rows, oldest first
+   */
+  function outstanding(events) {
+    var claimed = {}, cancelled = {};
+    (events || []).forEach(function (e) {
+      if (e.Type === 'student_early_out' || e.Type === 'pickup_flag') {
+        claimed[String(e.PersonKey)] = true;
+      }
+      if (e.Type === 'dismissal_planned' &&
+          String(e.FlagStatus || '').toLowerCase() === 'cancelled') {
+        cancelled[String(e.EventID)] = true;
+      }
+    });
+    return (events || []).filter(function (e) {
+      if (e.Type !== 'dismissal_planned') return false;
+      if (cancelled[String(e.EventID)]) return false;
+      return !claimed[String(e.PersonKey)];
+    });
+  }
+
+  /** The outstanding plan for ONE student today, or null. */
+  function forStudent(events, studentId) {
+    var id = String(studentId || '');
+    var hits = outstanding(events).filter(function (e) { return String(e.PersonKey) === id; });
+    return hits.length ? hits[hits.length - 1] : null;   // the most recent wins
+  }
+
+  /**
+   * Everyone in the same sibling group, so the desk sees "collecting 3" rather
+   * than three unrelated rows. Group id lives in RelatedEventID.
+   */
+  function groupOf(events, groupId) {
+    var g = String(groupId || '');
+    if (!g) return [];
+    return (events || []).filter(function (e) {
+      return e.Type === 'dismissal_planned' && String(e.RelatedEventID || '') === g;
+    });
+  }
+
+  /**
+   * The OTHER children on the same call who are still outstanding — what the
+   * kiosk offers back when one parent has come for several.
+   *
+   * Lives here rather than in the kiosk because two rules matter and both are
+   * easy to get quietly wrong: a sibling already collected must NOT be offered
+   * again (it would sign a child out twice), and a plan with no group id must
+   * drag in nobody — blank ids must never collide into one giant family.
+   */
+  function siblingsOf(events, studentId) {
+    var id = String(studentId || '');
+    var plan = forStudent(events, id);
+    if (!plan || !String(plan.RelatedEventID || '')) return [];
+    var still = {};
+    outstanding(events).forEach(function (e) { still[String(e.EventID)] = true; });
+    return groupOf(events, plan.RelatedEventID).filter(function (e) {
+      return still[String(e.EventID)] && String(e.PersonKey) !== id;
+    });
+  }
+
+  /** 'HH:mm' -> minutes, or -1. Used to sort plans by when they are expected. */
+  function minutesOf(hhmm) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+    if (!m) return -1;
+    var h = Number(m[1]), mi = Number(m[2]);
+    if (h > 23 || mi > 59) return -1;
+    return h * 60 + mi;
+  }
+
+  /** Outstanding plans sorted by expected time, unknown times last. */
+  function sorted(events) {
+    return outstanding(events).slice().sort(function (a, b) {
+      var ma = minutesOf(a.ExpectedBack), mb = minutesOf(b.ExpectedBack);
+      if (ma < 0 && mb < 0) return 0;
+      if (ma < 0) return 1;
+      if (mb < 0) return -1;
+      return ma - mb;
+    });
+  }
+
+  /**
+   * Outstanding plans folded into FAMILIES — one card per parent trip, not one
+   * per child (Josh, 2026-09-14). A parent collecting three children is one
+   * event at the counter, and three separate rows made the desk work out for
+   * themselves that they were related.
+   *
+   * Each family carries the desks it touches, and each child is tagged with
+   * theirs, so a desk can see at a glance which children are ITS job while
+   * still seeing the whole trip. Hiding the other building's children would
+   * make the card incoherent — "collecting 1" when a parent says "I'm here for
+   * three" is worse than showing one extra name.
+   *
+   * @param {Object} deskMap Settings desk.grade.map
+   * @return {Array<Object>} families, soonest-expected first
+   */
+  function families(events, deskMap) {
+    var rows = sorted(events);
+    var byGroup = {}, order = [];
+    rows.forEach(function (e) {
+      // A plan with no group id is its own family of one (older rows, or a
+      // single child) — keyed by event id so it can never collide.
+      var key = String(e.RelatedEventID || '') || ('solo:' + e.EventID);
+      if (!byGroup[key]) {
+        byGroup[key] = {
+          groupId: String(e.RelatedEventID || ''),
+          expectedAt: e.ExpectedBack || '',
+          reason: e.Reason || '',
+          guardianName: e.GuardianName || '',
+          at: e.Timestamp,
+          students: [],
+          desks: []
+        };
+        order.push(key);
+      }
+      var f = byGroup[key];
+      var desk = deskFor(deskMap, e.Grade);
+      f.students.push({
+        eventId: e.EventID, studentId: e.PersonKey, name: e.PersonName,
+        grade: e.Grade, desk: desk
+      });
+      if (desk && f.desks.indexOf(desk) < 0) f.desks.push(desk);
+      // The soonest time in the family is the family's time.
+      if (!f.expectedAt || (minutesOf(e.ExpectedBack) >= 0 &&
+          minutesOf(e.ExpectedBack) < minutesOf(f.expectedAt))) {
+        f.expectedAt = e.ExpectedBack || f.expectedAt;
+      }
+    });
+    return order.map(function (k) {
+      var f = byGroup[k];
+      f.desks.sort();
+      return f;
+    });
+  }
+
+  /**
+   * Translate an OFFICE plan reason into the KIOSK dismissal chip it should
+   * pre-select.
+   *
+   * The two lists are deliberately different vocabularies: the office picks
+   * from a short phone-call list ("Dr/Dentist", "Family Event", "Other") while
+   * the kiosk offers the fuller dismissal list ("Medical appointment",
+   * "Family", "Sports dismissal"…). Without a translation, "Dr/Dentist" would
+   * match no chip, quietly select nothing, and the parent would conclude the
+   * screen had forgotten their call — the exact failure this feature exists to
+   * prevent.
+   *
+   * Falls back through preferences rather than hard-coding one target, so the
+   * office can re-word either list in Settings without this going dead. An
+   * unmappable reason returns '' and the parent simply taps one, as before.
+   *
+   * @param {string} planReason what the office recorded
+   * @param {Array<string>} kioskReasons the live dismissal.reasons list
+   * @return {string} a value present in kioskReasons, or ''
+   */
+  var PLAN_REASON_ALIASES_ = {
+    'dr/dentist': ['Medical appointment', 'Appointment', 'Illness', 'Other'],
+    'family event': ['Family', 'Other'],
+    'other': ['Other']
+  };
+
+  function kioskReasonFor(planReason, kioskReasons) {
+    var want = String(planReason == null ? '' : planReason).trim();
+    if (!want) return '';
+    var list = (kioskReasons || []).filter(function (r) { return r; });
+    function find(target) {
+      for (var i = 0; i < list.length; i++) {
+        if (String(list[i]).toLowerCase() === String(target).toLowerCase()) return list[i];
+      }
+      return '';
+    }
+    var exact = find(want);                       // the lists may already agree
+    if (exact) return exact;
+    var alts = PLAN_REASON_ALIASES_[want.toLowerCase()] || [];
+    for (var j = 0; j < alts.length; j++) {
+      var hit = find(alts[j]);
+      if (hit) return hit;
+    }
+    return '';
+  }
+
+  // ---------------------------------------------------------------------------
+  // PLANNING AHEAD (Josh, 2026-09-28): "Mum rang on Monday about Friday's dentist."
+  //
+  // A future plan is the same dismissal_planned row with its Date column set to the day it is FOR
+  // (Timestamp still says when it was recorded). Every reader already filters by Date — this
+  // board's Expected pickups, the kiosk hand-back, the transportation Dismissal board — so on the
+  // day it simply appears, with nobody taught anything new. Before that day it shows only in the
+  // board's "Coming up" list.
+  // ---------------------------------------------------------------------------
+
+  /** How far ahead a plan may be made. A term is about this long; anything further is a typo. */
+  var MAX_DAYS_AHEAD = 60;
+
+  var DAY_NAMES_ = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTH_NAMES_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August',
+    'September', 'October', 'November', 'December'];
+
+  /** 'yyyy-MM-dd' -> UTC Date at midnight, or null when it is not a real calendar day. */
+  function parseDay_(key) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(key || '').trim());
+    if (!m) return null;
+    var d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    // Date.UTC rolls 2026-02-31 into March; a rolled date is not the day that was typed.
+    if (d.getUTCMonth() !== Number(m[2]) - 1 || d.getUTCDate() !== Number(m[3])) return null;
+    return d;
+  }
+
+  /**
+   * Is this an acceptable day to plan a pickup for?
+   *
+   * Blank means today, so the dialog behaves exactly as it did before for the common case.
+   * Refused: the past (nothing reads it), weekends (no school, and the morning reminder would
+   * mail a teacher on a Saturday about nothing), and more than MAX_DAYS_AHEAD out.
+   *
+   * @param {string} forDay 'yyyy-MM-dd' or ''
+   * @param {string} todayKey 'yyyy-MM-dd' (America/New_York, from Ids.dayKey)
+   * @return {{ok:boolean, day?:string, error?:string}}
+   */
+  function checkPlanDay(forDay, todayKey) {
+    var want = String(forDay == null ? '' : forDay).trim();
+    if (!want) return { ok: true, day: todayKey };
+    var d = parseDay_(want), t = parseDay_(todayKey);
+    if (!d || !t) return { ok: false, error: 'that is not a date' };
+    var ahead = Math.round((d.getTime() - t.getTime()) / 86400000);
+    if (ahead < 0) return { ok: false, error: 'that day has already gone' };
+    if (ahead > MAX_DAYS_AHEAD) {
+      return { ok: false, error: 'plans can be made up to ' + MAX_DAYS_AHEAD + ' days ahead' };
+    }
+    var dow = d.getUTCDay();
+    if (dow === 0 || dow === 6) return { ok: false, error: 'that is a ' + DAY_NAMES_[dow] };
+    return { ok: true, day: want };
+  }
+
+  /** 'yyyy-MM-dd' -> 'Friday, October 2' (or the input unchanged when it is not a date). */
+  function dayLabel(key) {
+    var d = parseDay_(key);
+    if (!d) return String(key || '');
+    return DAY_NAMES_[d.getUTCDay()] + ', ' + MONTH_NAMES_[d.getUTCMonth()] + ' ' + d.getUTCDate();
+  }
+
+  /**
+   * Plans for days AFTER today, as families, soonest day first — the board's "Coming up".
+   *
+   * Nothing can have claimed them yet (a departure is always today's), so only a cancellation
+   * removes one. Each family carries its date so the list can say which day it is for.
+   *
+   * @param {Array<Object>} rows EVENTS rows (any days; only future plans are kept)
+   * @return {Array<Object>} families with .date, by date then expected time
+   */
+  function upcoming(rows, todayKey, deskMap) {
+    var byDay = {};
+    (rows || []).forEach(function (e) {
+      if (e.Type !== 'dismissal_planned') return;
+      var day = String(e.Date || '').slice(0, 10);
+      if (!(day > todayKey)) return;
+      (byDay[day] = byDay[day] || []).push(e);
+    });
+    var out = [];
+    Object.keys(byDay).sort().forEach(function (day) {
+      families(byDay[day], deskMap).forEach(function (f) { f.date = day; out.push(f); });
+    });
+    return out;
+  }
+
+  /**
+   * The morning reminder: today's still-outstanding plans that were RECORDED ON AN EARLIER DAY,
+   * grouped by family. A plan rung in this morning already sent its email minutes ago and must
+   * not send a second; a plan made last week has not been mentioned since, and a teacher who read
+   * it on Monday will not remember it on Friday.
+   *
+   * @return {Array<Array<Object>>} one array of plan rows per family
+   */
+  function remindersDue(events, todayKey) {
+    var byGroup = {}, order = [];
+    outstanding(events).forEach(function (e) {
+      if (String(e.Date || '').slice(0, 10) !== todayKey) return;
+      if (!(String(e.Timestamp || '').slice(0, 10) < todayKey)) return;
+      var key = String(e.RelatedEventID || '') || ('solo:' + e.EventID);
+      if (!byGroup[key]) { byGroup[key] = []; order.push(key); }
+      byGroup[key].push(e);
+    });
+    return order.map(function (k) { return byGroup[k]; });
+  }
+
+  /** Does this family concern the given desk? '' / 'all' means every family. */
+  function familyTouchesDesk(family, desk) {
+    if (!desk || desk === 'all') return true;
+    return (family.desks || []).indexOf(desk) >= 0;
+  }
+
+  return {
+    deskFor: deskFor,
+    desksFor: desksFor,
+    isMultiDesk: isMultiDesk,
+    outstanding: outstanding,
+    forStudent: forStudent,
+    groupOf: groupOf,
+    siblingsOf: siblingsOf,
+    minutesOf: minutesOf,
+    sorted: sorted,
+    families: families,
+    familyTouchesDesk: familyTouchesDesk,
+    kioskReasonFor: kioskReasonFor,
+    MAX_DAYS_AHEAD: MAX_DAYS_AHEAD,
+    checkPlanDay: checkPlanDay,
+    dayLabel: dayLabel,
+    upcoming: upcoming,
+    remindersDue: remindersDue
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Planned;
+
+/* ===================== logic/history.js ===================== */
+'use strict';
+/**
+ * history.js — querying the EVENTS log for the front desk's "what happened?"
+ * questions, and for OTHER APPS that read this data (Josh, 2026-09-12).
+ *
+ * PURE: no GAS globals, no I/O. That is the point — the office History page,
+ * any future JSON endpoint, and any sibling project that vendors this file all
+ * answer a question the SAME way, instead of three subtly different filters
+ * drifting apart. Anything reading EVENTS should reach for this, not re-derive.
+ *
+ * The log is append-only and nothing is ever overwritten, so a student's day is
+ * the full sequence of what happened, in order — a late arrival, a walk to
+ * another building, the walk back, an early dismissal are four rows, not one
+ * row updated four times. These helpers reassemble that story.
+ */
+
+var History = (function () {
+
+  /** Event types a human would call "something happened to this student". */
+  var STUDENT_TYPES = {
+    student_late_in: 1, student_early_out: 1, student_return_in: 1,
+    movement: 1, pickup_flag: 1
+  };
+
+  /** 'yyyy-MM-dd' from a Date, in no particular timezone — callers pass day keys. */
+  function dayOf(value) {
+    var s = String(value == null ? '' : value);
+    var m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+    return m ? m[1] : '';
+  }
+
+  function shiftDays(dayKey, n) {
+    var p = String(dayKey).split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() + n);
+    var mm = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+  }
+
+  /**
+   * A named range → { from, to } inclusive day keys.
+   * Weeks run Monday–Sunday, which is how a school week is spoken about.
+   * @param {string} preset today|yesterday|week|lastweek|month|last30|all
+   * @param {string} todayKey 'yyyy-MM-dd'
+   */
+  function rangeFor(preset, todayKey) {
+    var p = String(preset || 'today').toLowerCase();
+    var parts = String(todayKey).split('-');
+    var dow = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getDay(); // 0=Sun
+    var sinceMonday = (dow === 0) ? 6 : dow - 1;
+
+    if (p === 'today') return { from: todayKey, to: todayKey, label: 'Today' };
+    if (p === 'yesterday') {
+      var y = shiftDays(todayKey, -1);
+      return { from: y, to: y, label: 'Yesterday' };
+    }
+    if (p === 'week') {
+      return { from: shiftDays(todayKey, -sinceMonday), to: todayKey, label: 'This week' };
+    }
+    if (p === 'lastweek') {
+      var lastMon = shiftDays(todayKey, -sinceMonday - 7);
+      return { from: lastMon, to: shiftDays(lastMon, 6), label: 'Last week' };
+    }
+    if (p === 'month') {
+      return { from: todayKey.slice(0, 8) + '01', to: todayKey, label: 'This month' };
+    }
+    if (p === 'last30') return { from: shiftDays(todayKey, -29), to: todayKey, label: 'Last 30 days' };
+    if (p === 'all') return { from: '', to: '', label: 'All time' };
+    return { from: todayKey, to: todayKey, label: 'Today' };
+  }
+
+  /** Inclusive day-range test; blank bounds mean unbounded. */
+  function inRange(dayKey, from, to) {
+    if (!dayKey) return false;
+    if (from && dayKey < from) return false;
+    if (to && dayKey > to) return false;
+    return true;
+  }
+
+  /**
+   * One event → a sentence a person can read without knowing the schema.
+   * Kept here rather than in a template so every surface says the same thing.
+   */
+  function describe(e) {
+    var t = e.Type;
+    var reason = String(e.Reason || '').trim();
+    if (t === 'student_late_in') {
+      return 'Arrived late' + (reason ? ' — ' + reason : '');
+    }
+    if (t === 'student_early_out') {
+      var who = String(e.GuardianName || '').trim();
+      return 'Signed out' + (reason ? ' — ' + reason : '') +
+        (who ? ' (' + who + ')' : '');
+    }
+    if (t === 'student_return_in') return 'Came back on campus';
+    if (t === 'movement') {
+      if (reason === 'returned' || reason === 'arrived') {
+        return 'Back in ' + (e.ToBuilding || 'their building');
+      }
+      return 'Walked to ' + (e.ToBuilding || '?') + (reason ? ' — ' + reason : '');
+    }
+    if (t === 'pickup_flag') {
+      return 'PICKUP FLAG — "' + String(e.GuardianName || '').trim() + '" did not match' +
+        (String(e.FlagStatus || '') === 'resolved' ? ' (resolved)' : ' (open)');
+    }
+    if (t === 'visitor_in') return 'Visitor signed in' + (reason ? ' — ' + reason : '');
+    if (t === 'visitor_out') return 'Visitor signed out';
+    return t;
+  }
+
+  /** 'yyyy-MM-dd HH:mm:ss' → 'HH:mm'. */
+  function timeOf(ts) {
+    var m = /\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/.exec(String(ts || ''));
+    return m ? m[1] : '';
+  }
+
+  /**
+   * Filter the log. Every criterion is optional and they AND together.
+   * @param {Array<Object>} events raw EVENTS rows
+   * @param {Object} q { from, to, studentId, types, station, personType }
+   */
+  function filter(events, q) {
+    q = q || {};
+    var wantTypes = (q.types && q.types.length)
+      ? q.types.reduce(function (m, t) { m[t] = 1; return m; }, {}) : null;
+    return (events || []).filter(function (e) {
+      if (!inRange(dayOf(e.Date), q.from, q.to)) return false;
+      if (q.studentId && String(e.PersonKey) !== String(q.studentId)) return false;
+      if (q.personType && String(e.PersonType || '') !== q.personType) return false;
+      if (q.station && String(e.Station || '') !== q.station) return false;
+      if (wantTypes && !wantTypes[e.Type]) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Everything that happened, grouped day → student, each student's events in
+   * time order. This is the shape both questions want: "show me this student"
+   * is one student across days, "show me last Tuesday" is one day across
+   * students — same structure, read differently.
+   */
+  function groupByDay(events) {
+    var days = {};
+    (events || []).forEach(function (e) {
+      var d = dayOf(e.Date);
+      if (!d) return;
+      var day = days[d] || (days[d] = {});
+      var key = String(e.PersonKey || '') || ('_' + e.EventID);
+      var person = day[key] || (day[key] = {
+        personKey: String(e.PersonKey || ''), name: e.PersonName || '',
+        grade: e.Grade || '', personType: e.PersonType || '', events: []
+      });
+      person.events.push(e);
+    });
+    return Object.keys(days).sort().reverse().map(function (d) {
+      var people = Object.keys(days[d]).map(function (k) {
+        var p = days[d][k];
+        p.events.sort(function (a, b) {
+          return String(a.Timestamp) < String(b.Timestamp) ? -1 : 1;
+        });
+        p.timeline = p.events.map(function (e) {
+          return { at: timeOf(e.Timestamp), type: e.Type, text: describe(e),
+                   station: e.Station || '', eventId: e.EventID };
+        });
+        return p;
+      });
+      people.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+      return { date: d, people: people, count: people.length };
+    });
+  }
+
+  /** Distinct students appearing in a set of events, for a picker. */
+  function studentsIn(events) {
+    var seen = {};
+    (events || []).forEach(function (e) {
+      if (String(e.PersonType || '') !== 'student' || !e.PersonKey) return;
+      var k = String(e.PersonKey);
+      if (!seen[k]) seen[k] = { id: k, name: e.PersonName || '', grade: e.Grade || '', count: 0 };
+      seen[k].count++;
+    });
+    return Object.keys(seen).map(function (k) { return seen[k]; })
+      .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+
+  /** Per-type totals for the header strip. */
+  function counts(events) {
+    var out = { total: (events || []).length };
+    (events || []).forEach(function (e) { out[e.Type] = (out[e.Type] || 0) + 1; });
+    return out;
+  }
+
+  return {
+    STUDENT_TYPES: STUDENT_TYPES,
+    rangeFor: rangeFor,
+    inRange: inRange,
+    dayOf: dayOf,
+    shiftDays: shiftDays,
+    timeOf: timeOf,
+    describe: describe,
+    filter: filter,
+    groupByDay: groupByDay,
+    studentsIn: studentsIn,
+    counts: counts
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = History;
 
 /* ===================== logic/badges.js ===================== */
 'use strict';
@@ -958,8 +1855,20 @@ var Presence = (function () {
       }
       if (st.movement) {
         var m = st.movement;
-        moved.push({ id: id, name: m.PersonName, from: m.FromBuilding, to: m.ToBuilding,
-                     at: hhmmOf_(m.Timestamp), inTransit: m.Reason !== 'arrived' });
+        // A trip is CLOSED by a return leg. 'returned' is what the kiosk's
+        // "coming back" flow writes; 'arrived' is the movement doPost API's
+        // documented sentinel — both must close, or a student who came back
+        // would read as still out.
+        var closed = m.Reason === 'returned' || m.Reason === 'arrived';
+        moved.push({
+          id: id, name: m.PersonName, grade: m.Grade,
+          from: m.FromBuilding, to: m.ToBuilding,
+          at: hhmmOf_(m.Timestamp),
+          expectedBack: m.ExpectedBack || '',
+          reason: closed ? '' : (m.Reason || ''),
+          away: !closed,          // still in another building
+          inTransit: !closed      // retained name; the board reads this
+        });
       }
     });
 
@@ -971,7 +1880,10 @@ var Presence = (function () {
     }
     visitors.forEach(function (v) { bump_(v.building, 'visitors'); });
     studentsOff.forEach(function (s) { bump_(s.building, 'off'); });
-    moved.forEach(function (m) { if (!m.inTransit) bump_(m.to, 'moved'); });
+    // Only students still AWAY shift a building count — that is the whole point
+    // during a drill ("which building do I look in?"). Once they are back, the
+    // homeroom-building assumption is correct again and needs no adjustment.
+    moved.forEach(function (m) { if (m.away) bump_(m.to, 'moved'); });
 
     return { visitors: visitors, studentsOff: studentsOff, late: late, moved: moved,
              flags: { openMismatch: openMismatch }, counts: counts };
@@ -989,8 +1901,11 @@ var Presence = (function () {
       studentsOff: presence.studentsOff.map(function (s) {
         return { n: s.name, grade: s.grade, bld: s.building, out: s.out, with: s.with };
       }),
-      moved: presence.moved.map(function (m) {
-        return { n: m.name, from: m.from, to: m.to, at: m.at, transit: !!m.inTransit };
+      // Only the students actually away — a lockdown roll-call needs to know who
+      // is NOT where the roster says, not who already came back.
+      moved: presence.moved.filter(function (m) { return m.away; }).map(function (m) {
+        return { n: m.name, from: m.from, to: m.to, at: m.at,
+                 back: m.expectedBack || '', why: m.reason || '' };
       }),
       flags: presence.flags
     };
@@ -1265,6 +2180,11 @@ var Metrics = (function () {
       var day = String(e.Date || '').slice(0, 10);
       if (!day || !inRange(day, from, to)) return;
 
+      // Auto-closed visitors are written as visitor_out, which COUNTED excludes,
+      // so this has to be tallied BEFORE the type filter — behind it the counter
+      // could never fire and the KPI read a permanent zero.
+      if (String(e.Notes || '').indexOf('auto sign-out') !== -1) kpi.autoClosed++;
+
       // Safety signal, counted and surfaced on its own — never a dismissal.
       if (e.Type === 'pickup_flag') {
         kpi.flags++;
@@ -1295,8 +2215,6 @@ var Metrics = (function () {
         var wd = new Date(Number(dt[0]), Number(dt[1]) - 1, Number(dt[2])).getDay();
         bump_(byWeekday, String(wd));
       }
-      if (String(e.Notes || '').indexOf('auto sign-out') !== -1) kpi.autoClosed++;
-
       if (e.PersonType === 'student' && e.PersonKey) {
         if (!studentSeen[e.PersonKey]) { studentSeen[e.PersonKey] = true; kpi.students++; }
         var s = perStudent[e.PersonKey] = perStudent[e.PersonKey] ||
@@ -1384,6 +2302,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Metrics;
  * notify.js — early-dismissal follow-up resolution. Pure decisions only; the
  * GAS side (Mailer / the pending-row alert bus) executes them.
  *
+ * WHO IS IN SCOPE FOR MAIL (Josh, 2026-09-15): the front line, and homeroom
+ * teachers up to grade 6. Above that boundary an early dismissal alerts the
+ * board rather than emailing the teacher — 'dismissal.followup.maxgrade'.
+ *
  * All four modes exist (Josh picks the live one in Settings later):
  *   email_teacher — resolve the student's teacher and email them
  *   office_alert  — mark the event FollowUpStatus=pending (board chime/toast)
@@ -1401,7 +2323,9 @@ var Notify = (function () {
    * Grades 7–12: Sheet1 'Homeroom Teacher' → Staff-tab email.
    * K5–6: Student Schedules Homeroom row → Staff tab, then ELC side-car.
    * @param {Object} student  from Directory.buildStudents
-   * @param {Object} ctx { staffEmailFor:fn(name), hrByStudent:{}, elcEmails:{} }
+   * @param {Object} ctx { staffEmailFor:fn(name), hrByStudent:{}, elcEmails:{},
+   *                        elcEmailFor?:fn(elcEmails, name) — Directory.elcEmailFor, which
+   *                        understands 'Burge Angela' as well as 'Burge, Angela' }
    * @return {{teacherName, email, via:'staff'|'elc'|'none'}}
    */
   function resolveTeacherEmail(student, ctx) {
@@ -1409,8 +2333,12 @@ var Notify = (function () {
     if (!name) return { teacherName: '', email: '', via: 'none' };
     var email = ctx.staffEmailFor ? ctx.staffEmailFor(name) : '';
     if (email) return { teacherName: name, email: email, via: 'staff' };
-    var key = name.toLowerCase().replace(/\s+/g, '');
-    email = (ctx.elcEmails || {})[key] || '';
+    // The side-car is hand-kept, so the name in it may not be spelled the way
+    // the schedules spell it. elcEmailFor tries every form; the flat key stays
+    // as the fallback so a caller that does not pass it still behaves as before.
+    email = ctx.elcEmailFor
+      ? ctx.elcEmailFor(ctx.elcEmails, name)
+      : ((ctx.elcEmails || {})[name.toLowerCase().replace(/\s+/g, '')] || '');
     if (email) return { teacherName: name, email: email, via: 'elc' };
     return { teacherName: name, email: '', via: 'none' };
   }
@@ -1426,6 +2354,13 @@ var Notify = (function () {
     var cc = (settings || {})['dismissal.followup.cc'] || '';
 
     if (mode === 'email_teacher') {
+      // Out of mail scope → the board still alerts, so nothing is LOST; the
+      // front desk simply carries it instead of the teacher's inbox. Degrading
+      // rather than falling silent is the whole point: a dismissal that
+      // notified nobody would be worse than one that notified the wrong desk.
+      if (!gradeInMailScope(settings, student && student.grade)) {
+        return { mode: 'office_alert', pending: true, degraded: 'grade-out-of-mail-scope' };
+      }
       var t = resolveTeacherEmail(student, ctx || {});
       if (t.email) return { mode: mode, sendEmail: { to: t.email, cc: cc, teacherName: t.teacherName }, pending: false };
       // Unresolvable teacher → degrade to office_alert and say so on the event.
@@ -1436,7 +2371,31 @@ var Notify = (function () {
     return { mode: 'record_only', pending: false };
   }
 
-  return { MODES: MODES, resolveTeacherEmail: resolveTeacherEmail, resolveFollowUp: resolveFollowUp };
+  /**
+   * Is this grade one whose TEACHER we email?
+   *
+   * Josh, 2026-09-15: "for now, I only want the emails going to the front line
+   * employees and the k4 thru 6th grade teachers." The 7-12 teachers are not
+   * on the list yet, so their students' dismissals alert the board instead.
+   * Kept as a Settings value, not a constant, because "for now" is doing real
+   * work in that sentence — widening it later is one cell, not a deploy.
+   */
+  function gradeInMailScope(settings, grade) {
+    var max = gradeNum((settings || {})['dismissal.followup.maxgrade'] || '6');
+    return gradeNum(grade) <= max;
+  }
+
+  /** 'K4'/'K5' sort below grade 1; anything unreadable sorts to 0 (in scope),
+   *  because an unknown grade is likelier to be a young child than a senior. */
+  function gradeNum(token) {
+    var t = String(token == null ? '' : token).trim().toUpperCase();
+    if (t === 'K4' || t === 'K5' || t === 'K') return 0;
+    var n = parseInt(t, 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  return { MODES: MODES, resolveTeacherEmail: resolveTeacherEmail, resolveFollowUp: resolveFollowUp,
+           gradeInMailScope: gradeInMailScope };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Notify;

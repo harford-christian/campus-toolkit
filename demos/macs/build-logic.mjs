@@ -54,7 +54,7 @@ export const EXPORTS = [
 export function buildLogic() {
   const DOMAIN = 'harford' + 'christian';
   const parts = FILES.map((f) => {
-    let body = readFileSync(path.join(SRC, f), 'utf8');
+    let body = readFileSync(path.join(SRC, f), 'utf8').replace(/\r\n?/g, '\n');
     body = body.replace(/^if \(typeof module !== 'undefined'\) module\.exports = \{[^\n]*\};\s*$/m, '');
     body = body.replace(new RegExp(DOMAIN + '\\.org', 'gi'), 'example.edu').replace(new RegExp(DOMAIN, 'gi'), 'example');
     body = body.replace(/\b[a-z]+@example\.edu\b/g, 'admin@example.edu');                     // the one real admin address

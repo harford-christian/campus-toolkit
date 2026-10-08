@@ -179,6 +179,93 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
 .pend-card .pend-body{flex:1;min-width:220px;}
 .pend-card .pend-kind{font-size:.66rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--hcs-warn);}
 .pend-card .who{font-weight:800;}
+/* Self sign-out: a student has already walked out and someone needs to check a
+   parent is really here. Red, so it reads as an action rather than a record. */
+.pend-card.selfout{border-color:var(--hcs-red);background:var(--hcs-red-soft);}
+.pend-card.selfout .pend-kind{color:var(--hcs-red);}
+/* Alert scope toggle + the note that says what is being hidden. Alerts from
+   the other building are out of sight by default so a desk is not reading
+   another building's work, but the count of what is hidden is always shown —
+   quietly dropping items with no trace would be worse than showing them. */
+.alert-h{display:flex;align-items:center;gap:10px;}
+.alert-h .alert-scope{margin-left:auto;font-size:.72rem;}
+.alert-hidden-note{font-size:.82rem;color:var(--hcs-muted);padding:8px 2px 0;}
+/* Authorised pickup contacts, revealed on demand from a flag card. Guardian PII
+   on a screen a visitor may be able to read, so it is never rendered by
+   default and collapses again on a second click. */
+.pickup-box{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-left:4px solid var(--hcs-ok);border-radius:10px;padding:10px 12px;margin:8px 0;
+}
+.pickup-h{font-size:.72rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--hcs-muted);margin-bottom:6px;}
+.pickup-row{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;padding:4px 0;
+  border-top:1px solid var(--hcs-line);}
+.pickup-row:first-of-type{border-top:0;}
+.pickup-name{font-weight:800;}
+.pickup-rel{font-size:.78rem;color:var(--hcs-muted);}
+.pickup-tel{font-weight:700;text-decoration:none;color:var(--hcs-red);
+  background:var(--hcs-red-soft);border-radius:7px;padding:2px 8px;font-variant-numeric:tabular-nums;}
+.pickup-tel:hover{text-decoration:underline;}
+.pickup-lbl{font-size:.66rem;color:var(--hcs-muted);margin-left:5px;text-transform:uppercase;}
+.pickup-em{font-size:.8rem;color:var(--hcs-muted);}
+.pickup-note{font-size:.78rem;color:var(--hcs-muted);width:100%;}
+@media print{ .pickup-box{display:none !important;} }
+
+/* Planned early dismissals: expected, not departed. Gold like "between
+   buildings" rather than red, because nobody has left and nothing is wrong. */
+.plan-wrap{margin:18px 0 4px;}
+.plan-wrap .section-h .btn{margin-left:auto;}
+.plan-card-row{border-left-color:var(--hcs-ok);}
+.plan-desk{font-size:.66rem;font-weight:800;letter-spacing:.05em;margin-left:8px;
+  background:var(--hcs-surface-2);color:var(--hcs-muted);border-radius:6px;padding:2px 7px;}
+.plan-row-actions{display:flex;gap:8px;margin-top:8px;}
+.plan-kids{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+.plan-kid{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:8px;
+  background:var(--hcs-surface-2);opacity:.55;}
+/* Children this desk is responsible for are full strength; the rest stay
+   visible but recede, so the card still tells the truth about the whole trip. */
+.plan-kid.mine{opacity:1;background:var(--hcs-ok-bg);}
+.plan-kid-name{font-weight:700;font-size:.9rem;flex:1;min-width:0;}
+.plan-kid .btn{margin-left:auto;}
+.plan-desk.multi{background:var(--hcs-warn-bg);color:var(--hcs-warn);}
+/* Coming up — pickups planned ahead for a later day (2026-09-28). Quieter than today's list. */
+.plan-ahead{margin-top:14px;}
+.plan-ahead-h{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:.8rem;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;opacity:.75;}
+.plan-ahead-row{border-left-color:var(--hcs-line);}
+.plan-day{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.03em;margin-right:8px;
+  padding:1px 7px;border-radius:6px;background:var(--hcs-warn-bg);color:var(--hcs-warn);}
+.plan-day-hint{margin-top:3px;min-height:16px;}
+.plan-day-hint.ahead{color:var(--hcs-warn);font-weight:800;opacity:1;}
+
+
+.plan-modal{position:fixed;inset:0;background:rgba(20,20,30,.45);z-index:2500;
+  display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
+.plan-card{background:var(--hcs-surface);border-radius:var(--hcs-radius-lg);
+  padding:20px 22px;width:min(560px,100%);box-shadow:0 12px 40px rgba(0,0,0,.25);}
+.plan-card h3{margin:0 0 4px;font-size:1.1rem;}
+.plan-card .f-label{display:block;margin:12px 0 4px;font-size:.72rem;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--hcs-muted);}
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.plan-results{max-height:150px;overflow:auto;margin-top:6px;}
+.plan-hit{display:block;width:100%;text-align:left;border:1px solid var(--hcs-line);
+  background:var(--hcs-surface);border-radius:9px;padding:7px 10px;margin-bottom:4px;
+  font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;}
+.plan-hit:hover{border-color:var(--hcs-gold);background:var(--hcs-gold-soft);}
+.plan-chosen{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:26px;}
+.plan-chip{background:var(--hcs-ok-bg);border:1px solid var(--hcs-ok-line);color:#14532d;
+  border-radius:999px;padding:3px 6px 3px 11px;font-size:.85rem;font-weight:700;
+  display:inline-flex;align-items:center;gap:4px;}
+.plan-chip-x{border:0;background:transparent;cursor:pointer;font-size:1.05rem;
+  line-height:1;color:inherit;padding:0 4px;}
+.plan-err{color:var(--hcs-red);font-weight:700;min-height:20px;margin-top:10px;font-size:.88rem;}
+.plan-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px;}
+@media (max-width:520px){ .plan-grid{grid-template-columns:1fr;} }
+@media print{ .plan-wrap,.plan-modal{display:none !important;} }
+
+
+
 .pend-card .meta{font-size:.82rem;color:#4b4f57;margin-top:2px;}
 .pend-card .btn{flex:none;}
 .pend-card.page{background:var(--hcs-red-soft);border-color:#f2c7c7;border-left-color:var(--hcs-red);}
@@ -315,6 +402,33 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
 }
 </style>
 
+<style>
+/* "Between buildings (still on campus)" — its own full-width strip, on purpose:
+   these students have NOT left campus, so they must not read as exceptions.
+   Amber + the word OVERDUE once the clock passes their expected-back time
+   (colour is never the only signal). */
+.btw-wrap{margin:18px 0 4px;}
+.btw-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}
+.btw-card{
+  background:var(--hcs-surface);border:1px solid var(--hcs-line);
+  border-left:4px solid var(--hcs-gold);border-radius:12px;padding:10px 14px;
+}
+.btw-card.overdue{
+  background:var(--hcs-warn-bg);border-color:var(--hcs-warn-line);
+  border-left-color:var(--hcs-warn);
+}
+.btw-card .who{font-weight:700;}
+.btw-card .route{font-weight:700;font-size:.9rem;margin-top:3px;}
+.btw-card .meta{font-size:.78rem;color:var(--hcs-muted);margin-top:2px;}
+.btw-card.overdue .meta{color:#4b4f57;}
+.btw-tag{
+  font-size:.66rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  border-radius:6px;padding:2px 7px;display:inline-block;margin-left:8px;vertical-align:1px;
+  background:var(--hcs-warn-bg);color:var(--hcs-warn);
+}
+.btw-tag.overdue{background:var(--hcs-red-soft);color:var(--hcs-red);}
+.btw-note{font-size:.78rem;color:var(--hcs-muted);margin:0 0 8px;}
+</style>
 <!-- ===== Showcase demo shim (standalone build) ===== -->
 <link rel="stylesheet" href="../../assets/demo-banner.css">
 <script>window.DEMO_META = { name: "Campus Presence — Live Board" };</script>
@@ -332,11 +446,16 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
     <p class="hcs-subtitle">Signed in as <b>demo.staff@example.edu</b> &middot; roster as of <span id="hdrGenAt">&hellip;</span></p>
   </div>
   <div class="head-actions">
+    <button type="button" class="btn btn-plain btn-sm hidden" id="finderBtn"
+            title="Open FACTS Finder in a new tab to look up a student.">FACTS Finder</button>
+    <button type="button" class="btn btn-plain btn-sm hidden" id="dismissalBtn"
+            title="Open the FACTS Dismissal board in a new tab — how each child goes home today.">Dismissal</button>
     <button type="button" class="btn btn-plain btn-sm snd-btn" id="sndBtn" title="One click arms the new-alert chime (browsers require a gesture before audio can play).">Sound: off</button>
     <nav class="head-nav">
       <a data-nav="board" class="current" href="board.html">Board</a>
       <a data-nav="muster" href="muster.html">Muster</a>
       <!-- Flags: not a separate surface in this demo — an OPEN flag is an alert card on this board -->
+      <!-- History: not a separate surface in this demo — the board asks for a child's history inline -->
       <a data-nav="metrics" href="metrics.html">Metrics</a>
       <span id="navSettings" hidden><!-- Settings: not part of this demo --></span>
     </nav>
@@ -353,12 +472,34 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
 
     <!-- ============ ALERTS (only rendered when something needs attention) ============ -->
     <section class="alert-stack hidden" id="alertsWrap">
-      <h2 class="section-h alert-h">Needs attention <span class="count" id="alertCount">0</span></h2>
+      <h2 class="section-h alert-h">Needs attention <span class="count" id="alertCount">0</span><button type="button" class="btn btn-plain btn-sm alert-scope" id="alertScopeBtn" title="Alerts raised at another building are hidden by default. Click to show the whole campus.">My building</button></h2>
       <div id="alertList"></div>
     </section>
 
     <!-- ============ PER-BUILDING COUNT STRIP ============ -->
     <div class="count-strip hidden" id="countStrip"></div>
+
+    <!-- ============ EXPECTED (parent rang ahead) ============ -->
+    <section class="plan-wrap hidden" id="planWrap">
+      <h2 class="section-h">Expected pickups <span class="count" id="planCount">0</span>
+        <button type="button" class="btn btn-plain btn-sm" id="planAddBtn">Plan a pickup</button>
+      </h2>
+      <p class="btw-note">A parent has rung ahead. Nothing is signed out yet &mdash; the check still
+        runs when they arrive. An unclaimed plan just expires at the end of the day.</p>
+      <div class="btw-list" id="planList"></div>
+      <div class="plan-ahead hidden" id="planAheadWrap">
+        <h3 class="plan-ahead-h">Coming up <span class="count" id="planAheadCount">0</span></h3>
+        <div class="btw-list" id="planAhead"></div>
+      </div>
+    </section>
+
+    <!-- ============ BETWEEN BUILDINGS (still on campus) ============ -->
+    <section class="btw-wrap hidden" id="btwWrap">
+      <h2 class="section-h">Between buildings (still on campus) <span class="count" id="btwCount">0</span></h2>
+      <p class="btw-note">Signed out of their own building and walking to another one &mdash; these students have
+        <b>not</b> left campus. They sign back in when they return.</p>
+      <div class="btw-list" id="btwList"></div>
+    </section>
 
     <!-- ============ VISITORS + STUDENT EXCEPTIONS ============ -->
     <div class="board-grid" id="boardGrid">
@@ -382,6 +523,45 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
 
 </main>
 
+<div class="plan-modal hidden" id="planModal">
+  <div class="plan-card">
+    <h3>Plan an early dismissal</h3>
+    <p class="muted small">For a parent who has rung ahead. The desk is emailed, plus the
+      homeroom teacher for K4&ndash;6; grades 7&ndash;12 go to Lisa only. Nothing is signed out
+      until they arrive.</p>
+
+    <label class="f-label" for="planSearch">Students <span class="muted">(add each child)</span></label>
+    <input class="form-control" id="planSearch" type="search" autocomplete="off"
+           placeholder="Type a name, then pick from the list&hellip;">
+    <div id="planResults" class="plan-results"></div>
+    <div id="planChosen" class="plan-chosen"></div>
+
+    <div class="plan-grid">
+      <div>
+        <label class="f-label" for="planDay">Day</label>
+        <input class="form-control" id="planDay" type="date">
+        <div class="plan-day-hint muted small" id="planDayHint"></div>
+      </div>
+      <div>
+        <label class="f-label" for="planTime">Expected time</label>
+        <input class="form-control" id="planTime" type="time">
+      </div>
+    </div>
+    <label class="f-label" for="planReason">Reason</label>
+    <select class="form-control" id="planReason"></select>
+    <label class="f-label" for="planWho">Who is collecting</label>
+    <input class="form-control" id="planWho" type="text" autocomplete="off" placeholder="Parent/guardian name">
+    <label class="f-label" for="planNote">Note (optional)</label>
+    <input class="form-control" id="planNote" type="text" autocomplete="off" placeholder="e.g. mum called at 8:40">
+
+    <div class="plan-err" id="planErr"></div>
+    <div class="plan-actions">
+      <button type="button" class="btn btn-plain" id="planCancel">Cancel</button>
+      <button type="button" class="btn btn-hcs" id="planSave">Save &amp; notify</button>
+    </div>
+  </div>
+</div>
+
 <div class="gate-cover hidden" id="gateCover">
   <div class="hcs-brand" style="width:52px;height:52px;font-size:1.3rem;">CP</div>
   <h1>Access removed</h1>
@@ -393,6 +573,76 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
 
 <!-- GENERATED by tools/wrap.js — DO NOT EDIT -->
 <script>
+'use strict';
+/**
+ * ids.js — event IDs + timestamp strings. Pure: every function takes a Date
+ * (callers pass new Date()) so tests are deterministic and Sheets' date
+ * coercion never enters the picture (we only ever WRITE strings).
+ */
+
+var Ids = (function () {
+  function pad2(n) { return ('0' + n).slice(-2); }
+
+  /** 'yyyy-MM-dd' (local time of the passed Date — GAS server runs America/New_York). */
+  function dayKey(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  /** 'yyyy-MM-dd HH:mm:ss' string — the ONLY timestamp format written to the DB. */
+  function timestamp(d) {
+    return dayKey(d) + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+  }
+
+  /** 'HH:mm' display time. */
+  function hhmm(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+
+  /**
+   * A stored time, written the way the front desk says it out loud: 2:05 PM.
+   *
+   * DISPLAY ONLY. Everything stored, sorted or compared stays 24-hour — 'HH:mm'
+   * sorts as a string, '2:05 PM' does not — so this is called at the edge, on
+   * the way to a screen or an email, and never on the way into the sheet.
+   *
+   * No timezone conversion happens here and none should: GAS runs this project
+   * in America/New_York and every timestamp was written in that zone, so the
+   * clock time is already Eastern. Shifting it again would move every time by
+   * hours.
+   *
+   * Takes a full 'yyyy-MM-dd HH:mm:ss' timestamp or a bare 'HH:mm'. Anything
+   * else is handed back untouched — a label is never worth throwing for.
+   */
+  function h12(value) {
+    var s = String(value == null ? '' : value).trim();
+    var h, mi;
+    var full = /^\d{4}-\d{2}-\d{2}[ T](\d{1,2}):(\d{2})/.exec(s);
+    if (full) { h = Number(full[1]); mi = Number(full[2]); }
+    else {
+      var bare = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(s);
+      if (!bare) return s;
+      h = Number(bare[1]); mi = Number(bare[2]);
+    }
+    if (h > 23 || mi > 59) return s;
+    var hour = h % 12;
+    if (hour === 0) hour = 12;              // midnight and noon are both 12
+    return hour + ':' + pad2(mi) + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+
+  /**
+   * Event ID: E-20260804-134210-4821. The 4-digit disambiguator is caller-supplied
+   * (GAS: Math.floor(Math.random()*10000)); same-second collisions at 10–30
+   * events/day are already vanishingly rare, the suffix makes them ignorable.
+   */
+  function makeEventId(d, disambig) {
+    var n = ('000' + (disambig == null ? 0 : disambig)).slice(-4);
+    return 'E-' + dayKey(d).replace(/-/g, '') + '-' +
+      pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()) + '-' + n;
+  }
+
+  return { dayKey: dayKey, timestamp: timestamp, hhmm: hhmm, h12: h12, makeEventId: makeEventId };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Ids;
+
 'use strict';
 /**
  * fuzzy.js — edit-distance matching primitives shared by search.js (student
@@ -581,6 +831,214 @@ var Search = (function () {
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Search;
 
+'use strict';
+/**
+ * history.js — querying the EVENTS log for the front desk's "what happened?"
+ * questions, and for OTHER APPS that read this data (Josh, 2026-09-12).
+ *
+ * PURE: no GAS globals, no I/O. That is the point — the office History page,
+ * any future JSON endpoint, and any sibling project that vendors this file all
+ * answer a question the SAME way, instead of three subtly different filters
+ * drifting apart. Anything reading EVENTS should reach for this, not re-derive.
+ *
+ * The log is append-only and nothing is ever overwritten, so a student's day is
+ * the full sequence of what happened, in order — a late arrival, a walk to
+ * another building, the walk back, an early dismissal are four rows, not one
+ * row updated four times. These helpers reassemble that story.
+ */
+
+var History = (function () {
+
+  /** Event types a human would call "something happened to this student". */
+  var STUDENT_TYPES = {
+    student_late_in: 1, student_early_out: 1, student_return_in: 1,
+    movement: 1, pickup_flag: 1
+  };
+
+  /** 'yyyy-MM-dd' from a Date, in no particular timezone — callers pass day keys. */
+  function dayOf(value) {
+    var s = String(value == null ? '' : value);
+    var m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+    return m ? m[1] : '';
+  }
+
+  function shiftDays(dayKey, n) {
+    var p = String(dayKey).split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() + n);
+    var mm = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (mm < 10 ? '0' : '') + mm + '-' + (dd < 10 ? '0' : '') + dd;
+  }
+
+  /**
+   * A named range → { from, to } inclusive day keys.
+   * Weeks run Monday–Sunday, which is how a school week is spoken about.
+   * @param {string} preset today|yesterday|week|lastweek|month|last30|all
+   * @param {string} todayKey 'yyyy-MM-dd'
+   */
+  function rangeFor(preset, todayKey) {
+    var p = String(preset || 'today').toLowerCase();
+    var parts = String(todayKey).split('-');
+    var dow = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])).getDay(); // 0=Sun
+    var sinceMonday = (dow === 0) ? 6 : dow - 1;
+
+    if (p === 'today') return { from: todayKey, to: todayKey, label: 'Today' };
+    if (p === 'yesterday') {
+      var y = shiftDays(todayKey, -1);
+      return { from: y, to: y, label: 'Yesterday' };
+    }
+    if (p === 'week') {
+      return { from: shiftDays(todayKey, -sinceMonday), to: todayKey, label: 'This week' };
+    }
+    if (p === 'lastweek') {
+      var lastMon = shiftDays(todayKey, -sinceMonday - 7);
+      return { from: lastMon, to: shiftDays(lastMon, 6), label: 'Last week' };
+    }
+    if (p === 'month') {
+      return { from: todayKey.slice(0, 8) + '01', to: todayKey, label: 'This month' };
+    }
+    if (p === 'last30') return { from: shiftDays(todayKey, -29), to: todayKey, label: 'Last 30 days' };
+    if (p === 'all') return { from: '', to: '', label: 'All time' };
+    return { from: todayKey, to: todayKey, label: 'Today' };
+  }
+
+  /** Inclusive day-range test; blank bounds mean unbounded. */
+  function inRange(dayKey, from, to) {
+    if (!dayKey) return false;
+    if (from && dayKey < from) return false;
+    if (to && dayKey > to) return false;
+    return true;
+  }
+
+  /**
+   * One event → a sentence a person can read without knowing the schema.
+   * Kept here rather than in a template so every surface says the same thing.
+   */
+  function describe(e) {
+    var t = e.Type;
+    var reason = String(e.Reason || '').trim();
+    if (t === 'student_late_in') {
+      return 'Arrived late' + (reason ? ' — ' + reason : '');
+    }
+    if (t === 'student_early_out') {
+      var who = String(e.GuardianName || '').trim();
+      return 'Signed out' + (reason ? ' — ' + reason : '') +
+        (who ? ' (' + who + ')' : '');
+    }
+    if (t === 'student_return_in') return 'Came back on campus';
+    if (t === 'movement') {
+      if (reason === 'returned' || reason === 'arrived') {
+        return 'Back in ' + (e.ToBuilding || 'their building');
+      }
+      return 'Walked to ' + (e.ToBuilding || '?') + (reason ? ' — ' + reason : '');
+    }
+    if (t === 'pickup_flag') {
+      return 'PICKUP FLAG — "' + String(e.GuardianName || '').trim() + '" did not match' +
+        (String(e.FlagStatus || '') === 'resolved' ? ' (resolved)' : ' (open)');
+    }
+    if (t === 'visitor_in') return 'Visitor signed in' + (reason ? ' — ' + reason : '');
+    if (t === 'visitor_out') return 'Visitor signed out';
+    return t;
+  }
+
+  /** 'yyyy-MM-dd HH:mm:ss' → 'HH:mm'. */
+  function timeOf(ts) {
+    var m = /\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2})/.exec(String(ts || ''));
+    return m ? m[1] : '';
+  }
+
+  /**
+   * Filter the log. Every criterion is optional and they AND together.
+   * @param {Array<Object>} events raw EVENTS rows
+   * @param {Object} q { from, to, studentId, types, station, personType }
+   */
+  function filter(events, q) {
+    q = q || {};
+    var wantTypes = (q.types && q.types.length)
+      ? q.types.reduce(function (m, t) { m[t] = 1; return m; }, {}) : null;
+    return (events || []).filter(function (e) {
+      if (!inRange(dayOf(e.Date), q.from, q.to)) return false;
+      if (q.studentId && String(e.PersonKey) !== String(q.studentId)) return false;
+      if (q.personType && String(e.PersonType || '') !== q.personType) return false;
+      if (q.station && String(e.Station || '') !== q.station) return false;
+      if (wantTypes && !wantTypes[e.Type]) return false;
+      return true;
+    });
+  }
+
+  /**
+   * Everything that happened, grouped day → student, each student's events in
+   * time order. This is the shape both questions want: "show me this student"
+   * is one student across days, "show me last Tuesday" is one day across
+   * students — same structure, read differently.
+   */
+  function groupByDay(events) {
+    var days = {};
+    (events || []).forEach(function (e) {
+      var d = dayOf(e.Date);
+      if (!d) return;
+      var day = days[d] || (days[d] = {});
+      var key = String(e.PersonKey || '') || ('_' + e.EventID);
+      var person = day[key] || (day[key] = {
+        personKey: String(e.PersonKey || ''), name: e.PersonName || '',
+        grade: e.Grade || '', personType: e.PersonType || '', events: []
+      });
+      person.events.push(e);
+    });
+    return Object.keys(days).sort().reverse().map(function (d) {
+      var people = Object.keys(days[d]).map(function (k) {
+        var p = days[d][k];
+        p.events.sort(function (a, b) {
+          return String(a.Timestamp) < String(b.Timestamp) ? -1 : 1;
+        });
+        p.timeline = p.events.map(function (e) {
+          return { at: timeOf(e.Timestamp), type: e.Type, text: describe(e),
+                   station: e.Station || '', eventId: e.EventID };
+        });
+        return p;
+      });
+      people.sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+      return { date: d, people: people, count: people.length };
+    });
+  }
+
+  /** Distinct students appearing in a set of events, for a picker. */
+  function studentsIn(events) {
+    var seen = {};
+    (events || []).forEach(function (e) {
+      if (String(e.PersonType || '') !== 'student' || !e.PersonKey) return;
+      var k = String(e.PersonKey);
+      if (!seen[k]) seen[k] = { id: k, name: e.PersonName || '', grade: e.Grade || '', count: 0 };
+      seen[k].count++;
+    });
+    return Object.keys(seen).map(function (k) { return seen[k]; })
+      .sort(function (a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; });
+  }
+
+  /** Per-type totals for the header strip. */
+  function counts(events) {
+    var out = { total: (events || []).length };
+    (events || []).forEach(function (e) { out[e.Type] = (out[e.Type] || 0) + 1; });
+    return out;
+  }
+
+  return {
+    STUDENT_TYPES: STUDENT_TYPES,
+    rangeFor: rangeFor,
+    inRange: inRange,
+    dayOf: dayOf,
+    shiftDays: shiftDays,
+    timeOf: timeOf,
+    describe: describe,
+    filter: filter,
+    groupByDay: groupByDay,
+    studentsIn: studentsIn,
+    counts: counts
+  };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = History;
+
 </script>
 
 <script>
@@ -593,6 +1051,16 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
   // Which station's alerts are audible here; set from PERMISSIONS.AlertStation
   // at bootstrap. 'all' until then, so nothing is missed while loading.
   var ALERT_STATION = 'all';
+  // FACTS Finder deep link, from Settings via bootstrap. '' hides the button.
+  var FINDER_URL = '';
+  // FACTS Dismissal board deep link, same route (Settings → Board). '' hides the button.
+  var DISMISSAL_URL = '';
+  // Whether the alert LIST shows the whole campus. Default false = this desk
+  // only. Remembered per browser so a desk that widens it stays widened.
+  // The building-scoped desks. 'all' / '' / 'none' are postures, not places.
+  var DESK_STATIONS = ['hs', 'el', 'kg'];
+  var ALERT_SCOPE_ALL = false;
+  try { ALERT_SCOPE_ALL = localStorage.getItem('cp_alert_scope') === 'all'; } catch (e) {}
 
   var RELOAD_MS = 4 * 60 * 60 * 1000;   // full page refresh (picks up new code + settings)
   var JITTER_MS = 1000;                 // +/- 1s so two office machines don't sync up
@@ -606,22 +1074,29 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   // 'yyyy-MM-dd HH:mm:ss' -> 'HH:mm'; presence times already arrive as 'HH:mm'
-  function tOf(ts) {
-    var s = String(ts || '');
-    var m = /\d{4}-\d{2}-\d{2} (\d{2}:\d{2})/.exec(s);
-    return m ? m[1] : s;
-  }
+  // 12-hour display (Josh, 2026-09-15). Ids.h12 handles both a full timestamp
+  // and a bare 'HH:mm', and leaves anything else alone.
+  function tOf(ts) { return Ids.h12(ts); }
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function clockStr(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()); }
+  // 'HH:mm' -> minutes since midnight, or null when it isn't a time
+  function hhmmMins(s) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '').trim());
+    if (!m) return null;
+    var h = Number(m[1]), mi = Number(m[2]);
+    if (h > 23 || mi > 59) return null;
+    return h * 60 + mi;
+  }
 
-  var STATION_KIOSK = { hs: 'HS kiosk', el: 'EL kiosk', office: 'office', mobile: 'mobile' };
+  var STATION_KIOSK = { hs: 'HS kiosk', el: 'EL kiosk', kg: 'Kindergarten kiosk',
+                        office: 'office', mobile: 'mobile', nurse: 'nurse' };
   var STATION_OFFICE = { hs: 'HS', el: 'Elementary', office: 'Main', mobile: 'Main' };
   var TYPE_LABEL = {
     student_early_out: 'Early dismissal', student_late_in: 'Late arrival',
     student_return_in: 'Returned', visitor_in: 'Visitor in', visitor_out: 'Visitor out',
     movement: 'Movement'
   };
-  var BUILDING_ORDER = ['High School', 'Elementary', 'Kindergarten', '6th Grade', 'Modular', 'Bus Barn', 'Other'];
+  var BUILDING_ORDER = ['High School', 'Elementary', 'Kindergarten', '6th Grade', 'Modular', 'Nurse', 'Other'];
 
   var toastTimer = null;
   function toast(msg, warn) {
@@ -715,13 +1190,29 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
     // Name the scope so staff can see at a glance which alerts will be audible.
     var scope = (!ALERT_STATION || ALERT_STATION === 'all') ? 'all buildings'
       : ALERT_STATION === 'none' ? 'muted for this account'
-      : (ALERT_STATION === 'hs' ? 'HS only' : ALERT_STATION === 'el' ? 'EL only' : ALERT_STATION);
+      : (STATION_KIOSK[ALERT_STATION] ? STATION_KIOSK[ALERT_STATION] + ' only' : ALERT_STATION);
     b.textContent = (armed ? 'Sound: on' : 'Sound: off') + ' · ' + scope;
     b.className = 'btn btn-plain btn-sm snd-btn' + (armed ? ' armed' : '');
     b.title = ALERT_STATION === 'none'
       ? 'Alert sound is disabled for your account (PERMISSIONS → AlertStation).'
       : 'The board shows the whole campus; only ' + scope + ' alerts make a sound.';
   }
+  // Alert scope toggle: this desk only (default) vs the whole campus.
+  function paintAlertScope() {
+    var b = $('alertScopeBtn');
+    if (!b) return;
+    b.textContent = ALERT_SCOPE_ALL ? 'Whole campus' : 'My building';
+  }
+  $('alertScopeBtn').addEventListener('click', function () {
+    ALERT_SCOPE_ALL = !ALERT_SCOPE_ALL;
+    try { localStorage.setItem('cp_alert_scope', ALERT_SCOPE_ALL ? 'all' : 'mine'); } catch (e) {}
+    paintAlertScope();
+    if (snap) renderAlerts(snap);   // repaint immediately, without waiting for the next poll
+    planRender(PLAN_LAST_TODAY);    // the plan lists filter by the same scope
+    planRenderAhead(PLAN_LAST_AHEAD);
+  });
+  paintAlertScope();
+
   $('sndBtn').addEventListener('click', function () {
     armed = !armed;
     try { window.localStorage.setItem('cp-office-sound', armed ? '1' : '0'); } catch (e) {}
@@ -756,6 +1247,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
   var snap = null;            // last good snapshot — keeps rendering under the banner
   var knownAlertIds = null;   // null until first snapshot, then eventId -> true (chime baseline)
 
+  // Server-corrected wall clock: the office machine's own clock may be minutes
+  // off, and "is this student overdue?" must never depend on that.
+  function serverNowMs() { return Date.now() + skewMs; }
+  function serverNowMins() {
+    var d = new Date(serverNowMs());
+    return d.getHours() * 60 + d.getMinutes();
+  }
+
   function jitter() { return Math.round(Math.random() * 2 * JITTER_MS) - JITTER_MS; }
   function schedule(ms) {
     if (stopped) return;
@@ -784,6 +1283,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
     snap = res;
     detectNewAlerts(res);
     render(res);
+    // Expected pickups ride the snapshot, so a plan made at another desk shows within a poll.
+    // Coming up costs the server a column scan, so it refreshes about once a minute instead.
+    if (res.planFamilies) planRender(res.planFamilies);
+    if (Date.now() - planFetchedAt > PLAN_AHEAD_EVERY_MS) planRefresh();
     schedule();
   }
   function onSnapFail() {
@@ -801,10 +1304,35 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
   // station make noise, so an EL sign-out never interrupts the HS desk.
   // ALERT_STATION comes from the PERMISSIONS tab: '' / 'all' = everything,
   // 'hs' | 'el' = that kiosk only, 'none' = silent.
+  /** Should this alert make a NOISE here? 'none' means a silent desk. */
   function alertIsMine(station) {
     if (ALERT_STATION === 'none') return false;
     if (!ALERT_STATION || ALERT_STATION === 'all') return true;
     return String(station || '').toLowerCase() === ALERT_STATION;
+  }
+
+  /**
+   * Should this alert be VISIBLE here? Deliberately NOT the same question.
+   *
+   * Reusing alertIsMine for the list (2026-09-14) blanked the Needs-attention
+   * section for every account set to AlertStation 'none' — 9 of 14 people,
+   * including administrators — and since the section hides itself when empty it
+   * disappeared altogether, which reads as "I cannot see the dashboard".
+   * 'none' has always meant "do not make noise at my desk". It never meant
+   * "hide the work from me".
+   *
+   * So only a desk explicitly scoped to a building filters its list; everyone
+   * else sees the whole campus, as they did before.
+   */
+  function alertInScope(station) {
+    if (ALERT_SCOPE_ALL) return true;
+    // Any desk scoped to a BUILDING filters its list; 'all', '' and 'none' do not. Listing the
+    // buildings by name meant a desk added later (kg) silently saw the whole campus — the exact
+    // noise this feature exists to prevent (2026-09-16).
+    if (DESK_STATIONS.indexOf(ALERT_STATION) !== -1) {
+      return String(station || '').toLowerCase() === ALERT_STATION;
+    }
+    return true;
   }
   function detectNewAlerts(res) {
     var ids = {};   // every alert, so nothing re-announces later
@@ -813,12 +1341,12 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
     for (i = 0; i < res.openFlags.length; i++) {
       a = res.openFlags[i];
       ids[a.eventId] = true;
-      if (alertIsMine(a.station)) mine[a.eventId] = true;
+      if (alertIsMine(a.desk || a.station)) mine[a.eventId] = true;
     }
     for (i = 0; i < res.pending.length; i++) {
       a = res.pending[i];
       ids[a.eventId] = true;
-      if (alertIsMine(a.station)) mine[a.eventId] = true;
+      if (alertIsMine(a.desk || a.station)) mine[a.eventId] = true;
     }
     var sawNewMine = false;
     if (knownAlertIds !== null) {
@@ -843,7 +1371,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
         (f.reason ? ' &middot; ' + esc(f.reason) : '') + '</div>' +
       '<input class="form-control flag-note" type="text" autocomplete="off" ' +
         'placeholder="Note (optional — saved on the flag)" data-eid="' + esc(f.eventId) + '">' +
+      '<div class="pickup-slot" data-sid="' + esc(f.studentId || '') + '"></div>' +
       '<div class="actions">' +
+        '<button type="button" class="btn btn-plain fl-contacts" data-sid="' +
+          esc(f.studentId || '') + '">Who can pick up?</button>' +
         '<button type="button" class="btn btn-hcs fl-approve" data-eid="' + esc(f.eventId) + '" data-name="' + esc(f.name) + '">Approve &amp; sign out</button>' +
         '<button type="button" class="btn btn-outline-hcs fl-deny" data-eid="' + esc(f.eventId) + '" data-name="' + esc(f.name) + '">Deny</button>' +
       '</div>' +
@@ -851,6 +1382,23 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
     '</div>';
   }
   function pendCardHtml(p) {
+    // A 9-12 student signed themselves out at the HS desk. The student has
+    // already left the kiosk, so this is not "approve it" — it is "go and check
+    // a parent is actually here". Worded as the instruction it is, and given its
+    // own look so it cannot be mistaken for the routine follow-ups beside it.
+    if (p.reason === 'Self sign-out') {
+      return '<div class="pend-card selfout" data-eid="' + esc(p.eventId) + '">' +
+        '<div class="pend-body">' +
+          '<div class="pend-kind">Self sign-out &mdash; confirm a parent is on campus</div>' +
+          '<div class="who">' + esc(p.name) + (p.grade ? ' (' + esc(p.grade) + ')' : '') + '</div>' +
+          '<div class="meta">Signed themselves out at the ' +
+            esc(STATION_KIOSK[p.station] || p.station) + ' &middot; ' + esc(tOf(p.at)) +
+            ' &middot; no parent notice sent &mdash; confirm in person</div>' +
+        '</div>' +
+        '<button type="button" class="btn btn-hcs pend-paged" data-eid="' + esc(p.eventId) +
+          '">Parent confirmed</button>' +
+      '</div>';
+    }
     if (p.mode === 'page_student') {
       return '<div class="pend-card page" data-eid="' + esc(p.eventId) + '">' +
         '<div class="pend-body">' +
@@ -891,15 +1439,33 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
       if (inputs[i] === document.activeElement) focusEid = inputs[i].getAttribute('data-eid');
     }
 
+    // Show only THIS desk's alerts by default (Josh, 2026-09-11): the HS
+    // attendant should not be looking at Elementary items. Scoping uses
+    // alertInScope, NOT alertIsMine — see the note there. Only a desk pinned to
+    // 'hs' or 'el' filters; an unscoped or silent account still sees the whole
+    // campus. The toggle widens it for anyone who wants everything.
+    var flagsShown = ALERT_SCOPE_ALL ? res.openFlags
+      : res.openFlags.filter(function (f) { return alertInScope(f.desk || f.station); });
+    var pendShown = ALERT_SCOPE_ALL ? res.pending
+      : res.pending.filter(function (f) { return alertInScope(f.desk || f.station); });
+    var hiddenCount = (res.openFlags.length - flagsShown.length) +
+                      (res.pending.length - pendShown.length);
+
     var html = '';
     var j;
-    for (j = 0; j < res.openFlags.length; j++) html += flagCardHtml(res.openFlags[j]);
-    for (j = 0; j < res.pending.length; j++) html += pendCardHtml(res.pending[j]);
+    for (j = 0; j < flagsShown.length; j++) html += flagCardHtml(flagsShown[j]);
+    for (j = 0; j < pendShown.length; j++) html += pendCardHtml(pendShown[j]);
+    if (hiddenCount) {
+      html += '<div class="alert-hidden-note">' + hiddenCount +
+        ' more at another building — click <b>My building</b> above to show them.</div>';
+    }
     list.innerHTML = html;
 
-    var total = res.openFlags.length + res.pending.length;
+    var total = flagsShown.length + pendShown.length;
     $('alertCount').textContent = total;
-    $('alertsWrap').classList.toggle('hidden', total === 0);
+    // Keep the section open when everything is filtered away, or the note saying
+    // so is hidden exactly when someone needs to read it.
+    $('alertsWrap').classList.toggle('hidden', total === 0 && hiddenCount === 0);
 
     var fresh = list.querySelectorAll('.flag-note');
     for (var k = 0; k < fresh.length; k++) {
@@ -944,6 +1510,42 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
       : '';
   }
 
+  /**
+   * Between buildings — presence.moved rows with away === true.
+   * NOT an off-campus exception: these students are still here, just in another
+   * building (music lesson, ELC services, Teacher's Aide duty, office errand).
+   * Amber + the word OVERDUE once the server clock passes expectedBack.
+   */
+  function renderBetween(res) {
+    var moved = res.presence.moved || [];
+    var away = [];
+    var i;
+    for (i = 0; i < moved.length; i++) if (moved[i].away === true) away.push(moved[i]);
+
+    var nowM = serverNowMins();
+    var html = '';
+    for (i = 0; i < away.length; i++) {
+      var m = away[i];
+      var dueM = hhmmMins(m.expectedBack);
+      var overdue = dueM !== null && nowM > dueM;
+      html += '<div class="btw-card' + (overdue ? ' overdue' : '') + '">' +
+        '<div class="who">' + esc(m.name) + (m.grade ? ' (' + esc(m.grade) + ')' : '') +
+          (overdue
+            ? '<span class="btw-tag overdue">Overdue</span>'
+            : '<span class="btw-tag">Between buildings</span>') + '</div>' +
+        '<div class="route">' + esc(m.from || '?') + ' &rarr; ' + esc(m.to || '?') + '</div>' +
+        '<div class="meta">left ' + esc(tOf(m.at)) +
+          ' &middot; ' + (m.expectedBack
+            ? 'back by ' + esc(tOf(m.expectedBack)) + (overdue ? ' &mdash; OVERDUE' : '')
+            : 'back by end of day') +
+          (m.reason ? ' &middot; ' + esc(m.reason) : '') + '</div>' +
+      '</div>';
+    }
+    $('btwList').innerHTML = html;
+    $('btwCount').textContent = away.length;
+    $('btwWrap').classList.toggle('hidden', away.length === 0);
+  }
+
   function renderExceptions(res) {
     var p = res.presence;
     var html = '';
@@ -973,20 +1575,33 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
       '</div>';
     }
 
-    html += '<div class="group-h">Moved between buildings (' + p.moved.length + ')</div>';
-    if (!p.moved.length) html += '<div class="board-empty">No movement today.</div>';
-    for (i = 0; i < p.moved.length; i++) {
-      var m = p.moved[i];
-      html += '<div class="exc-card transit">' +
-        '<div class="who">' + esc(m.name) +
-          (m.inTransit ? '<span class="exc-tag transit">In transit</span>' : '') + '</div>' +
+    // Students still AWAY are shown in the "Between buildings" strip above (they
+    // are on campus). What is left here is the completed round trips, so the
+    // desk can see a move happened without it reading as an exception.
+    var moved = p.moved || [];
+    var backAgain = [];
+    var awayNow = 0;
+    for (i = 0; i < moved.length; i++) {
+      if (moved[i].away === true) awayNow++; else backAgain.push(moved[i]);
+    }
+    html += '<div class="group-h">Back from another building (' + backAgain.length + ')</div>';
+    if (!backAgain.length) {
+      html += '<div class="board-empty">' + (awayNow
+        ? 'Nobody back yet &mdash; see &ldquo;Between buildings&rdquo; above.'
+        : 'No movement today.') + '</div>';
+    }
+    for (i = 0; i < backAgain.length; i++) {
+      var m = backAgain[i];
+      html += '<div class="exc-card late">' +
+        '<div class="who">' + esc(m.name) + (m.grade ? ' (' + esc(m.grade) + ')' : '') +
+          '<span class="exc-tag late">Back</span></div>' +
         '<div class="meta">' + esc(m.from || '?') + ' &rarr; ' + esc(m.to || '?') +
-          ' &middot; ' + esc(tOf(m.at)) + '</div>' +
+          ' &middot; back ' + esc(tOf(m.at)) + '</div>' +
       '</div>';
     }
 
     $('excList').innerHTML = html;
-    $('excCount').textContent = p.studentsOff.length + p.late.length + p.moved.length;
+    $('excCount').textContent = p.studentsOff.length + p.late.length + backAgain.length;
   }
 
   function renderCounts(res) {
@@ -1013,6 +1628,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
 
     renderAlerts(res);
     renderVisitors(res);
+    renderBetween(res);
     renderExceptions(res);
     renderCounts(res);
 
@@ -1120,6 +1736,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
       }
       pollMs = Math.max(5, Number(res.pollSeconds) || 12) * 1000;
       ALERT_STATION = String(res.alertStation || 'all').toLowerCase();
+      FINDER_URL = String(res.factsFinderUrl || '').trim();
+      PLAN_REASONS = res.planReasons || [];
+      planRefresh();
+      // Only offer the button when Settings actually has a Finder URL — a dead
+      // link on a front-desk screen is worse than no link.
+      $('finderBtn').classList.toggle('hidden', !FINDER_URL);
+      DISMISSAL_URL = String(res.dismissalUrl || '').trim();
+      $('dismissalBtn').classList.toggle('hidden', !DISMISSAL_URL);
       paintSnd(); // relabel once the scope is known ("Sound: on · HS only")
       $('hdrGenAt').textContent = res.generatedAt || 'unknown';
       poll();
@@ -1130,6 +1754,359 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Search;
   }
   boot();
   setTimeout(function () { location.reload(); }, RELOAD_MS);
+
+  /**
+   * "Who can pick up?" — fetched ON DEMAND, never rendered automatically.
+   * The live board often sits where a visitor at the counter can read it, so
+   * guardian phone numbers appear only when a member of staff asks for them,
+   * for one student, and collapse again on a second click.
+   */
+  function wirePickupContacts(root) {
+    (root || document).addEventListener('click', function (ev) {
+      var btn = ev.target;
+      while (btn && btn !== document && !(btn.classList && btn.classList.contains('fl-contacts'))) {
+        btn = btn.parentNode;
+      }
+      if (!btn || btn === document) return;
+      var sid = btn.getAttribute('data-sid');
+      var card = btn.closest ? btn.closest('.flag-card') : null;
+      var slot = card ? card.querySelector('.pickup-slot') : null;
+      if (!slot) return;
+      if (slot.innerHTML) { slot.innerHTML = ''; btn.textContent = 'Who can pick up?'; return; }
+      if (!sid) { slot.innerHTML = '<div class="pickup-box">No student id on this flag.</div>'; return; }
+
+      btn.disabled = true;
+      slot.innerHTML = '<div class="pickup-box"><span class="spin"></span> Looking up authorised contacts…</div>';
+      google.script.run
+        .withSuccessHandler(function (res) {
+          btn.disabled = false;
+          if (!res || !res.ok) {
+            slot.innerHTML = '<div class="pickup-box">Could not load contacts — ' +
+              esc((res && res.error) || 'no answer from the server') + '</div>';
+            return;
+          }
+          btn.textContent = 'Hide contacts';
+          if (!res.contacts.length) {
+            slot.innerHTML = '<div class="pickup-box"><b>No authorised pickup contacts on file</b>' +
+              (res.note ? '<div class="pickup-note">' + esc(res.note) + '</div>' : '') + '</div>';
+            return;
+          }
+          var h = '<div class="pickup-box"><div class="pickup-h">Authorised to collect ' +
+            esc(res.studentName || '') + '</div>';
+          res.contacts.forEach(function (c) {
+            h += '<div class="pickup-row"><span class="pickup-name">' + esc(c.name) + '</span>' +
+              (c.relationship ? '<span class="pickup-rel">' + esc(c.relationship) + '</span>' : '');
+            c.phones.forEach(function (p) {
+              h += '<a class="pickup-tel" href="tel:' + esc(String(p.number).replace(/[^0-9+]/g, '')) +
+                '">' + esc(p.number) + '<span class="pickup-lbl">' + esc(p.label) + '</span></a>';
+            });
+            if (c.email) h += '<span class="pickup-em">' + esc(c.email) + '</span>';
+            if (c.note) h += '<div class="pickup-note">' + esc(c.note) + '</div>';
+            h += '</div>';
+          });
+          slot.innerHTML = h + '</div>';
+        })
+        .withFailureHandler(function (e) {
+          btn.disabled = false;
+          slot.innerHTML = '<div class="pickup-box">Could not load contacts — ' +
+            esc(String((e && e.message) || e)) + '</div>';
+        })
+        .officeApi({ op: 'getPickupContacts', studentId: sid });
+    });
+  }
+  wirePickupContacts(document);
+
+
+  /**
+   * The other screens the desk needs: FACTS Finder for "who is this student /
+   * who are their guardians", and the Dismissal board for "how does this child
+   * go home today" (the same office holds Dismissal's Office role). Opened in a
+   * NEW TAB so the desk never loses the live board mid-shift — and with the
+   * top-window fallback, because the GAS sandbox can refuse window.open without
+   * raising anything (the same pattern the Muster roster links already use).
+   */
+  function openExternal(url) {
+    if (!url) return;
+    var opened = null;
+    try { opened = window.open(url, '_blank', 'noopener'); } catch (e) { opened = null; }
+    if (!opened) {
+      try { window.top.location.href = url; }
+      catch (e2) { window.location.href = url; }
+    }
+  }
+  $('finderBtn').addEventListener('click', function () { openExternal(FINDER_URL); });
+  $('dismissalBtn').addEventListener('click', function () { openExternal(DISMISSAL_URL); });
+
+
+  // ======================================================================
+  // PLANNED EARLY DISMISSALS — a parent rings ahead (Josh, 2026-09-14).
+  // The plan is a heads-up, never a sign-out: the authorised-pickup check
+  // still runs when the adult actually arrives at the kiosk.
+  // ======================================================================
+  var PLAN_CHOSEN = [];      // [{id,name,grade}] for the dialog
+  var PLAN_REASONS = [];     // from bootstrap (the dismissal picklist)
+  var PLAN_MAX_AHEAD = 60;   // days; the server's Planned.MAX_DAYS_AHEAD wins, sent with listPlanned
+  var PLAN_LAST_TODAY = [], PLAN_LAST_AHEAD = [];   // last lists drawn, for a scope-toggle repaint
+  var PLAN_AHEAD_EVERY_MS = 60000;
+  var planFetchedAt = 0;
+
+  // The desk filter both lists share: a family shows if it touches this desk, unless the reader is
+  // unscoped or has widened the alert scope to the whole campus.
+  function planIsMine(f) {
+    if (ALERT_SCOPE_ALL) return true;
+    if (DESK_STATIONS.indexOf(ALERT_STATION) === -1) return true;
+    return (f.desks || []).indexOf(ALERT_STATION) >= 0;
+  }
+
+  /** 'yyyy-MM-dd' for a local Date — the board runs in the office, on Eastern time. */
+  function planDayKey(d) {
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+
+  /**
+   * COMING UP — pickups planned ahead for a later day (Josh, 2026-09-28). Read-only apart from
+   * Cancel: nobody can be signed out against a day that has not come. On the day itself the plan
+   * moves up into Expected pickups on its own, because its Date is that day.
+   */
+  function planRenderAhead(families) {
+    PLAN_LAST_AHEAD = families || [];
+    var mine = PLAN_LAST_AHEAD.filter(planIsMine);
+    $('planAheadWrap').classList.toggle('hidden', !mine.length);
+    $('planAheadCount').textContent = mine.length;
+    $('planAhead').innerHTML = mine.map(function (f) {
+      var names = f.students.map(function (st) {
+        return esc(st.name) + (st.grade ? ' (' + esc(st.grade) + ')' : '');
+      }).join(', ');
+      return '<div class="btw-card plan-card-row plan-ahead-row">' +
+        '<div class="who"><span class="plan-day">' + esc(f.dayLabel || f.date) + '</span>' + names +
+          (f.desks.length > 1 ? '<span class="plan-desk multi">MORE THAN ONE BUILDING</span>' : '') +
+        '</div>' +
+        '<div class="route">' + (f.expectedAt ? 'Expected ' + esc(tOf(f.expectedAt)) : 'Time not given') +
+          (f.reason ? ' &middot; ' + esc(f.reason) : '') +
+          ' &middot; ' + (f.guardianName ? esc(f.guardianName) : 'collector not named') + '</div>' +
+        '<div class="plan-row-actions">' +
+          '<button type="button" class="btn btn-plain btn-sm plan-cancel" data-group="' +
+            esc(f.groupId) + '" data-eid="' + esc(f.students[0].eventId) +
+            '" data-name="' + esc(f.dayLabel || f.date) + '">Cancel</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function planRender(families) {
+    var wrap = $('planWrap'), list = $('planList');
+    // Show a family only if it concerns THIS desk — unless the reader is
+    // unscoped, or has widened the alert scope to the whole campus. A family
+    // that touches both buildings appears at BOTH desks, whole: telling the HS
+    // desk "collecting 2" when the parent says three would be worse than
+    // showing them a name that is not theirs to fetch.
+    families = families || [];
+    PLAN_LAST_TODAY = families;
+    var mine = families.filter(planIsMine);
+    var hidden = families.length - mine.length;
+
+    $('planCount').textContent = mine.length;
+    wrap.classList.remove('hidden');   // the "Plan a pickup" button lives in the heading
+    if (!mine.length) {
+      list.innerHTML = '<div class="board-empty">Nothing expected yet today.' +
+        (hidden ? ' (' + hidden + ' at another building.)' : '') + '</div>';
+      return;
+    }
+
+    var html = '';
+    mine.forEach(function (f) {
+      var many = f.students.length > 1;
+      html += '<div class="btw-card plan-card-row">' +
+        '<div class="who">' +
+          (many ? f.students.length + ' children' : esc(f.students[0].name)) +
+          (f.desks.length > 1 ? '<span class="plan-desk multi">MORE THAN ONE BUILDING</span>' : '') +
+        '</div>' +
+        '<div class="route">' + (f.expectedAt ? 'Expected ' + esc(tOf(f.expectedAt)) : 'Time not given') +
+          (f.reason ? ' &middot; ' + esc(f.reason) : '') + '</div>' +
+        '<div class="meta">' + (f.guardianName ? esc(f.guardianName) : 'collector not named') + '</div>' +
+        '<div class="plan-kids">';
+      f.students.forEach(function (st) {
+        var isMine = DESK_STATIONS.indexOf(ALERT_STATION) === -1 || st.desk === ALERT_STATION;
+        html += '<div class="plan-kid' + (isMine ? ' mine' : '') + '">' +
+          '<span class="plan-kid-name">' + esc(st.name) +
+            (st.grade ? ' (' + esc(st.grade) + ')' : '') + '</span>' +
+          '<span class="plan-desk">' + esc((st.desk || '?').toUpperCase()) + '</span>' +
+          '<button type="button" class="btn btn-plain btn-sm plan-out" data-eid="' +
+            esc(st.eventId) + '" data-name="' + esc(st.name) + '">Sign out</button>' +
+        '</div>';
+      });
+      html += '</div><div class="plan-row-actions">';
+      if (many) {
+        html += '<button type="button" class="btn btn-hcs btn-sm plan-out" data-group="' +
+          esc(f.groupId) + '" data-name="all ' + f.students.length + '">Sign out all ' +
+          f.students.length + '</button>';
+      }
+      html += '<button type="button" class="btn btn-plain btn-sm plan-cancel" data-group="' +
+        esc(f.groupId) + '" data-eid="' + esc(f.students[0].eventId) +
+        '" data-name="this pickup">Cancel</button>' +
+      '</div></div>';
+    });
+    if (hidden) {
+      html += '<div class="alert-hidden-note">' + hidden +
+        ' more expected at another building.</div>';
+    }
+    list.innerHTML = html;
+  }
+
+  function planRefresh() {
+    planFetchedAt = Date.now();   // stamped at send, so a slow reply is not re-requested every poll
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok) return;
+        if (res.maxDaysAhead) PLAN_MAX_AHEAD = Number(res.maxDaysAhead) || PLAN_MAX_AHEAD;
+        planRender(res.families || []);
+        planRenderAhead(res.upcoming || []);
+      })
+      .withFailureHandler(function () { /* the board keeps working without it */ })
+      .officeApi({ op: 'listPlanned' });
+  }
+
+  function planOpen() {
+    PLAN_CHOSEN = [];
+    $('planSearch').value = ''; $('planResults').innerHTML = '';
+    $('planTime').value = ''; $('planWho').value = ''; $('planNote').value = '';
+    $('planErr').textContent = '';
+    // Today by default — the common case is still "rang this morning about this afternoon".
+    var now = new Date(), last = new Date(now.getTime());
+    last.setDate(last.getDate() + PLAN_MAX_AHEAD);
+    $('planDay').min = planDayKey(now);
+    $('planDay').max = planDayKey(last);
+    $('planDay').value = planDayKey(now);
+    planDayHint();
+    var sel = $('planReason');
+    sel.innerHTML = '<option value="">(no reason given)</option>' +
+      PLAN_REASONS.map(function (r) { return '<option>' + esc(r) + '</option>'; }).join('');
+    planPaintChosen();
+    $('planModal').classList.remove('hidden');
+    $('planSearch').focus();
+  }
+  function planClose() { $('planModal').classList.add('hidden'); }
+
+  /** Say plainly when the plan is NOT for today, so a mis-tapped date is caught before saving. */
+  function planDayHint() {
+    var v = $('planDay').value, hint = $('planDayHint');
+    if (!v || v === planDayKey(new Date())) { hint.textContent = 'Today'; hint.classList.remove('ahead'); return; }
+    var p = v.split('-'), d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    hint.textContent = 'Not today \u2014 ' + d.toLocaleDateString('en-US',
+      { weekday: 'long', month: 'long', day: 'numeric' });
+    hint.classList.add('ahead');
+  }
+
+  function planPaintChosen() {
+    $('planChosen').innerHTML = PLAN_CHOSEN.length
+      ? PLAN_CHOSEN.map(function (c, i) {
+          return '<span class="plan-chip">' + esc(c.name) +
+            (c.grade ? ' (' + esc(c.grade) + ')' : '') +
+            '<button type="button" class="plan-chip-x" data-i="' + i + '">&times;</button></span>';
+        }).join('')
+      : '<span class="muted small">No students added yet.</span>';
+  }
+
+  var planDebounce = null;
+  function planSearch() {
+    var q = String($('planSearch').value || '').trim();
+    if (q.length < 3) { $('planResults').innerHTML = ''; return; }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        var rows = (res && res.results) || [];
+        $('planResults').innerHTML = rows.length
+          ? rows.map(function (r) {
+              return '<button type="button" class="plan-hit" data-id="' + esc(r.id) +
+                '" data-name="' + esc(r.name) + '" data-grade="' + esc(r.grade) + '">' +
+                esc(r.name) + ' <span class="muted">(' + esc(r.grade) + ')</span></button>';
+            }).join('')
+          : '<div class="muted small">No match.</div>';
+      })
+      .withFailureHandler(function () { $('planResults').innerHTML = '<div class="muted small">Search failed.</div>'; })
+      .officeApi({ op: 'searchStudents', q: q });
+  }
+
+  function planSave() {
+    if (!PLAN_CHOSEN.length) { $('planErr').textContent = 'Add at least one student.'; return; }
+    $('planErr').textContent = '';
+    $('planSave').disabled = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        $('planSave').disabled = false;
+        if (!res || !res.ok) {
+          $('planErr').textContent = (res && res.error) || 'Could not save.';
+          return;
+        }
+        planClose();
+        var ahead = res.day && res.day !== planDayKey(new Date());
+        toast('Planned' + (ahead ? ' for ' + res.dayLabel : '') + ' — ' +
+          (res.notified || []).length + ' notified');
+        planRefresh();
+      })
+      .withFailureHandler(function (e) {
+        $('planSave').disabled = false;
+        $('planErr').textContent = String((e && e.message) || e);
+      })
+      .officeApi({
+        op: 'planDismissal',
+        students: PLAN_CHOSEN.map(function (c) { return { id: c.id }; }),
+        forDay: $('planDay').value || '',
+        expectedAt: $('planTime').value || '',
+        reason: $('planReason').value || '',
+        guardianName: $('planWho').value || '',
+        note: $('planNote').value || ''
+      });
+  }
+
+  $('planAddBtn').addEventListener('click', planOpen);
+  $('planCancel').addEventListener('click', planClose);
+  $('planSave').addEventListener('click', planSave);
+  $('planSearch').addEventListener('input', function () {
+    clearTimeout(planDebounce);
+    planDebounce = setTimeout(planSearch, 220);
+  });
+  $('planResults').addEventListener('click', function (ev) {
+    var b = ev.target;
+    while (b && b !== document && !(b.classList && b.classList.contains('plan-hit'))) b = b.parentNode;
+    if (!b || b === document) return;
+    var id = b.getAttribute('data-id');
+    if (!PLAN_CHOSEN.some(function (c) { return c.id === id; })) {
+      PLAN_CHOSEN.push({ id: id, name: b.getAttribute('data-name'), grade: b.getAttribute('data-grade') });
+    }
+    $('planSearch').value = ''; $('planResults').innerHTML = '';
+    planPaintChosen();
+    $('planSearch').focus();
+  });
+  $('planChosen').addEventListener('click', function (ev) {
+    if (!ev.target.classList.contains('plan-chip-x')) return;
+    PLAN_CHOSEN.splice(Number(ev.target.getAttribute('data-i')), 1);
+    planPaintChosen();
+  });
+  $('planDay').addEventListener('change', planDayHint);
+  $('planDay').addEventListener('input', planDayHint);
+  // Coming up has only Cancel; the Expected-pickups handler already knows how to cancel a group.
+  $('planAhead').addEventListener('click', planListClick);
+  $('planList').addEventListener('click', planListClick);
+  function planListClick(ev) {
+    var b = ev.target;
+    while (b && b !== document && !(b.classList &&
+      (b.classList.contains('plan-out') || b.classList.contains('plan-cancel')))) b = b.parentNode;
+    if (!b || b === document) return;
+    var eid = b.getAttribute('data-eid'), name = b.getAttribute('data-name');
+    var group = b.getAttribute('data-group') || '';
+    var out = b.classList.contains('plan-out');
+    if (!window.confirm(out ? 'Sign ' + name + ' out now?' : 'Cancel the plan for ' + name + '?')) return;
+    b.disabled = true;
+    var call = { op: out ? 'signOutPlanned' : 'cancelPlanned' };
+    if (group) call.groupId = group; else call.eventId = eid;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok) { toast(out ? name + ' signed out' : 'Plan cancelled'); planRefresh(); poll(); }
+        else { b.disabled = false; toast((res && res.error) || 'Did not work', true); }
+      })
+      .withFailureHandler(function (e) { b.disabled = false; toast(String((e && e.message) || e), true); })
+      .officeApi(call);
+  }
+
 })();
 </script>
 </body>

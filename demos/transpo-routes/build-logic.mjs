@@ -29,7 +29,7 @@ if (!existsSync(SRC)) {
 const FILES = ['schema.js', 'stops.js', 'manifest.js', 'office.js', 'auth.js', 'sheet.js'];
 
 const parts = FILES.map((f) => {
-  let body = readFileSync(path.join(SRC, f), 'utf8');
+  let body = readFileSync(path.join(SRC, f), 'utf8').replace(/\r\n?/g, '\n');
 
   // Drop the Node shim at the bottom.
   const cut = body.indexOf("if (typeof module !== 'undefined'");

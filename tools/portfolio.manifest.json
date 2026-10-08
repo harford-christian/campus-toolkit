@@ -203,9 +203,14 @@
       ],
       "builtFrom": [
         "FACTS/transportation/Index.html",
-        "FACTS/transportation/DismissalClient.html"
+        "FACTS/transportation/DismissalClient.html",
+        "FACTS/transportation/Config.gs",
+        "FACTS/transportation/Code.gs",
+        "FACTS/transportation/Roles.gs",
+        "FACTS/transportation/Walkers.gs",
+        "FACTS/transportation/Routes.gs"
       ],
-      "buildMethod": "build-demo.mjs (includeDir=project root, inlines DismissalClient; head/body wrapper, sim + userEmail tokens and name scrubs via the replace list — config committed at demos/transportation/build.json) + hand data/mock"
+      "buildMethod": "demos/transportation/build-logic.mjs vendors the SERVER layer verbatim into logic.js (Config.gs whole with ids scrubbed; the named declarations of Code.gs, Roles.gs, Walkers.gs and Routes.gs — whole-file vendoring is out because Walkers.gs/Roles.gs seed real children and staff), applying the same name scrubs build.json applies to the page; then build-demo.mjs (includeDir=project root, inlines DismissalClient; head/body wrapper that loads logic.js, sim/userEmail/presenceUrl tokens and name scrubs via the replace list — config committed at demos/transportation/build.json). mock.js is an in-memory Google (four workbooks, a Drive folder, a TTL cache, script properties, a pinned clock) under the vendored endpoints; data.js is the fabricated school. demos/transportation/verify.mjs proves the roster equals the real producer's output, logic.js is byte-identical to the source, every page method is served, and drives the board, the time-travel and every write through the real endpoints"
     },
     "campus-presence": {
       "title": "Campus Presence",
@@ -225,7 +230,7 @@
         "campus-sign-in-out-system/apps/office/pages/OfficeStyles.html",
         "campus-sign-in-out-system/apps/office/pages/ClientLogic.html"
       ],
-      "buildMethod": "demos/campus-presence/build-logic.mjs (vendors the source project's logic/*.js into logic.js, scrubbing the FACTS-Finder /exec default out of SETTINGS_DEFAULTS) + build-demo.mjs once per surface, configs committed at demos/campus-presence/build.{kiosk,board,muster,metrics}.json + hand switcher/data/mock. The two kiosk surfaces are ONE built page read with ?station=hs|el, as the two iPads are. Settings and Flags are intentionally not built. demos/campus-presence/verify.mjs re-checks the dataset, the mock's op contract and the vendored logic bundle against the source modules"
+      "buildMethod": "demos/campus-presence/build-logic.mjs (vendors the source project's logic/*.js into logic.js, scrubbing the FACTS-Finder /exec default out of SETTINGS_DEFAULTS) + build-demo.mjs once per surface, configs committed at demos/campus-presence/build.{kiosk,board,muster,metrics}.json + hand switcher/data/mock. The three kiosk surfaces are ONE built page read with ?station=hs|el|kg, as the three iPads are (the kindergarten desk also runs the midday K4/K5 release). The staff pages' History link is swapped for an inline note (the demo has no history page). The board's Dismissal link and the Dismissal Board's Campus Presence link point at each other. Settings and Flags are intentionally not built. demos/campus-presence/verify.mjs re-checks the dataset, the mock's op contract and the vendored logic bundle against the source modules"
     },
     "transpo-routes": {
       "title": "Driver Routes",
