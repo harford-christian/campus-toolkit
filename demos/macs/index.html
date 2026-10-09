@@ -48,6 +48,8 @@
     <div class="seg" role="tablist" aria-label="Choose a screen">
       <button data-src="form.html" class="active" aria-selected="true">📝 School registration</button>
       <button data-src="admin.html" aria-selected="false">🗂️ Competition admin</button>
+      <button data-src="spelling-bee.html" aria-selected="false">🐝 Spelling Bee</button>
+      <button data-src="creative-writing.html" aria-selected="false">✍️ Creative Writing</button>
     </div>
     <span class="spacer"></span>
     <span class="hint" id="hint">Pick <b>Riverbend Baptist School</b>, any email, and the one-time code <code>123456</code>
@@ -64,12 +66,16 @@
   // One Apps Script project, two deployments in production: the anonymous registration form (schools verify
   // by emailed code) and the admin console behind a Google sign-in allowlist. Both read one Sheet; the demo's
   // in-memory copy lives in sessionStorage so a submission on the form shows on the admin page.
+  // The Spelling Bee and Creative Writing forms are two more, smaller projects, each with its own Sheet and no
+  // admin web app; each keeps its own sessionStorage copy.
   var frame = document.getElementById('screen');
   var hint = document.getElementById('hint');
   var btns = [].slice.call(document.querySelectorAll('.seg button'));
   var HINTS = {
     'form.html': 'Pick <b>Riverbend Baptist School</b>, any email, and the one-time code <code>123456</code> (it lands in the outbox here instead of an inbox). Add a few entries, submit, then open the admin screen&rsquo;s <b>Submissions</b> tab.',
-    'admin.html': 'Setup tabs edit what the form shows; <b>Submissions</b> is every entry with its auto cross-references; <b>Run Actions</b> seeds a sample school, clears it, and archives the year.'
+    'admin.html': 'Setup tabs edit what the form shows; <b>Submissions</b> is every entry with its auto cross-references; <b>Run Actions</b> seeds a sample school, clears it, and archives the year.',
+    'spelling-bee.html': 'Its own small project and Sheet, no sign-in. Pick a school and a sponsor, choose how many students per grade group, name them, submit. <b>Chesapeake</b> and <b>Pine Ridge</b> have already registered, so the one-time rule refuses them. There is no admin screen; staff read the Sheet.',
+    'creative-writing.html': 'Pick a school, tick the rules box and a level, then on that level&rsquo;s tab tick a category and upload a PDF for the entry and its judging sheet (any PDF, or this <a href="sample.pdf" download style="color:#fff">sample</a>). Submit from the <b>Payment</b> tab. <b>Harbor Light</b> has already registered.'
   };
   function activate(btn) {
     btns.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
@@ -81,7 +87,7 @@
   btns.forEach(function (btn) { btn.addEventListener('click', function () { activate(btn); }); });
 
   document.getElementById('reset').addEventListener('click', function () {
-    try { ['macs-demo-workbook-v1', 'macs-demo-outbox'].forEach(function (k) { sessionStorage.removeItem(k); }); } catch (e) {}
+    try { ['macs-demo-workbook-v1', 'macs-demo-outbox', 'macs-demo-spelling-v1', 'macs-demo-writing-v1'].forEach(function (k) { sessionStorage.removeItem(k); }); } catch (e) {}
     try { localStorage.removeItem('macsFormDraft_v1'); } catch (e) {}
     frame.src = frame.src.split('#')[0];
   });

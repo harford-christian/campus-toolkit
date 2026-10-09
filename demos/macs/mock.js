@@ -7,6 +7,7 @@
       outbox instead of sending. The whole workbook persists in sessionStorage for the visit, so a school's
       submission on the form shows up on the admin page.
    2. window.MOCK_BACKEND — every google.script.run method the two pages call, delegating to the real code.
+      (On the Spelling Bee and Creative Writing pages, mock-competitions.js takes over after the Drive section.)
       Two deliberate stand-ins: the "seed historical data" action runs the project's SAFE sample generator (the
       real one needs a file of real names that is never vendored), and the one-time code is always 123456. */
 (function () {
@@ -90,6 +91,15 @@
   var root = new Folder('My Drive');
   var workbooks = {};
   function registerWorkbook(wb) { workbooks[wb.id] = wb; var f = new File(wb.name, null, wb.id); root.addFile(f); return wb; }
+
+  /* ---------- the Spelling Bee and Creative Writing pages ----------
+     Separate single-form Apps Script projects with their own Sheets: mock-competitions.js (loaded with their
+     server bundle) seeds that project's Sheet over these same in-memory Sheets and Drive and answers its calls. */
+  if (window.MACS_COMPETITION) {
+    window.MOCK_BACKEND = window.MACS_COMPETITION.boot({ Workbook: Workbook, root: root, files: files,
+      registerWorkbook: registerWorkbook, readStore: readStore, writeStore: writeStore, data: D });
+    return;
+  }
 
   /* ---------- the live workbook ---------- */
   var live = registerWorkbook(new Workbook('macs-live', 'MACS Secondary Scheduling'));

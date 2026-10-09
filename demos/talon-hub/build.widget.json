@@ -1,0 +1,28 @@
+{
+  "_note": "Config for tools/build-demo.mjs — the embeddable team WIDGET (apps/fan pages/Widget.html, served at ?view=widget&team=…&sport=…&level=…&gender=…&show=…&title=… by Router.js doGet, for Google Sites iframes). Run from the repo root AFTER build-logic.mjs: node tools/build-demo.mjs demos/talon-hub/build.widget.json.",
+  "src": "../athletics/talon-hub/apps/fan/pages/Widget.html",
+  "dst": "demos/talon-hub/widget.html",
+  "demoName": "Talon Hub · Team widget",
+  "replace": [
+    [
+      "<!-- Embeddable team widget",
+      "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Talon Hub — HCS Athletics</title>\n<script src=\"fan-logic.js\"></script>\n</head>\n<body>\n<!-- Embeddable team widget"
+    ],
+    [
+      "      call('liveNow').then(function (r) { if (schedData) { liveData = r || { live: [] }; render(schedData, liveData); } }).catch(function () {});\n    }, 30000);\n  })();\n</script>\n",
+      "      call('liveNow').then(function (r) { if (schedData) { liveData = r || { live: [] }; render(schedData, liveData); } }).catch(function () {});\n    }, 30000);\n  })();\n</script>\n</body>\n</html>\n"
+    ],
+    [
+      "<?= BUILD_ID ?>",
+      "demo-2026"
+    ],
+    [
+      "<?!= paramsJson ?>",
+      "(function () { var q = new URLSearchParams(location.search), g = function (k) { return String(q.get(k) || ''); }; return { team: g('team'), sport: g('sport'), level: g('level'), gender: g('gender'), show: g('show'), title: g('title'), execUrl: 'fan.html' }; })()"
+    ]
+  ],
+  "_replaceNotes": {
+    "wrapper": "Widget.html is a fragment with its own <style>; the first two replacements wrap it into a document (and load fan-logic.js) so build-demo.mjs can inject the shim before </head>.",
+    "paramsJson": "The server builds WIDGET_PARAMS from the request's query string (Router.js doGet). The demo does the same in the browser, so widget.html?sport=GSOC&level=V filters exactly like the live ?view=widget URL. execUrl (ScriptApp.getService().getUrl() — the live /exec) becomes fan.html; the widget appends ?view=schedule, which fan.html ignores."
+  }
+}

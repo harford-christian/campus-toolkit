@@ -68,6 +68,16 @@
   },
   "athletics": {
     "files": [
+      "athletics/talon-hub/apps/fan/pages/Fan.html",
+      "athletics/talon-hub/apps/fan/pages/FanApp.html",
+      "athletics/talon-hub/apps/fan/pages/FanStyles.html",
+      "athletics/talon-hub/apps/fan/pages/Widget.html",
+      "athletics/talon-hub/apps/fan/server/lib/announcements.js",
+      "athletics/talon-hub/apps/fan/server/lib/fanview.js",
+      "athletics/talon-hub/apps/fan/server/lib/labels.js",
+      "athletics/talon-hub/apps/fan/server/lib/projection.js",
+      "athletics/talon-hub/apps/fan/server/lib/schema.js",
+      "athletics/talon-hub/apps/fan/server/lib/scoreboard.js",
       "athletics/talon-hub/apps/staff/pages/ClientLogic.html",
       "athletics/talon-hub/apps/staff/pages/Staff.html",
       "athletics/talon-hub/apps/staff/pages/StaffApp.html",
@@ -79,7 +89,7 @@
       "api"
     ],
     "ops": [],
-    "hash": "46f22525e1da7289"
+    "hash": "09dd716269d1efd2"
   },
   "purchasing": {
     "files": [
@@ -224,21 +234,26 @@
   },
   "custom-forms": {
     "files": [
-      "custom-forms/preview/admin.html",
-      "custom-forms/preview/fill.html",
-      "custom-forms/preview/index.html"
+      "custom-forms/Seeds.js",
+      "custom-forms/apps/builder/pages/Index.html",
+      "custom-forms/apps/builder/server/Router.js",
+      "custom-forms/apps/chooser/pages/Index.html",
+      "custom-forms/apps/chooser/server/Router.js",
+      "custom-forms/apps/runner-macs/pages/Index.html",
+      "custom-forms/apps/runner-macs/server/Router.js",
+      "custom-forms/apps/runner-public/pages/Index.html",
+      "custom-forms/apps/runner-public/server/Router.js",
+      "custom-forms/apps/runner-public/server/RunnerApi.js",
+      "custom-forms/apps/runner-staff/pages/Index.html",
+      "custom-forms/apps/runner-staff/server/Router.js"
     ],
     "missing": [],
-    "gsr": [
-      "authRequestOtp",
-      "authVerifyOtp",
-      "withdrawSubmission"
-    ],
+    "gsr": [],
     "ops": [
-      "equals",
-      "sum"
+      "count",
+      "equals"
     ],
-    "hash": "41170028c9cb765b"
+    "hash": "465d5b523b69a3ff"
   },
   "gym-tv": {
     "files": [
@@ -307,6 +322,11 @@
   },
   "transportation": {
     "files": [
+      "FACTS/transportation-kiosk/Code.gs",
+      "FACTS/transportation-kiosk/Config.gs",
+      "FACTS/transportation-kiosk/Kiosk.html",
+      "FACTS/transportation-kiosk/KioskClient.html",
+      "FACTS/transportation-kiosk/Pure.gs",
       "FACTS/transportation/Code.gs",
       "FACTS/transportation/Config.gs",
       "FACTS/transportation/DismissalClient.html",
@@ -325,6 +345,7 @@
       "pickupAuthDelete",
       "pickupAuthSave",
       "plannedApi",
+      "rampApi",
       "removeWalker",
       "rolesApi",
       "saveRoleView",
@@ -333,7 +354,7 @@
       "setStanding"
     ],
     "ops": [],
-    "hash": "f1b9380e6d920a35"
+    "hash": "3defaa1b29d6f91b"
   },
   "campus-presence": {
     "files": [
@@ -441,12 +462,20 @@
       "savePrefsApi"
     ],
     "ops": [],
-    "hash": "6928afe5fdf0bac2"
+    "hash": "24c652a8559d789e"
   },
   "macs": {
     "files": [
+      "macs-scheduling/creative_writing/Code.js",
+      "macs-scheduling/creative_writing/Config.js",
+      "macs-scheduling/creative_writing/Form.html",
+      "macs-scheduling/creative_writing/YearRollover.js",
       "macs-scheduling/secondary/AdminApp.html",
-      "macs-scheduling/secondary/Form.html"
+      "macs-scheduling/secondary/Form.html",
+      "macs-scheduling/spelling_bee/Code.js",
+      "macs-scheduling/spelling_bee/Config.js",
+      "macs-scheduling/spelling_bee/Form.html",
+      "macs-scheduling/spelling_bee/YearRollover.js"
     ],
     "missing": [],
     "gsr": [
@@ -471,14 +500,16 @@
       "getBranding",
       "getCategoryList",
       "getFieldTemplateDefs",
+      "getGradeGroups",
       "getJudgingSheets",
       "getPaymentInfo",
       "getSchoolList",
+      "submitRegistration",
       "submitSchoolEntries",
       "uploadEntryFile"
     ],
     "ops": [],
-    "hash": "76c262ab251eff2a"
+    "hash": "3c23d98bb45aca28"
   },
   "elc-assessments": {
     "files": [

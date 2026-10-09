@@ -14,6 +14,7 @@ const SRC = '../../../athletics/talon-hub/apps/staff/pages/';
 const PAGES = ['ClientLogic', 'StaffApp', 'Staff', 'EventFormatEditor', 'TryoutResults'];
 
 const w = {};
+new Function('window', readFileSync(here + 'fan-logic.js', 'utf8'))(w);   // fan pages' publicSchedule needs it
 new Function('window', readFileSync(here + 'data.js', 'utf8'))(w);
 new Function('window', readFileSync(here + 'mock.js', 'utf8'))(w);
 
@@ -36,6 +37,13 @@ const pct = (n) => ((100 * n) / ops.length).toFixed(0) + '%';
 console.log(`ops the Staff client calls : ${ops.length}`);
 console.log(`answered by the mock       : ${answered.length}  (${pct(answered.length)})`);
 console.log(`NOT answered               : ${unsupported.length}  (${pct(unsupported.length)})`);
+// The public fan pages (fan.html, widget.html) share this mock; report their ops separately.
+const FAN = ['FanApp', 'Widget'].map(f => readFileSync(new URL('../../../athletics/talon-hub/apps/fan/pages/' + f + '.html', import.meta.url), 'utf8')).join('\n');
+const fanOps = [...new Set([...FAN.matchAll(/\bcall\(\s*'([A-Za-z0-9_.]+)'/g)].map(m => m[1]))].sort();
+const fanAnswered = fanOps.filter(op => {
+  try { const r = w.MOCK_BACKEND.api(op, {}); return r && r.ok === true; } catch (e) { threw.push(op + ' — ' + e.message); return false; }
+});
+console.log(`ops the Fan pages call     : ${fanOps.length} (${fanOps.join(', ')}) — answered ${fanAnswered.length}`);
 if (threw.length) {
   console.log(`\nTHREW (a handler exists but crashed on {} — fix these first):`);
   threw.forEach(t => console.log('  ' + t));

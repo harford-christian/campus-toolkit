@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talon Hub — HCS Athletics</title>
+<script src="fan-logic.js"></script>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Talon Hub · Team widget" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<!-- Embeddable team widget for Google Sites (fan app, ?view=widget). Chrome-free,
+     transparent, read-only. Reuses the anonymous publicSchedule + liveNow
+     endpoints; filters client-side to one team via the URL params. -->
+<style>
+  /* Palette mirrors ui/Theme.html (school red + gold) so the embed matches the apps. */
+  :root { --mar: #C8102E; --ink: #1f2328; --mut: #6b7280; --line: #e5e7eb;
+    --win: #137333; --loss: #c5221f; --live: #A00C24; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: transparent; }
+  body { font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+  .wrap { padding: 4px 2px 10px; max-width: 640px; margin: 0 auto; }
+  .whead { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; margin: 0 0 .5rem; }
+  .wtitle { font-weight: 700; font-size: 1.02rem; color: var(--mar); }
+  .rec { font-weight: 700; font-size: .82rem; color: var(--mut); }
+  .sect { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--mut); font-weight: 700; margin: .9rem 0 .35rem; }
+  .row { display: flex; align-items: center; gap: .55rem; padding: .4rem 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .dt { flex: 0 0 auto; width: 3.4rem; text-align: center; }
+  .dt .d { font-weight: 700; font-size: .82rem; }
+  .dt .t { font-size: .68rem; color: var(--mut); }
+  .mid { flex: 1 1 auto; min-width: 0; }
+  .opp { font-weight: 600; }
+  .sub { font-size: .72rem; color: var(--mut); }
+  .res { flex: 0 0 auto; font-weight: 700; font-size: .82rem; }
+  .res.win { color: var(--win); } .res.loss { color: var(--loss); }
+  .live-banner { background: var(--live); color: #fff; border-radius: 10px; padding: .55rem .7rem; margin-bottom: .6rem; }
+  .live-banner .lb-top { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; opacity: .9; display: flex; align-items: center; gap: .35rem; }
+  .live-dot { width: .5rem; height: .5rem; border-radius: 50%; background: #fff; display: inline-block; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .live-banner .lb-score { font-weight: 800; font-size: 1.15rem; margin-top: .1rem; }
+  .live-banner a { color: #fff; text-decoration: underline; font-size: .78rem; }
+  .foot { margin-top: .9rem; font-size: .66rem; color: var(--mut); text-align: right; }
+  .foot a { color: var(--mut); }
+  .empty { color: var(--mut); font-size: .82rem; padding: .4rem 0; }
+  .badge { font-size: .64rem; font-weight: 700; padding: .06rem .32rem; border-radius: 5px; background: #f1f3f4; color: var(--mut); margin-left: .35rem; }
+</style>
+
+<div class="wrap" id="w"><p class="empty">Loading…</p></div>
+
+<span id="build-id" hidden>demo-2026</span>
+<script>
+  var WIDGET_PARAMS = (function () { var q = new URLSearchParams(location.search), g = function (k) { return String(q.get(k) || ''); }; return { team: g('team'), sport: g('sport'), level: g('level'), gender: g('gender'), show: g('show'), title: g('title'), execUrl: 'fan.html' }; })();
+  (function () {
+    'use strict';
+    function call(fn, args) { return new Promise(function (res, rej) { google.script.run.withSuccessHandler(res).withFailureHandler(rej).api(fn, args || {}); }); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+    function norm(s) { return String(s || '').toLowerCase().trim(); }
+    var P = WIDGET_PARAMS || {};
+    var SHOW = (function () {
+      var raw = norm(P.show);
+      if (!raw) return { live: true, record: true, schedule: true, results: true };
+      var set = {}; raw.split(',').forEach(function (k) { set[k.trim()] = true; });
+      return { live: !!set.live, record: !!set.record, schedule: !!set.schedule, results: !!set.results };
+    })();
+
+    // A public event belongs to this widget's team if every provided filter matches.
+    function mine(ev) {
+      if (P.team && norm(ev.team).indexOf(norm(P.team)) === -1) return false;
+      if (P.sport && norm(ev.sport) !== norm(P.sport)) return false;
+      if (P.level && norm(ev.level) !== norm(P.level)) return false;
+      if (P.gender && norm(ev.gender) !== norm(P.gender)) return false;
+      return true;
+    }
+
+    function fmtDate(d) { // 'YYYY-MM-DD' → 'Sat Sep 6'
+      var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d || ''); if (!m) return esc(d || '');
+      var dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+    function fmtTime(t) { // '15:30' → '3:30 PM'
+      var m = /^(\d{1,2}):(\d{2})/.exec(t || ''); if (!m) return '';
+      var h = Number(m[1]), ap = h >= 12 ? 'PM' : 'AM', h12 = (h % 12) || 12;
+      return h12 + ':' + m[2] + ' ' + ap;
+    }
+    function vs(ev) { return (norm(ev.homeAway) === 'away' ? '@ ' : 'vs ') + esc(ev.opponent || 'TBD'); }
+
+    function record(events) {
+      var w = 0, l = 0, t = 0;
+      var COMPETITIVE = { Game: 1, Match: 1, Meet: 1, Tournament: 1 }; // Match=volleyball, Meet=XC
+      events.forEach(function (e) {
+        if (e.type && !COMPETITIVE[e.type]) return;    // scrimmages/practices don't count toward the record
+        if (!e.result) return;
+        if (e.resultTone === 'win') w++;
+        else if (e.resultTone === 'loss') l++;
+        else if (/^t/i.test(e.result)) t++;
+      });
+      return { w: w, l: l, t: t, any: (w + l + t) > 0 };
+    }
+
+    function scheduleRow(e) {
+      return '<div class="row"><div class="dt"><div class="d">' + fmtDate(e.date) + '</div><div class="t">' + esc(fmtTime(e.time)) + '</div></div>' +
+        '<div class="mid"><div class="opp">' + vs(e) + '</div><div class="sub">' + esc(e.location || (norm(e.homeAway) === 'away' ? 'Away' : 'Home')) +
+        (e.type && e.type !== 'Game' ? '<span class="badge">' + esc(e.type) + '</span>' : '') + '</div></div>' +
+        (e.liveStreamUrl ? '<a class="res" href="' + esc(e.liveStreamUrl) + '" target="_blank" rel="noopener">▶ Watch</a>' : '') + '</div>';
+    }
+    function resultRow(e) {
+      var tone = e.resultTone === 'win' ? ' win' : (e.resultTone === 'loss' ? ' loss' : '');
+      return '<div class="row"><div class="dt"><div class="d">' + fmtDate(e.date) + '</div></div>' +
+        '<div class="mid"><div class="opp">' + vs(e) + '</div><div class="sub">' + esc(e.location || '') + '</div></div>' +
+        '<div class="res' + tone + '">' + esc(e.result) + '</div></div>';
+    }
+    function liveBanner(g) {
+      var away = norm(g.homeAway) === 'away';
+      var ourScore = away ? g.awayScore : g.homeScore;
+      var oppScore = away ? g.homeScore : g.awayScore;
+      var clock = g.detail || g.label || '';
+      var score = esc(g.team) + ' ' + esc(ourScore == null ? '' : ourScore) + ' — ' + esc(oppScore == null ? '' : oppScore) + ' ' + esc(g.opponent);
+      return '<div class="live-banner"><div class="lb-top"><span class="live-dot"></span>Live now' + (clock ? ' · ' + esc(clock) : '') + '</div>' +
+        '<div class="lb-score">' + score + '</div>' +
+        (g.liveStreamUrl ? '<a href="' + esc(g.liveStreamUrl) + '" target="_blank" rel="noopener">▶ Watch the stream</a>' : '') + '</div>';
+    }
+
+    function render(sched, live) {
+      var el = document.getElementById('w');
+      var events = (sched.events || []).filter(mine);
+      var today = sched.today || '';
+      var title = P.title || (events[0] && events[0].team) || 'Team';
+
+      var upcoming = events.filter(function (e) { return e.date >= today && !e.result; })
+        .sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : (a.time < b.time ? -1 : 1)); }).slice(0, 6);
+      var recent = events.filter(function (e) { return !!e.result; })
+        .sort(function (a, b) { return a.date > b.date ? -1 : 1; }).slice(0, 6);
+      var rec = record(events);
+      var liveMine = (live.live || []).filter(mine);
+
+      var h = '<div class="whead"><span class="wtitle">' + esc(title) + '</span>' +
+        (SHOW.record && rec.any ? '<span class="rec">' + rec.w + '-' + rec.l + (rec.t ? '-' + rec.t : '') + '</span>' : '') + '</div>';
+
+      if (SHOW.live && liveMine.length) h += liveMine.map(liveBanner).join('');
+
+      if (SHOW.schedule) {
+        h += '<div class="sect">Upcoming</div>';
+        h += upcoming.length ? upcoming.map(scheduleRow).join('') : '<div class="empty">No upcoming games scheduled.</div>';
+      }
+      if (SHOW.results) {
+        h += '<div class="sect">Recent results</div>';
+        h += recent.length ? recent.map(resultRow).join('') : '<div class="empty">No results yet.</div>';
+      }
+      var execUrl = (WIDGET_PARAMS && WIDGET_PARAMS.execUrl) || '';
+      // Bare /exec is now the sign-in hub, so link the schedule board explicitly.
+      var schedUrl = execUrl ? (execUrl + (execUrl.indexOf('?') === -1 ? '?' : '&') + 'view=schedule') : '';
+      var buildId = (document.getElementById('build-id') || {}).textContent || '';
+      h += '<div class="foot">' + (schedUrl ? '<a href="' + esc(schedUrl) + '" target="_blank" rel="noopener">Full schedule & scores →</a> · ' : '') +
+        'Talon Hub · HCS Athletics' + (buildId ? ' · <span title="build">' + esc(buildId) + '</span>' : '') + '</div>';
+      el.innerHTML = h;
+    }
+
+    var schedData = null, liveData = { live: [] };
+    function load() {
+      Promise.all([call('publicSchedule'), call('liveNow').catch(function () { return { live: [] }; })])
+        .then(function (r) {
+          schedData = r[0] || { events: [] }; liveData = r[1] || { live: [] };
+          if (!schedData.ok) { document.getElementById('w').innerHTML = '<p class="empty">Schedule unavailable.</p>'; return; }
+          render(schedData, liveData);
+        })
+        .catch(function () { document.getElementById('w').innerHTML = '<p class="empty">Could not load.</p>'; });
+    }
+    load();
+    // Refresh live score periodically without re-fetching the whole schedule.
+    // Skipped while the embedding page/tab is hidden — a backgrounded Sites tab
+    // was polling the server forever for nothing.
+    setInterval(function () {
+      if (document.hidden) return;
+      call('liveNow').then(function (r) { if (schedData) { liveData = r || { live: [] }; render(schedData, liveData); } }).catch(function () {});
+    }, 30000);
+  })();
+</script>
+</body>
+</html>

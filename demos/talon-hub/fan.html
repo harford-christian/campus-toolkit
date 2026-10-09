@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talon Hub — Schedule &amp; scores</title>
+<script src="fan-logic.js"></script>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Talon Hub · Fan schedule" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<!-- GENERATED SOURCE: edit ui/Theme.html, then `npm run build` copies it to
+     apps/*/pages/Theme.html. Included by both shells via include('pages/Theme').
+     Shared design system: Eagles palette (auto light/dark), base components,
+     sport+nav SVG sprite, and the TalonUI client helper (sport badges). -->
+<!-- NOTE (2026-08-30): the display face is DEFINED but not yet LOADED, on purpose.
+     Barlow Condensed belongs on big numerals — scores, times, record tiles, the
+     Today feed's counts — and none of those displays exist yet; they arrive with
+     the nav/Today work. Loading a webfont that styles nothing is pure cost, so
+     the <link> stays out until there is something to render in it.
+
+     Measured 2026-08-30 so the decision is on the record: 2.6 KB of CSS plus
+     ~22 KB per weight the browser actually renders (latin subset; weights that
+     never get used are never fetched). When it goes in, load it NON-BLOCKING —
+     media="print" + an onload swap, with a preconnect to fonts.gstatic.com — so
+     a slow font host can never hold up first paint on a school phone. Arial
+     Narrow is the metric-compatible fallback in the stack below. -->
+<style>
+  :root {
+    /* Numbers and headings that should read as "athletics", not as UI chrome.
+       Inert until the <link> above is restored — until then this resolves to
+       Arial Narrow, which is the intended fallback anyway. */
+    --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+    /* School colors: MAROON + white, antique GOLD accent (matches the public
+       landing). --maroon/--maroon-deep are the brand primary (referenced across
+       all component CSS); --red/--red-deep are aliases kept pointing at maroon. */
+    --maroon: #6b1f2a; --maroon-deep: #4a141c; --red: #6b1f2a; --red-deep: #4a141c; --gold: #c8a24a;
+    --bg: #f4f1ec; --panel: #FBFAFA; --card: #FFFFFF; --text: #17181B;
+    --muted: #6B7280; --line: #E6E8EC;
+    --shadow: 0 1px 2px rgba(20,20,30,.06), 0 8px 24px rgba(20,20,30,.06);
+    --ok: #0B7A48; --warn: #B45309; --err: #B42318;
+    --logo: url("data:image/png;base64,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"); /* HCS Athletics crest (data URI) injected at build */
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --maroon:#b5566a; --maroon-deep:#8f3f50; --red:#b5566a; --red-deep:#8f3f50; --gold:#d4b366;
+      --bg:#141518; --panel:#1B1D21; --card:#212429;
+      --text:#ECEDEF; --muted:#9AA1AC; --line:#2C313A; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+      --ok:#3DBB7E; --warn:#E08A2B; --err:#E5675A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --maroon:#EF4152; --maroon-deep:#C8102E; --red:#EF4152; --red-deep:#C8102E; --gold:#F4C300;
+    --bg:#141518; --panel:#1B1D21; --card:#212429;
+    --text:#ECEDEF; --muted:#9AA1AC; --line:#2C313A; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+    --ok:#3DBB7E; --warn:#E08A2B; --err:#E5675A;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; line-height:1.5; }
+
+  /* app shell: fixed app bar + optional chip row, scrolling content, fixed bottom tabs */
+  .app { display:flex; flex-direction:column; min-height:100dvh; }
+  .abar { position:sticky; top:0; z-index:5; flex:none; display:flex; align-items:center; gap:.5rem; padding:.55rem .9rem;
+    background:var(--maroon); color:#fff; }
+  .abar .crest { width:42px; height:27px; background:#fff var(--logo) center/contain no-repeat; border-radius:5px; flex:none; }
+  .abar .title { font-weight:800; font-size:1rem; letter-spacing:-.01em; }
+  .abar .meta { margin-left:auto; font-size:.72rem; color:rgba(255,255,255,.82); font-weight:700; }
+  .abar .act { color:#fff; background:rgba(255,255,255,.16); border:0; border-radius:999px; padding:.3rem .7rem; font-size:.75rem; font-weight:700; }
+
+  .chips { position:sticky; z-index:4; flex:none; display:flex; gap:.4rem; padding:.5rem .8rem; overflow-x:auto;
+    background:var(--bg); border-bottom:1px solid var(--line); -webkit-overflow-scrolling:touch; }
+  .chips::-webkit-scrollbar { display:none; }
+  .chip { flex:none; display:flex; align-items:center; gap:.35rem; padding:.32rem .6rem; border:1px solid var(--line);
+    border-radius:999px; background:var(--card); color:var(--text); font-size:.75rem; font-weight:700; white-space:nowrap; cursor:pointer; }
+  .chip.on { background:var(--maroon); color:#fff; border-color:var(--maroon); }
+  .chip.on .badge { background:rgba(255,255,255,.2); }
+  .chip.on .badge svg { color:#fff; }
+  .chip.on .badge .lvl { background:#fff; color:var(--maroon); border-color:transparent; }
+  .chip .dot { min-width:16px; height:16px; padding:0 .25rem; border-radius:999px; background:var(--err); color:#fff;
+    font-size:.58rem; font-weight:900; display:flex; align-items:center; justify-content:center; }
+  /* Team lifecycle tag (Preseason / Offseason / Past season) — quiet by default,
+     inverts on a selected chip. */
+  .phasepill { font-size:.58rem; font-weight:800; padding:.1rem .4rem; border-radius:999px; text-transform:uppercase; letter-spacing:.02em;
+    background:color-mix(in srgb,var(--gold) 30%,transparent); color:#5b4a00; white-space:nowrap; }
+  .chip.on .phasepill { background:rgba(255,255,255,.22); color:#fff; }
+
+  main.content { flex:1; padding:.85rem .85rem 5.5rem; display:flex; flex-direction:column; gap:.6rem; max-width:34rem; margin:0 auto; width:100%; }
+
+  .tabbar { position:fixed; bottom:0; left:0; right:0; z-index:6; display:flex; background:var(--card);
+    border-top:1px solid var(--line); padding:.3rem .1rem calc(.3rem + env(safe-area-inset-bottom)); }
+  .tabbar .tb { flex:1; display:flex; flex-direction:column; align-items:center; gap:.15rem; background:none; border:0;
+    font-size:.6rem; font-weight:700; color:var(--muted); padding:.25rem 0; cursor:pointer; }
+  .tabbar .tb.on { color:var(--maroon); }
+  .tabbar .tb svg { width:21px; height:21px; color:currentColor; }
+  .tabbar .tb:focus-visible, .chip:focus-visible, .abar .act:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+
+  /* sport badge: mono glyph + red level letter */
+  .badge { position:relative; width:28px; height:28px; border-radius:8px; background:color-mix(in srgb,var(--text) 8%,transparent);
+    display:flex; align-items:center; justify-content:center; flex:none; }
+  .badge svg { width:16px; height:16px; color:var(--text); }
+  .badge .lvl { position:absolute; bottom:-5px; right:-6px; background:var(--card); color:var(--maroon); font-size:.5rem;
+    font-weight:900; padding:.02rem .18rem; border-radius:5px; border:1px solid var(--line); line-height:1.25; }
+  .badge.lg { width:36px; height:36px; border-radius:10px; } .badge.lg svg { width:21px; height:21px; }
+
+  /* athlete avatar: photo thumbnail or initials placeholder */
+  .avatar { width:38px; height:38px; border-radius:999px; flex:none; overflow:hidden; display:inline-flex; align-items:center; justify-content:center;
+    background:color-mix(in srgb,var(--maroon) 14%,var(--card)); color:var(--maroon); font-weight:800; font-size:.85rem; }
+  .avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+  .avatar.lg { width:60px; height:60px; font-size:1.25rem; }
+
+  /* atoms */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:.7rem .8rem; box-shadow:var(--shadow); }
+  .card.tight { padding:.55rem .7rem; }
+  .flex { display:flex; align-items:center; gap:.5rem; }
+  .row2 { display:flex; align-items:center; justify-content:space-between; gap:.5rem; }
+  .h { font-size:.9rem; font-weight:700; } .s { font-size:.78rem; color:var(--muted); } .xs { font-size:.7rem; color:var(--muted); }
+  .sectlabel { font-size:.66rem; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); font-weight:800; margin:.5rem .15rem .1rem; }
+  .pill { font-size:.62rem; font-weight:800; padding:.12rem .45rem; border-radius:999px; text-transform:uppercase; letter-spacing:.02em; }
+  .pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok);}
+  .pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);}
+  .pill.err{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err);}
+  .pill.gold{background:color-mix(in srgb,var(--gold) 32%,transparent);color:#5b4a00;}
+  .pill.win{background:var(--ok);color:#fff;} .pill.plain{background:color-mix(in srgb,var(--text) 9%,transparent);color:var(--muted);}
+  .livebadge{display:inline-flex;align-items:center;gap:.3rem;background:var(--err);color:#fff;border-radius:999px;padding:.1rem .5rem;font-size:.7rem;font-weight:700;letter-spacing:.03em;}
+  .livebadge::before{content:"";width:.5rem;height:.5rem;border-radius:50%;background:#fff;animation:livepulse 1.4s ease-in-out infinite;}
+  @keyframes livepulse{0%,100%{opacity:1;}50%{opacity:.2;}}
+  @media (prefers-reduced-motion: reduce){.livebadge::before{animation:none;}}
+  .watchbtn{display:inline-block;background:var(--err);color:#fff;border-radius:8px;padding:.35rem .7rem;font-size:.8rem;font-weight:600;text-decoration:none;margin-top:.4rem;}
+  .watchbtn.hl{background:var(--maroon);}
+  .btn { border:0; border-radius:10px; background:var(--maroon); color:#fff; font-weight:700; font-size:.85rem; padding:.6rem .8rem; text-align:center; cursor:pointer; }
+  .btn:active { background:var(--maroon-deep); }
+  .btn.ghost { background:transparent; color:var(--maroon); border:1px solid color-mix(in srgb,var(--maroon) 40%,var(--line)); }
+  .btn.block { display:block; width:100%; }
+  .input, select.input { width:100%; font-size:1rem; padding:.6rem .7rem; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--text); }
+  .conflict { border:1px solid color-mix(in srgb,var(--err) 45%,var(--line)); background:color-mix(in srgb,var(--err) 8%,var(--card)); border-radius:14px; padding:.7rem .8rem; }
+  .todo { border:1px solid color-mix(in srgb,var(--warn) 45%,var(--line)); background:color-mix(in srgb,var(--warn) 8%,var(--card)); border-radius:14px; padding:.7rem .8rem; }
+  .notice { background:color-mix(in srgb,var(--gold) 12%,var(--card)); border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line)); border-radius:12px; padding:.6rem .8rem; font-size:.85rem; }
+  /* Announcement banner — sticky just under the app bar, dismissible. */
+  .annc-bar { position:sticky; top:0; z-index:6; flex:none; display:flex; flex-direction:column; }
+  .annc-item { display:flex; align-items:flex-start; gap:.5rem; padding:.5rem .9rem; font-size:.82rem; background:color-mix(in srgb,var(--gold) 22%,var(--card)); border-bottom:1px solid color-mix(in srgb,var(--gold) 45%,var(--line)); }
+  .annc-item.urgent { background:color-mix(in srgb,var(--err) 16%,var(--card)); border-bottom-color:color-mix(in srgb,var(--err) 45%,var(--line)); }
+  .annc-item .annc-body { flex:1; }
+  .annc-item .annc-x { flex:none; border:0; background:transparent; color:var(--muted); font-size:1rem; line-height:1; cursor:pointer; padding:0 .1rem; }
+  /* ── Live ticker (shared, all apps) ────────────────────────────────────────
+     Mounts itself above #annc-bar, so no app shell needs a new slot. Sticky and
+     above the announcement bar because "a game is on RIGHT NOW" outranks a
+     notice that will still be true in an hour. */
+  .live-ticker { position:sticky; top:0; z-index:7; display:block; width:100%; border:0; padding:0;
+    background:var(--err); color:#fff; font:inherit; cursor:pointer; overflow:hidden; text-align:left; }
+  .live-ticker:hover { filter:brightness(1.06); }
+  .live-ticker .lt-in { display:flex; align-items:center; gap:.5rem; padding:.4rem .9rem; }
+  .live-ticker .lt-dot { flex:none; width:.5rem; height:.5rem; border-radius:50%; background:#fff; animation:ltPulse 1.4s infinite; }
+  .live-ticker .lt-tag { flex:none; font-size:.6rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+  /* The scrolling half. One line, clipped, never wraps the bar to two rows. */
+  .live-ticker .lt-scroll { flex:1; min-width:0; overflow:hidden; }
+  .live-ticker .lt-move { display:inline-block; white-space:nowrap; font-size:.82rem; font-weight:600;
+    padding-left:100%; animation:ltMarquee 18s linear infinite; }
+  .live-ticker .lt-go { flex:none; font-size:.72rem; font-weight:800; opacity:.95; }
+  @keyframes ltPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  @keyframes ltMarquee { from{transform:translateX(0)} to{transform:translateX(-100%)} }
+  /* Respect a reduced-motion preference: keep the bar, drop the movement — the
+     text still has to be readable, so it sits still rather than scrolling. */
+  @media (prefers-reduced-motion: reduce) {
+    .live-ticker .lt-move { animation:none; padding-left:0; }
+    .live-ticker .lt-dot { animation:none; }
+  }
+  /* Persistent Home-card announcements (not dismissible) */
+  .annc-card .annc-line { padding:.4rem .1rem; border-top:1px solid var(--line); }
+  .annc-card .annc-line:first-of-type { border-top:0; }
+  .annc-card .annc-line.urgent { border-left:3px solid var(--err); padding-left:.5rem; }
+  .center { text-align:center; } .muted { color:var(--muted); }
+  .build-stamp { text-align:center; color:var(--muted); opacity:.7; font-size:.68rem; padding:1.5rem 0 .5rem; }
+  .toast { position:fixed; left:50%; bottom:5rem; transform:translateX(-50%); background:var(--text); color:var(--bg);
+    padding:.5rem .9rem; border-radius:999px; font-size:.8rem; font-weight:700; z-index:20; box-shadow:var(--shadow); }
+  /* In-app dialog — replaces native alert/confirm/prompt so there's no browser
+     "An embedded page at …googleusercontent.com says" banner. Themed + light/dark. */
+  .tdlg-scrim { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center;
+    z-index:50; padding:1rem; opacity:0; transition:opacity .15s ease; }
+  .tdlg-scrim.on { opacity:1; }
+  .tdlg { background:var(--card); color:var(--text); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+    max-width:24rem; width:100%; max-height:calc(100vh - 2rem); padding:1.1rem 1.15rem 1rem; transform:translateY(8px) scale(.98);
+    transition:transform .15s ease; display:flex; flex-direction:column; }
+  .tdlg-scrim.on .tdlg { transform:none; }
+  .tdlg-title { font-weight:800; font-size:1rem; margin-bottom:.3rem; flex-shrink:0; }
+  /* The longest dialog in the app (standings-inclusion preview: header + up to
+     a dozen move lines + the unchanged line) can outgrow a phone screen —
+     scroll the message body instead of pushing OK/Cancel off-viewport. */
+  .tdlg-msg { font-size:.9rem; color:var(--muted); white-space:pre-wrap; line-height:1.5; overflow-y:auto; min-height:0; }
+  .tdlg-input { width:100%; font-size:1rem; padding:.55rem .6rem; border:1px solid var(--line); border-radius:10px;
+    background:var(--card); color:var(--text); margin-top:.7rem; }
+  .tdlg-actions { display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem; flex-shrink:0; }
+  .tdlg-actions .btn.danger { background:var(--err); }
+  .tdlg-actions .btn.danger:active { filter:brightness(.9); }
+  @media (prefers-reduced-motion:reduce){ .tdlg-scrim,.tdlg{ transition:none; } }
+  @media (prefers-reduced-motion:no-preference){ .btn,.chip,.tb{transition:background .12s ease,color .12s ease;} }
+
+  /* Inline attachment images (announcements, polls, item sign-ups). Capped in
+     height so a portrait photo cannot push the rest of a card off screen; tap
+     opens the full file in Drive. */
+  .att-imgs { display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.45rem; }
+  .att-img-l { display:block; flex:0 1 auto; line-height:0; }
+  .att-img { max-width:100%; max-height:13rem; width:auto; border-radius:10px; border:1px solid var(--line);
+    background:var(--bg); object-fit:cover; display:block; }
+  .att-imgs:has(.att-img-l:only-child) .att-img { max-height:17rem; }
+
+  /* ===== Lens bar (2026-08-31) ==============================================
+     The hats one person wears, switched in place. Replaces the "I'm here as"
+     <select> that lived in the app bar — a control most people never found,
+     which also mixed two different acts: BEING something (a hat you hold) and
+     LOOKING AT what someone else sees (a view you borrow). Only hats belong
+     here; borrowing a view is view-only and lives in More.
+
+     Renders ONLY for someone with more than one hat (Identity.isMultiHat), so a
+     plain coach — the common case — pays no chrome for it at all. */
+  .lensbar { position:sticky; z-index:5; flex:none; display:flex; gap:.4rem; padding:.5rem .8rem;
+    background:var(--card); border-bottom:1px solid var(--line); overflow-x:auto; }
+  .lensbar::-webkit-scrollbar { display:none; }
+  .lens { flex:1 1 0; min-width:5.5rem; position:relative; display:flex; flex-direction:column; align-items:center;
+    gap:.1rem; padding:.4rem .45rem; border:1px solid var(--line); border-radius:12px; background:var(--panel);
+    color:var(--muted); font:inherit; font-size:.7rem; font-weight:700; cursor:pointer; min-height:44px; }
+  .lens .lname { font-size:.78rem; letter-spacing:-.01em; white-space:nowrap; }
+  .lens .lsub { font-size:.6rem; font-weight:600; opacity:.85; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; max-width:100%; }
+  .lens.on { background:var(--maroon); border-color:var(--maroon); color:#fff; }
+  .lens.on .lsub { opacity:.82; }
+  .lens:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+  .lens .cnt { position:absolute; top:-6px; right:-3px; min-width:17px; height:17px; padding:0 .22rem; border-radius:999px;
+    background:var(--err); color:#fff; font-size:.58rem; font-weight:800; display:flex; align-items:center;
+    justify-content:center; border:2px solid var(--card); }
+  /* A lens that leaves for another app (the parent portal is its own deployment,
+     so "switch" means a new tab carrying a bridge token — not a lie about it). */
+  .lens .lout { position:absolute; top:.25rem; right:.3rem; width:11px; height:11px; opacity:.6; }
+  .lens.on .lout { opacity:.9; }
+  @media (min-width:820px) {
+    .lensbar { margin-left:220px; }
+    .lens { flex:0 0 auto; min-width:7rem; }
+  }
+
+  /* ===== Event page (2026-08-30) ============================================
+     One page per event, grouped Before / During / After. Replaces the split
+     where "who's out", "who's riding" and "where is it" lived on different
+     screens — and where a coach could TYPE IN the address, food stop and stream
+     link (they were <input>s in the editor) but never see any of them again. */
+  .dsp { font-family:var(--display); }
+  /* Phase chips: which part of the event you're looking at. The clock picks one;
+     tapping overrides. `.now` marks the phase the clock would have chosen, so a
+     coach browsing tomorrow's game can still tell which one is "live". */
+  .evphz { display:flex; gap:.35rem; margin:.1rem 0 .55rem; }
+  .evpz { flex:1; border:1px solid var(--line); border-radius:10px; background:var(--card); color:var(--muted);
+    font:inherit; font-size:.75rem; font-weight:700; padding:.4rem .3rem; cursor:pointer; min-height:40px; }
+  .evpz .sub { display:block; font-size:.58rem; font-weight:600; opacity:.85; }
+  .evpz.on { background:var(--maroon); border-color:var(--maroon); color:#fff; }
+  .evpz.now { border-color:var(--gold); }
+  .evpz:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+  /* The "where and when" card — every logistics field the event row already holds. */
+  .evrow { display:flex; align-items:flex-start; gap:.6rem; padding:.5rem 0; border-top:1px solid var(--line); }
+  .evrow:first-child { border-top:0; padding-top:.1rem; }
+  .evrow:last-child { padding-bottom:.1rem; }
+  .evico { flex:none; width:28px; height:28px; border-radius:8px; background:var(--bg);
+    display:flex; align-items:center; justify-content:center; }
+  .evico svg { width:16px; height:16px; color:var(--maroon); }
+  .evtx { flex:1; min-width:0; }
+  .evt { display:block; font-size:.86rem; font-weight:700; letter-spacing:-.01em; }
+  .evs { display:block; font-size:.74rem; color:var(--muted); word-break:break-word; }
+  .evlk { align-self:center; flex:none; color:var(--maroon); font-size:.72rem; font-weight:800; text-decoration:none;
+    border:1px solid color-mix(in srgb,var(--maroon) 35%,var(--line)); border-radius:999px; padding:.28rem .6rem;
+    white-space:nowrap; min-height:32px; display:inline-flex; align-items:center; }
+  .evlk:hover { background:color-mix(in srgb,var(--maroon) 8%,transparent); }
+
+  /* ===== "More" sheet (mobile bottom sheet; grouped secondary destinations) === */
+  .msheet-scrim { position:fixed; inset:0; background:rgba(10,12,16,.34); z-index:40; opacity:0; transition:opacity .15s ease; }
+  .msheet-scrim.on { opacity:1; }
+  .msheet { position:fixed; left:0; right:0; bottom:0; z-index:41; background:var(--card); border-top-left-radius:20px; border-top-right-radius:20px;
+    box-shadow:0 -10px 34px rgba(0,0,0,.22); padding:.5rem .7rem calc(1rem + env(safe-area-inset-bottom)); transform:translateY(102%); transition:transform .2s ease; }
+  .msheet.on { transform:none; }
+  .msheet .grip { width:36px; height:4px; border-radius:999px; background:var(--line); margin:.4rem auto .5rem; }
+  .msheet h3 { font-size:.66rem; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); font-weight:800; margin:.2rem .3rem .3rem; }
+  .msheet .mrow { display:flex; align-items:center; gap:.8rem; width:100%; text-align:left; background:none; border:0; padding:.85rem .3rem; border-bottom:1px solid var(--line);
+    font-size:.95rem; font-weight:600; color:var(--text); cursor:pointer; }
+  .msheet .mrow:last-child { border-bottom:0; }
+  .msheet .mrow svg { width:22px; height:22px; color:var(--muted); flex:none; }
+  @media (prefers-reduced-motion:reduce){ .msheet-scrim,.msheet{ transition:none; } }
+
+  /* ===== Desktop: bottom tab bar → left sidebar rail (same markup) ============ */
+  @media (min-width:820px) {
+    .tabbar { top:0; bottom:0; right:auto; width:220px; flex-direction:column; align-items:stretch; justify-content:flex-start;
+      border-top:0; border-right:1px solid var(--line); padding:.6rem .55rem; gap:.15rem; overflow-y:auto; }
+    .tabbar .tb { flex:none; flex-direction:row; justify-content:flex-start; gap:.7rem; font-size:.92rem; font-weight:700; color:var(--muted);
+      padding:.6rem .65rem; border-radius:10px; }
+    .tabbar .tb.on { color:var(--red); background:color-mix(in srgb,var(--red) 10%,transparent); }
+    .tabbar .tb svg { width:20px; height:20px; }
+    .tabbar .tb.more-only { display:none; }             /* the mobile-only "More" tab */
+    .tabbar .rail-head { display:flex; align-items:center; gap:.5rem; padding:.2rem .5rem .7rem; font-weight:800; color:var(--text); }
+    .tabbar .rail-head .crest { width:34px; height:22px; background:#fff var(--logo) center/contain no-repeat; border-radius:4px; }
+    .tabbar .rail-sec { margin-top:auto; padding-top:.5rem; border-top:1px solid var(--line); font-size:.6rem; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:800; }
+    .abar, .annc-bar, .chips, main.content { margin-left:220px; }
+    main.content { max-width:64rem; padding:1.2rem 1.4rem 2rem; }
+    .abar { border-bottom:1px solid var(--line); }
+    /* two-up dashboards on wide screens (apps opt in with .cols) */
+    .cols { display:grid; grid-template-columns:1.5fr 1fr; gap:1.1rem; align-items:start; }
+  }
+  @media (max-width:819px){ .cols{ display:block; } .tabbar .rail-head, .tabbar .rail-sec{ display:none; } .tabbar .tb.desk-only{ display:none; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="sp-soccer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8.2l3.6 2.6-1.4 4.2H9.8l-1.4-4.2z"/><path d="M12 8.2V3.2M15.6 10.8l4.5-1.6M14.2 15l2.7 3.8M9.8 15l-2.7 3.8M8.4 10.8l-4.5-1.6"/></symbol>
+  <symbol id="sp-basketball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/><path d="M6.2 4.8c3.3 2.6 3.3 11.8 0 14.4M17.8 4.8c-3.3 2.6-3.3 11.8 0 14.4"/></symbol>
+  <symbol id="sp-volleyball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3c-3.2 3.8-3.4 9.4-.6 18M9.4 3.6C6 8 5.4 13 7.8 20.4M3.3 10.2c5 .2 10 2.6 13 7.4M21 8.7c-4.4 2.4-7.2 6.6-8 12.1M20.4 13.8c-4.8-1.6-10.4-1-15.6 1.8"/></symbol>
+  <symbol id="sp-baseball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M6.5 5.2c2.4 3.6 2.4 10 0 13.6M17.5 5.2c-2.4 3.6-2.4 10 0 13.6"/><path d="M7.7 8.2l1.4-.8M7.4 11l1.5-.5M7.6 13.9l1.4-.3M16.3 8.2l-1.4-.8M16.6 11l-1.5-.5M16.4 13.9l-1.4-.3"/></symbol>
+  <symbol id="sp-softball" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M6.5 5.2c2.4 3.6 2.4 10 0 13.6M17.5 5.2c-2.4 3.6-2.4 10 0 13.6"/></symbol>
+  <symbol id="sp-xc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="4.5" r="2"/><path d="M14 8.2l-3.6 1.6 1.5 3 3.4-1"/><path d="M15.4 9.5l1.6 4.2-2.4 3.4M17 13.7l2.6 1.3 1.4-2M11 21l2.1-4.3"/></symbol>
+  <symbol id="sp-golf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20V4l7.5 2.4L9 8.8"/><ellipse cx="11" cy="20" rx="6.5" ry="1.6"/><circle cx="16" cy="19.4" r="1.1"/></symbol>
+  <symbol id="sp-football" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 19.5C3.5 11.5 11.5 3.5 19.5 4.5c1 8-7 16-15 15z"/><path d="M8.8 15.2l6.4-6.4"/><path d="M10.5 13.2l1.6 1.6M12.3 11.4l1.6 1.6"/></symbol>
+  <symbol id="sp-generic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></symbol>
+  <symbol id="n-dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="n-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></symbol>
+  <symbol id="n-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></symbol>
+  <symbol id="n-more" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h.01M12 12h.01M19 12h.01"/></symbol>
+  <symbol id="n-events" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18"/></symbol>
+  <symbol id="n-roster" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0M17 11l2 2 4-4"/></symbol>
+  <symbol id="n-tryout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v7a6 6 0 0012 0V3"/><path d="M4 3h16M9 21h6M12 16v5"/></symbol>
+  <symbol id="n-whistle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 015 5c0 3-5 9-5 9S7 10 7 7a5 5 0 015-5z"/><circle cx="12" cy="7" r="1.6"/></symbol>
+  <symbol id="n-stats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="n-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></symbol>
+  <symbol id="n-clipboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V3a1 1 0 011-1h4a1 1 0 011 1v1M9 11h6M9 15h6"/></symbol>
+  <symbol id="n-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></symbol>
+  <symbol id="n-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/></symbol>
+  <symbol id="n-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></symbol>
+  <symbol id="n-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 9a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 004 0"/></symbol>
+  <!-- Event-page icons (2026-08-30): the "where and when" card renders these next
+       to fields that were already on the SCHEDULE row but never shown to a coach. -->
+  <symbol id="n-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s7-5.8 7-11a7 7 0 10-14 0c0 5.2 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+  <symbol id="n-bus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M4 10h16"/><circle cx="8" cy="18.4" r="1.5"/><circle cx="16" cy="18.4" r="1.5"/></symbol>
+  <symbol id="n-food" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a2.4 2.4 0 004.8 0V3M8.4 3v18"/><path d="M17 3c-1.6 1.1-2.4 3-2.4 5.3s.9 3.6 2.4 3.9V21"/></symbol>
+  <symbol id="n-shirt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8.6 3.6 4 6.2l2 4 1.8-1V21h8.4V9.2l1.8 1 2-4-4.6-2.6"/><path d="M8.6 3.6a3.4 3.4 0 006.8 0"/></symbol>
+  <symbol id="n-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10.4 9.4v5.2l4.4-2.6z"/></symbol>
+  <symbol id="n-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M2 12s3.9-6.6 10-6.6S22 12 22 12s-3.9 6.6-10 6.6S2 12 2 12z"/><circle cx="12" cy="12" r="2.7"/></symbol>
+  <!-- A guardian and a child — the front door's Parent card. n-user is one
+       person and n-roster is a person with a tick (a checked-in athlete), so
+       neither of those says "family". -->
+  <symbol id="n-family" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="7" r="3.2"/><path d="M2.5 20.5a5.5 5.5 0 0111 0"/><circle cx="17" cy="9.6" r="2.4"/><path d="M13.6 20.5a3.9 3.9 0 017.8 0"/></symbol>
+</defs></svg>
+
+<script>
+  /* Shared client UI helpers (both apps). Kept tiny and dependency-free. */
+  var TalonUI = (function () {
+    var GLYPH = { BSOC:'sp-soccer', GSOC:'sp-soccer', SOC:'sp-soccer',
+      BBB:'sp-basketball', GBB:'sp-basketball', BBK:'sp-basketball', GBK:'sp-basketball', BSK:'sp-basketball',
+      VB:'sp-volleyball', VOLL:'sp-volleyball', BASE:'sp-baseball', SOFT:'sp-softball',
+      XC:'sp-xc', GOLF:'sp-golf', FF:'sp-football', FB:'sp-football' };
+    var LEVEL = { V:'V', JV:'JV', MS:'MS' };
+    function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':String(s); return d.innerHTML; }
+    function glyphId(sport){ return GLYPH[String(sport||'').toUpperCase()] || 'sp-generic'; }
+    function levelLetter(level){ return LEVEL[String(level||'').toUpperCase()] || esc(level); }
+    function badge(sport, level, big){
+      return '<span class="badge'+(big?' lg':'')+'"><svg><use href="#'+glyphId(sport)+'"></use></svg>'+
+        (level? '<span class="lvl">'+levelLetter(level)+'</span>':'')+'</span>';
+    }
+    function toast(msg){ var t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+      document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2600); }
+    /* Mobile "More" bottom sheet. items = [{label, icon(sprite id), onClick}].
+       Opens a themed sheet; picking a row closes it and fires onClick. On desktop
+       the same destinations live in the sidebar, so this is the phone mechanism. */
+    function moreSheet(items, opts){
+      opts = opts || {};
+      var scrim=document.createElement('div'); scrim.className='msheet-scrim';
+      var sheet=document.createElement('div'); sheet.className='msheet';
+      var rows=(items||[]).map(function(it,i){
+        return '<button class="mrow" data-i="'+i+'">'+(it.icon?'<svg><use href="#'+it.icon+'"></use></svg>':'')+esc(it.label)+'</button>';
+      }).join('');
+      sheet.innerHTML='<div class="grip"></div>'+(opts.title?'<h3>'+esc(opts.title)+'</h3>':'')+rows;
+      document.body.appendChild(scrim); document.body.appendChild(sheet);
+      void sheet.offsetWidth; scrim.classList.add('on'); sheet.classList.add('on');
+      var done=false;
+      function close(){ if(done)return; done=true; scrim.classList.remove('on'); sheet.classList.remove('on');
+        setTimeout(function(){ scrim.remove(); sheet.remove(); }, 220); }
+      scrim.addEventListener('click', close);
+      Array.prototype.forEach.call(sheet.querySelectorAll('.mrow'), function(b){
+        b.addEventListener('click', function(){ var it=items[+b.getAttribute('data-i')]; close(); if(it&&it.onClick) it.onClick(); }); });
+      return close;
+    }
+    /* Promise-based in-app dialogs (drop-in for native alert/confirm/prompt).
+         await TalonUI.confirm(msg, {title, okLabel, cancelLabel, danger}) -> true/false
+         await TalonUI.prompt(msg,  {title, okLabel, cancelLabel, defaultValue}) -> string|null
+         await TalonUI.alert(msg,   {title, okLabel}) -> undefined
+       Message text is set via textContent (safe) and honors newlines (pre-wrap). */
+    function dialog(opts){
+      opts = opts || {};
+      return new Promise(function(resolve){
+        var scrim = document.createElement('div'); scrim.className = 'tdlg-scrim';
+        var dlg = document.createElement('div'); dlg.className = 'tdlg';
+        dlg.setAttribute('role','dialog'); dlg.setAttribute('aria-modal','true');
+        var h = '';
+        if (opts.title) h += '<div class="tdlg-title"></div>';
+        h += '<div class="tdlg-msg"></div>';
+        if (opts.prompt) h += '<input class="tdlg-input" type="text">';
+        h += '<div class="tdlg-actions">';
+        if (opts.cancel) h += '<button class="btn ghost" data-x="cancel"></button>';
+        h += '<button class="btn' + (opts.danger ? ' danger' : '') + '" data-x="ok"></button></div>';
+        dlg.innerHTML = h;
+        if (opts.title) dlg.querySelector('.tdlg-title').textContent = opts.title;
+        dlg.querySelector('.tdlg-msg').textContent = opts.message == null ? '' : String(opts.message);
+        var input = dlg.querySelector('.tdlg-input'); if (input) input.value = opts.defaultValue || '';
+        var okBtn = dlg.querySelector('[data-x="ok"]'); okBtn.textContent = opts.okLabel || 'OK';
+        var cancelBtn = dlg.querySelector('[data-x="cancel"]'); if (cancelBtn) cancelBtn.textContent = opts.cancelLabel || 'Cancel';
+        scrim.appendChild(dlg); document.body.appendChild(scrim);
+        void scrim.offsetWidth; scrim.classList.add('on');       // reflow so the fade/scale animates
+        var done = false;
+        function close(val){ if (done) return; done = true; scrim.classList.remove('on'); setTimeout(function(){ scrim.remove(); }, 180); resolve(val); }
+        okBtn.addEventListener('click', function(){ close(opts.prompt ? (input ? input.value : '') : true); });
+        if (cancelBtn) cancelBtn.addEventListener('click', function(){ close(opts.prompt ? null : false); });
+        scrim.addEventListener('mousedown', function(e){ if (e.target === scrim) close(opts.prompt ? null : (opts.cancel ? false : true)); });
+        scrim.addEventListener('keydown', function(e){
+          if (e.key === 'Enter' && (!input || !e.shiftKey)) { e.preventDefault(); okBtn.click(); }
+          else if (e.key === 'Escape') { e.preventDefault(); (cancelBtn || okBtn).click(); }
+        });
+        setTimeout(function(){ (input || okBtn).focus(); }, 50);
+      });
+    }
+    function talonAlert(message, opts){ opts = opts || {}; return dialog({ title:opts.title, message:message, okLabel:opts.okLabel || 'OK', cancel:false }); }
+    function talonConfirm(message, opts){ opts = opts || {}; return dialog({ title:opts.title, message:message, okLabel:opts.okLabel || 'OK', cancelLabel:opts.cancelLabel || 'Cancel', cancel:true, danger:opts.danger }); }
+    function talonPrompt(message, opts){ opts = opts || {}; return dialog({ title:opts.title, message:message, okLabel:opts.okLabel || 'OK', cancelLabel:opts.cancelLabel || 'Cancel', cancel:true, prompt:true, defaultValue:opts.defaultValue || '' }); }
+    /* A short guided sequence of themed dialogs. steps = [{title, message}].
+       Next/Done to advance; Skip stops early. Resolves when finished/skipped. */
+    function talonTour(steps){
+      steps = steps || []; var i = 0;
+      return (function next(){
+        if (i >= steps.length) return Promise.resolve();
+        var s = steps[i], last = i === steps.length - 1;
+        return dialog({ title: s.title, message: s.message, okLabel: last ? 'Got it' : 'Next →', cancel: !last, cancelLabel: 'Skip' })
+          .then(function(ok){ if (ok === false) return; i++; return next(); });
+      })();
+    }
+    /* Scroll-gated acceptance modal (handbook dual-accept). Clones the hidden
+       #handbook-excerpt (or opts.contentId) into a scrollable body; Accept stays
+       disabled until the reader reaches the bottom (unlocks immediately when the
+       content fits). Optional opts.linkUrl adds an "Open the full handbook" link.
+         await TalonUI.scrollAccept({title, contentId, linkUrl, acceptLabel}) -> true/false */
+    function scrollAccept(opts){
+      opts = opts || {};
+      return new Promise(function(resolve){
+        var src = document.getElementById(opts.contentId || 'handbook-excerpt');
+        var scrim = document.createElement('div'); scrim.className = 'tdlg-scrim';
+        var dlg = document.createElement('div'); dlg.className = 'tdlg';
+        dlg.setAttribute('role','dialog'); dlg.setAttribute('aria-modal','true');
+        dlg.style.maxWidth = '30rem';
+        var h = '<div class="tdlg-title"></div>';
+        if (opts.linkUrl) h += '<div style="margin-bottom:.45rem"><a data-x="pdf" target="_blank" rel="noopener" style="font-size:.8rem;font-weight:700;color:var(--maroon)">Open the full handbook (PDF) ↗</a></div>';
+        h += '<div data-x="body" style="max-height:55vh;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:.6rem .75rem;-webkit-overflow-scrolling:touch"></div>' +
+          '<div data-x="hint" style="margin-top:.4rem;color:var(--muted);font-size:.75rem">Scroll to the end to enable Accept.</div>' +
+          '<div class="tdlg-actions"><button class="btn ghost" data-x="cancel">Not now</button><button class="btn" data-x="ok" disabled></button></div>';
+        dlg.innerHTML = h;
+        dlg.querySelector('.tdlg-title').textContent = opts.title || 'Handbook';
+        var pdf = dlg.querySelector('[data-x="pdf"]'); if (pdf) pdf.href = opts.linkUrl; // property-set: no HTML injection
+        var body = dlg.querySelector('[data-x="body"]');
+        if (src) { var copy = src.cloneNode(true); copy.removeAttribute('id'); copy.style.display = 'block'; body.appendChild(copy); }
+        var okBtn = dlg.querySelector('[data-x="ok"]'); okBtn.textContent = opts.acceptLabel || 'I accept';
+        var cancelBtn = dlg.querySelector('[data-x="cancel"]');
+        var hint = dlg.querySelector('[data-x="hint"]');
+        scrim.appendChild(dlg); document.body.appendChild(scrim);
+        void scrim.offsetWidth; scrim.classList.add('on');
+        function unlock(){ okBtn.disabled = false; if (hint) hint.textContent = ''; }
+        function checkScroll(){ if (body.scrollTop + body.clientHeight >= body.scrollHeight - 4) unlock(); }
+        body.addEventListener('scroll', checkScroll);
+        setTimeout(checkScroll, 60); // content that fits (or a tiny viewport quirk) unlocks after first layout
+        var done = false;
+        function close(val){ if (done) return; done = true; scrim.classList.remove('on'); setTimeout(function(){ scrim.remove(); }, 180); resolve(val); }
+        okBtn.addEventListener('click', function(){ if (!okBtn.disabled) close(true); });
+        cancelBtn.addEventListener('click', function(){ close(false); });
+        scrim.addEventListener('mousedown', function(e){ if (e.target === scrim) close(false); });
+        scrim.addEventListener('keydown', function(e){ if (e.key === 'Escape') { e.preventDefault(); close(false); } });
+        setTimeout(function(){ cancelBtn.focus(); }, 50);
+      });
+    }
+    function initials(f,l){ return (String(f||'').charAt(0)+String(l||'').charAt(0)).toUpperCase() || '?'; }
+    function avatar(photo, first, last, big){
+      var cls='avatar'+(big?' lg':'');
+      return photo ? '<span class="'+cls+'"><img src="'+esc(photo)+'" alt=""></span>'
+                   : '<span class="'+cls+'">'+esc(initials(first,last))+'</span>';
+    }
+    /* Downscale a chosen image File to a small JPEG data URI (client-side). */
+    function resizePhoto(file, cb){
+      var img=new Image(), url=URL.createObjectURL(file);
+      img.onload=function(){ var max=200, s=Math.min(max/img.width, max/img.height, 1);
+        var w=Math.max(1,Math.round(img.width*s)), h=Math.max(1,Math.round(img.height*s));
+        var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url); try{ cb(c.toDataURL('image/jpeg',0.7)); }catch(e){ cb(null); } };
+      img.onerror=function(){ URL.revokeObjectURL(url); cb(null); };
+      img.src=url;
+    }
+    /* Downscale a chosen image File to a JPEG data URI at a caller-chosen max edge
+       (for OCR — bigger than resizePhoto's 200px thumbnail so text stays legible). */
+    function resizeImage(file, maxPx, quality, cb){
+      maxPx=maxPx||1280; quality=quality||0.8;
+      var img=new Image(), url=URL.createObjectURL(file);
+      img.onload=function(){ var s=Math.min(maxPx/img.width, maxPx/img.height, 1);
+        var w=Math.max(1,Math.round(img.width*s)), h=Math.max(1,Math.round(img.height*s));
+        var c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+        URL.revokeObjectURL(url); try{ cb(c.toDataURL('image/jpeg',quality)); }catch(e){ cb(null); } };
+      img.onerror=function(){ URL.revokeObjectURL(url); cb(null); };
+      img.src=url;
+    }
+    /* Announcement banner (shared across all apps). Renders into #annc-bar;
+       dismissals persist per-device in localStorage. */
+    /* Body text may be multi-line now; escape THEN convert newlines, so the
+       <br> survives and everything else stays inert. */
+    function escMl(s){ return esc(s).replace(/\n/g,'<br>'); }
+    /* Drive gives us a VIEWER url (…/file/d/<id>/view). An <img> cannot load
+       that, which is why every attachment — a team photo, a shirt, a game
+       flyer — used to appear as a 📎 link you had to open. Pull the id back out
+       and point at the thumbnail endpoint, which DOES serve an
+       anyone-with-link file as an image.
+       Derived at render time on purpose: every attachment already posted starts
+       showing inline too, with no data migration and no re-upload. */
+    function driveFileId(url){ var m=/\/d\/([A-Za-z0-9_-]+)/.exec(String(url||'')); return m?m[1]:''; }
+    function isImageAtt(f){
+      /* A stored mimeType is authoritative BOTH ways — if we know it is a PDF,
+         a file called "flyer.png" is still a PDF and must not render as an img.
+         The extension is only a guess for rows posted before mimeType was
+         stored, so it runs only when there is no type at all. */
+      var m = String((f&&f.mimeType)||'').trim();
+      if(m) return /^image\//.test(m);
+      return /\.(png|jpe?g|gif|webp|avif|bmp)$/i.test(String((f&&f.name)||''));
+    }
+    /* Shared by announcements, polls and item sign-ups: images render inline
+       (tap through to the full file), everything else stays a 📎 link. */
+    function attachmentsHtml(list){
+      list = list || []; if(!list.length) return '';
+      var imgs=[], docs=[];
+      list.forEach(function(f){ (isImageAtt(f)?imgs:docs).push(f); });
+      var h='';
+      if(imgs.length){
+        h += '<div class="att-imgs">'+imgs.map(function(f){
+          var id=driveFileId(f.url);
+          var src=id?('https://drive.google.com/thumbnail?id='+id+'&sz=w1200'):f.url;
+          return '<a class="att-img-l" href="'+esc(f.url)+'" target="_blank" rel="noopener">'+
+            '<img class="att-img" src="'+esc(src)+'" alt="'+esc(f.name||'attachment')+'" loading="lazy">'+
+            '</a>';
+        }).join('')+'</div>';
+      }
+      if(docs.length){
+        h += '<div class="xs" style="margin-top:.25rem">'+docs.map(function(f){
+          return '<a href="'+esc(f.url)+'" target="_blank" rel="noopener" style="margin-right:.6rem;white-space:nowrap">📎 '+esc(f.name||'file')+'</a>';
+        }).join('')+'</div>';
+      }
+      return h;
+    }
+    function anncFiles(a){
+      var list=[]; try{ list=JSON.parse((a&&a.AttachmentsJson)||'[]'); }catch(e){}
+      return attachmentsHtml(list);
+    }
+    /* One inline image from a Drive viewer url (the sign-up-list photo). '' when
+       no url — same thumbnail rewrite + tap-to-open as attachmentsHtml. */
+    function driveImage(url){
+      url=String(url||''); if(!url) return '';
+      var id=driveFileId(url), src=id?('https://drive.google.com/thumbnail?id='+id+'&sz=w1200'):url;
+      return '<div class="att-imgs"><a class="att-img-l" href="'+esc(url)+'" target="_blank" rel="noopener">'+
+        '<img class="att-img" src="'+esc(src)+'" alt="photo" loading="lazy"></a></div>';
+    }
+    function anncDismissed(){ try{ return JSON.parse(localStorage.getItem('talonAnncDismissed')||'[]'); }catch(e){ return []; } }
+    function dismissAnnouncement(id){ try{ var d=anncDismissed(); if(d.indexOf(id)===-1){ d.push(id); localStorage.setItem('talonAnncDismissed', JSON.stringify(d)); } }catch(e){} }
+    function renderAnnouncements(list){
+      var el=document.getElementById('annc-bar'); if(!el) return;
+      var d=anncDismissed();
+      var show=(list||[]).filter(function(a){ return d.indexOf(a.AnnouncementID)===-1; });
+      if(!show.length){ el.hidden=true; el.innerHTML=''; return; }
+      el.hidden=false;
+      el.innerHTML=show.map(function(a){
+        return '<div class="annc-item'+(a.Severity==='urgent'?' urgent':'')+'"><div class="annc-body"><b>'+esc(a.Title||'')+'</b>'+(a.Body?'<div>'+escMl(a.Body)+'</div>':'')+anncFiles(a)+(a.PostedByName?' <span class="muted">— '+esc(a.PostedByName)+'</span>':'')+'</div><button class="annc-x" data-id="'+esc(a.AnnouncementID)+'" aria-label="Dismiss">✕</button></div>';
+      }).join('');
+      Array.prototype.forEach.call(el.querySelectorAll('.annc-x'), function(b){ b.addEventListener('click', function(){ dismissAnnouncement(b.getAttribute('data-id')); renderAnnouncements(list); }); });
+    }
+    /* Live ticker — "a game is streaming RIGHT NOW", on every app.
+       Fed by CONFIG.LiveNowJson, which the staff project's StreamPoll trigger
+       writes from the YouTube Data API (so it reflects the real broadcast, not
+       the scheduled window). Self-mounting: creates its own node above
+       #annc-bar, so no app shell needed a new slot.
+       NOT dismissible — it disappears on its own the moment the stream ends,
+       which is the whole point of asking YouTube instead of guessing. */
+    function renderLive(items){
+      var list=(items||[]).filter(function(g){ return g && g.url; });
+      var el=document.getElementById('live-ticker');
+      if(!list.length){ if(el) el.remove(); return; }
+      if(!el){
+        el=document.createElement('button');
+        el.id='live-ticker'; el.className='live-ticker'; el.type='button';
+        var anchor=document.getElementById('annc-bar');
+        if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(el, anchor);
+        else document.body.insertBefore(el, document.body.firstChild);
+      }
+      var say=list.map(function(g){
+        var who=g.team||'HCS';
+        var vs=g.opponent?(' vs '+g.opponent):'';
+        var eyes=(g.viewers!=null&&g.viewers>0)?(' · '+g.viewers+' watching'):'';
+        return who+vs+eyes;
+      }).join('     •     ');
+      var label=list.length===1?'Watch →':(list.length+' games live →');
+      el.innerHTML='<span class="lt-in"><span class="lt-dot"></span><span class="lt-tag">Live</span>'+
+        '<span class="lt-scroll"><span class="lt-move">'+esc(say)+'</span></span>'+
+        '<span class="lt-go">'+esc(label)+'</span></span>';
+      el.setAttribute('aria-label','Live now: '+say);
+      el.onclick=function(){
+        // One game → straight to it. Several → the fan board, which lists them all.
+        var href=list.length===1?list[0].url:(el.getAttribute('data-hub')||list[0].url);
+        window.open(href,'_blank','noopener');
+      };
+    }
+    /* Persistent Home-card version (NOT dismissible) so announcements stay
+       reachable after the banner is closed. Returns HTML ('' when none). */
+    function announcementsCard(list){
+      var items=(list||[]);
+      if(!items.length) return '';
+      return '<div class="card tight annc-card"><div class="sectlabel" style="margin:.1rem 0 .35rem">📣 Announcements</div>'+
+        items.map(function(a){
+          return '<div class="annc-line'+(a.Severity==='urgent'?' urgent':'')+'"><b>'+esc(a.Title||'')+'</b>'+(a.Body?'<div class="s">'+escMl(a.Body)+'</div>':'')+anncFiles(a)+
+            (a.PostedByName?'<div class="xs muted">— '+esc(a.PostedByName)+(a.ExpiresAt?' · until '+esc(String(a.ExpiresAt).slice(0,10)):'')+'</div>':'')+'</div>';
+        }).join('')+'</div>';
+    }
+    return { esc:esc, glyphId:glyphId, levelLetter:levelLetter, badge:badge, toast:toast, avatar:avatar, resizePhoto:resizePhoto, resizeImage:resizeImage, renderAnnouncements:renderAnnouncements, announcementsCard:announcementsCard, dismissAnnouncement:dismissAnnouncement, renderLive:renderLive,
+      moreSheet:moreSheet, confirm:talonConfirm, alert:talonAlert, prompt:talonPrompt, tour:talonTour, dialog:dialog, scrollAccept:scrollAccept,
+      attachmentsHtml:attachmentsHtml, isImageAtt:isImageAtt, driveFileId:driveFileId, driveImage:driveImage };
+  })();
+</script>
+
+<style>
+  /* Fan surface — shared Theme tokens/components do the heavy lifting; nothing
+     app-specific needed yet. Kept as a partial so the shell's include resolves. */
+  .content { padding-bottom: 2rem; }
+</style>
+
+
+<div id="view-app" class="app">
+  <header class="abar">
+    <span class="crest" aria-hidden="true"></span>
+    <span class="title">Talon Hub</span>
+    <span class="meta">HCS Athletics · Schedule &amp; scores</span>
+  </header>
+  <div id="annc-bar" class="annc-bar" hidden></div>
+  <div class="chips" id="chips" hidden></div>
+  <main class="content" id="content"><p class="placeholder">Loading…</p></main>
+</div>
+
+<span id="build-id" hidden>demo-2026</span>
+<span id="parent-url" hidden></span>
+<span id="signup-url" hidden></span>
+<!-- GENERATED by npm run build — do not hand-edit. Source: logic/*.js -->
+<script>
+'use strict';
+/**
+ * sports.js — the per-sport blueprint registry. Pure, no GAS. This is the
+ * single source of the sport-shaped defaults every other module reads:
+ *   - the live game/scrimmage tool reads clockModel + scoreModel (MX-2),
+ *   - the tryout tool seeds the right rubric (SEED_EVENTS_BY_SPORT in tryouts.js),
+ *   - the practice tool reads drillCategories + practiceTimerMode,
+ *   - the Design Wizard prefills its knobs from here (MX-4),
+ *   - per-team overrides (TEAM_CONFIG.OverridesJson) layer on top via resolve().
+ *
+ * Keyed by a canonical sport family; the codes actually stored in TEAMS.Sport
+ * (BSOC/GSOC/BBK/VOLL/…) alias into a family. Gender lives in a separate column,
+ * so BSOC and GSOC share one 'soccer' blueprint. Unknown codes fall back to a
+ * neutral 'generic' blueprint (never throws), so a new sport degrades gracefully
+ * until someone authors its blueprint.
+ *
+ * clockModel  : 'timed-periods' | 'sets' | 'innings' | 'single-race' | 'none'
+ * scoreModel  : 'goals' | 'points' | 'sets' | 'runs' | 'places' | 'none'
+ * practiceTimerMode : 'linear' | 'station-rotation' | 'interval'
+ * eventShape  : 'single-opponent' | 'multi-wave'
+ */
+
+var Sports = (function () {
+  // canonical family → blueprint
+  var BLUEPRINTS = {
+    soccer: {
+      key: 'soccer', name: 'Soccer', landingTab: 'gameday',
+      clockModel: 'timed-periods', periods: 2, periodMin: 40, breakMin: 10, countDirection: 'up', runningClock: true,
+      scoreModel: 'goals', scoreIncrements: [1],
+      positions: ['GK', 'DEF', 'MID', 'FWD'], squadDefault: 7, rosterRange: [16, 22], cut: true,
+      drillCategories: ['Warm-up', 'Technical', 'Possession', 'Finishing', 'Small-sided', 'Set pieces', 'Conditioning'],
+      practiceTimerMode: 'linear', eventShape: 'single-opponent', tryoutSeed: 'soccer',
+      // defaultTryouts: pre-check the Tryouts pack in onboarding. Set on sports
+      // that run formal cut-downs at HCS (soccer/basketball/volleyball, per Josh
+      // 2026-07-22); other sports start with Tryouts off (coach can enable it).
+      defaultTryouts: true,
+      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+    },
+    basketball: {
+      key: 'basketball', name: 'Basketball', landingTab: 'stats',
+      clockModel: 'timed-periods', periods: 4, periodMin: 8, breakMin: 10, countDirection: 'down', runningClock: false, shotClockSec: 0,
+      scoreModel: 'points', scoreIncrements: [1, 2, 3],
+      positions: ['PG', 'SG', 'SF', 'PF', 'C'], squadDefault: 5, rosterRange: [12, 15], cut: true,
+      drillCategories: ['Warm-up', 'Shooting', 'Ball-handling', 'Passing', 'Defense', 'Rebounding', 'Transition', 'Set plays', 'Conditioning'],
+      practiceTimerMode: 'linear', eventShape: 'single-opponent', tryoutSeed: 'basketball',
+      defaultTryouts: true, // runs formal cut-downs (all-sports rollout, Josh 2026-07-22)
+      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+    },
+    volleyball: {
+      key: 'volleyball', name: 'Volleyball', landingTab: 'stats',
+      clockModel: 'sets', setsToWin: 3, pointsPerSet: 25, decidingSetPoints: 15, winBy: 2, bestOf: 5,
+      scoreModel: 'sets', scoreIncrements: [1],
+      positions: ['OH', 'OPP', 'MB', 'S', 'L', 'DS'], squadDefault: 6, rosterRange: [10, 14], cut: true,
+      drillCategories: ['Warm-up', 'Serving', 'Passing/Serve-receive', 'Setting', 'Hitting/Attacking', 'Blocking', 'Defense/Digging', 'Team systems'],
+      practiceTimerMode: 'linear', eventShape: 'multi-wave', tryoutSeed: 'volleyball',
+      defaultTryouts: true, // runs formal cut-downs (all-sports rollout, Josh 2026-07-22)
+      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+    },
+    baseball: {
+      key: 'baseball', name: 'Baseball', landingTab: 'stats',
+      clockModel: 'innings', innings: 7, mercyRuleRuns: 10, mercyAfterInnings: 5,
+      scoreModel: 'runs', scoreIncrements: [1],
+      positions: ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'], squadDefault: 9, rosterRange: [14, 18], cut: true,
+      drillCategories: ['Warm-up/Arm-care', 'Hitting', 'Infield', 'Outfield', 'Pitching/Bullpen', 'Catching', 'Baserunning', 'Situational'],
+      practiceTimerMode: 'station-rotation', eventShape: 'single-opponent', tryoutSeed: 'baseball',
+      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+    },
+    softball: {
+      key: 'softball', name: 'Softball', landingTab: 'stats',
+      clockModel: 'innings', innings: 7, mercyRuleRuns: 10, mercyAfterInnings: 5,
+      scoreModel: 'runs', scoreIncrements: [1],
+      positions: ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'], squadDefault: 9, rosterRange: [14, 18], cut: true,
+      drillCategories: ['Warm-up/Arm-care', 'Hitting', 'Infield', 'Outfield', 'Pitching', 'Catching', 'Baserunning', 'Situational'],
+      practiceTimerMode: 'station-rotation', eventShape: 'single-opponent', tryoutSeed: 'baseball',
+      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+    },
+    xc: {
+      key: 'xc', name: 'Cross-Country', landingTab: 'results', gradeBand: [6, 12],
+      clockModel: 'single-race', usesStopwatch: true, topN: 7,
+      scoreModel: 'places', scoreIncrements: [],
+      positions: [], squadDefault: 0, rosterRange: [20, 40], cut: false,
+      drillCategories: ['Warm-up', 'Easy/Recovery', 'Long run', 'Tempo', 'Intervals/Track', 'Hills', 'Fartlek', 'Strides/Form', 'Strength'],
+      practiceTimerMode: 'interval', eventShape: 'multi-wave', tryoutSeed: 'xc',
+      // gameLive true = offers a live in-race tool (a stopwatch + finish capture,
+      // not a countdown clock — that distinction lives in clock/scoreModel).
+      // tryouts false: XC doesn't cut (cut:false above), so the raw default matches
+      // the wizard recommendation — no Tryouts tab that shows then vanishes on save.
+      modules: { tryouts: false, practices: true, gameLive: true, scoreboard: true, travel: true }
+    },
+    golf: {
+      // Logistics-only by design (Josh 2026-07-22): golf is stroke/match play
+      // with no clock — the generic timed-periods scoreboard and box-score stats
+      // are meaningless for it. Schedule, roster, travel, practices, and comms
+      // all work; a coach can still flip modules on in the wizard. Finals can be
+      // typed on the event as a plain two-number result if wanted.
+      key: 'golf', name: 'Golf', landingTab: 'events',
+      clockModel: 'none',
+      scoreModel: 'none', scoreIncrements: [],
+      positions: [], squadDefault: 0, rosterRange: [6, 12], cut: false,
+      drillCategories: ['Warm-up', 'Driving range', 'Short game', 'Putting', 'Course play', 'Rules & etiquette'],
+      practiceTimerMode: 'linear', eventShape: 'multi-wave', tryoutSeed: '',
+      modules: { tryouts: false, practices: true, gameLive: false, scoreboard: false, travel: true }
+    },
+    generic: {
+      key: 'generic', name: 'Sport',
+      clockModel: 'timed-periods', periods: 2, periodMin: 20, breakMin: 5, countDirection: 'up', runningClock: true,
+      scoreModel: 'points', scoreIncrements: [1],
+      positions: [], squadDefault: 0, rosterRange: [12, 24], cut: true,
+      drillCategories: ['Warm-up', 'Skill', 'Team', 'Conditioning', 'Cool-down'],
+      practiceTimerMode: 'linear', eventShape: 'single-opponent', tryoutSeed: 'soccer',
+      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+    }
+  };
+
+  // Print roster — an opt-in Game-Day add-in (a quick paper team sheet). ON by
+  // default for soccer, OFF for every other sport; a coach can flip it on per
+  // team in Team settings. Declared here (rather than threaded through each
+  // blueprint literal) so it is a KNOWN module key everywhere — overrides merge,
+  // the wizard can toggle it, and the button gates on it — with one source.
+  Object.keys(BLUEPRINTS).forEach(function (k) {
+    var bp = BLUEPRINTS[k];
+    if (bp && bp.modules && bp.modules.printRoster === undefined) bp.modules.printRoster = (k === 'soccer');
+  });
+
+  // TEAMS.Sport code → canonical family (mirrors Labels.SPORT's coverage).
+  var ALIAS = {
+    BSOC: 'soccer', GSOC: 'soccer', SOC: 'soccer',
+    BBB: 'basketball', GBB: 'basketball', BBK: 'basketball', GBK: 'basketball', BSK: 'basketball',
+    VB: 'volleyball', VOLL: 'volleyball',
+    BASE: 'baseball', SOFT: 'softball',
+    XC: 'xc', GOLF: 'golf', FF: 'generic', FB: 'generic'
+  };
+
+  function keyFor(code) { return ALIAS[String(code || '').toUpperCase()] || 'generic'; }
+
+  /** Do two sport codes denote the SAME sport? Same canonical family (BSOC≡GSOC≡SOC
+   *  all soccer), but the catch-all 'generic' family requires an EXACT code match so
+   *  distinct un-blueprinted sports (e.g. FF vs FB) never conflate. */
+  function same(a, b) {
+    var fa = keyFor(a), fb = keyFor(b);
+    if (fa !== fb) return false;
+    if (fa === 'generic') return String(a).toUpperCase() === String(b).toUpperCase();
+    return true;
+  }
+
+  /** The blueprint for a stored sport code (never null — falls back to generic). */
+  function get(code) { return BLUEPRINTS[keyFor(code)] || BLUEPRINTS.generic; }
+
+  /** A deep-ish copy so callers/overrides can't mutate the shared blueprint. */
+  function clone(bp) { return JSON.parse(JSON.stringify(bp)); }
+
+  /**
+   * Blueprint for a code with per-team overrides layered on top. overrides is a
+   * plain object (or JSON string) of KNOWN blueprint keys only — unknown keys are
+   * dropped (mirrors CoachPrefs.sanitize), and nested `modules` merges key-by-key.
+   */
+  function resolve(code, overrides) {
+    var out = clone(get(code));
+    var o = overrides;
+    if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { o = null; } }
+    if (o && typeof o === 'object') {
+      Object.keys(o).forEach(function (k) {
+        if (!(k in out)) return;                 // only known knobs
+        if (k === 'modules' && o.modules && typeof o.modules === 'object') {
+          Object.keys(out.modules).forEach(function (m) {
+            if (m in o.modules) out.modules[m] = o.modules[m] === true || o.modules[m] === 'true';
+          });
+        } else {
+          out[k] = o[k];
+        }
+      });
+    }
+    return out;
+  }
+
+  /** All distinct blueprints (for a sport picker in the wizard). */
+  function list() { return Object.keys(BLUEPRINTS).filter(function (k) { return k !== 'generic'; }).map(function (k) { return clone(BLUEPRINTS[k]); }); }
+
+  /** The alias map (code → family) — the wizard's sport dropdown source. */
+  function codes() { return JSON.parse(JSON.stringify(ALIAS)); }
+
+  return { get: get, resolve: resolve, list: list, codes: codes, keyFor: keyFor, same: same };
+})();
+
+if (typeof module !== 'undefined') module.exports = Sports;
+
+'use strict';
+/**
+ * standings.js — pure season-record aggregation (Feature A). No GAS, no DOM.
+ * Computed client-side from the schedule each app already has (events carry a
+ * recorded result), so there's no new schema, endpoint, or PII surface.
+ *
+ * Rules (per product decision):
+ *  - Count COMPETITIVE games only: Game, Match, Meet, Tournament. Practices,
+ *    Scrimmages, and "Other" never count toward a record.
+ *  - Only events with a recorded result count (an unplayed/future game is skipped).
+ *  - Head-to-head sports get a W-L(-T) record from the result tone. Race/field
+ *    sports (XC, golf — no head-to-head W/L) instead report a meet count.
+ */
+
+var Standings = (function () {
+  var COMPETITIVE = { Game: 1, Match: 1, Meet: 1, Tournament: 1 };
+
+  /** Map a recorded-result tone → outcome letter (null if not decisive). */
+  function outcome(tone) {
+    if (tone === 'win') return 'W';
+    if (tone === 'loss') return 'L';
+    return 'T'; // a recorded non-win/loss result is a tie (head-to-head sports)
+  }
+
+  function record(t) {
+    if (t.isRace) return t.meets + ' meet' + (t.meets === 1 ? '' : 's');
+    var r = t.wins + '-' + t.losses;
+    return t.ties ? r + '-' + t.ties : r;
+  }
+
+  /**
+   * @param games [{ teamKey, sport, eventType, hasResult, resultTone, isRace }]
+   *   teamKey  = stable per-team id (e.g. TeamID or label)
+   *   hasResult= a final was recorded for this event
+   *   isRace   = true for XC/golf-style (meet count instead of W/L)
+   * @returns { byTeam: {teamKey→{teamKey,sport,isRace,wins,losses,ties,meets,record}}, list:[…] }
+   */
+  function compute(games) {
+    var byTeam = {};
+    (games || []).forEach(function (g) {
+      if (!g || !COMPETITIVE[g.eventType] || !g.hasResult) return;
+      var t = byTeam[g.teamKey] || (byTeam[g.teamKey] = { teamKey: g.teamKey, sport: g.sport, isRace: !!g.isRace, wins: 0, losses: 0, ties: 0, meets: 0 });
+      if (g.isRace) { t.isRace = true; t.meets++; return; }
+      var o = outcome(g.resultTone);
+      if (o === 'W') t.wins++; else if (o === 'L') t.losses++; else t.ties++;
+    });
+    var list = Object.keys(byTeam).map(function (k) { var t = byTeam[k]; t.record = record(t); return t; });
+    return { byTeam: byTeam, list: list };
+  }
+
+  return { compute: compute, outcome: outcome, record: record };
+})();
+
+if (typeof module !== 'undefined') module.exports = Standings;
+
+</script>
+
+<script>
+  /* Fan surface client — public, read-only. Fetches the whitelisted publicSchedule
+     and renders a schedule + recent-results board with a sport filter. No login,
+     no writes, no PII ever reaches this code. */
+  (function () {
+    var state = { events: [], sport: 'all', today: '' };
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return TalonUI.esc(s); }
+    function hid(id) { var el = $(id); return el ? String(el.textContent || '').trim() : ''; }
+    var BUILD = hid('build-id');
+    // Cross-app doors (server-injected from CONFIG; empty → link hidden).
+    var LINKS = (function () {
+      var p = hid('parent-url'), s = hid('signup-url');
+      if (s) s += (s.indexOf('?') === -1 ? '?' : '&') + 'view=signup'; // student app's sign-up deep link
+      return { parent: p, signup: s };
+    })();
+    function call(fn, args) { return new Promise(function (res, rej) { google.script.run.withSuccessHandler(res).withFailureHandler(rej).api(fn, args || {}); }); }
+    function fmtDate(d) { var p = String(d).split('-'); if (p.length !== 3) return d; return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+    function title(e) {
+      if (e.type === 'Tournament') return esc(e.opponent || 'Tournament');
+      var verb = e.homeAway === 'Away' ? ' at ' : ' vs ';
+      var label = e.type === 'Scrimmage' ? 'Scrimmage' : (e.type || 'Game');
+      return e.opponent ? esc(label + verb + e.opponent) : esc(label);
+    }
+    function sportName(code) { return (typeof Sports !== 'undefined' && Sports.get(code) && Sports.get(code).name) || code; }
+    function isRaceSport(code) { return code === 'XC' || (typeof Sports !== 'undefined' && Sports.get && Sports.get(code) && Sports.get(code).scoreModel === 'places'); }
+    function standingsList() {
+      var games = state.events.map(function (e) { return { teamKey: e.team, sport: e.sport, eventType: e.type, hasResult: !!e.result, resultTone: e.resultTone, isRace: isRaceSport(e.sport) }; });
+      return Standings.compute(games).list;
+    }
+
+    // Stale-while-revalidate: paint the last schedule instantly (public data, no
+    // PII — the safest cache in the product), refresh in the background.
+    var FAN_CACHE_KEY = 'talonFanSched';
+    function readFanCache() {
+      try { var o = JSON.parse(localStorage.getItem(FAN_CACHE_KEY) || 'null'); return (o && o.build === BUILD) ? o.payload : null; } catch (e) { return null; }
+    }
+    function writeFanCache(r) { try { localStorage.setItem(FAN_CACHE_KEY, JSON.stringify({ build: BUILD, payload: r })); } catch (e) {} }
+    function applySched(r) {
+      state.events = r.events || []; state.today = r.today || ''; render();
+      try { TalonUI.renderAnnouncements(r.announcements || []); } catch (e) {} // fan-flagged announcements (banner)
+      try { TalonUI.renderLive(r.liveNow || []); } catch (e) {}                // shared live ticker
+    }
+    function boot() {
+      var cached = readFanCache();
+      if (cached) applySched(cached); // instant paint; revalidated below
+      // Board + live strip in ONE round trip (the strip used to arrive a full
+      // round trip after the board — the widget already did this).
+      Promise.all([
+        call('publicSchedule').catch(function () { return null; }),
+        call('liveNow').catch(function () { return null; })
+      ]).then(function (rs) {
+        var r = rs[0], l = rs[1];
+        if (r && r.ok) { applySched(r); writeFanCache(r); }
+        else if (!cached) { $('content').innerHTML = '<p class="placeholder">Could not load the schedule. Please reload.</p>'; }
+        if (l && l.ok) { state.live = l.live || []; renderLive(); }
+        scheduleLivePoll();
+      });
+    }
+    // Live poll: 20s while something is live, backing off to 120s when idle (most
+    // hours nothing is live — no point hammering the server), paused in hidden
+    // tabs, snapping back to 20s the moment the tab is visible again.
+    var LIVE_MIN = 20000, LIVE_MAX = 120000, liveDelay = LIVE_MIN;
+    function scheduleLivePoll() {
+      if (state._liveTimer) clearTimeout(state._liveTimer);
+      state._liveTimer = setTimeout(pollLive, liveDelay);
+    }
+    function pollLive() {
+      if (document.hidden) { scheduleLivePoll(); return; } // backgrounded tab: skip the fetch, keep the clock
+      call('liveNow').then(function (r) {
+        if (r && r.ok) {
+          state.live = r.live || []; renderLive();
+          liveDelay = state.live.length ? LIVE_MIN : Math.min(liveDelay * 2, LIVE_MAX);
+        }
+        scheduleLivePoll();
+      }).catch(function () { scheduleLivePoll(); });
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && state._liveTimer) { liveDelay = LIVE_MIN; pollLive(); }
+    });
+    function renderLive() {
+      var el = $('live-strip'); if (!el) return;
+      var live = (state.live || []).filter(function (g) { return state.sport === 'all' || g.sport === state.sport; });
+      if (!live.length) { el.innerHTML = ''; return; }
+      el.innerHTML = '<div class="sectlabel" style="color:var(--err)">🔴 Live now</div>' + live.map(function (g) {
+        var stream = g.liveStreamUrl ? '<div style="margin-top:.25rem"><a class="watchbtn" target="_blank" rel="noopener" href="' + esc(g.liveStreamUrl) + '">▶ Watch live</a></div>' : '';
+        return '<div class="card" style="border:2px solid var(--err)"><div class="flex">' + TalonUI.badge(g.sport, g.level) +
+          '<div style="flex:1"><div class="h">' + esc(g.team) + (g.opponent ? ' <span class="s">' + (g.homeAway === 'Away' ? 'at' : 'vs') + ' ' + esc(g.opponent) + '</span>' : '') + '</div>' +
+          (g.detail ? '<div class="xs">' + esc(g.detail) + '</div>' : '') + '</div>' +
+          '<div style="text-align:right"><span class="livebadge">LIVE</span><div style="font-weight:800;font-size:1.2rem;font-variant-numeric:tabular-nums;margin-top:.2rem">' + esc(g.label) + '</div></div></div>' + stream + '</div>';
+      }).join('');
+    }
+    function sports() { var s = {}; state.events.forEach(function (e) { if (e.sport) s[e.sport] = 1; }); return Object.keys(s).sort(); }
+
+    function render() {
+      var chips = $('chips'), sp = sports();
+      if (sp.length > 1) {
+        chips.hidden = false;
+        chips.innerHTML = '<button class="chip' + (state.sport === 'all' ? ' on' : '') + '" data-s="all">All</button>' +
+          sp.map(function (code) { return '<button class="chip' + (state.sport === code ? ' on' : '') + '" data-s="' + esc(code) + '">' + TalonUI.badge(code, '') + esc(sportName(code)) + '</button>'; }).join('');
+        Array.prototype.forEach.call(chips.querySelectorAll('.chip'), function (b) { b.addEventListener('click', function () { state.sport = b.getAttribute('data-s'); render(); }); });
+      } else chips.hidden = true;
+
+      var evs = state.events.filter(function (e) { return state.sport === 'all' || e.sport === state.sport; });
+      var up = evs.filter(function (e) { return e.date >= state.today && !e.result; });
+      var results = evs.filter(function (e) { return e.result; }).slice().reverse();
+      var h = '<div id="live-strip"></div><div class="sectlabel">Upcoming</div>' + (up.length ? up.map(card).join('') : '<p class="s">Nothing scheduled right now.</p>');
+      if (results.length) h += '<div class="sectlabel">Recent results</div>' + results.slice(0, 25).map(card).join('');
+      var recs = standingsList().filter(function (t) { return state.sport === 'all' || t.sport === state.sport; });
+      if (recs.length) {
+        h += '<div class="sectlabel">Season records</div>' + recs.map(function (t) {
+          return '<div class="card tight flex">' + TalonUI.badge(t.sport, '') + '<div style="flex:1"><div class="h">' + esc(t.teamKey) + '</div></div><span class="pill plain">' + esc(t.record) + '</span></div>';
+        }).join('');
+      }
+      // Funnel footer: the fan board is the only public page — point families at
+      // the doors. Links render only when the CONFIG URLs are set server-side.
+      var doors = [];
+      if (LINKS.parent) doors.push('<a href="' + esc(LINKS.parent) + '" target="_blank" rel="noopener">👪 Families sign in →</a>');
+      if (LINKS.signup) doors.push('<a href="' + esc(LINKS.signup) + '" target="_blank" rel="noopener">🎓 Students: sign up to play →</a>');
+      if (doors.length) h += '<div class="card tight" style="text-align:center">' + doors.join(' &nbsp;·&nbsp; ') + '</div>';
+      h += '<p class="build-stamp">Talon Hub · HCS Athletics · ' + esc(BUILD) + '</p>';
+      $('content').innerHTML = h;
+      renderLive(); // refill the live strip after a full re-render (e.g. sport filter change)
+    }
+    function card(e) {
+      var meta = fmtDate(e.date) + (e.time ? ' · ' + e.time : '') + (e.location ? ' · ' + esc(e.location) : '');
+      var statusPill = (e.status === 'Postponed' || e.status === 'Changed') ? '<span class="pill err">' + esc(e.status) + '</span>' : '';
+      var right = e.result ? '<span class="pill ' + (e.resultTone === 'win' ? 'win' : (e.resultTone === 'loss' ? 'err' : 'plain')) + '">' + esc(e.result) + '</span>'
+        : (statusPill || (e.homeAway === 'Home' ? '<span class="pill gold">Home</span>' : (e.homeAway === 'Away' ? '<span class="pill plain">Away</span>' : '')));
+      var live = e.liveStreamUrl ? '<div style="margin-top:.25rem"><a class="watchbtn" target="_blank" rel="noopener" href="' + esc(e.liveStreamUrl) + '">▶ Watch live</a></div>' : '';
+      var hl = e.highlightUrl ? '<div style="margin-top:.25rem"><a class="watchbtn hl" target="_blank" rel="noopener" href="' + esc(e.highlightUrl) + '">🎬 Highlights</a></div>' : '';
+      // Tournament card: one calendar event, several games — each with its
+      // time, opponent, and score once it's live or final.
+      var games = '';
+      if (e.games && e.games.length) {
+        games = '<div style="margin-top:.35rem;border-top:1px solid var(--line);padding-top:.3rem">' + e.games.map(function (g) {
+          var sc = g.state === 'Live' ? '<span class="livebadge">LIVE</span> <b>' + esc(g.score) + '</b>'
+            : (g.state === 'Final' ? '<b>' + esc(g.score) + '</b> <span class="s">final</span>' : '');
+          return '<div class="flex" style="gap:.4rem;padding:.15rem 0"><span class="s" style="min-width:4.6rem">' + esc(g.time) + '</span>' +
+            '<span class="s" style="flex:1">vs ' + esc(g.opponent) + '</span>' + sc + '</div>';
+        }).join('') + '</div>';
+      }
+      return '<div class="card"><div class="flex">' + TalonUI.badge(e.sport, e.level) + '<div style="flex:1"><div class="h">' + title(e) + '</div><div class="s">' + esc(e.team) + ' · ' + meta + '</div></div>' + right + '</div>' + games + live + hl + '</div>';
+    }
+    boot();
+  })();
+</script>
+</body>
+</html>
+

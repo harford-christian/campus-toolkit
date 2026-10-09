@@ -1,0 +1,44 @@
+{
+  "_note": "Config for tools/build-demo.mjs — apps/runner-macs, bare URL (and ?form= before a school is picked): the schoolGate branch, which renders its own picker inline. Run node demos/custom-forms/build.mjs (it runs build-logic.mjs, the template prep, then tools/build-demo.mjs on every build.*.json). src is the prep output: the app's pages/Index.html with ONLY the doGet branch for this surface kept and include_('pages/X') respelled include('pages/X') (see build.mjs); includeDir is the app root because the partials are named with their pages/ prefix. Demo-only edits, all at the page edges, none in the app's own scripts: (1) base target _top becomes _self so the page stays inside the switcher's frame, and DEMO_APP names the Apps Script project this page belongs to, ahead of the vendored server (logic.js); (2) every template output tag is answered by the app's OWN doGet — mock.js runs the vendored Router.js doGet(e) with this page's query string and captures what it assigns to the template (t.mode, t.formId, t.siteName ...) as DEMO_DOGET, so a quoted <?= x ?> becomes DEMO_DOGET.x and a raw <?!= x ?> JSON value becomes JSON.parse(DEMO_DOGET.x); (3) Theme.html's <?!= themeCss ?> is left as a comment and mock.js adds the CSS that this app's include_('pages/Theme') renders (ThemeLogic over the context's THEME_JSON), so MACS pages wear MACS's palette exactly as in production. When doGet's branch is a different surface (a ?form= link on the portal page, say), mock.js moves to that surface's page — the one template conditional a static page cannot carry.",
+  "src": ".tmp/custom-forms/macs.src.html",
+  "dst": "demos/custom-forms/macs.html",
+  "includeDir": "../custom-forms/apps/runner-macs",
+  "demoName": "MACS Forms — School picker",
+  "replace": [
+    [
+      "<base target=\"_top\">",
+      "<base target=\"_self\">\n  <script>var DEMO_APP = 'runner-macs', DEMO_SURFACE = 'macs'; // demo: which Apps Script project and which doGet branch this page is</script>\n  <script src=\"logic.js\"></script>"
+    ],
+    [
+      "<?!= themeCss ?>",
+      "/* themeCss: added at load by mock.js — what this app's include_('pages/Theme') renders */"
+    ],
+    [
+      "top.location.href = SELF_URL + '?' + parts.join('&');",
+      "location.href = SELF_URL + '?' + parts.join('&'); // demo: stay inside the showcase frame"
+    ]
+  ],
+  "replaceRegex": [
+    [
+      "\"<\\?= (\\w+) \\?>\"",
+      "g",
+      "DEMO_DOGET.$1"
+    ],
+    [
+      "<\\?!= (\\w+) \\?>",
+      "g",
+      "JSON.parse(DEMO_DOGET.$1)"
+    ]
+  ],
+  "nameAliases": {
+    "013b672b502e3685": "Forms Owner 1",
+    "0a7e1bb1ad3e7c5b": "Forms Owner 2",
+    "9a3d2cbf64275e64": "Forms Owner 3",
+    "8ebd6499bd56a435": "Lena Van Horn",
+    "bcb97d7065a37b28": "Avery Ashford",
+    "3ff3f333af0e3460": "Devon Bramley",
+    "8a5f5179250a5841": "Casey Calloway",
+    "c205c7d284f4cca1": "Ellis Easton",
+    "03cc8b7cd5010e4c": "Finley Foster"
+  }
+}

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>HCS Ramp</title>
+<script src="kiosk-logic.js"></script>
+<script src="logic.js"></script>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Ramp Kiosk" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<!--
+  HCS Ramp — the kiosk board.
+
+  ONE flat alphabetical list of the children the ramp collects (K4-5, bus + car), with the ones NOT
+  to wait for flagged inline in red. Built for a dedicated iPad in Single App Mode, and for a staff
+  phone in a pinch. It reads a small file the main dismissal app publishes every minute; it does NOT
+  sign into a Google account (a token in the URL is the gate), it NEVER goes blank, and it NEVER
+  reloads itself. If the data stops being fresh it says so, loudly, rather than lying.
+
+  Filters (route, bus/car, grade, not-riding) and a "Full app" button were added 2026-09-10; the
+  list stays alphabetical and search stays primary — the filters sit behind one Filters button so
+  the default view is still the clean full list.
+-->
+<style>
+  :root {
+    color-scheme: only light;
+    --red: #8E1420; --red-deep: #6d0f18; --gold: #F2B705; --gold-ink: #3a2a00;
+    --page: #8E1420; --card: #fff; --line: #e5e7eb; --ink: #1f2430; --dt: #6b7280;
+    --flag: #C62828; --flag-bg: #FDECEA; --who: #e9c2c7;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink);
+         background: var(--page); padding: .6rem; min-height: 100vh;
+         -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+  .wrap { max-width: 56rem; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem;
+           padding: .2rem .2rem .5rem; }
+  h1 { color: #fff; font-size: 1.3rem; margin: 0; font-weight: 500; }
+  h1 b { font-weight: 800; }
+  .hdr-right { display: flex; align-items: center; gap: .6rem; }
+  .fullapp { color: var(--gold-ink); background: var(--gold); border-radius: .5rem;
+             padding: .35rem .7rem; font-size: .8rem; font-weight: 700; text-decoration: none;
+             white-space: nowrap; }
+  .stamp { color: var(--who); font-size: .85rem; text-align: right; }
+  .stamp .dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 50%;
+                background: #7CCf88; margin-right: .3rem; vertical-align: baseline; }
+  .stamp.warn .dot { background: var(--gold); } .stamp.stale .dot { background: #ff5a5a; }
+
+  .controls { display: flex; gap: .4rem; margin: 0 0 .5rem; }
+  input[type=search] { flex: 1; min-width: 0; font-size: 1.15rem; min-height: 48px; padding: .6rem .8rem;
+    border-radius: .6rem; border: 2px solid var(--red-deep); background: #fff; color: var(--ink); }
+  input[type=search]:focus { outline: 3px solid var(--gold); border-color: transparent; }
+  #filterToggle { min-height: 48px; padding: .5rem .8rem; border-radius: .6rem; border: 2px solid var(--red-deep);
+    background: #fff; color: var(--red-deep); font-size: .95rem; font-weight: 700; white-space: nowrap; }
+  #filterToggle[aria-pressed="true"] { background: var(--red-deep); color: #fff; }
+  #filterToggle .fdot { display: inline-block; width: .5rem; height: .5rem; border-radius: 50%;
+    background: var(--gold); margin-left: .3rem; vertical-align: middle; }
+
+  #filterPanel { background: rgba(255,255,255,.1); border-radius: .6rem; padding: .35rem .5rem;
+    margin: 0 0 .55rem; }
+  .frow { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem; padding: .18rem 0; }
+  .flabel { color: var(--who); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+    min-width: 2.6rem; }
+  .fsep { width: 1px; align-self: stretch; background: rgba(255,255,255,.25); margin: 0 .15rem; }
+  .fchip { min-height: 38px; padding: .3rem .65rem; font-size: .88rem; border-radius: .5rem;
+    background: transparent; color: #fff; border: 1px solid var(--who); font-weight: 600; }
+  .fchip[aria-pressed="true"] { background: #fff; color: var(--red-deep); border-color: #fff; font-weight: 800; }
+  .fchip.route[aria-pressed="true"] { color: #fff; font-weight: 800; }   /* colour set inline */
+  .fchip.clear { background: transparent; color: var(--gold); border-color: var(--gold); }
+
+  .tally { color: #fff; font-size: 1rem; margin: 0 .1rem .5rem; }
+  .tally b { font-weight: 800; } .tally .fl { color: #ffd9d9; }
+
+  .banner { border-radius: .6rem; padding: .7rem .9rem; margin: 0 0 .6rem; font-size: 1rem;
+            line-height: 1.4; font-weight: 600; }
+  .banner.warn { background: #FFF3CD; color: #7a5b00; }
+  .banner.stale { background: var(--flag-bg); color: #7f1d1d; border: 2px solid #e57373;
+                  font-size: 1.05rem; }
+
+  .list { background: var(--card); border-radius: .6rem; overflow: hidden; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: .7rem;
+         min-height: 60px; padding: .55rem .9rem; border-bottom: 1px solid var(--line);
+         font-size: 1.15rem; }
+  .row:last-child { border-bottom: 0; }
+  .row.flag { background: var(--flag-bg); }
+  .who2 { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .5rem; }
+  .nm { font-weight: 700; }
+  .row.flag .nm { color: var(--flag); }
+  .gr { color: var(--dt); font-size: .95rem; white-space: nowrap; font-weight: 600; }
+  .chip { display: inline-block; font-weight: 800; font-size: .85rem; padding: .12em .7em;
+          border-radius: 1em; border: 1px solid; line-height: 1.35; }
+  .badge { font-size: .68rem; font-weight: 800; padding: .18em .55em; border-radius: .6em;
+           letter-spacing: .02em; white-space: nowrap; }
+  .badge.flag { background: var(--flag); color: #fff; }
+  .badge.walkup { background: #00796B; color: #fff; }
+  .badge.today { background: #1f8a4c; color: #fff; }
+  .badge.hand { background: #e7e9ee; color: var(--ink); font-weight: 700; }
+  .badge.auth { background: #6A1B9A; color: #fff; }   /* a temporary pickup authorization is on file */
+  .badge.game { background: #E65100; color: #fff; }   /* posted sports dismissal — still expected, confirm */
+  .badge.back { background: #2E7D32; color: #fff; }   /* signed out and back in — on campus, wait for them */
+  .badge.spec { background: #0277BD; color: #fff; }   /* 8th-period special: comes out late, with the class */
+  .grphdr { background: #E1F5FE; color: #01579B; font-weight: 800; padding: .5rem .9rem; border-top: 3px solid #0277BD;
+            display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; font-size: 1rem; }
+  .grphdr.rest { background: #f1f2f5; color: var(--ink); border-color: #c9ccd3; }
+  .pk.temp { background: #F3E5F5; border-radius: .4rem; padding: .25rem .5rem; }
+  .pk .thru { color: var(--dt); font-size: .85rem; white-space: nowrap; }
+  .empty { padding: 1.2rem .9rem; color: var(--dt); font-size: 1.05rem; text-align: center; }
+  .row { cursor: pointer; }
+
+  /* the authorized-pickup call-out: tap a child, tap outside (or Close) to dismiss */
+  .cback { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 60;
+           display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .ccard { background: #fff; color: var(--ink); border-radius: .7rem; width: 100%; max-width: 26rem;
+           max-height: 82vh; overflow: auto; padding: 1rem 1.1rem 1.1rem; }
+  .ccard h3 { margin: 0 0 .15rem; font-size: 1.3rem; }
+  .csub { color: var(--dt); font-size: .9rem; margin: 0 0 .4rem; }
+  .ccard h4 { margin: .7rem 0 .3rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dt); }
+  .cflag { background: var(--flag-bg); color: var(--flag); font-weight: 800; border-radius: .4rem;
+           padding: .4rem .6rem; margin: .3rem 0 0; }
+  .pk { display: flex; justify-content: space-between; align-items: baseline; gap: .7rem;
+        padding: .5rem 0; border-bottom: 1px dotted var(--line); font-size: 1.1rem; }
+  .pk:last-of-type { border-bottom: 0; }
+  .pkn { font-weight: 700; }
+  .pk .rel { color: var(--dt); font-size: .88rem; white-space: nowrap; text-transform: capitalize; }
+  .ccard .none { color: var(--dt); font-size: 1rem; padding: .3rem 0; }
+  .cbtn { margin-top: 1rem; width: 100%; min-height: 48px; border: 0; border-radius: .55rem;
+          background: var(--red); color: #fff; font-size: 1.05rem; font-weight: 800; }
+  @media (max-width: 420px) { .gr { display: none; } h1 { font-size: 1.1rem; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>HCS <b>Ramp</b></h1>
+    <div class="hdr-right">
+      <a class="fullapp" id="fullapp" target="_self" rel="noopener" hidden>Full app &#8599;</a>
+      <div class="stamp" id="stamp">&nbsp;</div>
+    </div>
+  </header>
+  <div class="controls">
+    <input id="q" type="search" placeholder="Find a name…" autocomplete="off"
+           autocapitalize="off" spellcheck="false">
+    <button id="filterToggle" type="button" aria-pressed="false">Filters</button>
+  </div>
+  <div id="filterPanel" hidden></div>
+  <div id="banner"></div>
+  <div class="tally" id="tally"></div>
+  <div id="list"></div>
+</div>
+<div id="callout"></div>   <!-- the authorized-pickup call-out fills this when a name is tapped -->
+
+<script>
+// GENERATED from Pure.gs by tools/build-client.mjs — DO NOT EDIT.
+// Edit Pure.gs, then re-run the generator.
+/**
+ * Pure.gs — the kiosk's PURE helpers. No DriveApp, no DOM, no GAS globals.
+ *
+ * Runs in three places from this one source, like Dismissal.gs in ../transportation:
+ *   GAS      — not really needed server-side, but harmless
+ *   Node     — tools/test-kiosk.mjs
+ *   Browser  — KioskClient.html, GENERATED by tools/build-client.mjs. After ANY edit here, re-run
+ *              that generator or the client goes stale (the test suite fails if it is).
+ *
+ * The one piece of real logic here is ksStaleness: whether what is on the screen is LIVE. On a
+ * safety board that is the most important thing to get right and the easiest to get wrong, so it is
+ * pure and tested rather than buried in the page.
+ */
+
+/**
+ * How stale is the published board, from its builtMs epoch stamp and 'now' (both ms).
+ * ok    — under 2 min: the minute publisher is keeping up; show it plainly.
+ * warn  — 2 to 5 min: a tick or two missed; a yellow note, board still trustworthy.
+ * stale — 5 min or more, or no stamp at all: a red LOUD banner — the publisher or the network is
+ *         down and the board may be wrong. Never show a stale board as if it were live.
+ * @return {{ageSec:number, level:string}}
+ */
+function ksStaleness(builtMs, nowMs) {
+  var age = (typeof builtMs === 'number' && builtMs > 0)
+    ? Math.max(0, Math.round((nowMs - builtMs) / 1000)) : 1e9;
+  return { ageSec: age, level: age <= 120 ? 'ok' : age <= 300 ? 'warn' : 'stale' };
+}
+
+/** A clock age in words. */
+function ksFmtAge(sec) {
+  if (sec == null || sec >= 1e9) return 'unknown';
+  if (sec < 90) return 'just now';
+  var m = Math.round(sec / 60);
+  return m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago';
+}
+
+/**
+ * The seven stick colours, verbatim from ../transportation/Index.html so the kiosk and the main
+ * board render a route identically. WHITE is why these are filled chips and not coloured text.
+ * Anything unrecognised renders grey with its name still shown, so a new colour degrades.
+ */
+var KS_CHIP = {
+  white:  { bg: '#ffffff', fg: '#1f2430', bd: '#8a8f98' },
+  orange: { bg: '#F57C00', fg: '#ffffff', bd: '#F57C00' },
+  pink:   { bg: '#EC407A', fg: '#ffffff', bd: '#EC407A' },
+  purple: { bg: '#7E57C2', fg: '#ffffff', bd: '#7E57C2' },
+  red:    { bg: '#D32F2F', fg: '#ffffff', bd: '#D32F2F' },
+  green:  { bg: '#2E7D32', fg: '#ffffff', bd: '#2E7D32' },
+  blue:   { bg: '#1976D2', fg: '#ffffff', bd: '#1976D2' }
+};
+function ksChipStyle(colour) {
+  var c = KS_CHIP[String(colour || '').toLowerCase()] || { bg: '#9e9e9e', fg: '#ffffff', bd: '#9e9e9e' };
+  return 'background:' + c.bg + ';color:' + c.fg + ';border-color:' + c.bd;
+}
+
+/** Filter the ramp list by a name query — also matches a lane's LABEL and its COLOUR, because
+ *  "the purple bus" and "Jarrettsville" are both things people say while scanning for a child. */
+function ksFilter(students, q) {
+  q = String(q || '').trim().toLowerCase();
+  if (!q) return students || [];
+  return (students || []).filter(function (s) {
+    var hay = (s.name + ' ' + (s.lanes || []).map(function (l) {
+      return l.label + ' ' + (l.colour || '');
+    }).join(' ')).toLowerCase();
+    return hay.indexOf(q) !== -1;
+  });
+}
+
+/** Header counts: how many to expect, how many flagged NOT to wait for. */
+function ksCounts(students) {
+  var total = (students || []).length, flagged = 0;
+  (students || []).forEach(function (s) { if (!s.expected) flagged++; });
+  return { total: total, flagged: flagged, expected: total - flagged };
+}
+
+/**
+ * Apply the kiosk's filters. Everything composes with AND. `q` matches name, lane label and colour
+ * (as ksFilter does); the rest narrow by type, route, grade and "who is not riding". Pure and
+ * tested, so the list the ramp trusts is never a guess.
+ * @param {Array} students
+ * @param {Object} f {q, type:''|'Bus'|'Car', route:'' (a lane label), grade:'', notRidingOnly:bool}
+ */
+function ksApplyFilters(students, f) {
+  f = f || {};
+  var q = String(f.q || '').trim().toLowerCase();
+  var type = f.type || '', route = f.route || '', grade = String(f.grade || '');
+  var notRiding = !!f.notRidingOnly;
+  return (students || []).filter(function (s) {
+    if (notRiding && s.expected) return false;
+    if (type && s.type !== type) return false;
+    if (grade && String(s.grade) !== grade) return false;
+    if (route && !(s.lanes || []).some(function (l) { return l.label === route; })) return false;
+    if (q) {
+      var hay = (s.name + ' ' + (s.lanes || []).map(function (l) {
+        return l.label + ' ' + (l.colour || '');
+      }).join(' ')).toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+}
+
+/** Distinct BUS routes present, with colour, alphabetical — for the route filter chips. */
+function ksRoutes(students) {
+  var seen = {}, out = [];
+  (students || []).forEach(function (s) {
+    if (s.type !== 'Bus') return;
+    (s.lanes || []).forEach(function (l) {
+      if (l.label && !seen[l.label]) { seen[l.label] = 1; out.push({ label: l.label, colour: l.colour || '' }); }
+    });
+  });
+  out.sort(function (a, b) { return a.label < b.label ? -1 : a.label > b.label ? 1 : 0; });
+  return out;
+}
+
+/** Distinct grades present, in school order — for the grade filter chips. */
+function ksGrades(students) {
+  var ORDER = ['K4', 'K5', '1', '2', '3', '4', '5', '6', '7', '8'];
+  var seen = {};
+  (students || []).forEach(function (s) { seen[String(s.grade)] = 1; });
+  return ORDER.filter(function (g) { return seen[g]; });
+}
+
+/** Distinct dismissal types present, in a fixed order — for the "Show" filter chips. The ramp gets
+ *  Bus, Car and Early Bird; deriving it means a new type would appear rather than be silently
+ *  unfilterable. */
+function ksTypes(students) {
+  var ORDER = ['Bus', 'Car', 'Early Bird', 'Staff Kid'];
+  var seen = {};
+  (students || []).forEach(function (s) { seen[s.type] = 1; });
+  var out = ORDER.filter(function (t) { return seen[t]; });
+  // any type not in ORDER still shows, after the known ones
+  Object.keys(seen).forEach(function (t) { if (ORDER.indexOf(t) === -1) out.push(t); });
+  return out;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    ksStaleness: ksStaleness, ksFmtAge: ksFmtAge, ksChipStyle: ksChipStyle,
+    ksFilter: ksFilter, ksCounts: ksCounts, KS_CHIP: KS_CHIP,
+    ksApplyFilters: ksApplyFilters, ksRoutes: ksRoutes, ksGrades: ksGrades, ksTypes: ksTypes
+  };
+}
+</script>
+
+<script>
+  // Raw scriptlets on purpose: dataJson is already JSON (a valid JS literal), token/err/fullAppUrl
+  // are JSON.stringify'd server-side, nowMs is a stringified number. Same reasoning as the main app.
+  var TOKEN = KIOSK_DEMO.page.token;
+  var DATA = JSON.parse(KIOSK_DEMO.page.dataJson);               // the board inlined by doGet, or null if it could not read
+  var INIT_ERR = JSON.parse(KIOSK_DEMO.page.errJson);
+  var NOW_MS = Number(KIOSK_DEMO.page.nowMs);
+  var FULL_APP = KIOSK_DEMO.page.fullAppUrl;
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  // Last good board kept on the device: a failed first load is still not a blank screen, and a
+  // reopened Home-Screen app paints instantly. Keyed to nothing but this app's origin; wrapped
+  // because private mode / full storage throw.
+  var CACHE_KEY = 'hcs_ramp_board_v1';
+  function cachePut(b) { try { if (b && b.students) localStorage.setItem(CACHE_KEY, JSON.stringify(b)); } catch (e) {} }
+  function cacheGet() {
+    try { var b = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); return (b && b.students) ? b : null; }
+    catch (e) { return null; }
+  }
+
+  var board = DATA || cacheGet();
+  var pollFails = 0;
+  // Age is measured on the SERVER clock (the iPad's may be wrong): anchor server-now to device-now
+  // at each payload and advance it with the short device delta between polls.
+  var serverAnchor = (board && board.serverMs) || NOW_MS || Date.now();
+  var deviceAnchor = Date.now();
+  function serverNowEst() { return serverAnchor + (Date.now() - deviceAnchor); }
+  if (board) cachePut(board);
+
+  // The full-app button, if a URL was provided.
+  (function () { var a = $('fullapp'); if (FULL_APP) { a.href = FULL_APP; a.hidden = false; } })();
+
+  /* ------------------------------ filters ------------------------------
+   * All compose with AND (ksApplyFilters). q rides from the search box. Route and Bus/Car overlap,
+   * so a light rule keeps them sane: choosing Car clears the route, choosing a route clears Bus/Car.
+   * The panel is hidden by default so the wall board is the clean list; the button shows a dot when
+   * a filter is on. */
+  var F = { q: '', type: '', route: '', grade: '', notRidingOnly: false };
+  var lastRows = [];                          // the currently-rendered rows, for the tap call-out
+  function anyFilter() { return !!(F.type || F.route || F.grade || F.notRidingOnly); }
+
+  function fchip(label, pressed, attr, extraClass, style) {
+    return '<button class="fchip' + (extraClass ? ' ' + extraClass : '') + '" aria-pressed="' +
+      (pressed ? 'true' : 'false') + '"' + (style ? ' style="' + style + '"' : '') + ' ' + attr + '>' +
+      label + '</button>';
+  }
+  function buildFilters() {
+    if (!board) { $('filterPanel').innerHTML = ''; return; }
+    var all = board.students || [];
+    var typeRow = '<span class="flabel">Show</span>' +
+      fchip('All', F.type === '', 'data-type=""') +
+      ksTypes(all).map(function (t) { return fchip(esc(t), F.type === t, 'data-type="' + esc(t) + '"'); }).join('') +
+      '<span class="fsep"></span>' +
+      fchip('Not riding', F.notRidingOnly, 'data-notriding="1"');
+
+    var routes = ksRoutes(all);
+    var routeRow = routes.length
+      ? '<span class="flabel">Bus</span>' + fchip('All', F.route === '', 'data-route=""') +
+        routes.map(function (r) {
+          return fchip(esc(r.label), F.route === r.label, 'data-route="' + esc(r.label) + '"',
+            'route', F.route === r.label ? ksChipStyle(r.colour) : '');
+        }).join('')
+      : '';
+
+    var grades = ksGrades(all);
+    var gradeRow = grades.length
+      ? '<span class="flabel">Grade</span>' + fchip('All', F.grade === '', 'data-grade=""') +
+        grades.map(function (g) { return fchip(esc(g), F.grade === g, 'data-grade="' + esc(g) + '"'); }).join('')
+      : '';
+
+    $('filterPanel').innerHTML =
+      '<div class="frow">' + typeRow + '</div>' +
+      (routeRow ? '<div class="frow">' + routeRow + '</div>' : '') +
+      (gradeRow ? '<div class="frow">' + gradeRow + '</div>' : '') +
+      (anyFilter() ? '<div class="frow"><button class="fchip clear" data-clear="1">&#10005; Clear filters</button></div>' : '');
+
+    var p = $('filterPanel');
+    Array.prototype.forEach.call(p.querySelectorAll('[data-type]'), function (b) {
+      b.onclick = function () { F.type = b.getAttribute('data-type'); if (F.type && F.type !== 'Bus') F.route = ''; buildFilters(); render(); };
+    });
+    Array.prototype.forEach.call(p.querySelectorAll('[data-route]'), function (b) {
+      b.onclick = function () { F.route = b.getAttribute('data-route'); if (F.route) F.type = ''; buildFilters(); render(); };
+    });
+    Array.prototype.forEach.call(p.querySelectorAll('[data-grade]'), function (b) {
+      b.onclick = function () { F.grade = b.getAttribute('data-grade'); buildFilters(); render(); };
+    });
+    Array.prototype.forEach.call(p.querySelectorAll('[data-notriding]'), function (b) {
+      b.onclick = function () { F.notRidingOnly = !F.notRidingOnly; buildFilters(); render(); };
+    });
+    var clr = p.querySelector('[data-clear]');
+    if (clr) clr.onclick = function () { F.type = ''; F.route = ''; F.grade = ''; F.notRidingOnly = false; buildFilters(); render(); };
+
+    $('filterToggle').innerHTML = 'Filters' + (anyFilter() ? '<span class="fdot"></span>' : '');
+  }
+  $('filterToggle').addEventListener('click', function () {
+    var open = $('filterPanel').hidden;
+    $('filterPanel').hidden = !open;
+    $('filterToggle').setAttribute('aria-pressed', open ? 'true' : 'false');
+  });
+
+  /* ------------------------------ render ------------------------------ */
+  function laneChips(s) {
+    return (s.lanes || []).map(function (l) {
+      return '<span class="chip" style="' + ksChipStyle(l.colour) + '" title="' + esc(l.colour) + '">' +
+        esc(l.label) + '</span>';
+    }).join('');
+  }
+  function badges(s) {
+    var b = '';
+    if (!s.expected) b += '<span class="badge flag">' + esc(s.reason || 'NOT TODAY') +
+      (s.detail ? ' ' + esc(s.detail) : '') + '</span>';
+    else if (s.reason === 'GAME DAY') b += '<span class="badge game">GAME DAY' + (s.detail ? ' ' + esc(s.detail) : '') + '</span>';
+    // A parent rang the office to arrange an early pickup. SOFT: the child is still on the ramp list
+    // and is still waited for. They only come off it when the iPad records the actual sign-out.
+    else if (s.reason === 'PICKUP PLANNED') b += '<span class="badge game">PICKUP PLANNED' + (s.detail ? ' ' + esc(s.detail) : '') + '</span>';
+    else if (s.reason === 'BACK') b += '<span class="badge back">BACK' + (s.detail ? ' ' + esc(s.detail) : '') + '</span>';
+    if (s.walkUp) b += '<span class="badge walkup">WALK-UP</span>';
+    if (s.authPickups && s.authPickups.length) b += '<span class="badge auth">PICKUP+</span>';
+    if (s.special) b += '<span class="badge spec">8TH ' + esc(String(s.special.subject).toUpperCase()) + '</span>';
+    if (s.today) b += '<span class="badge today">TODAY</span>';
+    if (s.handedTo) b += '<span class="badge hand">to ' + esc(s.handedTo) + '</span>';
+    return b;
+  }
+  function rowHtml(s, i) {
+    return '<div class="row' + (s.expected ? '' : ' flag') + '" data-idx="' + i + '" role="button" tabindex="0">' +
+      '<div class="who2"><span class="nm">' + esc(s.name) + '</span>' + laneChips(s) + badges(s) + '</div>' +
+      '<div class="gr">' + esc(s.grade) + '</div></div>';
+  }
+
+  /* ------------------------------ the authorized-pickup call-out ------------------------------
+   * Tap a child to see who may collect them — NAME + RELATIONSHIP only, never a phone (those are
+   * not on this device). Tap the backdrop or Close to dismiss. `pickups` is absent on a board
+   * published before this feature, so say that rather than "none recorded". */
+  function openCallout(s) {
+    if (!s) return;
+    var pk = s.pickups, body;
+    if (typeof pk === 'undefined') {
+      body = '<div class="none">Authorized names aren\'t in this board yet — it fills in on the next ' +
+        'update, or check the Full app.</div>';
+    } else if (!pk.length) {
+      body = '<div class="none">No authorized pickups recorded in FACTS for this child.</div>';
+    } else {
+      body = pk.map(function (p) {
+        return '<div class="pk"><span class="pkn">' + esc(p[0]) + '</span>' +
+          (p[1] ? '<span class="rel">' + esc(p[1]) + '</span>' : '') + '</div>';
+      }).join('');
+    }
+    // TEMPORARY authorizations the office recorded from a parent's email — name, relationship and
+    // the last day they apply. Shown apart from the FACTS list, so the ramp knows this one is a
+    // this-week arrangement, not the permanent record (Josh, 2026-09-15).
+    var tmp = s.authPickups || [];
+    if (tmp.length) {
+      body += '<h4>Temporarily authorized</h4>' + tmp.map(function (p) {
+        return '<div class="pk temp"><span class="pkn">' + esc(p[0]) + '</span>' +
+          (p[1] ? '<span class="rel">' + esc(p[1]) + '</span>' : '') +
+          '<span class="thru">through ' + esc(p[2] || '') + '</span></div>';
+      }).join('');
+    }
+    var lanes = (s.lanes || []).map(function (l) {
+      return '<span class="chip" style="' + ksChipStyle(l.colour) + '">' + esc(l.label) + '</span>';
+    }).join(' ');
+    var flag = s.expected ? '' :
+      '<div class="cflag">' + esc(s.reason || '') + (s.detail ? ' ' + esc(s.detail) : '') + '</div>';
+    $('callout').innerHTML =
+      '<div class="cback" data-close="1"><div class="ccard" role="dialog" aria-label="Authorized pickups">' +
+        '<h3>' + esc(s.name) + '</h3>' +
+        '<div class="csub">Grade ' + esc(s.grade) + (lanes ? ' · ' + lanes : '') +
+          (s.handedTo ? ' · to ' + esc(s.handedTo) : '') + '</div>' +
+        (s.special ? '<div class="cflag" style="background:#E1F5FE;color:#01579B">8th period ' + esc(s.special.subject) +
+          (s.special.from ? ' — comes out late from the ' + esc(s.special.from) : ' — comes out late') + ', with the class</div>' : '') +
+        flag + '<h4>Authorized to collect</h4>' + body +
+        '<button class="cbtn" data-close="1" type="button">Close</button>' +
+      '</div></div>';
+  }
+  function closeCallout() { $('callout').innerHTML = ''; }
+  $('callout').addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute('data-close') === '1') closeCallout();
+  });
+  $('list').addEventListener('click', function (ev) {
+    var el = ev.target;
+    while (el && el !== this && (!el.getAttribute || el.getAttribute('data-idx') === null)) el = el.parentNode;
+    if (el && el !== this && el.getAttribute) {
+      var idx = Number(el.getAttribute('data-idx'));
+      if (!isNaN(idx)) openCallout(lastRows[idx]);
+    }
+  });
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' || ev.keyCode === 27) closeCallout(); });
+
+  function renderStamp() {
+    var st = board ? ksStaleness(board.builtMs, serverNowEst()) : { level: 'stale', ageSec: 1e9 };
+    if (pollFails >= 3 && st.level === 'ok') st = { level: 'warn', ageSec: st.ageSec };
+    $('stamp').className = 'stamp ' + st.level;
+    $('stamp').innerHTML = '<span class="dot"></span>board ' + esc(ksFmtAge(st.ageSec)) +
+      (board && board.attendanceAsOf ? ' · attendance ' + esc(board.attendanceAsOf) : '');
+    return st;
+  }
+  function renderBanner(st) {
+    var b = '';
+    if (!board) {
+      b = '<div class="banner stale"><b>No board yet.</b> ' +
+        esc(INIT_ERR || 'Waiting for the dismissal app to publish today\'s board.') +
+        ' This screen will fill in on its own.</div>';
+    } else if (st.level === 'stale' || pollFails >= 3) {
+      b = '<div class="banner stale"><b>NOT LIVE — this board is ' + esc(ksFmtAge(st.ageSec)) + '.</b> ' +
+        'A change since then is not shown. Check the paper list or the office. ' +
+        (pollFails >= 3 ? 'The connection to the server was lost.' : 'The board stopped updating.') +
+        '</div>';
+    } else if (st.level === 'warn') {
+      b = '<div class="banner warn">Updating — the last board is ' + esc(ksFmtAge(st.ageSec)) + '.</div>';
+    } else if (board.attendanceOffDay) {
+      b = '<div class="banner warn">Today\'s attendance has not been pulled yet, so nobody here is ' +
+        'marked absent from today\'s attendance.</div>';
+    }
+    $('banner').innerHTML = b;
+  }
+  function render() {
+    var st = renderStamp();
+    renderBanner(st);
+    if (!board) { $('tally').innerHTML = ''; $('list').innerHTML =
+      '<div class="list"><div class="empty">Waiting for the board…</div></div>'; return; }
+    var all = board.students || [];
+    var c = ksCounts(all);
+    F.q = $('q').value;
+    var rows = ksApplyFilters(all, F);
+    lastRows = rows;                           // the call-out indexes into exactly what is shown
+    var showing = anyFilter() || F.q ? rows.length + ' shown · ' : '';
+    $('tally').innerHTML = showing + '<b>' + c.expected + '</b> to expect' +
+      (c.flagged ? ' · <span class="fl"><b>' + c.flagged + '</b> not — do not wait</span>' : '') +
+      ' · ' + c.total + ' on the ramp' + (board.dayName ? ' · ' + esc(board.dayName) : '');
+    // 8TH-PERIOD SPECIALS FIRST: those classes come out late and together, so they sit under one
+    // header per special above the alphabetical list. Row indexes stay aligned with lastRows.
+    var groups = {}, order = [], html = '';
+    rows.forEach(function (s, i) {
+      if (!s.special) return;
+      var k = s.special.subject + '|' + (s.special.from || '');
+      if (!groups[k]) { groups[k] = { subject: s.special.subject, from: s.special.from || '', idx: [] }; order.push(k); }
+      groups[k].idx.push(i);
+    });
+    order.sort();
+    order.forEach(function (k) {
+      var gp = groups[k];
+      html += '<div class="grphdr"><span>8th period ' + esc(gp.subject) + (gp.from ? ' · from the ' + esc(gp.from) : '') + '</span>' +
+        '<span>' + gp.idx.length + ' — come out late, together</span></div>' +
+        gp.idx.map(function (i) { return rowHtml(rows[i], i); }).join('');
+    });
+    var rest = '';
+    rows.forEach(function (s, i) { if (!s.special) rest += rowHtml(s, i); });
+    if (order.length && rest) html += '<div class="grphdr rest"><span>Everyone else</span></div>';
+    html += rest;
+    $('list').innerHTML = '<div class="list">' + (rows.length
+      ? html
+      : '<div class="empty">Nobody matches' + (anyFilter() || F.q ? ' these filters.' : ' that search.') + '</div>') + '</div>';
+  }
+
+  function accept(b) {
+    board = b; pollFails = 0;
+    serverAnchor = b.serverMs || Date.now(); deviceAnchor = Date.now();
+    cachePut(b); buildFilters(); render();
+  }
+  function poll() {
+    google.script.run
+      .withSuccessHandler(function (b) { if (b && b.students) accept(b); else { pollFails++; render(); } })
+      .withFailureHandler(function () { pollFails++; render(); })
+      .rampApi(TOKEN);
+  }
+
+  $('q').addEventListener('input', render);
+  buildFilters();
+  render();                                   // paint immediately from the inlined / cached board
+  poll();                                     // then confirm live
+  setInterval(poll, 60 * 1000);               // every minute; never reloads the page
+  // Re-tick the clock every 15 s so "just now" ages to "2 min ago" between polls without waiting.
+  setInterval(function () { if (board) { renderStamp(); renderBanner(ksStaleness(board.builtMs, serverNowEst())); } }, 15 * 1000);
+</script>
+</body>
+</html>

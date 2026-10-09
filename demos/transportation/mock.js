@@ -16,6 +16,11 @@
                       and freshness all land on the dataset's day. ?sim= still time-travels the
                       BOARD exactly as it does in production (the server reads it, not the clock).
 
+   The same file backs the Ramp Kiosk (kiosk.html), a separate Apps Script project: when kiosk-logic.js is
+   on the page, the section at the end binds the kiosk's vendored server to this same Drive folder, runs the
+   Dismissal server's minute publisher, and serves rampApi — so the kiosk renders the very
+   Dismissal_RAMP_BOARD.json this server publishes, from the same sheets the board writes.
+
    Everything the real app would WRITE (Overrides, Standing, PickupAuth, Walkers, Roles, Notes,
    saved views, role views) persists in sessionStorage for the visit; a new tab starts clean.
    window.DISMISSAL_DEMO exposes the outbox and a reset for the verifier and the curious. */
@@ -118,7 +123,6 @@
 
   /* ---------- Drive: the shared folder and the sports feed ---------- */
   var files = { 'sports-feed-demo': { id: 'sports-feed-demo', name: 'Sports_Dismissals_TODAY.json', content: JSON.stringify(D.sportsFeed), updated: minutesAgo(8 * 60 + 47) } };
-  var nextFile = 1;
   function fileObj(f) {
     return {
       getId: function () { return f.id; }, getName: function () { return f.name; },
@@ -131,7 +135,7 @@
   function byName(name) { return Object.keys(files).filter(function (id) { return files[id].name === name; }).map(function (id) { return fileObj(files[id]); }); }
   var folder = {
     getFilesByName: function (name) { return iterator(byName(name)); },
-    createFile: function (name, content, mime) { var id = 'shared-file-' + (nextFile++); files[id] = { id: id, name: name, content: String(content), mime: mime, updated: Date.now() }; return fileObj(files[id]); }
+    createFile: function (name, content, mime) { var id = 'shared-' + String(name).replace(/[^A-Za-z0-9]+/g, '-'); files[id] = { id: id, name: name, content: String(content), mime: mime, updated: Date.now() }; return fileObj(files[id]); }
   };
   var DriveApp = {
     getFileById: function (id) {
@@ -169,6 +173,13 @@
   /* ---------- the rest ---------- */
   var outbox = saved.outbox || [];
   var uuidN = 0;
+  var utilities = {
+    formatDate: formatDate,
+    getUuid: function () { uuidN++; var r = Math.random().toString(16).slice(2, 10); return (r + '00000000').slice(0, 8) + '-demo-4000-8000-' + ('000000000000' + uuidN).slice(-12); },
+    formatString: function (f) { var a = [].slice.call(arguments, 1), i = 0; return String(f).replace(/%[sd]/g, function () { return String(a[i++]); }); },
+    sleep: function () {}
+  };
+  var logger = { log: function () { if (window.console && window.DISMISSAL_DEBUG) console.log.apply(console, ['[Logger]'].concat([].slice.call(arguments))); } };
   L.bind({
     SpreadsheetApp: { openById: function (id) { if (!WORKBOOKS[id]) throw new Error('Unknown spreadsheet ' + id); return WORKBOOKS[id]; }, flush: function () {} },
     DriveApp: DriveApp,
@@ -179,18 +190,13 @@
       getEffectiveUser: function () { return { getEmail: function () { return 'itscripts@example.edu'; } }; },
       getScriptTimeZone: function () { return 'America/New_York'; }
     },
-    Utilities: {
-      formatDate: formatDate,
-      getUuid: function () { uuidN++; var r = Math.random().toString(16).slice(2, 10); return (r + '00000000').slice(0, 8) + '-demo-4000-8000-' + ('000000000000' + uuidN).slice(-12); },
-      formatString: function (f) { var a = [].slice.call(arguments, 1), i = 0; return String(f).replace(/%[sd]/g, function () { return String(a[i++]); }); },
-      sleep: function () {}
-    },
+    Utilities: utilities,
     MailApp: { sendEmail: function (opts) { outbox.push(clone(opts)); } },
     ScriptApp: { getService: function () { return { getUrl: function () { return ''; } }; }, getProjectTriggers: function () { return []; } },
     LockService: { getScriptLock: function () { return { tryLock: function () { return true; }, waitLock: function () {}, releaseLock: function () {}, hasLock: function () { return true; } }; } },
     HtmlService: null,
     AdminDirectory: { Users: { get: function () { throw new Error('the demo has no directory — the allowlist decides'); } } },
-    Logger: { log: function () { if (window.console && window.DISMISSAL_DEBUG) console.log.apply(console, ['[Logger]'].concat([].slice.call(arguments))); } }
+    Logger: logger
   });
 
   /* ---------- persistence and the page's methods ---------- */
@@ -212,6 +218,90 @@
     };
   });
   window.MOCK_BACKEND = backend;
+
+  /* ---------- the Ramp Kiosk (kiosk.html only: the page that loads kiosk-logic.js) ----------
+     The kiosk is its OWN Apps Script project: its own Script Properties (the enrolled device tokens, the
+     Full-app URL) and an anonymous visitor. What it shares with the board is the Drive folder above, where
+     the vendored Dismissal server publishes Dismissal_RAMP_BOARD.json; the kiosk's vendored rampApi and
+     doGet read that file and nothing else.
+
+     Who publishes it in THIS tab: the Dismissal server's own minute trigger, publishBoardTick (vendored in
+     logic.js), run at load and then once a minute — with its real Mon-Fri 07:45-15:50 window on the pinned
+     clock, so leave the demo open past 15:50 and the kiosk goes yellow, then red, exactly as the iPad
+     would. A change saved on the board lands in sessionStorage; at the next poll this tab picks the sheets
+     up and republishes the way the board's write does in production (dsAfterWrite_ -> dsPublishBundle_),
+     so the kiosk shows it within a minute. The kiosk itself writes nothing. */
+  var K = window.KIOSK_LOGIC;
+  if (K) {
+    var DEMO_TOKEN = 'demo-ramp-ipad-0001';
+    var kPropStore = {
+      KIOSK_TOKENS: JSON.stringify({ 'demo-ramp-ipad-0001': { device: 'Ramp iPad', added: '2026-09-08 07:30' } }),
+      FULL_APP_URL: 'board.html'
+    };
+    var kProps = {
+      getProperty: function (k) { return Object.prototype.hasOwnProperty.call(kPropStore, k) ? kPropStore[k] : null; },
+      setProperty: function (k, v) { kPropStore[k] = String(v); return this; },
+      deleteProperty: function (k) { delete kPropStore[k]; return this; },
+      getProperties: function () { return clone(kPropStore); }
+    };
+    // HtmlService, just enough for doGet: a template whose evaluate() captures what doGet set on it.
+    function served(o) { o.setTitle = function (t) { o.title = t; return o; }; o.addMetaTag = function () { return o; }; return o; }
+    var kHtml = {
+      createTemplateFromFile: function (name) {
+        var t = { evaluate: function () {
+          return served({ file: name, token: t.token, dataJson: t.dataJson, errJson: t.errJson, nowMs: t.nowMs, fullAppUrl: t.fullAppUrl });
+        } };
+        return t;
+      },
+      createHtmlOutput: function (html) { return served({ message: String(html) }); },
+      createHtmlOutputFromFile: function () { throw new Error('the demo page inlines its partials at build time'); }
+    };
+    K.bind({
+      DriveApp: DriveApp, PropertiesService: { getScriptProperties: function () { return kProps; } }, HtmlService: kHtml,
+      ScriptApp: { getService: function () { return { getUrl: function () { return ''; } }; } },
+      Session: { getActiveUser: function () { return { getEmail: function () { return ''; } }; },        // ANYONE_ANONYMOUS
+                 getEffectiveUser: function () { return { getEmail: function () { return 'itscripts@example.edu'; } }; } },
+      Utilities: utilities, Logger: logger
+    });
+
+    var seen = JSON.stringify((readStore() || {}).dismissal || null), lastTick = 0;
+    /** Pick up the board's writes from sessionStorage. True when something changed. */
+    function syncFromStore() {
+      var now = JSON.stringify((readStore() || {}).dismissal || null);
+      if (now === seen) return false;
+      seen = now;
+      var tabs = JSON.parse(now) || {};
+      WRITABLE.forEach(function (n) { dismissal.sheets[n] = new Sheet(n, tabs[n] || T[n]); });
+      Object.keys(cacheStore).forEach(function (k) { delete cacheStore[k]; });   // the sheets changed under the cache
+      return true;
+    }
+    /** The publisher side: the board's write republishes at once; otherwise the minute trigger runs. */
+    function publish() {
+      if (syncFromStore()) { L.dsPublishBundle_(L.dsComputeBoardBundle_('')); lastTick = Date.now(); return 'write'; }
+      if (Date.now() - lastTick >= 55 * 1000) { L.publishBoardTick(); lastTick = Date.now(); return 'tick'; }
+      return '';
+    }
+    L.publishBoardTick();                     // the trigger has been running all afternoon
+    lastTick = Date.now();
+    backend.rampApi = function (token) { publish(); return K.rampApi(token); };
+
+    // doGet, for real: ?k= is the device token (an enrolled demo token when absent).
+    var kParam = null;
+    try { kParam = new URLSearchParams(window.location.search || '').get('k'); } catch (e) { kParam = null; }
+    var out = K.doGet({ parameter: { k: kParam === null ? DEMO_TOKEN : kParam } });
+    var page = out.message === undefined ? out
+      : { token: '', dataJson: 'null', errJson: '""', nowMs: String(Date.now()), fullAppUrl: '', message: out.message };
+    window.KIOSK_DEMO = { page: page, token: DEMO_TOKEN, props: kPropStore, publish: publish, files: files };
+    // A refused device gets doGet's own message page, laid over the (empty) board.
+    if (page.message !== undefined && typeof document !== 'undefined') {
+      document.addEventListener('DOMContentLoaded', function () {
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;inset:0;z-index:100';
+        d.innerHTML = page.message;
+        document.body.appendChild(d);
+      });
+    }
+  }
   window.DISMISSAL_DEMO = {
     outbox: outbox, workbooks: WORKBOOKS, props: propStore, files: files,
     pinnedNow: function () { return formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd HH:mm'); },

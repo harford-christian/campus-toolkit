@@ -44,7 +44,7 @@ function chainEndpoint(src, from) {
     if (ch === '(') depth++;
     else if (ch === ')') depth--;
     else if (depth === 0 && (ch === '[' || ch === ';')) return null;   // runner[name](...) is dynamic; ';' ends the statement
-    else if (depth === 0 && ch === '.') { const m = /^\.([a-zA-Z]\w*)\s*\(/.exec(text.slice(i, i + 60)); if (m && !/^with/.test(m[1])) return m[1]; }
+    else if (depth === 0 && ch === '.') { const m = /^\.([a-zA-Z]\w*)\s*\(/.exec(text.slice(i, i + 60)); if (m && !/^with(SuccessHandler|FailureHandler|UserObject)$/.test(m[1])) return m[1]; }
   }
   return null;
 }

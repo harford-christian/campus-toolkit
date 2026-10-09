@@ -53,7 +53,8 @@
         Active: true, label: 'Boys Varsity Soccer', Phase: 'InSeason', GradeMin: 9, GradeMax: 12,
         mine: true, phase: 'InSeason', phaseLabel: 'In season', future: false,
         features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
-        overrides: {}, wizardComplete: true, sportName: 'Soccer'
+        overrides: {}, wizardComplete: true, sportName: 'Soccer',
+        ShowPracticesPublic: ''          // fan board: practices stay private (the default)
       },
       {
         TeamID: 'GSOC-V-F26', Sport: 'GSOC', Level: 'V', Gender: 'Girls', Season: 'F26', CalendarId: '',
@@ -61,7 +62,8 @@
         Active: true, label: 'Girls Varsity Soccer', Phase: 'InSeason', GradeMin: 9, GradeMax: 12,
         mine: true, phase: 'InSeason', phaseLabel: 'In season', future: false,
         features: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true },
-        overrides: {}, wizardComplete: true, sportName: 'Soccer'
+        overrides: {}, wizardComplete: true, sportName: 'Soccer',
+        ShowPracticesPublic: '1'         // coach opted practices INTO the public fan calendar
       }
     ],
 
@@ -138,7 +140,27 @@
 
     // Events (day offsets → resolved in mock.js). missing[] are outbound exceptions;
     // returnPlan holds return-leg special cases; seedChecked pre-checks a few riders.
+    // seedScore/seedMedia are recorded finals + links, applied by mock.js into the same
+    // state setScore/setEventMedia write, so a coach can edit them in the staff app.
     events: [
+      {
+        EventID: 'EV-BSOC-0', TeamID: 'BSOC-V-F26', Sport: 'BSOC', Gender: 'Boys', Season: 'F26', Level: 'V',
+        EventType: 'Game', inDays: -3, StartTime: '4:00 PM', EndTimeEst: '5:30 PM',
+        Opponent: 'Riverside Christian', HomeAway: 'Home', LocationName: 'HCS Stadium', LocationAddress: '',
+        DepartTime: '', ReturnEstTime: '', TransportMode: 'None', UniformNote: 'Home maroon',
+        Status: 'Scheduled', StaffNotes: 'Senior recognition at halftime — seniors line up at midfield.', exceptionCount: 0,
+        seedScore: { our: 3, opp: 1 }, seedMedia: { highlight: 'https://example.com/highlights/bsoc-riverside' },
+        missing: [], returnPlan: { guardian: [], self: [], other: [] }, seedChecked: { out: [], ret: [] }
+      },
+      {
+        EventID: 'EV-GSOC-0', TeamID: 'GSOC-V-F26', Sport: 'GSOC', Gender: 'Girls', Season: 'F26', Level: 'V',
+        EventType: 'Game', inDays: -4, StartTime: '4:30 PM', EndTimeEst: '6:00 PM',
+        Opponent: 'Lakeview Academy', HomeAway: 'Away', LocationName: 'Lakeview Academy', LocationAddress: '8 Shoreline Ave, Lakeview',
+        DepartTime: '2:45 PM', ReturnEstTime: '7:15 PM', TransportMode: 'Bus', UniformNote: 'Away whites',
+        Status: 'Scheduled', StaffNotes: 'Two subs out with ankle tweaks — trainer on the bus.', exceptionCount: 0,
+        seedScore: { our: 1, opp: 2 },
+        missing: [], returnPlan: { guardian: [], self: [], other: [] }, seedChecked: { out: [], ret: [] }
+      },
       {
         EventID: 'EV-BSOC-1', TeamID: 'BSOC-V-F26', Sport: 'BSOC', Gender: 'Boys', Season: 'F26', Level: 'V',
         EventType: 'Practice', inDays: 1, StartTime: '3:30 PM', EndTimeEst: '5:00 PM',
@@ -219,12 +241,17 @@
       {
         AnnouncementID: 'ANN-001', Audience: 'Program', TeamID: '', Title: 'Fall pictures Thursday',
         Body: 'Team photos in the gym before practice — wear home uniforms.', Severity: 'info',
-        CreatedAt: '', ExpiresAt: '', PostedByName: 'Athletics Office', PostedByEmail: 'athletics@example.edu', Status: 'Active'
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Athletics Office', PostedByEmail: 'athletics@example.edu', Status: 'Active', ShowFans: ''
+      },
+      {
+        AnnouncementID: 'ANN-003', Audience: 'Program', TeamID: '', Title: 'Homecoming weekend',
+        Body: 'Both varsity soccer teams play at home Saturday — gates open at 9:30, concessions all day.', Severity: 'info',
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Athletics Office', PostedByEmail: 'athletics@example.edu', Status: 'Active', ShowFans: '1'
       },
       {
         AnnouncementID: 'ANN-002', Audience: 'Team', TeamID: 'BSOC-V-F26', Title: 'Bus leaves 30 min early Friday',
         Body: 'Bayside Prep is farther than usual — depart 2:45 sharp from the gym lot.', Severity: 'urgent',
-        CreatedAt: '', ExpiresAt: '', PostedByName: 'Coach Turner', PostedByEmail: 'aturner@example.edu', Status: 'Active'
+        CreatedAt: '', ExpiresAt: '', PostedByName: 'Coach Turner', PostedByEmail: 'aturner@example.edu', Status: 'Active', ShowFans: ''
       }
     ],
 

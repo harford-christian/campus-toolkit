@@ -119,7 +119,7 @@ function backendCalls(src) {
       else if (c === ';' && depth === 0) break;
       else if (c === '.' && depth === 0) {
         const m = /^\.(\w+)\s*\(/.exec(src.slice(j));
-        if (m && !/^with/.test(m[1])) out.add(m[1]);
+        if (m && !/^with(SuccessHandler|FailureHandler|UserObject)$/.test(m[1])) out.add(m[1]);
       }
       j++;
     }

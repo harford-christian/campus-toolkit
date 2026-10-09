@@ -1,0 +1,40 @@
+{
+  "_note": "Config for tools/build-demo.mjs — the PUBLIC fan schedule board (apps/fan, served at ?view=schedule by Router.js doGet). Run from the repo root AFTER node demos/talon-hub/build-logic.mjs: node tools/build-demo.mjs demos/talon-hub/build.fan.json. Same data.js + mock.js as the staff app; the mock answers publicSchedule/liveNow through the vendored FanView whitelist in fan-logic.js. includeDir is the APP ROOT (includes are written include('pages/Theme')).",
+  "src": "../athletics/talon-hub/apps/fan/pages/Fan.html",
+  "dst": "demos/talon-hub/fan.html",
+  "includeDir": "../athletics/talon-hub/apps/fan",
+  "demoName": "Talon Hub · Fan schedule",
+  "replace": [
+    [
+      "<!-- GENERATED SOURCE: edit ui/Theme.html",
+      "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>Talon Hub — Schedule &amp; scores</title>\n</head>\n<body>\n<!-- GENERATED SOURCE: edit ui/Theme.html"
+    ],
+    [
+      "    boot();\n  })();\n</script>\n",
+      "    boot();\n  })();\n</script>\n</body>\n</html>\n"
+    ],
+    [
+      "</title>\n</head>",
+      "</title>\n<script src=\"fan-logic.js\"></script>\n</head>"
+    ],
+    [
+      "<?= BUILD_ID ?>",
+      "demo-2026"
+    ],
+    [
+      "<?= (typeof PARENT_URL !== 'undefined' ? PARENT_URL : '') ?>",
+      ""
+    ],
+    [
+      "<?= (typeof SIGNUP_URL !== 'undefined' ? SIGNUP_URL : '') ?>",
+      ""
+    ]
+  ],
+  "_replaceNotes": {
+    "wrapper": "Fan.html is a FRAGMENT like Staff.html (HtmlService wraps it), so the first two replacements wrap it into a document; without a </head> build-demo.mjs injects no shim and the page loads with no backend. Anchors: first line of Theme.html (first include) and the last lines of FanApp.html (last include).",
+    "fan-logic.js": "The third replacement loads the vendored fan server modules (FanView, Labels, Scoreboard, Announcements, Projection, SCHEMA) in <head>; mock.js resolves window.TalonFanLogic at call time.",
+    "PARENT_URL / SIGNUP_URL": "Deliberately empty: they are the live parent/student portal /exec URLs (CONFIG rows). Empty is the app's own 'hide the footer door' setting (FanApp.html LINKS).",
+    "branding": "Theme.html carries the school crest as a data-URI CSS variable (--logo); kept, exactly as in the staff build. BrandLogo.html is only used by Hub.html, which is not built.",
+    "scrubs": "Real-world identifiers are scrubbed BY PATTERN in tools/build-demo.mjs; verify with node tools/privacy-scan.mjs."
+  }
+}

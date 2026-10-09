@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_self">
+  <script src="logic-writing.js"></script>
+  <script src="mock-competitions.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --md-red: #c8102e;
+      --md-red-deep: #8c0a1f;
+      --md-cream: #f2ead9;
+      --danger: #7a1220;
+      --bg: #2b2b2d;
+      --surface: #ffffff;
+      --border: #ecdfd8;
+      --text: #241414;
+      --text-muted: #7a6a63;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text); margin: 0; padding: 0 0 80px; line-height: 1.5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .page {
+      max-width: 1000px; margin: 0 auto; background: var(--surface); min-height: 100vh;
+      border: 1px solid var(--border); box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .page::before {
+      content: ''; display: block; height: 8px;
+      background: repeating-linear-gradient(90deg, var(--md-red) 0 25px, #ffffff 25px 50px);
+    }
+    .masthead { display: flex; align-items: center; gap: 20px; padding: 20px 32px 16px; }
+    .crest { width: 76px; height: auto; flex-shrink: 0; border-radius: 8px; box-shadow: 0 6px 16px rgba(140,10,31,.3); }
+    .masthead-title h1 { font-size: 28px; margin: 0; color: var(--md-red-deep); font-weight: 800; }
+    .masthead-title p { margin: 4px 0 0; font-size: 16px; color: var(--md-red); font-weight: 700; }
+
+    .content { padding: 4px 32px 32px; }
+
+    .section-title {
+      font-size: 18px; font-weight: 800; color: var(--md-red-deep); margin: 28px 0 4px;
+      padding-bottom: 8px; border-bottom: 2px solid var(--border);
+    }
+    .section-title:first-of-type { margin-top: 8px; }
+    .section-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; }
+
+    label { display: block; font-size: 13px; font-weight: 700; color: var(--md-red-deep); margin-bottom: 6px; }
+    select, input {
+      width: 100%; padding: 11px 12px; font-size: 15px; border: 2px solid var(--border);
+      border-radius: 8px; background: #fff; color: var(--text); font-family: inherit;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--md-red); box-shadow: 0 0 0 3px rgba(200,16,46,.15); }
+    input[type=file] { padding: 8px; font-size: 13.5px; }
+    input[type=checkbox] { width: auto; }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .field { margin-bottom: 14px; }
+
+    .data-card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; background: #fffdfb;
+      box-shadow: 0 2px 8px rgba(140,10,31,.06); margin-bottom: 16px;
+    }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .card-head h3 { margin: 0; font-size: 16px; color: var(--md-red-deep); font-weight: 800; }
+    .card-head h4 { margin: 0; font-size: 14.5px; color: var(--md-red-deep); font-weight: 800; }
+
+    .rules-list { margin: 0 0 12px; padding-left: 20px; font-size: 13.5px; color: var(--text); }
+    .rules-list li { margin-bottom: 8px; }
+    .rules-block { margin-bottom: 12px; }
+    .rules-block .rules-heading { font-weight: 700; color: var(--md-red-deep); font-size: 13.5px; margin: 0 0 8px; }
+
+    .checkbox-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .checkbox-row label { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+    .category-checks { display: flex; gap: 20px; margin-bottom: 14px; flex-wrap: wrap; }
+
+    .entry-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-top: 10px; background: #fff; }
+    .entry-card.empty { display: none; }
+
+    .soa-box { border-left: 4px solid var(--md-red); background: #fdf1ee; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-style: italic; color: var(--md-red-deep); margin-bottom: 12px; }
+
+    .notice { border-left: 4px solid var(--md-red-deep); background: #f7f0ee; padding: 12px 16px; border-radius: 8px; font-size: 14px; }
+    .notice.warn { border-left-color: var(--danger); background: #fdf0ee; color: #7f1d1d; font-weight: 600; }
+    .notice.success { border-left-color: var(--md-red); background: #fdf1ee; color: var(--md-red-deep); font-weight: 600; }
+
+    .payment-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    .payment-links a {
+      display: inline-block; background: #fff; color: var(--md-red-deep); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 700; text-decoration: none;
+    }
+    .payment-links a:hover { background: #fdf1ee; }
+    .judging-sheet-link { font-size: 13px; margin: 6px 0; }
+    .judging-sheet-link a { color: var(--md-red-deep); font-weight: 700; text-decoration: none; }
+
+    .tabbar {
+      display: flex; gap: 2px; padding: 8px 24px;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .tabbar button {
+      flex: 1 1 0; min-width: 0; background: #514e49; color: #fff; border: none;
+      padding: 13px 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      transition: background .15s; border-radius: 10px;
+    }
+    .tabbar button:hover { background: #66625b; }
+    .tabbar button.active { background: var(--md-red); color: #fff; }
+    .tabpanel { display: none; }
+    .tabpanel.active { display: block; }
+
+    button { cursor: pointer; border: none; border-radius: 9px; padding: 12px 20px; font-size: 14.5px; font-weight: 700; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    button.submit-final {
+      background: var(--md-red); color: #fff; border: none; border-radius: 8px; padding: 13px 28px;
+      font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 20px;
+      box-shadow: 0 4px 12px rgba(224,60,49,.3); transition: transform .1s, box-shadow .1s;
+    }
+    button.submit-final:hover { background: var(--md-red-deep); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(200,16,46,.4); }
+    button.submit-final:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .status-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; padding: 6px 13px; border-radius: 999px; margin-left: 12px; }
+    .status-chip:empty { display: none; }
+    .status-chip.saving { background: #f6dde1; color: var(--md-red-deep); }
+    .status-chip.success { background: #e3f6e9; color: #15803d; }
+    .status-chip.error { background: #fdeceb; color: var(--danger); }
+    .spinner {
+      width: 12px; height: 12px; border: 2px solid rgba(0,0,0,.15); border-top-color: currentColor;
+      border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "MACS Fine Arts" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <div class="masthead">
+      <img class="crest" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23c8102e'/%3E%3Ccircle cx='32' cy='32' r='24' fill='none' stroke='white' stroke-width='2'/%3E%3Ctext x='32' y='38' font-family='Inter,Arial,sans-serif' font-size='15' font-weight='800' fill='white' text-anchor='middle'%3EMACS%3C/text%3E%3C/svg%3E" alt="MACS logo">
+      <div class="masthead-title">
+        <h1>MACS Creative Writing Competition 2026</h1>
+        <p>Fine Arts Competition 2026 — Creative Writing Registration</p>
+      </div>
+    </div>
+
+    <div class="tabbar" id="tabbar">
+      <button data-tab="Register" onclick="switchTab('Register')" class="active">Register</button>
+      <button data-tab="L1A" onclick="switchTab('L1A')">Level 1a</button>
+      <button data-tab="L1B" onclick="switchTab('L1B')">Level 1b</button>
+      <button data-tab="L2" onclick="switchTab('L2')">Level II</button>
+      <button data-tab="L3" onclick="switchTab('L3')">Level III</button>
+      <button data-tab="Payment" onclick="switchTab('Payment')">Payment</button>
+    </div>
+
+    <div class="content">
+      <div id="warning" class="notice warn" style="display:none; margin:0 0 16px"></div>
+      <div id="success" class="notice success" style="display:none; margin:0 0 16px"></div>
+
+      <div id="form-body">
+        <div class="tabpanel active" id="tab-Register">
+          <div class="section-title" style="margin-top:8px">Contact Information</div>
+          <div class="field-row">
+            <div class="field">
+              <label>School Name &amp; Code*</label>
+              <select id="schoolSelect"><option value="">Select a school…</option></select>
+            </div>
+            <div></div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Contact Person* — First Name</label>
+              <input type="text" id="contactFirst">
+            </div>
+            <div class="field">
+              <label>Contact Person* — Last Name</label>
+              <input type="text" id="contactLast">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label>Phone Number*</label>
+              <input type="text" id="contactPhone" placeholder="(000) 000-0000">
+              <p class="section-sub" style="margin:4px 0 0">Please enter a valid phone number for your contact person. Format: (000) 000-0000.</p>
+            </div>
+            <div class="field">
+              <label>Email*</label>
+              <input type="email" id="contactEmail" placeholder="example@example.com">
+            </div>
+          </div>
+          <p class="section-sub">*Please do not submit until you have completed everything on your registration. Only the first submission for each school will be accepted.</p>
+
+          <div class="section-title">General Rules</div>
+          <ol class="rules-list" id="generalRulesList"></ol>
+          <div class="checkbox-row">
+            <input type="checkbox" id="rulesAccepted">
+            <label for="rulesAccepted">I hereby testify that I have read the MACS Creative Writing General Rules.</label>
+          </div>
+
+          <div class="section-title">Levels</div>
+          <p class="section-sub">Please choose ALL of the levels for your entries. Do NOT choose a level for which you have no entries.</p>
+          <div class="category-checks" id="levelChecks"></div>
+        </div>
+
+        <div class="tabpanel" id="tab-L1A"></div>
+        <div class="tabpanel" id="tab-L1B"></div>
+        <div class="tabpanel" id="tab-L2"></div>
+        <div class="tabpanel" id="tab-L3"></div>
+
+        <div class="tabpanel" id="tab-Payment">
+          <div class="section-title" style="margin-top:8px">Total Due</div>
+          <p class="section-sub">Please complete the appropriate Participation Fee Form:</p>
+          <div class="payment-links" id="paymentLinks"></div>
+          <div class="notice" style="margin-top:14px" id="deadlineNote"></div>
+
+          <button class="submit-final" id="submitBtn" onclick="submitForm()">Submit Registration</button>
+          <span class="status-chip" id="statusChip"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var levels = [];
+    var generalRulesAccepted = false;
+
+    function gsRun(fnName) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      return new Promise(function (resolve, reject) {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fnName].apply(null, args);
+      });
+    }
+
+    function switchTab(id) {
+      document.querySelectorAll('.tabbar button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === id); });
+      document.querySelectorAll('.tabpanel').forEach(function (p) { p.classList.toggle('active', p.id === 'tab-' + id); });
+    }
+
+    function init() {
+      gsRun('getSchoolList').then(function (list) {
+        var sel = document.getElementById('schoolSelect');
+        list.forEach(function (s) {
+          var opt = document.createElement('option');
+          opt.value = s.code;
+          opt.textContent = s.code + ' — ' + s.name;
+          opt.dataset.name = s.name;
+          sel.appendChild(opt);
+        });
+      });
+
+      gsRun('getGeneralRules').then(function (rules) {
+        var ol = document.getElementById('generalRulesList');
+        rules.forEach(function (r) {
+          var li = document.createElement('li');
+          li.textContent = r;
+          ol.appendChild(li);
+        });
+      });
+
+      gsRun('getLevels').then(function (data) {
+        levels = data;
+        renderLevelChecks();
+        renderLevelSections();
+      });
+
+      gsRun('getPaymentInfo').then(function (info) {
+        document.getElementById('deadlineNote').textContent =
+          'The completed Participation Fee Form and payment must be mailed no later than ' + (info.deadline || '') +
+          (info.mailingAddress ? '. Checks should be made out to MACS and mailed to ' + info.mailingAddress + '.' : '.');
+        var links = document.getElementById('paymentLinks');
+        if (info.macsPaymentPdfLink) links.appendChild(makeLink('MACS School Participation Fee Form', info.macsPaymentPdfLink));
+        if (info.nonMacsPaymentPdfLink) links.appendChild(makeLink('Non-MACS School Participation Fee Form', info.nonMacsPaymentPdfLink));
+      });
+
+      document.getElementById('schoolSelect').addEventListener('change', onSchoolChange);
+    }
+
+    function makeLink(label, url) {
+      var a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.textContent = label;
+      return a;
+    }
+
+    function onSchoolChange() {
+      var code = document.getElementById('schoolSelect').value;
+      if (!code) return;
+      gsRun('checkSchoolStatus', code).then(function (status) {
+        if (status.alreadySubmitted) {
+          showWarning('This school has already submitted entries. To make a change, please email the competition admin directly — the form does not allow a second submission.');
+          document.getElementById('submitBtn').disabled = true;
+        } else {
+          hideWarning();
+          document.getElementById('submitBtn').disabled = false;
+        }
+      });
+    }
+
+    function renderLevelChecks() {
+      var wrap = document.getElementById('levelChecks');
+      wrap.innerHTML = '';
+      levels.forEach(function (level) {
+        var row = document.createElement('div');
+        row.className = 'checkbox-row';
+        row.style.margin = '0';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = 'levelCheck_' + level.key;
+        var lbl = document.createElement('label');
+        lbl.setAttribute('for', cb.id);
+        lbl.textContent = level.label;
+        row.appendChild(cb);
+        row.appendChild(lbl);
+        wrap.appendChild(row);
+      });
+    }
+
+    function renderLevelSections() {
+      levels.forEach(function (level) {
+        var container = document.getElementById('tab-' + level.key);
+        container.innerHTML = '';
+        var section = document.createElement('div');
+
+        var title = document.createElement('div');
+        title.className = 'section-title';
+        title.style.marginTop = '8px';
+        title.textContent = level.label + ' — ' + level.categories.map(function (c) { return c.name; }).join(' & ');
+        section.appendChild(title);
+
+        var rulesDetails = document.createElement('div');
+        rulesDetails.className = 'rules-block';
+        var summary = document.createElement('p');
+        summary.className = 'rules-heading';
+        summary.textContent = level.label + ' Rules';
+        rulesDetails.appendChild(summary);
+        if (level.lengthNote) {
+          var lenP = document.createElement('p');
+          lenP.className = 'section-sub';
+          lenP.style.fontWeight = '700';
+          lenP.textContent = level.lengthNote;
+          rulesDetails.appendChild(lenP);
+        }
+        var ol = document.createElement('ol');
+        ol.className = 'rules-list';
+        level.rules.forEach(function (r) {
+          var li = document.createElement('li');
+          li.textContent = r;
+          ol.appendChild(li);
+        });
+        rulesDetails.appendChild(ol);
+        section.appendChild(rulesDetails);
+
+        var soaBox = document.createElement('div');
+        soaBox.className = 'soa-box';
+        soaBox.textContent = 'Statement of Originality: "' + level.soa + '"';
+        section.appendChild(soaBox);
+
+        var catChecks = document.createElement('div');
+        catChecks.className = 'category-checks';
+        var catLabel = document.createElement('p');
+        catLabel.className = 'section-sub';
+        catLabel.style.width = '100%';
+        catLabel.textContent = 'Please check the categories for which you have an entry in ' + level.label + '.';
+        section.appendChild(catLabel);
+
+        level.categories.forEach(function (cat) {
+          var row = document.createElement('div');
+          row.className = 'checkbox-row';
+          row.style.margin = '0';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.id = 'catCheck_' + level.key + '_' + cat.name;
+          var lbl = document.createElement('label');
+          lbl.setAttribute('for', cb.id);
+          lbl.textContent = cat.name;
+          row.appendChild(cb);
+          row.appendChild(lbl);
+          catChecks.appendChild(row);
+
+          var entryCard = buildEntryCard(level, cat);
+          cb.addEventListener('change', function () {
+            entryCard.classList.toggle('empty', !cb.checked);
+          });
+
+          catChecks.appendChild(entryCard);
+        });
+        section.appendChild(catChecks);
+
+        container.appendChild(section);
+      });
+    }
+
+    function buildEntryCard(level, cat) {
+      var card = document.createElement('div');
+      card.className = 'entry-card empty';
+      card.style.flexBasis = '100%';
+      card.dataset.levelKey = level.key;
+      card.dataset.category = cat.name;
+
+      var h4 = document.createElement('h4');
+      h4.textContent = cat.name + ' — ' + level.label;
+      card.appendChild(h4);
+
+      if (level.categoryRules && level.categoryRules[cat.name]) {
+        var details = document.createElement('div');
+        details.className = 'rules-block';
+        var summary = document.createElement('p');
+        summary.className = 'rules-heading';
+        summary.textContent = cat.name + ' Category Rules';
+        details.appendChild(summary);
+        var ol = document.createElement('ol');
+        ol.className = 'rules-list';
+        level.categoryRules[cat.name].forEach(function (r) {
+          var li = document.createElement('li');
+          li.textContent = r;
+          ol.appendChild(li);
+        });
+        details.appendChild(ol);
+        card.appendChild(details);
+      }
+
+      var row1 = document.createElement('div');
+      row1.className = 'field-row';
+      row1.appendChild(makeTextField('Name of Student (' + cat.name + ' ' + level.key + ') — First Name', 'first'));
+      row1.appendChild(makeTextField('Name of Student (' + cat.name + ' ' + level.key + ') — Last Name', 'last'));
+      card.appendChild(row1);
+
+      var titleField = makeTextField('Title of ' + (cat.name === 'Short Story' ? 'Short Story' : cat.name) + ' (' + level.key + ')', 'title');
+      card.appendChild(titleField);
+
+      var entryFileField = makeFileField(cat.name + ' (' + level.key + ') PDF File', 'entryFile');
+      card.appendChild(entryFileField);
+
+      if (cat.judgingSheetUrl) {
+        var jsLink = document.createElement('p');
+        jsLink.className = 'judging-sheet-link';
+        var a = document.createElement('a');
+        a.href = cat.judgingSheetUrl; a.target = '_blank';
+        a.textContent = level.label + ' ' + cat.name + ' Judging Sheet';
+        jsLink.appendChild(a);
+        card.appendChild(jsLink);
+      }
+      var instr = document.createElement('p');
+      instr.className = 'section-sub';
+      instr.textContent = 'Please download the judging sheet from the link above. Fill out the top portion of the sheet, but leave the student ID# blank. Please scan and upload a readable copy in the next box.';
+      card.appendChild(instr);
+
+      var jsFileField = makeFileField('Judging Sheet (' + cat.name + ' ' + level.key + ') PDF Upload', 'judgingSheetFile');
+      card.appendChild(jsFileField);
+
+      return card;
+    }
+
+    function makeTextField(labelText, dataKey) {
+      var wrap = document.createElement('div');
+      wrap.className = 'field';
+      var label = document.createElement('label');
+      label.textContent = labelText;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.dataset.field = dataKey;
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    function makeFileField(labelText, dataKey) {
+      var wrap = document.createElement('div');
+      wrap.className = 'field';
+      var label = document.createElement('label');
+      label.textContent = labelText;
+      var input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/pdf';
+      input.dataset.field = dataKey;
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    function showWarning(msg) {
+      var el = document.getElementById('warning');
+      el.textContent = msg; el.style.display = 'block';
+    }
+    function hideWarning() {
+      document.getElementById('warning').style.display = 'none';
+    }
+    function setStatus(state, text) {
+      var chip = document.getElementById('statusChip');
+      chip.className = 'status-chip ' + state;
+      chip.innerHTML = state === 'saving' ? '<span class="spinner"></span>' + text : text;
+    }
+
+    function fileToBase64(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result.split(',')[1]); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function submitForm() {
+      hideWarning();
+      var sel = document.getElementById('schoolSelect');
+      var schoolCode = sel.value;
+      var schoolName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].dataset.name : '';
+      if (!schoolCode) { showWarning('Please select a school.'); return; }
+
+      var contact = {
+        firstName: document.getElementById('contactFirst').value.trim(),
+        lastName: document.getElementById('contactLast').value.trim(),
+        phone: document.getElementById('contactPhone').value.trim(),
+        email: document.getElementById('contactEmail').value.trim()
+      };
+      if (!contact.firstName || !contact.lastName || !contact.phone || !contact.email) {
+        showWarning('Contact person, phone, and email are required.');
+        return;
+      }
+
+      var rulesAccepted = document.getElementById('rulesAccepted').checked;
+      if (!rulesAccepted) {
+        showWarning('You must certify that you have read the MACS Creative Writing General Rules.');
+        return;
+      }
+
+      var levelsSelected = levels.filter(function (l) {
+        return document.getElementById('levelCheck_' + l.key).checked;
+      }).map(function (l) { return l.key; });
+      if (levelsSelected.length === 0) {
+        showWarning('Please choose at least one level.');
+        return;
+      }
+
+      var entryCards = Array.prototype.filter.call(
+        document.querySelectorAll('.entry-card'),
+        function (card) { return !card.classList.contains('empty'); }
+      );
+      if (entryCards.length === 0) {
+        showWarning('Please check at least one category and complete an entry.');
+        return;
+      }
+
+      for (var i = 0; i < entryCards.length; i++) {
+        var card = entryCards[i];
+        var first = card.querySelector('[data-field=first]').value.trim();
+        var last = card.querySelector('[data-field=last]').value.trim();
+        var title = card.querySelector('[data-field=title]').value.trim();
+        var entryFile = card.querySelector('[data-field=entryFile]').files[0];
+        var jsFile = card.querySelector('[data-field=judgingSheetFile]').files[0];
+        if (!first || !last || !title || !entryFile || !jsFile) {
+          showWarning('Every checked category needs a student name, title, entry PDF, and judging sheet PDF (' + card.dataset.category + ' ' + card.dataset.levelKey + ').');
+          return;
+        }
+      }
+
+      setStatus('saving', 'Uploading files…');
+      document.getElementById('submitBtn').disabled = true;
+
+      var uploadChain = entryCards.reduce(function (chain, card) {
+        return chain.then(function (acc) {
+          var levelKey = card.dataset.levelKey;
+          var category = card.dataset.category;
+          var entryFile = card.querySelector('[data-field=entryFile]').files[0];
+          var jsFile = card.querySelector('[data-field=judgingSheetFile]').files[0];
+          return Promise.all([fileToBase64(entryFile), fileToBase64(jsFile)]).then(function (b64) {
+            return Promise.all([
+              gsRun('uploadEntryFile', b64[0], entryFile.name, entryFile.type, schoolName, levelKey, category, 'entry'),
+              gsRun('uploadEntryFile', b64[1], jsFile.name, jsFile.type, schoolName, levelKey, category, 'judging-sheet')
+            ]).then(function (uploaded) {
+              acc.push({
+                levelKey: levelKey, category: category,
+                studentFirst: card.querySelector('[data-field=first]').value.trim(),
+                studentLast: card.querySelector('[data-field=last]').value.trim(),
+                title: card.querySelector('[data-field=title]').value.trim(),
+                entryUrl: uploaded[0].url,
+                judgingSheetUrl: uploaded[1].url
+              });
+              return acc;
+            });
+          });
+        });
+      }, Promise.resolve([]));
+
+      uploadChain.then(function (entries) {
+        setStatus('saving', 'Submitting…');
+        return gsRun('submitRegistration', schoolCode, schoolName, contact, rulesAccepted, levelsSelected, entries);
+      }).then(function (result) {
+        setStatus('success', 'Submitted');
+        document.getElementById('success').textContent = 'Registration submitted — ' + result.count + ' entr' + (result.count === 1 ? 'y' : 'ies') + ' recorded.';
+        document.getElementById('success').style.display = 'block';
+        document.getElementById('form-body').querySelectorAll('input, select, button').forEach(function (el) { el.disabled = true; });
+      }).catch(function (err) {
+        setStatus('error', 'Error');
+        showWarning((err && err.message) || String(err));
+        document.getElementById('submitBtn').disabled = false;
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

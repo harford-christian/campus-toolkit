@@ -58,16 +58,27 @@
       "demoFolder": "demos/talon-hub",
       "launch": "demos/talon-hub/index.html",
       "sourceProject": [
-        "athletics/talon-hub/apps/staff"
+        "athletics/talon-hub/apps/staff",
+        "athletics/talon-hub/apps/fan"
       ],
       "builtFrom": [
         "athletics/talon-hub/apps/staff/pages/Staff.html",
         "athletics/talon-hub/apps/staff/pages/StaffApp.html",
         "athletics/talon-hub/apps/staff/pages/StaffStyles.html",
         "athletics/talon-hub/apps/staff/pages/Theme.html",
-        "athletics/talon-hub/apps/staff/pages/ClientLogic.html"
+        "athletics/talon-hub/apps/staff/pages/ClientLogic.html",
+        "athletics/talon-hub/apps/fan/pages/Fan.html",
+        "athletics/talon-hub/apps/fan/pages/FanApp.html",
+        "athletics/talon-hub/apps/fan/pages/FanStyles.html",
+        "athletics/talon-hub/apps/fan/pages/Widget.html",
+        "athletics/talon-hub/apps/fan/server/lib/fanview.js",
+        "athletics/talon-hub/apps/fan/server/lib/labels.js",
+        "athletics/talon-hub/apps/fan/server/lib/scoreboard.js",
+        "athletics/talon-hub/apps/fan/server/lib/announcements.js",
+        "athletics/talon-hub/apps/fan/server/lib/projection.js",
+        "athletics/talon-hub/apps/fan/server/lib/schema.js"
       ],
-      "buildMethod": "build-demo.mjs + hand data/mock"
+      "buildMethod": "build-demo.mjs + hand data/mock; index.html is now a hand switcher over staff.html (build.json), fan.html (build.fan.json) and widget.html (build.widget.json); build-logic.mjs vendors the fan server lib (FanView whitelist etc.) verbatim into fan-logic.js and mock.js answers publicSchedule/liveNow from the state the staff app edits"
     },
     "purchasing": {
       "title": "Purchasing & Procurement",
@@ -138,11 +149,20 @@
         "custom-forms"
       ],
       "builtFrom": [
-        "custom-forms/preview/index.html",
-        "custom-forms/preview/fill.html",
-        "custom-forms/preview/admin.html"
+        "custom-forms/apps/builder/pages/Index.html",
+        "custom-forms/apps/chooser/pages/Index.html",
+        "custom-forms/apps/runner-public/pages/Index.html",
+        "custom-forms/apps/runner-staff/pages/Index.html",
+        "custom-forms/apps/runner-macs/pages/Index.html",
+        "custom-forms/apps/builder/server/Router.js",
+        "custom-forms/apps/chooser/server/Router.js",
+        "custom-forms/apps/runner-public/server/Router.js",
+        "custom-forms/apps/runner-staff/server/Router.js",
+        "custom-forms/apps/runner-macs/server/Router.js",
+        "custom-forms/apps/runner-public/server/RunnerApi.js",
+        "custom-forms/Seeds.js"
       ],
-      "buildMethod": "reuse project's own preview build + scrub + banner"
+      "buildMethod": "node demos/custom-forms/build.mjs: build-logic.mjs vendors the five apps' server into logic.js; a template-prep step keeps each page's doGet branch (into the ignored .tmp/); build-demo.mjs x9 (build.*.json); hand index.html switcher over the five apps plus data.js/mock.js (in-memory Google, shared form store in sessionStorage). demos/custom-forms/verify.mjs"
     },
     "gym-tv": {
       "title": "Gym Display TV",
@@ -200,7 +220,8 @@
       "demoFolder": "demos/transportation",
       "launch": "demos/transportation/index.html",
       "sourceProject": [
-        "FACTS/transportation"
+        "FACTS/transportation",
+        "FACTS/transportation-kiosk"
       ],
       "builtFrom": [
         "FACTS/transportation/Index.html",
@@ -209,9 +230,14 @@
         "FACTS/transportation/Code.gs",
         "FACTS/transportation/Roles.gs",
         "FACTS/transportation/Walkers.gs",
-        "FACTS/transportation/Routes.gs"
+        "FACTS/transportation/Routes.gs",
+        "FACTS/transportation-kiosk/Kiosk.html",
+        "FACTS/transportation-kiosk/KioskClient.html",
+        "FACTS/transportation-kiosk/Config.gs",
+        "FACTS/transportation-kiosk/Code.gs",
+        "FACTS/transportation-kiosk/Pure.gs"
       ],
-      "buildMethod": "demos/transportation/build-logic.mjs vendors the SERVER layer verbatim into logic.js (Config.gs whole with ids scrubbed; the named declarations of Code.gs, Roles.gs, Walkers.gs and Routes.gs — whole-file vendoring is out because Walkers.gs/Roles.gs seed real children and staff), applying the same name scrubs build.json applies to the page; then build-demo.mjs (includeDir=project root, inlines DismissalClient; head/body wrapper that loads logic.js, sim/userEmail/presenceUrl tokens and name scrubs via the replace list — config committed at demos/transportation/build.json). mock.js is an in-memory Google (four workbooks, a Drive folder, a TTL cache, script properties, a pinned clock) under the vendored endpoints; data.js is the fabricated school. demos/transportation/verify.mjs proves the roster equals the real producer's output, logic.js is byte-identical to the source, every page method is served, and drives the board, the time-travel and every write through the real endpoints"
+      "buildMethod": "demos/transportation/build-logic.mjs vendors the SERVER layer verbatim into logic.js (Config.gs whole with ids scrubbed; the named declarations of Code.gs, Roles.gs, Walkers.gs and Routes.gs — whole-file vendoring is out because Walkers.gs/Roles.gs seed real children and staff), applying the same name scrubs build.json applies to the page; then build-demo.mjs (includeDir=project root, inlines DismissalClient; head/body wrapper that loads logic.js, sim/userEmail/presenceUrl tokens and name scrubs via the replace list — config committed at demos/transportation/build.json). mock.js is an in-memory Google (four workbooks, a Drive folder, a TTL cache, script properties, a pinned clock) under the vendored endpoints; data.js is the fabricated school. demos/transportation/verify.mjs proves the roster equals the real producer's output, logic.js is byte-identical to the source, every page method is served, and drives the board, the time-travel and every write through the real endpoints; index.html is a hand switcher over board.html (build.json) and kiosk.html (build.kiosk.json). build-kiosk-logic.mjs vendors the Ramp Kiosk's Config.gs + Code.gs whole (ids scrubbed) plus DismissalClient into kiosk-logic.js; mock.js binds it to the same Drive folder and runs the vendored publishBoardTick, so rampApi/doGet read the Dismissal_RAMP_BOARD.json the board publishes"
     },
     "campus-presence": {
       "title": "Campus Presence",
@@ -252,13 +278,23 @@
       "demoFolder": "demos/macs",
       "launch": "demos/macs/index.html",
       "sourceProject": [
-        "macs-scheduling/secondary"
+        "macs-scheduling/secondary",
+        "macs-scheduling/spelling_bee",
+        "macs-scheduling/creative_writing"
       ],
       "builtFrom": [
         "macs-scheduling/secondary/Form.html",
-        "macs-scheduling/secondary/AdminApp.html"
+        "macs-scheduling/secondary/AdminApp.html",
+        "macs-scheduling/spelling_bee/Form.html",
+        "macs-scheduling/spelling_bee/Config.js",
+        "macs-scheduling/spelling_bee/Code.js",
+        "macs-scheduling/spelling_bee/YearRollover.js",
+        "macs-scheduling/creative_writing/Form.html",
+        "macs-scheduling/creative_writing/Config.js",
+        "macs-scheduling/creative_writing/Code.js",
+        "macs-scheduling/creative_writing/YearRollover.js"
       ],
-      "buildMethod": "build-logic.mjs vendors Config/Auth/Intake/MacsBridge/AdminBackend/MasterList/TestData/YearRollover verbatim into logic.js (domain, admin address, sibling-app URL and Drive ids scrubbed; HistoricalData.js NEVER); mock.js supplies in-memory Sheets/Drive/cache/properties, the sibling forms project's roster + OTP endpoints and a mail outbox, and seeds three schools' entries through the real write path. Then build-demo.mjs x2 (demos/macs/build.form.json, build.admin.json: _self base + logic.js; the embedded crest swapped for a generated badge via replaceRegex; one admin button label). verify.mjs re-checks privacy (above all that HistoricalData never ships), vendored-logic drift, fresh builds, the mock contract and the gate / submission / admin / rollover behaviour.",
+      "buildMethod": "build-logic.mjs vendors Config/Auth/Intake/MacsBridge/AdminBackend/MasterList/TestData/YearRollover verbatim into logic.js (domain, admin address, sibling-app URL and Drive ids scrubbed; HistoricalData.js NEVER); mock.js supplies in-memory Sheets/Drive/cache/properties, the sibling forms project's roster + OTP endpoints and a mail outbox, and seeds three schools' entries through the real write path. Then build-demo.mjs x2 (demos/macs/build.form.json, build.admin.json: _self base + logic.js; the embedded crest swapped for a generated badge via replaceRegex; one admin button label). verify.mjs re-checks privacy (above all that HistoricalData never ships), vendored-logic drift, fresh builds, the mock contract and the gate / submission / admin / rollover behaviour.; plus the Spelling Bee and Creative Writing forms: build.spelling.json / build.writing.json, their Config/Code/YearRollover vendored into logic-spelling.js / logic-writing.js, answered by mock-competitions.js",
       "_sourceNote": "secondary/HistoricalData.js holds ~571 real minors' names and real school names; elementary/ and spelling_bee/ carry committed xlsx files with real registrations. None of it may be read for a demo. creative_writing/ and spelling_bee/ forms are the same pattern as the secondary form and are not showcased (Josh, 2026-10-08)."
     },
     "student-portal": {
@@ -333,7 +369,13 @@
     "macs-scheduling/secondary",
     "hcs-lunch-inventory-management",
     "parent-teacher-conference-scheduling",
-    "elc/elc-student-assessments"
+    "elc/elc-student-assessments",
+    "athletics/talon-hub/apps/staff-ext",
+    "custom-forms/apps/builder",
+    "custom-forms/apps/chooser",
+    "custom-forms/apps/runner-public",
+    "custom-forms/apps/runner-staff",
+    "custom-forms/apps/runner-macs"
   ],
   "excludeDirs": [
     "apps-script-showcase",
@@ -342,6 +384,7 @@
     "node_modules",
     ".git",
     "/legacy/",
-    "/.clasp-store/"
+    "/.clasp-store/",
+    "hcs-custom-forms-form-contexts"
   ]
 }

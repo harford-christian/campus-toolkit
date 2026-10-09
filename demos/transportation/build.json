@@ -1,7 +1,7 @@
 {
-  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST (it vendors the server layer into logic.js and reads the name scrubs from THIS file), then: node tools/build-demo.mjs demos/transportation/build.json. The source Index.html is an Apps Script template FRAGMENT (no <head>): HtmlService wraps it in a document and doGet sets the title + viewport, so the first two replacements reproduce that wrapper — which is also where build-demo.mjs injects the demo shim (before </head>) and where logic.js is loaded. The SIM scriptlet is replaced with the same URL-parameter read and sanitiser doGet applies, so ?sim= still time-travels the board; presenceUrl points at the sibling Campus Presence demo. People named in the source comments (staff first names, a few family names) are replaced by nameAliases: keys are sha256 hashes of the lowercased word or phrase (up to three words), values the role or fabricated name that replaces it — so this public file never names anyone. build-logic.mjs applies the same table to the vendored server bundle.",
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST (it vendors the server layer into logic.js and reads the name scrubs from THIS file), then: node tools/build-demo.mjs demos/transportation/build.json. It builds board.html, the Dismissal Board half of the demo; index.html is a hand-written switcher that frames it beside kiosk.html (build.kiosk.json), and forwards its own query string to the board so index.html?sim= still time-travels. The source Index.html is an Apps Script template FRAGMENT (no <head>): HtmlService wraps it in a document and doGet sets the title + viewport, so the first two replacements reproduce that wrapper — which is also where build-demo.mjs injects the demo shim (before </head>) and where logic.js is loaded. The SIM scriptlet is replaced with the same URL-parameter read and sanitiser doGet applies, so ?sim= still time-travels the board; APP_URL (the Reload link, target _top) points at the switcher when the board is framed, so Reload stays inside it; presenceUrl points at the sibling Campus Presence demo. People named in the source comments (staff first names, a few family names) are replaced by nameAliases: keys are sha256 hashes of the lowercased word or phrase (up to three words), values the role or fabricated name that replaces it — so this public file never names anyone. build-logic.mjs applies the same table to the vendored server bundle.",
   "src": "../FACTS/transportation/Index.html",
-  "dst": "demos/transportation/index.html",
+  "dst": "demos/transportation/board.html",
   "includeDir": "../FACTS/transportation",
   "demoName": "Dismissal Board",
   "replace": [
@@ -19,7 +19,7 @@
     ],
     [
       "var APP_URL = <?!= JSON.stringify(appUrl || '') ?>;",
-      "var APP_URL = location.href.split('?')[0];"
+      "var APP_URL = window.top !== window.self ? 'index.html' + location.search : location.href.split('?')[0];"
     ],
     [
       "var SIM = <?!= JSON.stringify(sim || '') ?>;",

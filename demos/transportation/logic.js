@@ -1142,6 +1142,32 @@ function dsWriteSharedFile_(fileName, propKey, content) {
 }
 
 /**
+ * The minute publisher. Installed by RUN_installPublishTrigger, it rebuilds the shared board and
+ * republishes both stores — but only during the dismissal-relevant window (Mon-Fri 07:45-15:50),
+ * so it costs nothing overnight or at the weekend. A minute trigger can slip; the builtAt stamp,
+ * not the schedule, is what freshness and the kiosk trust.
+ */
+/**
+ * THE TICK STAMPS ITSELF (audit, 2026-09-18). Readiness used to judge the publisher alive by the
+ * mtime of the ramp JSON — but ANY page load that finds a stale bundle republishes that same file,
+ * including outside this window. So one person opening the board at 07:20 made a trigger that had
+ * been dead for a week look like it had run two minutes ago, on the one diagnostic whose job is to
+ * say GO or NO-GO for a dismissal. This property is written by the trigger and by nothing else.
+ */
+var PROP_PUBLISH_TICK = 'PUBLISH_TICK_MS';
+
+function publishBoardTick() {
+  var now = new Date();
+  var dow = Number(Utilities.formatDate(now, TZ, 'u'));         // 1=Mon .. 7=Sun
+  var hm = Number(Utilities.formatDate(now, TZ, 'HHmm'));
+  if (dow > 5 || hm < 745 || hm > 1550) return;
+  try {
+    dsPublishBundle_(dsComputeBoardBundle_(''));
+    PropertiesService.getScriptProperties().setProperty(PROP_PUBLISH_TICK, String(now.getTime()));
+  } catch (e) { Logger.log('publishBoardTick failed: %s', e.message); }
+}
+
+/**
  * Attach the per-viewer parts a shared bundle cannot carry — permissions and the effective saved
  * view — and stamp this request's own wall-clock. Both dismissalApi and setOverride finish here, so
  * the returned shape is identical whichever path built the board.
@@ -2360,6 +2386,8 @@ var ROUTES_HEADER = ['Route Code', 'Route Name', 'Colour', 'Vehicle', 'Session',
     addRoleMember: addRoleMember,
     removeRoleMember: removeRoleMember,
     dsComputeBoardBundle_: dsComputeBoardBundle_,
+    dsPublishBundle_: dsPublishBundle_,
+    publishBoardTick: publishBoardTick,
     dsMyPermissions_: dsMyPermissions_,
     dsTodayKey_: dsTodayKey_,
     dsDayName_: dsDayName_,

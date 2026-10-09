@@ -1,0 +1,41 @@
+{
+  "_note": "Config for tools/build-demo.mjs — the Ramp Kiosk, the anonymous iPad half of the Dismissal Board demo. Run build-logic.mjs and build-kiosk-logic.mjs FIRST, then: node tools/build-demo.mjs demos/transportation/build.kiosk.json. The source Kiosk.html is an Apps Script template FRAGMENT: doGet (Code.gs) wraps it with setTitle('HCS Ramp') and a viewport addMetaTag, so the first replacement reproduces that wrapper and loads the two vendored bundles in <head> — kiosk-logic.js (the kiosk's own Config.gs + Code.gs, plus the publisher's pure logic) and logic.js (the Dismissal server, whose publishBoardTick is the minute trigger that writes the ramp file). includeDir inlines KioskClient (generated from Pure.gs). The five template values are NOT faked: mock.js runs the kiosk's REAL doGet over a stand-in HtmlService and the page reads back what doGet put on its template (window.KIOSK_DEMO.page) — the token from ?k= (an enrolled demo token when absent, so the device-token gate passes; ?k=anything-else shows the real 'Not enrolled' refusal), the board doGet read from the ramp file, its error, the server clock and the Full app URL (the kiosk's FULL_APP_URL Script Property, set to board.html). The Full app link targets _self so it stays inside the switcher's frame.",
+  "src": "../FACTS/transportation-kiosk/Kiosk.html",
+  "dst": "demos/transportation/kiosk.html",
+  "includeDir": "../FACTS/transportation-kiosk",
+  "demoName": "Ramp Kiosk",
+  "replace": [
+    [
+      "<!--\n  HCS Ramp — the kiosk board.",
+      "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">\n<title>HCS Ramp</title>\n<script src=\"kiosk-logic.js\"></script>\n<script src=\"logic.js\"></script>\n</head>\n<body>\n<!--\n  HCS Ramp — the kiosk board."
+    ],
+    [
+      "  setInterval(function () { if (board) { renderStamp(); renderBanner(ksStaleness(board.builtMs, serverNowEst())); } }, 15 * 1000);\n</script>\n",
+      "  setInterval(function () { if (board) { renderStamp(); renderBanner(ksStaleness(board.builtMs, serverNowEst())); } }, 15 * 1000);\n</script>\n</body>\n</html>\n"
+    ],
+    [
+      "<a class=\"fullapp\" id=\"fullapp\" target=\"_top\"",
+      "<a class=\"fullapp\" id=\"fullapp\" target=\"_self\""
+    ],
+    [
+      "<?!= JSON.stringify(token) ?>",
+      "KIOSK_DEMO.page.token"
+    ],
+    [
+      "<?!= dataJson ?>",
+      "JSON.parse(KIOSK_DEMO.page.dataJson)"
+    ],
+    [
+      "<?!= errJson ?>",
+      "JSON.parse(KIOSK_DEMO.page.errJson)"
+    ],
+    [
+      "<?!= JSON.stringify(nowMs) ?>",
+      "KIOSK_DEMO.page.nowMs"
+    ],
+    [
+      "<?!= JSON.stringify(fullAppUrl) ?>",
+      "KIOSK_DEMO.page.fullAppUrl"
+    ]
+  ]
+}

@@ -100,6 +100,47 @@ window.MACS_DATA = (function () {
       ] }
   ];
 
+  /* ---------- the Spelling Bee and Creative Writing projects ----------
+     Two more Apps Script projects, one registration form each, each with its own Sheet. They share the member
+     schools above. Settings listed here are the rows that differ from each project's own DEFAULT_SETTINGS (the
+     mailing address is a row admins add; the real form backfills it blank). The registrations below go through
+     each project's REAL submitRegistration at first boot, so their entry ids are produced, not typed. */
+  var SAMPLE_PDF = 'sample.pdf';   // a fabricated one-page PDF beside this file: fee forms, judging sheets, uploads
+  var MAILING = 'MACS Fine Arts Office (demo), 400 Sample Road, Exampleton, MD 00000';   // fictional
+  var SPELLING = {
+    settings: { 'Competition Year': '2026', 'Admin Emails': DEMO.adminEmail, 'Payment PDF Link (MACS Schools)': SAMPLE_PDF,
+      'Payment PDF Link (Non-MACS Schools)': SAMPLE_PDF, 'Payment Mailing Address': MAILING },
+    // { code, name, contact, groups: [{ groupKey, students: [name, ...] }] } — exactly what the form sends.
+    submitted: [
+      { code: '1100', name: 'Chesapeake Christian Academy',
+        contact: { firstName: 'Dana', lastName: 'Whitcombe', phone: '(410) 555-0171', email: 'dwhitcombe@chesapeake.example.org' },
+        groups: [{ groupKey: 'G1', students: ['Posy Leverett'] }, { groupKey: 'G2-3', students: ['Abel Quintana', 'Mae Okafor'] },
+          { groupKey: 'G4-6', students: ['Corin Ashby', 'Lark Pennington', 'Tobiah Reyes'] }, { groupKey: 'G7-9', students: ['Ivy Marchbanks'] }] },
+      { code: '1300', name: 'Pine Ridge Baptist Academy',
+        contact: { firstName: 'Carol', lastName: 'Ferreira', phone: '(301) 555-0188', email: 'cferreira@pineridge.example.org' },
+        groups: [{ groupKey: 'G4-6', students: ['Hollis Grantham'] }, { groupKey: 'G10-12', students: ['Junia Vasquez-Hart', 'Bram Ellery'] }] }
+    ],
+    stamps: ['2026-01-14 10:05:00', '2026-01-22 15:32:00']
+  };
+  var WRITING = {
+    settings: { 'Competition Year': '2026', 'Admin Emails': DEMO.adminEmail, 'Payment PDF Link (MACS Schools)': SAMPLE_PDF,
+      'Payment PDF Link (Non-MACS Schools)': SAMPLE_PDF, 'Payment Mailing Address': MAILING },
+    judgingSheetUrl: SAMPLE_PDF,     // every Level+Category row on the Judging Sheets tab
+    // { code, name, contact, levels, entries: [{ levelKey, category, studentFirst, studentLast, title }] } — the PDFs
+    // are "uploaded" through the real uploadEntryFile at boot, so each entry carries the two links it returns.
+    submitted: [
+      { code: '1200', name: 'Harbor Light Christian School',
+        contact: { firstName: 'Miguel', lastName: 'Santangelo', phone: '(443) 555-0144', email: 'msantangelo@harborlight.example.org' },
+        levels: ['L1B', 'L3'],
+        entries: [
+          { levelKey: 'L1B', category: 'Poetry', studentFirst: 'Winnie', studentLast: 'Calloway', title: 'The Lighthouse Keeps Watch' },
+          { levelKey: 'L1B', category: 'Short Story', studentFirst: 'Oren', studentLast: 'Daskalov', title: 'The Day the Tide Forgot' },
+          { levelKey: 'L3', category: 'Essay', studentFirst: 'Selah', studentLast: 'Ibarra', title: 'Why Small Harbors Matter' }
+        ] }
+    ],
+    stamps: ['2025-11-24 13:47:00']
+  };
+
   return { demo: DEMO, schools: SCHOOLS, master: MASTER, judges: JUDGES, judgingSheets: JUDGING_SHEETS,
-    settingsOverrides: SETTINGS_OVERRIDES, submitted: SUBMITTED };
+    settingsOverrides: SETTINGS_OVERRIDES, submitted: SUBMITTED, spelling: SPELLING, writing: WRITING };
 })();

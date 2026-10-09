@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base target="_self">
+  <script>var DEMO_APP = 'runner-public', DEMO_SURFACE = 'parent'; // demo: which Apps Script project and which doGet branch this page is</script>
+  <script src="logic.js"></script>
+  <!-- GENERATED FILE — DO NOT HAND-EDIT. Produced by tools/wrap.js from Theme.html. Edit the source, then run `npm run build`. -->
+<!-- Theme.html — the ONE HCS Forms design system. Included by Index.html into both
+     the builder and the runner so every form looks like one branded product.
+     Canonical palette (resolves the red/gold drift across older projects):
+       HCS Red #8B1E1E  ·  Gold #D4AF37  ·  White  ·  Inter.
+     Verify exact hex against example.edu before go-live (M0 checkpoint). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Values are per-context (HCS red/gold by default, MACS black/gray/red, etc.) — see
+     Theme.js's ThemeLogic.renderThemeCss_(). Var NAMES stay fixed so no consuming file
+     (Builder.html/Portal.html/Runner.html) needs to change when a context's palette does. */
+  :root {
+    /* themeCss: added at load by mock.js — what this app's include_('pages/Theme') renders */
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { background:var(--bg); color:var(--text); line-height:1.5;
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+
+  /* ---- layout ---- */
+  .page { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
+  .page.wide { max-width:1080px; }
+  .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
+    padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
+  /* full-bleed variant — Portal's site shell (matches Builder's always-full-width .topbar);
+     the default (unrounded-top removed) is still used by boxed contexts like the runner's
+     access-denied page, which keep the rounded-top-of-a-card look. */
+  .brandbar.flush { border-radius:0; }
+  .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
+  .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
+  .brandbar .spacer { margin-left:auto; }
+  .goldrule { height:4px; background:var(--hcs-gold); }
+
+  /* ---- card / surfaces ---- */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .card.flush-top { border-top-left-radius:0; border-top-right-radius:0; }
+  .card-pad { padding:22px; }
+  .stack > * + * { margin-top:16px; }
+  .formpage.stack > .field + .field { margin-top:32px; }
+  .divider { height:1px; background:var(--line); border:0; margin:20px 0; }
+
+  /* ---- headings / text ---- */
+  .form-title { font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.02em; }
+  .form-desc { color:var(--muted); margin:0; }
+  .section-head { font-size:1.05rem; font-weight:700; color:var(--hcs-red); margin:8px 0 2px;
+    padding-bottom:6px; border-bottom:2px solid var(--hcs-gold-soft); }
+  .help { font-size:.83rem; color:var(--muted); margin:3px 0 0; }
+  .muted { color:var(--muted); } .center { text-align:center; }
+
+  /* ---- fields ---- */
+  .field { margin:0; }
+  .field > label { display:block; font-weight:600; font-size:.92rem; margin-bottom:6px; }
+  .req { color:var(--err); margin-left:2px; }
+  .control, input.control, select.control, textarea.control {
+    width:100%; font:inherit; font-size:1rem; color:var(--text); background:var(--card);
+    border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; transition:border-color .12s, box-shadow .12s; }
+  textarea.control { min-height:96px; resize:vertical; }
+  .control:focus, .control:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .control:disabled, .control[readonly] { background:#f3f4f6; color:#4b5563; cursor:not-allowed; }
+  .field.invalid .control { border-color:var(--err); }
+  .field .error { display:none; color:var(--err); font-size:.82rem; margin-top:5px; }
+  .field.invalid .error { display:block; }
+
+  /* choice groups (radio/checkbox) */
+  .choices { display:flex; flex-direction:column; gap:8px; }
+  .choice { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line);
+    border-radius:var(--radius-sm); cursor:pointer; background:var(--card); }
+  .choice:hover { border-color:var(--line-strong); }
+  .choice:focus-within { border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .choice input { margin-top:2px; accent-color:var(--hcs-red); width:18px; height:18px; }
+  .choice.selected { border-color:var(--hcs-red); background:#fbf4f4; }
+
+  /* ---- buttons ---- */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    border:1px solid transparent; border-radius:var(--radius-sm); font-weight:700; font-size:.95rem;
+    padding:11px 18px; background:var(--hcs-red); color:#fff; transition:background .12s, box-shadow .12s; }
+  .btn:hover { background:var(--hcs-red-hover); }
+  .btn:focus-visible { outline:none; box-shadow:var(--ring); }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .btn.block { width:100%; }
+  .btn.ghost { background:transparent; color:var(--hcs-red); border-color:var(--line-strong); }
+  .btn.ghost:hover { background:#fbf4f4; }
+  .btn.gold { background:var(--hcs-gold); color:#3a2e00; }
+  .btn.sm { padding:7px 12px; font-size:.85rem; }
+
+  /* ---- badges / pills (status system, reused from purchasing) ---- */
+  .pill { display:inline-block; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; text-transform:capitalize; }
+  .pill.draft { background:#eef1f5; color:#475467; }
+  .pill.published, .pill.open, .pill.approved { background:var(--ok-bg); color:var(--ok); }
+  .pill.private { background:var(--hcs-gold-soft); color:#7a5b00; }
+  .pill.staff { background:#e7edfb; color:#2b4a9b; }
+  .pill.locked, .pill.closed, .pill.rejected { background:var(--err-bg); color:var(--err); }
+  .pill.pending { background:var(--warn-bg); color:var(--warn); }
+
+  /* ---- notices ---- */
+  .notice { border-radius:var(--radius-sm); padding:12px 14px; font-size:.9rem; }
+  .notice.info { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; }
+  .notice.err { background:var(--err-bg); border:1px solid #f3c6c2; color:var(--err); }
+  .notice.ok { background:var(--ok-bg); border:1px solid #bfe0c1; color:var(--ok); }
+
+  /* ---- pre-fill component (MACS school forms) ----
+     Two phases, one component: .pf-step is the OFFER (something to act on), .pf-row is the
+     RECORD (what happened). Deliberately NOT a .notice — a tinted rectangle reads as
+     boilerplate on a long form and gets skipped, and tint alone must never carry the meaning.
+     State is carried by an icon plus words; colour appears only on the icon and the button. */
+  .pf-row {
+    display:flex; align-items:flex-start; gap:12px;
+    /* full-bleed to the card's edges, so it reads as a band separating title from fields
+       rather than a box sitting among them. Tracks .card-pad, including its 520px step. */
+    margin:0 -22px; padding:14px 22px;
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    background:#fbfbfc; font-size:.94rem;
+  }
+  .pf-row .pf-ico { flex:none; width:20px; height:20px; margin-top:2px; color:var(--muted); }
+  .pf-row.is-ok .pf-ico { color:var(--ok); }
+  .pf-row.is-attn .pf-ico { color:var(--hcs-red); }
+  .pf-row .pf-body { flex:1; min-width:0; }
+  .pf-row .pf-t { font-weight:600; margin:0; }
+  /* the count must not reflow as it changes */
+  .pf-row .pf-t .pf-num { font-variant-numeric:tabular-nums; }
+  .pf-row .pf-d { font-size:.85rem; color:var(--muted); margin:2px 0 0; }
+  .pf-row .pf-side { flex:none; }
+  /* .stack's 16px gap would otherwise show above an empty slot */
+  #formNotices { margin:0; }
+  #formNotices > div:empty { display:none; }
+
+  /* per-field provenance — the chip IS the record, so nothing has to be summarised up top */
+  .pf-mark { display:inline-flex; align-items:center; gap:5px; vertical-align:middle;
+    font-size:.68rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--ok); background:var(--ok-bg); border:1px solid #bfe0c1;
+    border-radius:999px; padding:2px 8px; margin-left:8px; }
+  .pf-mark .hcsi { width:11px; height:11px; }
+  .pf-undo { font:inherit; font-size:.78rem; font-weight:600; cursor:pointer; background:none;
+    border:0; color:var(--hcs-red); text-decoration:underline; text-underline-offset:2px;
+    padding:6px 4px; margin-left:2px; }
+  .pf-undo:hover { color:var(--hcs-red-hover); }
+
+  .pf-step { border:1px solid var(--line-strong); border-radius:var(--radius);
+    background:#fbfbfc; padding:16px; }
+  .pf-step .pf-kick { font-size:.68rem; font-weight:700; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+  .pf-step .pf-head { display:flex; align-items:flex-start; gap:12px; }
+  .pf-step .pf-ico { flex:none; width:22px; height:22px; margin-top:1px; color:var(--hcs-red); }
+  .pf-step .pf-t { font-size:1rem; font-weight:700; margin:0 0 4px; }
+  .pf-step .pf-d { font-size:.88rem; color:var(--muted); margin:0; max-width:52ch; }
+  .pf-step .pf-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px; }
+  .pf-step .pf-otp { margin-top:14px; border-top:1px solid var(--line); padding-top:14px; }
+  .pf-step .pf-otp .control { max-width:22rem; }
+  /* a text button that is still a 44px target */
+  .btn.plain { background:none; border:0; color:var(--hcs-red); font-weight:600;
+    text-decoration:underline; text-underline-offset:3px; padding:11px 4px; }
+  .btn.plain:hover { color:var(--hcs-red-hover); }
+  @media (max-width:520px) { .pf-row { margin:0 -16px; padding:14px 16px; } }
+
+  /* ---- toast + spinner ---- */
+  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#1f2430; color:#fff;
+    padding:11px 18px; border-radius:999px; font-size:.88rem; font-weight:600; box-shadow:var(--shadow); z-index:60; }
+  .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%;
+    display:inline-block; animation:spin .7s linear infinite; }
+  .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; overflow-y:auto; }
+  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; max-height:calc(100vh - 32px); overflow-y:auto; margin:auto; }
+  .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
+  .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
+  /* Signature pad — the wrapper positions a "Sign here" cue + baseline over an EMPTY canvas
+     (P10). Both vanish as soon as the canvas has ink (.has-ink, set on first stroke / on a
+     restored draft) so they can never be mistaken for part of the signature or exported into it
+     — they're DOM siblings, never drawn onto the canvas. */
+  .sigwrap { position:relative; }
+  .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; position:relative; z-index:1; }
+  .sigwrap .sigcue { position:absolute; left:0; right:0; bottom:34px; text-align:center; color:var(--muted);
+    font-size:.85rem; pointer-events:none; z-index:0; }
+  .sigwrap .sigcue::after { content:''; position:absolute; left:12%; right:12%; bottom:-8px; border-bottom:1px solid var(--line-strong); }
+  .sigpad.has-ink + .sigcue { display:none; }
+  .sigbar { margin-top:6px; }
+  .filelist { margin-top:6px; }
+  .filelist .fitem { display:flex; align-items:center; gap:8px; font-size:.82rem; color:var(--text); }
+  .desc-block { font-size:.9rem; color:var(--text); white-space:pre-wrap; line-height:1.5; margin:0; }
+  .desc-block + .desc-block { margin-top:10px; }
+  .progress { height:6px; background:var(--line); border-radius:999px; overflow:hidden; margin-bottom:4px; }
+  .progress-bar { height:100%; background:var(--hcs-red); transition:width .2s ease; }
+  .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
+  .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
+  @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* ---- shared shell nav (cross-app link + role-toggle + "signed in as", topbar/brandbar) ----
+     One wrapper claims margin-left:auto so however many of these three are present, they
+     cluster together at the right edge instead of splitting apart. */
+  .brandbar-right, .topbar-right { margin-left:auto; display:flex; align-items:center; gap:16px; min-width:0; flex-wrap:wrap; row-gap:8px; justify-content:flex-end; }
+  .shell-topbar-link { color:#fff; text-decoration:none; font-weight:700;
+    font-size:.85rem; background:rgba(255,255,255,.14); border-radius:999px; padding:7px 14px;
+    transition:background .12s; }
+  .shell-topbar-link:hover { background:rgba(255,255,255,.24); }
+  /* shared "signed in as" badge — same look Builder's .topbar .who used one-off; now used
+     by Portal/Builder/Runner's brandbar alike. */
+  .shell-who { font-size:.8rem; color:rgba(255,255,255,.92); display:flex;
+    align-items:center; gap:8px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Sign-out lives inside .shell-who now (header, not a body banner) — override .btn.ghost's
+     red-on-transparent look (meant for light card backgrounds; invisible on this dark red
+     bar) with a white outline pill matching the other header controls. */
+  .shell-who button.btn { padding:5px 12px; border-radius:999px; font-size:.78rem; font-weight:700;
+    color:#fff; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.4); }
+  .shell-who button.btn:hover { background:rgba(255,255,255,.24); }
+  /* Profile chip — compact avatar + dropdown, replaces a plain "Signed in as x@y.com" label. */
+  .profile-chip { position:relative; }
+  .profile-avatar { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.16);
+    color:#fff; border:1px solid rgba(255,255,255,.45); font-weight:800; font-size:.85rem;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+  .profile-avatar:hover { background:rgba(255,255,255,.28); }
+  .profile-menu { position:absolute; right:0; top:calc(100% + 10px); background:var(--card);
+    color:var(--text); border:1px solid var(--line); border-radius:var(--radius-sm);
+    box-shadow:var(--shadow); min-width:230px; padding:10px; z-index:50; text-align:left; }
+  .profile-menu-email { font-size:.8rem; color:var(--muted); padding:0 2px 8px; word-break:break-all;
+    border-bottom:1px solid var(--line); margin-bottom:8px; }
+  .profile-menu .btn.block { margin-bottom:6px; }
+  .profile-menu .btn.block:last-child { margin-bottom:0; }
+  .profile-menu-admin { margin-bottom:8px; }
+  /* "View as: X · Y" toggle — lives in the brandbar, not a body notice (was easy to miss
+     between the title and the students block). Same pill language as .shell-topbar-link
+     (identical rgba values) so every header control reads as one consistent family instead
+     of competing pill styles. */
+  .role-toggle { display:inline-flex; align-items:center; gap:8px; font-size:.85rem; color:rgba(255,255,255,.85); }
+  .role-toggle .rt-active { color:#fff; font-weight:700; }
+  .role-toggle button, .role-toggle a { padding:6px 12px; border-radius:999px; font:inherit;
+    font-weight:700; color:#fff; background:rgba(255,255,255,.14); border:0; cursor:pointer;
+    text-decoration:none; transition:background .12s; }
+  .role-toggle button:hover, .role-toggle a:hover { background:rgba(255,255,255,.24); }
+  .role-toggle button:disabled { opacity:.6; cursor:not-allowed; }
+  .adminchip { background:var(--hcs-gold); color:#3a2e00; font-size:.62rem; font-weight:800; padding:2px 7px; border-radius:999px; text-transform:uppercase; }
+
+  /* ---- tile grid (Portal's full-site home view — same visual language as Builder's
+     .chipgrid/.chip, generically named so Portal doesn't need Builder's CSS) ---- */
+  .tilegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; padding:16px;
+    text-decoration:none; color:inherit; font:inherit; cursor:pointer; text-align:left;
+    transition:border-color .12s, transform .12s; }
+  .tile:hover { border-color:var(--hcs-gold); transform:translateY(-1px); }
+  .tile:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .tile:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+  .tile-icon { flex:0 0 auto; width:40px; height:40px; border-radius:10px; background:var(--hcs-gold-soft);
+    color:var(--hcs-red); display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+  .tile-body { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  /* P8: real form titles are long ("2026-27 Athletic Participation & Physical Form"), and a
+     single ellipsised line made two different forms look identical on a phone. Clamp to two
+     lines instead, and every truncatable label also carries a title attribute (see portalTile_
+     / formCardHtml) so the full text is reachable. */
+  .tile-name { font-weight:700; color:var(--text); overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-clamp:2; }
+  /* which class a student-section form belongs to, in place of a separate class-roster list */
+  .tile-sub { font-size:.76rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tile-chev { flex:0 0 auto; color:var(--muted); font-size:1.1rem; }
+  /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
+  .identity-collapsed { display:none !important; }
+  /* FAQ accordion (faq field type) */
+  .faq-block { margin:4px 0 8px; }
+  .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
+  .faq-item > summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:.95rem; list-style:none; position:relative; padding-right:34px; }
+  .faq-item > summary::-webkit-details-marker { display:none; }
+  .faq-item > summary::after { content:'+'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--hcs-red); font-size:1.15rem; }
+  .faq-item[open] > summary::after { content:'\2013'; }
+  .faq-item > summary:hover { color:var(--hcs-red); }
+  .faq-a { padding:0 14px 12px; color:#444; font-size:.92rem; line-height:1.5; white-space:pre-wrap; }
+  /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
+  .hcsi { display:inline-block; vertical-align:middle; flex:none; }
+  .hcsi-lg { width:44px; height:44px; }
+  .infoicon { color:var(--muted); cursor:help; }
+  .infoicon:hover { color:var(--hcs-red); }
+  .infotip { position:fixed; max-width:260px; background:var(--card); border:1px solid var(--line-strong);
+    border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.18); padding:9px 12px; font-size:.8rem;
+    line-height:1.4; color:var(--text); z-index:200; }
+</style>
+
+<script>
+  /* HCS logo (base64 data URI, downscaled from example.edu) — embedded so it never 404s. */
+  var HCS_LOGO = "data:image/png;base64,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";
+  /* FormsUI — tiny dependency-free client helpers shared by builder + runner. */
+  var FormsUI = (function () {
+    // textContent→innerHTML escapes & < > but NOT quotes, and esc() output is interpolated into
+    // quoted attributes (value="…", data-*="…") all over — so escape both quote kinds too.
+    function esc(s){ var d=document.createElement('div'); d.textContent = (s==null?'':String(s)); return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function toast(msg, ms){ var t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); t.textContent=msg;
+      document.body.appendChild(t); setTimeout(function(){ t.remove(); }, ms||2600); }
+    function el(tag, attrs, html){ var e=document.createElement(tag);
+      if(attrs) Object.keys(attrs).forEach(function(k){ e.setAttribute(k, attrs[k]); });
+      if(html!=null) e.innerHTML=html; return e; }
+    function trap_(ov){
+      ov.addEventListener('keydown', function(e){
+        if(e.key!=='Tab') return;
+        var f=ov.querySelectorAll('button,input,select,textarea,a[href]'); if(!f.length) return;
+        var first=f[0], last=f[f.length-1];
+        if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+      });
+    }
+    function modal(title, bodyHtml, btnLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div><button class="btn block">'+esc(btnLabel||'Got it')+'</button></div>';
+        var b=ov.querySelector('button');
+        b.onclick=function(){ ov.remove(); resolve(); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape'){ ov.remove(); resolve(); } });
+        document.body.appendChild(ov); trap_(ov); b.focus();
+      });
+    }
+    function confirm(title, bodyHtml, okLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(okLabel||'OK')+'</button></div></div>';
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(false); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(true); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape') done(false); });
+        document.body.appendChild(ov); trap_(ov); ov.querySelector('[data-x="1"]').focus();
+      });
+    }
+    /* Two labelled choices, neither of which is "cancel". Escape and backdrop resolve to the
+       PRIMARY label, which callers must make the non-destructive option — confirm() resolves
+       Escape to false, and using it here would let a stray keypress throw away typed work. */
+    function choose(title, bodyHtml, primaryLabel, secondaryLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn block" data-x="1" type="button">'+esc(primaryLabel)+'</button>'+
+          '<button class="btn ghost block" data-x="0" type="button">'+esc(secondaryLabel)+'</button></div></div>';
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(true); };
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(false); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape') done(true); });
+        document.body.appendChild(ov); trap_(ov); ov.querySelector('[data-x="1"]').focus();
+      });
+    }
+    function prompt(title, opts){
+      opts = opts || {};
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        var input = opts.multiline ? '<textarea class="control" id="_pmt"></textarea>'
+          : '<input class="control" id="_pmt" value="'+esc(opts.value||'')+'" placeholder="'+esc(opts.placeholder||'')+'">';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+(opts.body||'')+input+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(opts.okLabel||'OK')+'</button></div></div>';
+        var field=ov.querySelector('#_pmt'); if(opts.multiline && opts.value) field.value=opts.value;
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(null); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(field.value); };
+        field.addEventListener('keydown', function(e){ if(e.key==='Enter' && !opts.multiline){ e.preventDefault(); done(field.value); } if(e.key==='Escape') done(null); });
+        document.body.appendChild(ov); trap_(ov); field.focus();
+      });
+    }
+    /* Inline SVG icon set (stroke = currentColor). Replaces emoji glyphs so the UI renders
+       identically across platforms/fonts. Usage: FormsUI.icon('trash') or icon('info',{size:14}). */
+    var ICON_PATHS = {
+      up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+      down:'<path d="M12 5v14M19 12l-7 7-7-7"/>',
+      dup:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
+      trash:'<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
+      chevron:'<path d="M6 9l6 6 6-6"/>',
+      check:'<path d="M20 6L9 17l-5-5"/>',
+      eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+      clip:'<path d="M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8"/>',
+      plus:'<path d="M12 5v14M5 12h14"/>',
+      minus:'<path d="M5 12h14"/>',
+      info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+      edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+      more:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+      grip:'<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
+      /* pre-fill component states — same family/stroke as the rest of this set */
+      clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.5 2"/>',
+      shield:'<path d="M12 3l8 3.5V11c0 4.2-3.3 7.2-8 8-4.7-.8-8-3.8-8-8V6.5z"/><path d="M12 9.5v3"/><path d="M12 15.5h.01"/>',
+      mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7.5l8.5 5.5 8.5-5.5"/>',
+      download:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>'
+    };
+    function icon(name, opts){
+      opts = opts || {}; var s = opts.size || 16;
+      return '<svg class="hcsi'+(opts.cls?' '+opts.cls:'')+'" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(ICON_PATHS[name]||'')+'</svg>';
+    }
+    /* ---- OTP resend cooldown, shared by BOTH code-entry screens ----
+       Mirrors the real server-side limiter (10 requests / 15 min / email — AUTH.OTP_PER_EMAIL_15MIN
+       in gas-shared/AuthKit.js) in localStorage, so the UI warns BEFORE walking into the server's
+       15-minute lockout, and so a page refresh can't reset the cooldown for free.
+
+       This lived only in Portal.html. Runner.html — the screen parents actually reach, since
+       private-form links are emailed to them — still had a purely in-memory 20s countdown that a
+       refresh wiped, letting a parent hammer Resend straight into a silent lockout. Hoisted here
+       so the two screens cannot diverge again. */
+    var OTP_WINDOW_MS = 15 * 60 * 1000, OTP_SOFT_LIMIT = 8;  // stay under the real limit of 10
+    function otpSendLogKey_(email){ return 'hcsOtpSends:' + String(email||'').trim().toLowerCase(); }
+    function otpRecentSends(email){
+      var raw; try { raw = JSON.parse(localStorage.getItem(otpSendLogKey_(email)) || '[]'); } catch(e){ raw = []; }
+      var cutoff = Date.now() - OTP_WINDOW_MS;
+      return Array.isArray(raw) ? raw.filter(function(t){ return t > cutoff; }) : [];
+    }
+    function otpRecordSend(email){
+      var log = otpRecentSends(email); log.push(Date.now());
+      try { localStorage.setItem(otpSendLogKey_(email), JSON.stringify(log)); } catch(e){}
+      return log;
+    }
+    /** ms until another request is safe, or 0 — based on the persisted rolling window. */
+    function otpCooldownRemainingMs(email){
+      var log = otpRecentSends(email);
+      if (log.length < OTP_SOFT_LIMIT) return 0;
+      return Math.max(0, (log[0] + OTP_WINDOW_MS) - Date.now());
+    }
+    /* ---- announcing view changes (P9) ----
+       Every shell in this app replaces app.innerHTML wholesale on each state change (form ->
+       submitted, step 1 -> step 2, portal -> OTP). For a sighted user that's obvious; for a
+       screen-reader or keyboard user it was silent, and focus silently reset to the top of the
+       document. announce() speaks the change through one persistent polite live region (created
+       once, OUTSIDE the swapped container so it survives the swap), and focusView() moves focus
+       to the new view's heading so the next Tab starts in the right place. */
+    function liveRegion_(){
+      var el = document.getElementById('hcsLive');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'hcsLive';
+        el.setAttribute('role','status');
+        el.setAttribute('aria-live','polite');
+        el.setAttribute('aria-atomic','true');
+        // Visually hidden but not display:none — display:none is not announced.
+        el.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0;margin:-1px';
+        document.body.appendChild(el);
+      }
+      return el;
+    }
+    function announce(msg){
+      var el = liveRegion_();
+      // Re-setting identical text isn't re-announced; clearing first forces it.
+      el.textContent = '';
+      setTimeout(function(){ el.textContent = String(msg || ''); }, 30);
+    }
+    /** Focus a container's heading (or the container) without scrolling the page again. */
+    function focusView(rootEl){
+      if (!rootEl) return;
+      var h = rootEl.querySelector('h1, h2, .form-title, .section-head') || rootEl;
+      if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex','-1');
+      try { h.focus({ preventScroll: true }); } catch (e) { try { h.focus(); } catch (x) {} }
+    }
+
+    /* ---- per-context branding, resolved once for every shell ----
+       SITE_NAME / SITE_LOGO / ORG_NAME come from each app's Index.html (server-side
+       brandTokens_, Theme.js). Unset SITE_LOGO falls back to the built-in HCS eagle above, and
+       unset ORG_NAME to "Harford Christian School" — so HCS's apps render exactly as before,
+       while MACS stops showing HCS's logo and footer. */
+    function brand(){
+      return {
+        name: (typeof SITE_NAME !== 'undefined' && SITE_NAME) || 'HCS Forms',
+        logo: (typeof SITE_LOGO !== 'undefined' && SITE_LOGO) || HCS_LOGO,
+        org:  (typeof ORG_NAME  !== 'undefined' && ORG_NAME)  || 'Harford Christian School'
+      };
+    }
+    /* Standard brandbar inner markup (logo + name), optionally wrapped in a link. */
+    function brandbarInner(hrefOrNull){
+      var b = brand();
+      var img = '<img class="logo" src="' + esc(b.logo) + '" alt="' + esc(b.name) + '"><span class="name">' + esc(b.name) + '</span>';
+      return hrefOrNull
+        ? '<a href="' + esc(hrefOrNull) + '" target="_top" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit">' + img + '</a>'
+        : img;
+    }
+    /* Footer line — the organisation, not a hardcoded school name. */
+    function brandFooter(){ return '<div class="footer">' + esc(brand().org) + '</div>'; }
+
+    /**
+     * The one honest way out of the OTP screens, shared by Portal.html and Runner.html.
+     *
+     * authRequestOtp deliberately returns the SAME "a code is on its way" answer whether or not
+     * the address is on file (anti-enumeration, gas-shared/AuthKit.js), and both screens repeat
+     * that as fact. For a parent whose FACTS record holds a different address, the result was a
+     * silent dead end: no code ever arrives, nothing on screen admits that's possible, and there
+     * is no support path or way back to the other sign-in options.
+     *
+     * opts: { supportContact, chooserUrl, stage: 'email'|'code' }. Both URLs/strings are optional
+     * — whatever isn't configured simply isn't rendered, so an unset Config key degrades to the
+     * generic wording rather than a broken link.
+     */
+    function otpHelpHtml(opts){
+      opts = opts || {};
+      var contact = String(opts.supportContact || '').trim();
+      var who = contact
+        ? 'contact the school office at <strong>' + esc(contact) + '</strong>'
+        : 'contact the school office';
+      var lines = [];
+      if (opts.stage === 'code') {
+        lines.push('<p class="help" style="margin:0">No code after about 5 minutes? Check your spam folder first. ' +
+          'If it still hasn\'t arrived, the school may have a different email address on file for you — ' + who + '.</p>');
+      } else {
+        lines.push('<p class="help" style="margin:0">Use the email address the school has on file for you. ' +
+          'If you\'re not sure which that is, ' + who + '.</p>');
+      }
+      if (opts.chooserUrl) {
+        lines.push('<p class="help" style="margin:6px 0 0"><a href="' + esc(opts.chooserUrl) + '" target="_top">' +
+          'Not a parent? See the other ways to sign in</a></p>');
+      }
+      return '<div style="margin-top:4px">' + lines.join('') + '</div>';
+    }
+    /**
+     * Wipe every saved form draft/attachment-draft on this device (localStorage), regardless of
+     * which form(s) they belong to. Both sign-outs need this so a shared device doesn't hand the
+     * next person's answers, signature, or attachments to whoever signs in after them — Runner.html
+     * had its own copy (draft keys are per-FORM_ID there); Portal.html's signOut had none at all
+     * (P16), the gap a second parent on the same browser fell into. Hoisted here so the two
+     * screens can't diverge again — same move already made for the OTP cooldown above.
+     */
+    function clearAllDrafts(prefixes){
+      try {
+        var kill = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && prefixes.some(function(p){ return k.indexOf(p) === 0; })) kill.push(k);
+        }
+        kill.forEach(function (k) { localStorage.removeItem(k); });
+      } catch (e) {}
+    }
+    /**
+     * Base error-code -> friendly-sentence map shared by every parent/MACS-facing screen
+     * (M13 — the MACS gate in apps/runner-macs/pages/Index.html can't see Runner.html's private
+     * friendlyErr_, and duplicating the map there would let the two drift, same as clearAllDrafts
+     * above). Runner.html/Portal.html wrap this with their own recovery-text/edit-mode copy;
+     * callers with nothing extra to add (the gate) can use it directly. Passes through unknown
+     * input — a genuine prose message from the server, not a bare code — unchanged.
+     */
+    var ERROR_CODE_MAP_ = {
+      AUTH_EXPIRED: 'Your session has expired. Please verify your email again.',
+      AUTH_INVALID: 'Your session is no longer valid. Please verify your email again.',
+      AUTH_REQUIRED: 'Please sign in again to continue.',
+      AUTH_LOOKUP_FAILED: 'Could not verify your account right now. Please try again in a moment.',
+      RATE_LIMITED: 'You have requested too many codes for this email. Please wait 15 minutes and try again.',
+      LOCKED: 'Too many attempts. Try again in 15 minutes.',
+      CODE_EXPIRED: 'Code expired or not found. Request a new one.',
+      CODE_INVALID: 'That code is not correct.'
+    };
+    function friendlyErrCode(e){
+      var code = String((e && e.message) || e || '');
+      return ERROR_CODE_MAP_[code] || code;
+    }
+    /* Compact header identity control — an avatar button that opens a dropdown, instead of
+       a "Signed in as x@y.com" text label. bodyHtml is whatever actions belong under the
+       identity (role-toggle, sign-out) — rendered on a normal card background, so use
+       ordinary .btn styles there, not the brandbar's white-on-red pill treatment. */
+    function profileChip(email, bodyHtml){
+      var initials = String(email||'?').trim().slice(0,1).toUpperCase();
+      return '<div class="profile-chip">' +
+        '<button id="profileBtn" class="profile-avatar" type="button" aria-haspopup="true" aria-expanded="false" title="'+esc(email)+'">'+esc(initials)+'</button>' +
+        '<div id="profileMenu" class="profile-menu" hidden>' +
+          '<div class="profile-menu-email">'+esc(email)+'</div>' +
+          (bodyHtml||'') +
+        '</div>' +
+      '</div>';
+    }
+    /* Call once after inserting profileChip()'s HTML into the DOM. */
+    function wireProfileChip(){
+      var btn = document.getElementById('profileBtn'), menu = document.getElementById('profileMenu');
+      if (!btn || !menu) return;
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var opening = menu.hidden;
+        menu.hidden = !opening;
+        btn.setAttribute('aria-expanded', String(opening));
+      };
+      document.addEventListener('click', function (e) {
+        if (!menu.hidden && e.target !== btn && !menu.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+      });
+    }
+    return { esc:esc, toast:toast, el:el, modal:modal, confirm:confirm, choose:choose, prompt:prompt, icon:icon,
+      profileChip:profileChip, wireProfileChip:wireProfileChip,
+      otpRecentSends:otpRecentSends, otpRecordSend:otpRecordSend, otpCooldownRemainingMs:otpCooldownRemainingMs,
+      otpHelpHtml:otpHelpHtml, brand:brand, brandbarInner:brandbarInner, brandFooter:brandFooter,
+      announce:announce, focusView:focusView, clearAllDrafts:clearAllDrafts, friendlyErrCode:friendlyErrCode };
+  })();
+</script>
+
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "HCS Forms — Parent portal" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <script>
+    var APP_MODE     = DEMO_DOGET.mode;
+    var FORM_ID      = DEMO_DOGET.formId;
+    var PREVIEW_MODE = DEMO_DOGET.preview;
+    var URL_PREFILL  = JSON.parse(DEMO_DOGET.prefillParams);
+    var EDIT_SUB     = DEMO_DOGET.editSub;
+    var EDIT_TOKEN   = DEMO_DOGET.editToken;
+    var BRIDGE_TOKEN = DEMO_DOGET.bridgeToken;
+    // Per-context branding (see brandTokens_ in Theme.js). SITE_LOGO empty => the shells fall
+    // back to the built-in HCS_LOGO const in Theme.html, so HCS is unchanged.
+    var SITE_NAME    = DEMO_DOGET.siteName;
+    var SITE_LOGO    = DEMO_DOGET.brandLogo;
+    var ORG_NAME     = DEMO_DOGET.orgName;
+  </script>
+
+  <!-- Shared conditional-logic + calculation (generated from Logic.js) — must load before Runner. -->
+  <!-- GENERATED FILE — DO NOT HAND-EDIT. Produced by tools/wrap.js from SharedLogic.html. Edit the source, then run `npm run build`. -->
+<!-- GENERATED from Logic.js by tools/build-shared-logic.js — DO NOT EDIT BY HAND.
+     This is the client copy of the shared conditional-logic + calculation code.
+     Regenerate after editing Logic.js: node tools/build-shared-logic.js -->
+<script>
+/**
+ * Logic.js — the SINGLE canonical source for conditional-logic + calculation, used by
+ * the server directly (globals) AND by the client verbatim: tools/build-shared-logic.js
+ * regenerates SharedLogic.html from this file, so the runner never keeps its own copy.
+ * Kept tiny and dependency-free; unit-tested in Node (tests/logic.test.js).
+ *
+ * A showIf rule is either:
+ *   - legacy flat:     { field, op: 'equals'|'notEquals'|'contains'|'notEmpty'|'empty', value }
+ *   - multi-condition: { mode: 'all'|'any', rules: [ {field, op, value}, ... ] }
+ * No rule (null/empty/no field, or an empty rules array) → always visible / condition met.
+ * Both shapes are accepted forever — Builder only WRITES the array shape once a field's
+ * conditional-logic editor is touched (see condRules_/wireCondLogic_ in Builder.html), so a
+ * form saved before multi-condition support needs no migration.
+ */
+function evalShowIf(rule, answers) {
+  if (!rule) return true;
+  if (Array.isArray(rule.rules)) {
+    if (!rule.rules.length) return true;
+    var results = rule.rules.map(function (r) { return evalShowIfRule_(r, answers); });
+    return rule.mode === 'any' ? results.some(function (x) { return x; }) : results.every(function (x) { return x; });
+  }
+  return evalShowIfRule_(rule, answers);
+}
+
+/** One single {field, op, value} check — the whole of evalShowIf before multi-condition support. */
+function evalShowIfRule_(rule, answers) {
+  if (!rule || !rule.field) return true;
+  var raw = answers ? resolveFieldValue_(answers, rule.field) : undefined;
+  var target = rule.value == null ? '' : String(rule.value);
+
+  if (Array.isArray(raw)) {
+    switch (rule.op) {
+      case 'contains':  return raw.indexOf(target) > -1;
+      case 'notEmpty':  return raw.length > 0;
+      case 'empty':     return raw.length === 0;
+      case 'equals':    return raw.join(', ') === target;
+      case 'notEquals': return raw.join(', ') !== target;
+      default:          return true;
+    }
+  }
+  var val = raw == null ? '' : String(raw);
+  switch (rule.op) {
+    case 'equals':    return val === target;
+    case 'notEquals': return val !== target;
+    case 'contains':  return val.toLowerCase().indexOf(target.toLowerCase()) > -1;
+    case 'notEmpty':  return val.trim() !== '';
+    case 'empty':     return val.trim() === '';
+    default:          return true;
+  }
+}
+
+/**
+ * A field key is either a plain fieldId, or "fieldId::subLabel" pointing at one sub-row of a
+ * multiAnswer field (answers[fieldId] is an object keyed by sub-row label there — see
+ * Runner.html's readValue). Plain fieldId lookups are unaffected either way. Shared by
+ * evalShowIf (a showIf.field can target one sub-row) and computeCalc (same, for calc.fields).
+ */
+function resolveFieldValue_(answers, key) {
+  var i = String(key).indexOf('::');
+  if (i === -1) return answers[key];
+  var obj = answers[key.slice(0, i)];
+  return (obj && typeof obj === 'object') ? obj[key.slice(i + 2)] : undefined;
+}
+
+/**
+ * Compute a calculation field's value. op 'count' = number of non-empty source answers
+ * (each selected checkbox counts once); anything else = sum of numeric source answers.
+ * Callers must pass VISIBLE-only answers (hidden fields blanked) so client + server agree.
+ */
+function computeCalc(field, answers) {
+  var calc = (field && field.calc) || {}, src = calc.fields || [];
+  if (calc.op === 'count') {
+    var n = 0;
+    src.forEach(function (fid) { var v = resolveFieldValue_(answers, fid); n += Array.isArray(v) ? v.length : (v !== '' && v != null ? 1 : 0); });
+    return String(n);
+  }
+  if (calc.op === 'multiply') {
+    var base = parseFloat(resolveFieldValue_(answers, src[0]));
+    if (!isFinite(base)) base = 0;
+    var factor = parseFloat(calc.factor);
+    if (!isFinite(factor)) factor = 1;
+    return String(Math.round(base * factor * 100) / 100);
+  }
+  var sum = 0;
+  src.forEach(function (fid) {
+    var v = resolveFieldValue_(answers, fid);
+    if (Array.isArray(v)) v.forEach(function (x) { var num = parseFloat(x); if (isFinite(num)) sum += num; });
+    else { var num = parseFloat(v); if (isFinite(num)) sum += num; }
+  });
+  return String(Math.round(sum * 100) / 100);
+}
+
+/**
+ * The grade AFTER the given one, for "registering for next year" defaults. Handles the HCS
+ * ladder K3→K4→K5→1→…→12; a graduating 12th-grader returns 'Graduated'. Tolerates FACTS
+ * formatting ('09'→'9', bare 'K'→'K5'). Unknown/blank grade → '' (leave the field for the user).
+ */
+function nextGrade(g) {
+  var norm = String(g == null ? '' : g).trim().toUpperCase().replace(/^0+(?=\d)/, '');
+  if (norm === 'K') norm = 'K5';
+  var ladder = ['K3', 'K4', 'K5', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  var i = ladder.indexOf(norm);
+  if (i === -1) return '';
+  return i === ladder.length - 1 ? 'Graduated' : ladder[i + 1];
+}
+
+// ---------- shared predicates (single source for server + client — no more copy-paste drift) ----------
+
+/** The one email-shape check used everywhere (client hints + server validation). */
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A field whose answer is an ARRAY (checkboxes, or a multi student/staff picker). */
+function isMultiField(field) {
+  return field.type === 'checkboxes' ||
+    ((field.type === 'studentPicker' || field.type === 'staffPicker') && field.multiple);
+}
+
+/** "Remember from last time" is per-field (field.priorYear) EXCEPT multiAnswer, where it's
+ *  per-sub-row (field.subPriorYear = {subLabel: true}) — a plain field's whole answer is one
+ *  thing to remember, a multiAnswer's isn't. True if there's anything at all to remember. */
+function fieldHasPriorYear(field) {
+  if (field.type === 'multiAnswer') return !!(field.subPriorYear && Object.keys(field.subPriorYear).length);
+  return !!field.priorYear;
+}
+
+/** Static content types: no answer, no validation, no response column. */
+function isContentType(type) {
+  return type === 'sectionHeader' || type === 'description' || type === 'pageBreak' || type === 'faq' || type === 'sectionEnd';
+}
+
+/**
+ * Form-level settings persisted via setFormState, by coercion kind — the single list the server
+ * (Forms.setFormState) and the builder (stateFromSettings_) both iterate. Add a new simple setting
+ * HERE and it round-trips automatically; special-cased elsewhere: lifecycle (template guard),
+ * access + approval (use-as-is lock guard), locked (registry column), maxResponses (number),
+ * notifyEmails (domain filter).
+ */
+var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames'];
+var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage', 'humanDriveNameField'];
+
+/**
+ * Server error CODES → a sentence a school staff member can act on.
+ *
+ * Privileged endpoints throw bare codes on purpose (`throw new Error('DENIED')` in
+ * assertCanEdit_, 'CONFLICT' from checkAndBumpVersion_, 'ACCESS_DENIED_STUDENT' from
+ * requireStaff_, …) so the wire never carries a human-readable reason a caller could mine.
+ * The Builder then rendered those codes verbatim: opening a colleague's form produced a modal
+ * whose entire body was the word "DENIED". Only doSave had a hand-rolled map, and only for two
+ * codes — this replaces it.
+ *
+ * Unknown input passes through UNCHANGED — a genuine prose message from a thrown Error must not
+ * be swallowed or replaced by a vague catch-all.
+ */
+var ERROR_MESSAGES = {
+  DENIED: 'You don’t have access to that form. Only its owner or an admin can open it — ask them to share it, or to add you as an admin.',
+  CONFLICT: 'Someone else saved changes to this form while you were editing. Reload the form before saving again, or you’ll overwrite their work.',
+  LAYOUT_LOCKED: 'This form’s layout is locked (use as-is), so its fields can’t be changed. An admin can unlock it.',
+  AUTH_REQUIRED: 'Please sign in with your Harford Christian account and try again.',
+  AUTH_LOOKUP_FAILED: 'Couldn’t confirm your account with Google just now. Wait a moment and try again.',
+  AUTH_EXPIRED: 'Your session has expired. Reload the page to sign in again.',
+  AUTH_INVALID: 'Your session is no longer valid. Reload the page to sign in again.',
+  ACCESS_DENIED_ADMIN: 'That action is admin-only. Ask an HCS Forms admin to do it, or to add you as an admin.',
+  ACCESS_DENIED_STUDENT: 'Student accounts can’t use the form builder.',
+  'Form not found': 'That form no longer exists — it may have been deleted, or moved to another context.'
+};
+function friendlyError(code) {
+  var key = String((code && code.message) || code || '').trim();
+  return ERROR_MESSAGES[key] || key;
+}
+
+/**
+ * Attachment size limits — ONE source for the client preflight, the server guard, and every
+ * message either shows. There used to be three different numbers in play: Runner.html blocked
+ * per-file at 10 MB, RunnerApi.js's processAnswers_ flagged tooLarge above 25 MB, and the
+ * resulting message told the submitter "under about 20 MB". A parent attaching three 8 MB
+ * photos therefore passed every visible check and only failed at submit, after filling the
+ * whole form, against a number nothing on screen had mentioned.
+ *
+ * MAX_TOTAL_BYTES is deliberately the 25 MB the server ALREADY enforced, not the 20 MB the
+ * message claimed — tightening to 20 would have rejected submissions that previously worked.
+ * The messages moved to match the code, not the reverse.
+ */
+var ATTACH_LIMITS = {
+  MAX_FILE_BYTES: 10 * 1024 * 1024,   // per individual file (Runner.html + uploadAnswerFiles_)
+  MAX_TOTAL_BYTES: 25 * 1024 * 1024   // all attachments on one submission (processAnswers_)
+};
+
+/** Human file size for UI copy: 1.4 MB, 812 KB, 0 KB. Same wording client and server. */
+function formatBytes(n) {
+  var b = Number(n) || 0;
+  if (b >= 1024 * 1024) return (Math.round(b / (1024 * 1024) * 10) / 10) + ' MB';
+  return Math.round(b / 1024) + ' KB';
+}
+
+/** Shared limit copy so the client's warning and the server's rejection can't drift apart. */
+function attachTotalTooLargeMsg() {
+  return 'Your attachments add up to more than ' + formatBytes(ATTACH_LIMITS.MAX_TOTAL_BYTES) +
+    ' in total — please remove or shrink one before submitting.';
+}
+function attachFileTooLargeMsg(name) {
+  return (name ? '"' + name + '" is' : 'That file is') + ' larger than ' +
+    formatBytes(ATTACH_LIMITS.MAX_FILE_BYTES) + ' and can\'t be attached.';
+}
+
+/**
+ * What to say about last year's answers on a MACS school form.
+ *
+ * Nothing is ever filled in unprompted. The form OFFERS, the respondent accepts, and only then
+ * does anything touch a field — including when a verified session from earlier in the visit is
+ * already in hand, which skips the code but still asks. Two silent writers to the same inputs
+ * (a restored draft and a prior-year fill) is exactly what made those two features
+ * indistinguishable, so neither writes without being asked.
+ *
+ * Once accepted, the component names the verified email: a form that has just filled itself in
+ * has to answer "on whose authority", and the address is the answer.
+ *
+ * Returns null (say nothing — this school can't verify at all), or
+ * { phase:'offer', icon, title, detail, action:{kind:'verify'|'use', label}, dismissible:true }, or
+ * { phase:'verified', icon, title, detail, action:null, dismissible:false }.
+ */
+function schoolPrefillNotice(state) {
+  if (!state || !state.school || !state.otpAvailable) return null;
+  var school = String(state.school);
+
+  if (state.verified) {
+    var filled = Number(state.filled) || 0;
+    var email = state.email ? String(state.email) : '';
+    return {
+      phase: 'verified', icon: filled > 0 ? 'check' : 'info',
+      title: email ? 'Verified as ' + email : 'Verified',
+      detail: filled > 0
+        ? filled + (filled === 1 ? ' answer ' : ' answers ') + 'from last year filled in — marked below.'
+        : 'No previous answers on file for ' + school + '.',
+      action: null, dismissible: false
+    };
+  }
+  return {
+    phase: 'offer', icon: 'shield',
+    title: 'Save time — reuse last year’s answers',
+    detail: 'Verify an email on file for ' + school + ' and the answers that don’t change year ' +
+      'to year will be filled in for you. First time filling this out? Verify anyway — it\'s what ' +
+      'lets next year\'s form fill itself in from what you enter today.',
+    // A session already verified earlier this visit shouldn't be asked for a code again, but it
+    // still doesn't get to fill anything until this button is pressed.
+    action: state.hasToken
+      ? { kind: 'use', label: 'Use last year’s answers' }
+      : { kind: 'verify', label: 'Verify my email' },
+    dismissible: true
+  };
+}
+</script>
+
+
+  <div id="app"></div>
+
+  
+    <!-- GENERATED FILE — DO NOT HAND-EDIT. Produced by tools/wrap.js from Portal.html. Edit the source, then run `npm run build`. -->
+<!-- Portal.html — the Forms Portal, the default entry point (bare URL, no query params —
+     staff/admins go to ?page=builder instead). Serves parent/staff/student alike, listing
+     both published forms and registered apps. Staff/students are identified via existing
+     Google SSO (identifyVisitor_, no OTP shown at all); anyone with no Google identity
+     falls back to the same OTP flow Runner.html uses for parents. -->
+<style>
+  .portal-section { margin-bottom:22px; }
+  .portal-section-h { font-size:.95rem; font-weight:700; color:var(--text); margin:0 0 10px; }
+  .portal-subhead { font-size:.78rem; font-weight:700; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.04em; margin:16px 0 8px; }
+  .portal-subhead:first-child { margin-top:0; }
+  /* per-student cards — sit side-by-side (not stacked full-width) so a parent with several
+     kids doesn't scroll past one child to reach the next. */
+  .portal-students { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; margin-bottom:22px; }
+  .portal-student-card { border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:var(--card); box-shadow:var(--shadow); }
+  .portal-student-head { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; }
+  .portal-student-name { font-weight:700; color:var(--text); }
+  .portal-student-sub { font-size:.8rem; color:var(--muted); }
+  .portal-student-count { margin-left:auto; font-size:.74rem; font-weight:700; color:var(--muted); white-space:nowrap; }
+  /* "Closing soon" reads as urgent — a warm highlighted strip, not a plain tile row. */
+  .portal-urgent { border:1px solid var(--hcs-gold); background:var(--hcs-gold-soft); border-radius:12px;
+    padding:14px 16px; margin-bottom:22px; }
+  .portal-urgent-h { color:var(--hcs-red); }
+  .portal-urgent-row { display:flex; align-items:center; gap:12px; padding:8px 0; text-decoration:none; color:inherit; }
+  .portal-urgent-row + .portal-urgent-row { border-top:1px solid rgba(0,0,0,.08); }
+  .portal-urgent-days { flex:none; width:44px; height:44px; border-radius:50%; background:var(--hcs-red); color:#fff;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; }
+  .portal-urgent-days b { font-size:1rem; }
+  .portal-urgent-days span { font-size:.55rem; text-transform:uppercase; letter-spacing:.03em; }
+  .portal-urgent-body { flex:1; min-width:0; }
+  .portal-urgent-t { font-weight:700; font-size:.92rem; overflow:hidden; display:-webkit-box;
+    -webkit-line-clamp:2; -webkit-box-orient:vertical; line-clamp:2; }
+</style>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var otpEmail = '';
+  var builderUrl_ = '';
+  // Optional Config keys (SUPPORT_CONTACT / CHOOSER_URL), delivered by getPortalView. Blank
+  // when unset — FormsUI.otpHelpHtml degrades to generic wording rather than a broken link.
+  var SUPPORT_CONTACT_ = '';
+  var CHOOSER_URL_ = '';
+  var TOKEN_KEY = 'hcsFormsToken';
+  var PARENT_TOKEN = null; try { PARENT_TOKEN = localStorage.getItem(TOKEN_KEY); } catch (e) {}
+
+  // runner-public only: a staff member who is also a guardian arrived via the builder's
+  // "fill out a form as a parent" bridge link (?ssoToken=...), which the server already
+  // exchanged for an ordinary parent session token (see Router.js/ssoBridgeLogin_). Treat
+  // it exactly like a token restored from localStorage — persist it, skip OTP entirely.
+  if (typeof BRIDGE_TOKEN !== 'undefined' && BRIDGE_TOKEN) {
+    PARENT_TOKEN = BRIDGE_TOKEN;
+    try { localStorage.setItem(TOKEN_KEY, PARENT_TOKEN); } catch (e) {}
+  }
+
+  // runner-public only: fully anonymous guest browsing (?guest=1) — no OTP, no identity,
+  // no auto-fill (there's nothing to prefill from). Only 'open' access forms show, same
+  // rule any non-staff/non-parent visitor gets. Never reaches boot()/getPortalView at all.
+  if (typeof APP_MODE !== 'undefined' && APP_MODE === 'guest') {
+    bootGuest();
+  } else {
+    boot();
+  }
+
+  function bootGuest() {
+    shell('<div class="card flush-top card-pad center"><span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span><p class="help" style="margin-top:10px">Loading…</p></div>');
+    google.script.run.withSuccessHandler(function (res) { renderGuestHome(res.forms, res.apps, res.portalUrl, res.closingSoonDays); })
+      .withFailureHandler(function (e) { shell('<div class="card flush-top card-pad"><h1 class="form-title">Something went wrong</h1><p class="form-desc">' + FormsUI.esc(friendlyErr_(e)) + '</p></div>'); })
+      .getGuestView();
+  }
+
+  /**
+   * MACS-only (runner-macs): its doGet sends any `?form=` without a `School` back to the school
+   * gate, so a guest-portal tile built as a bare `?form=<id>` made the visitor pick their school
+   * a SECOND time — and threw away the SchoolToken they may have just verified, silently losing
+   * the "remember last year's answers" autofill they opted into. Carry both forward.
+   * No-ops on runner-public/runner-staff, which define neither global.
+   */
+  /**
+   * Link target for a form link. MACS/school-picker visits open in the SAME tab: sessionStorage
+   * is per-tab, and that's where a school's verified pre-fill token lives (renderSchoolVerify_
+   * in Runner.html) — a _blank link hands the form a fresh, empty sessionStorage and quietly
+   * drops a verification the visitor already completed. Parent/staff portals keep _blank; their
+   * token is in localStorage, which crosses tabs fine.
+   */
+  function tileTarget_() {
+    var school = (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
+    return school ? ' target="_top"' : ' target="_blank" rel="noopener"';
+  }
+
+  function withSchoolParams_(url) {
+    var school = (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
+    if (!school) return url;
+    var out = url + (url.indexOf('?') > -1 ? '&' : '?') + 'School=' + encodeURIComponent(school);
+    var tok = (typeof SCHOOL_TOKEN !== 'undefined' && SCHOOL_TOKEN) ? SCHOOL_TOKEN : '';
+    if (tok) out += '&SchoolToken=' + encodeURIComponent(tok);
+    return out;
+  }
+
+  /**
+   * Guest/MACS home. Was a single flat tile grid with no deadlines and no grouping, so a context
+   * with 20 forms was one undifferentiated list — while signed-in parents got "Closing soon" and
+   * category headings from the same data (getGuestView now returns category + closeDate too).
+   * Reuses portalTile_/formItem_ and the same closing-soon markup rather than its own bespoke
+   * tile HTML, so the two views can't drift apart visually.
+   */
+  function renderGuestHome(forms, apps, portalUrl, closingSoonDays) {
+    // P22/M16: closingSoonDays comes from the server's own PORTAL_CLOSING_SOON_DAYS
+    // (gas-shared/AuthKit.js) via getGuestView — no local copy to drift out of sync with it.
+    var days = closingSoonDays || 7;
+    var list = (forms || []).map(function (f) {
+      var copy = {};
+      Object.keys(f).forEach(function (k) { copy[k] = f[k]; });
+      copy.url = withSchoolParams_(f.url); // carry School/SchoolToken (MACS) — see withSchoolParams_
+      return copy;
+    });
+    // Apps fold into the same tile grid as forms, same as the signed-in portal's globalItems —
+    // never a separate "Apps" section. Only VisibleToGuest-flagged apps ever reach here
+    // (getGuestView filters via listAppsForRole_('guest')).
+    var items = list.map(function (f) { return formItem_(f); }).concat((apps || []).map(appItem_));
+    items.forEach(function (it, i) { it.idx = i; });
+
+    var closing = list.filter(function (f) {
+      var d = daysUntil_(f.closeDate);
+      return d !== null && d >= 0 && d <= days;
+    }).sort(function (a, b) { return daysUntil_(a.closeDate) - daysUntil_(b.closeDate); });
+
+    var closingHtml = closing.length
+      ? '<section class="portal-urgent"><h2 class="portal-section-h portal-urgent-h">Closing soon</h2>' +
+        closing.map(function (f) {
+          var days = daysUntil_(f.closeDate);
+          // Same-tab on a school-picker visit, for the same reason portalTile_ is — see there.
+          return '<a class="portal-urgent-row" href="' + FormsUI.esc(f.url) + '"' + tileTarget_() + '>' +
+            daysBadgeHtml_(days) +
+            '<span class="portal-urgent-body"><span class="portal-urgent-t" title="' + FormsUI.esc(f.title) + '">' + FormsUI.esc(f.title) + '</span></span>' +
+            '<span class="tile-chev">›</span></a>';
+        }).join('') + '</section>'
+      : '';
+
+    var byCat = {};
+    items.forEach(function (it) { var c = it.data.category || 'General'; (byCat[c] = byCat[c] || []).push(it); });
+    var cats = Object.keys(byCat).sort(function (a, b) {
+      if (a === 'General') return 1; if (b === 'General') return -1;
+      return a.localeCompare(b);
+    });
+    // Guest mode shows OPEN forms only. On runner-public that means a parent may be looking at a
+    // short list while their student's forms sit behind sign-in — the old empty state ("Nothing
+    // here yet.") never hinted at that. MACS has no parent sign-in at all (its school picker IS
+    // the sign-in), so the offer is suppressed there; MACS_SCHOOLS only exists on that app.
+    var isMacs = (typeof MACS_SCHOOLS !== 'undefined');
+    var signInHtml = (!isMacs && portalUrl)
+      ? '<p class="help" style="margin-top:4px">Are you a parent or guardian? ' +
+        '<a href="' + FormsUI.esc(portalUrl) + '" target="_top">Sign in to see forms for your students</a>.</p>'
+      : '';
+    var gridHtml = items.length
+      ? cats.map(function (c) {
+          return (cats.length > 1 ? '<h3 class="portal-subhead">' + FormsUI.esc(c) + '</h3>' : '') +
+            '<div class="tilegrid">' + byCat[c].map(function (it) { return portalTile_(it, it.idx); }).join('') + '</div>';
+        }).join('')
+      : '<p class="help">Nothing is open to everyone right now.' + (isMacs ? ' Please check back later, or contact the school office.' : '') + '</p>';
+
+    // M11: name the picked school and offer a way to change it — MACS guest flow only
+    // (URL_PREFILL.School only exists there; runner-public/staff never define MACS_SCHOOLS).
+    var school = (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
+    var schoolHtml = (isMacs && school)
+      ? '<p class="form-desc" style="margin-top:2px">' + FormsUI.esc(school) +
+        ' &middot; <a href="javascript:void(0)" id="changeSchool">Change school</a></p>'
+      : '';
+
+    shell(
+      '<div class="stack" style="margin-top:18px">' +
+        '<div><h1 class="form-title">' + FormsUI.esc(FormsUI.brand().name) + '</h1>' +
+        '<p class="form-desc">Choose a form below.</p>' + schoolHtml + '</div>' +
+        closingHtml +
+        '<section class="portal-section">' + gridHtml + signInHtml + '</section>' +
+      '</div>', { wide: true });
+
+    // Guests have no parentToken/identity — pass null. An app flagged VisibleToGuest should
+    // never also have SupportsHandoff on (nothing to hand off), so this always plain window.opens.
+    items.forEach(function (it, i) {
+      if (it.kind !== 'app') return;
+      var btn = document.querySelector('.tile[data-i="' + i + '"]');
+      if (btn) btn.onclick = function () { openApp(it.data, null, btn); };
+    });
+
+    var changeBtn = document.getElementById('changeSchool');
+    if (changeBtn) changeBtn.onclick = function () {
+      // Verification is per-school (schoolTokenMatches_ binds the token to school+email), so
+      // switching schools drops it — but it's now offered on the form itself rather than at the
+      // gate, so the honest warning is "you'll be asked again there", not "go verify first".
+      FormsUI.confirm('Change school?', 'Any email verification for this school will be cleared. You can verify again on the form itself if you want last year’s answers pre-filled.', 'Change school').then(function (ok) {
+        if (!ok || !portalUrl) return;
+        // portalUrl (from getGuestView) is this app's own bare /exec, no School param — window.location
+        // here is the sandboxed googleusercontent iframe's address, never a usable base (same trap
+        // documented elsewhere in this file/Router.js), so it can't be derived client-side.
+        location.href = portalUrl; // demo: stay inside the showcase frame
+      });
+    };
+  }
+
+  // Brandbar+goldrule render full-bleed (outside any max-width container), exactly like
+  // Builder's chrome() — only the content below is width-constrained. Previously the
+  // whole page (brandbar included) sat inside .page, so Portal's top bar was capped at
+  // .page's max-width while Builder's topbar spanned the full viewport — the two shells
+  // visibly didn't match width. Same structure now, regardless of opts.wide.
+  function shell(inner, opts) {
+    opts = opts || {};
+    // Cross-app link (Portal <-> Builder) lives inside the profile dropdown now, alongside
+    // sign-out/view-as — one menu for "things about my account/navigation", not a separate
+    // brandbar pill next to the avatar.
+    var crossLink = opts.crossLinkUrl
+      ? '<a href="' + FormsUI.esc(opts.crossLinkUrl) + '" target="_top" class="btn ghost sm block" style="text-align:center">' + FormsUI.esc(opts.crossLinkLabel || 'Open Form Builder') + '</a>'
+      : '';
+    var profile = opts.profileEmail ? FormsUI.profileChip(opts.profileEmail, crossLink + (opts.profileBody || '')) : '';
+    app.innerHTML =
+      '<div class="brandbar flush">' +
+        '<a id="logoHome" href="javascript:void(0)" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit">' +
+          FormsUI.brandbarInner(null) + '</a>' +
+        (profile ? '<span class="brandbar-right">' + profile + '</span>' : '') +
+      '</div><div class="goldrule"></div>' +
+      '<div class="page' + (opts.wide ? ' wide' : '') + '">' +
+        inner +
+        FormsUI.brandFooter() +
+      '</div>';
+    FormsUI.wireProfileChip();
+    var lh = document.getElementById('logoHome');
+    if (lh) lh.onclick = (typeof APP_MODE !== 'undefined' && APP_MODE === 'guest') ? bootGuest : boot;
+  }
+
+  function boot() {
+    shell('<div class="card flush-top card-pad center"><span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span><p class="help" style="margin-top:10px">Loading…</p></div>');
+    google.script.run.withSuccessHandler(function (res) {
+      SUPPORT_CONTACT_ = res.supportContact || '';
+      CHOOSER_URL_ = res.chooserUrl || '';
+      if (res.needsOtp) {
+        // P19: reason 'expired' means this client sent a token and it stopped verifying
+        // (expired, or SESSION_EPOCH revoked it) — a first-time visitor (no token sent) sees
+        // no change.
+        var expired = res.reason === 'expired';
+        if (PARENT_TOKEN) { PARENT_TOKEN = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+        renderOtp(res.builderUrl, expired);
+        return;
+      }
+      if (res.role !== 'parent') PARENT_TOKEN = null; // token only meaningful for the parent path
+      renderPortalHome(res.role, res.email, res.apps, res.closingSoon, res.globalForms, PARENT_TOKEN, res.students, res.canBridge, res.alsoStaff, res.builderUrl, res.builderEditorUrl, res.devOverride);
+    }).withFailureHandler(function (e) { shell('<div class="card flush-top card-pad"><h1 class="form-title">Something went wrong</h1><p class="form-desc">' + FormsUI.esc(friendlyErr_(e)) + '</p></div>'); })
+      .getPortalView(PARENT_TOKEN);
+  }
+
+  /**
+   * This app is parent-only now — the role chooser (Parent vs Staff) lives in the
+   * separate apps/chooser project, which just links here or to Builder. builderUrl is
+   * still passed through from getPortalView (needed by the view-as toggle on
+   * renderPortalHome for a signed-in parent who is ALSO staff), but this OTP screen no
+   * longer offers a staff sign-in link of its own.
+   */
+  function renderOtp(builderUrl, expired) {
+    if (builderUrl) builderUrl_ = builderUrl;
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Forms Portal</h1>' +
+        (expired ? '<p class="notice info" style="margin:0 0 8px">Your sign-in expired — please verify your email again.</p>' : '') +
+        '<p class="form-desc">Enter the email ' + FormsUI.esc(FormsUI.brand().org) + ' has on file. We’ll send you a 6-digit code.</p></div>' +
+        '<div class="field"><label for="otpEmail">Email address</label><input class="control" id="otpEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>' +
+        '<div id="otpErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="otpSend" class="btn block" type="button">Send code</button>' +
+        FormsUI.otpHelpHtml({ supportContact: SUPPORT_CONTACT_, chooserUrl: CHOOSER_URL_, stage: 'email' }) +
+      '</div>');
+    document.getElementById('otpSend').addEventListener('click', sendCode);
+    document.getElementById('otpEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendCode(); });
+    FormsUI.focusView(document.querySelector('#app .card'));
+  }
+
+  // The persisted send-log cooldown now lives in FormsUI (Theme.html) so Runner.html's OTP
+  // screen shares the exact same implementation — see the comment there.
+  function otpRecordSend_(email) { return FormsUI.otpRecordSend(email); }
+  function otpCooldownRemainingMs_(email) { return FormsUI.otpCooldownRemainingMs(email); }
+
+  function sendCode() {
+    var email = (document.getElementById('otpEmail').value || '').trim();
+    if (!EMAIL_RE.test(email)) return otpError('Enter a valid email address.');
+    var waitMs = otpCooldownRemainingMs_(email);
+    if (waitMs > 0) return otpError('Too many code requests for this email. Please try again in about ' + Math.ceil(waitMs / 60000) + ' minute(s).');
+    otpEmail = email;
+    var btn = document.getElementById('otpSend'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
+    otpRecordSend_(email);
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.ok === false) { btn.disabled = false; btn.textContent = 'Send code'; otpError(res.msg); return; }
+      renderCodeEntry();
+    }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Send code'; otpError(friendlyErr_(e)); })
+      .authRequestOtp(email);
+  }
+
+  function renderCodeEntry() {
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Enter your code</h1>' +
+        '<p class="form-desc">If <strong>' + FormsUI.esc(otpEmail) + '</strong> is on file, a 6-digit code is on its way. It expires in 10 minutes.</p></div>' +
+        '<div class="field"><label for="otpCode">6-digit code</label><input class="control" id="otpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>' +
+        '<div id="otpErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="otpVerify" class="btn block" type="button">Verify</button>' +
+        '<div style="display:flex;gap:10px;margin-top:8px"><button id="otpResend" class="btn ghost block" type="button">Resend code</button>' +
+        '<button id="otpBack" class="btn ghost block" type="button">Use a different email</button></div>' +
+        FormsUI.otpHelpHtml({ supportContact: SUPPORT_CONTACT_, chooserUrl: CHOOSER_URL_, stage: 'code' }) +
+      '</div>');
+    document.getElementById('otpVerify').addEventListener('click', verifyCode);
+    document.getElementById('otpBack').addEventListener('click', function () { renderOtp(); });
+    var resend = document.getElementById('otpResend');
+    // Restores cooldown state from the persisted send log on every render — including right
+    // after a page refresh, which used to reset the (purely in-memory) 20s countdown for free
+    // and let a user walk straight into the server's real 15-minute lockout with no warning.
+    var armResendCooldown_ = function (seconds) {
+      var n = Math.ceil(seconds);
+      resend.disabled = true; resend.textContent = 'Resend in ' + n + 's';
+      var t = setInterval(function () {
+        n--; resend.textContent = n > 0 ? 'Resend in ' + n + 's' : 'Resend code';
+        if (n <= 0) { clearInterval(t); resend.disabled = false; }
+      }, 1000);
+    };
+    var lockMs = otpCooldownRemainingMs_(otpEmail);
+    if (lockMs > 0) {
+      resend.disabled = true;
+      resend.textContent = 'Try again in ' + Math.ceil(lockMs / 60000) + 'm';
+      setTimeout(function () { resend.disabled = false; resend.textContent = 'Resend code'; }, lockMs);
+    } else {
+      var sinceLastMs = 20000; // matches the server-visible cadence below; not itself a hard limit
+      armResendCooldown_(sinceLastMs / 1000);
+    }
+    resend.addEventListener('click', function () {
+      var waitMs = otpCooldownRemainingMs_(otpEmail);
+      if (waitMs > 0) { FormsUI.toast('Too many requests — try again in ' + Math.ceil(waitMs / 60000) + ' minute(s).'); return; }
+      otpRecordSend_(otpEmail);
+      armResendCooldown_(20);
+      google.script.run.withSuccessHandler(function (res) {
+        FormsUI.toast(res && res.ok === false ? res.msg : 'New code sent (if the email is on file)');
+      }).authRequestOtp(otpEmail);
+    });
+    FormsUI.announce('Enter the 6-digit code we sent to ' + otpEmail + '.');
+    var codeEl = document.getElementById('otpCode');
+    codeEl.focus();
+    codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') verifyCode(); });
+  }
+
+  function verifyCode() {
+    var code = (document.getElementById('otpCode').value || '').trim();
+    if (!/^\d{6}$/.test(code)) return otpError('Enter the 6-digit code.');
+    var btn = document.getElementById('otpVerify'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Verifying…';
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.ok && res.token) {
+        PARENT_TOKEN = res.token;
+        try { localStorage.setItem(TOKEN_KEY, PARENT_TOKEN); } catch (e) {}
+        google.script.run.withSuccessHandler(function (view) { renderPortalHome(view.role, view.email, view.apps, view.closingSoon, view.globalForms, PARENT_TOKEN, view.students, view.canBridge, view.alsoStaff, view.builderUrl, view.builderEditorUrl, view.devOverride); })
+          .withFailureHandler(function (e) { otpError(friendlyErr_(e)); })
+          .getPortalView(PARENT_TOKEN);
+      } else {
+        btn.disabled = false; btn.textContent = 'Verify';
+        otpError((res && res.msg) || 'That code is not correct.');
+      }
+    }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Verify'; otpError(friendlyErr_(e)); })
+      .authVerifyOtp(otpEmail, code);
+  }
+
+  function otpError(msg) { var e = document.getElementById('otpErr'); if (e) { e.style.display = 'block'; e.textContent = msg; } }
+  /** Sentence a parent can act on, instead of the bare code — FormsUI's shared base map (M13),
+   *  same one the MACS gate and Runner.html use, so wording can't drift between screens. */
+  function friendlyErr_(e) {
+    return FormsUI.friendlyErrCode(e);
+  }
+
+  /** One tile for a form OR an app. Apps get a data-i index (for click-wiring below);
+   *  forms are plain links, no wiring needed. subtitle (student-section forms only) shows
+   *  which class the form belongs to, instead of a separate class-roster list. */
+  function portalTile_(it, i) {
+    var down = it.kind === 'app' && it.data.lastStatus === 'down';
+    var tileInner = '<span class="tile-icon">' + FormsUI.esc(it.icon) + '</span>' +
+      '<span class="tile-body">' +
+        '<span class="tile-name" title="' + FormsUI.esc(it.title) + '">' + FormsUI.esc(it.title) + '</span>' +
+        (it.subtitle ? '<span class="tile-sub" title="' + FormsUI.esc(it.subtitle) + '">' + FormsUI.esc(it.subtitle) + '</span>' : '') +
+      '</span>' +
+      '<span class="tile-chev">›</span>';
+    if (down) {
+      // Status only ever refreshes via manual "Check status" or the every-6h background
+      // trigger (checkAllAppsStatusAcrossContexts_) — a stale badge is possible but this is
+      // still strictly better than showing a dead app as a normal clickable tile with no
+      // indication anything's wrong.
+      return '<div class="tile" style="opacity:.55;cursor:not-allowed" title="This app didn’t respond at its last check and may be temporarily unavailable.">' + tileInner + '</div>';
+    }
+    return it.kind === 'form'
+      ? '<a class="tile" href="' + FormsUI.esc(it.data.url) + '"' + tileTarget_() + '>' + tileInner + '</a>'
+      : '<button class="tile" data-i="' + i + '" type="button">' + tileInner + '</button>';
+  }
+  // Apps and forms look and read identically to parents/staff — both are just "a form" to
+  // fill out. icon/category never signal which is which; the only difference (handoff vs.
+  // direct link) is decided server-side in openApp_/click-wiring below.
+  function formItem_(f, subtitle) { return { kind: 'form', title: f.title, icon: '📄', data: f, subtitle: subtitle || '' }; }
+  function appItem_(a) { return { kind: 'app', title: a.name, icon: '📄', data: a, subtitle: a.lastStatus === 'down' ? 'Temporarily unavailable' : '' }; }
+
+  function daysUntil_(dateStr) {
+    if (!dateStr) return null;
+    var d = new Date(dateStr); if (isNaN(d)) return null;
+    var ms = d.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0);
+    return Math.round(ms / 86400000);
+  }
+  /**
+   * The urgency badge, shared by the signed-in portal and the guest/MACS home.
+   * P12: 0 used to render as "0 days", which reads as "already over" for a form that in fact
+   * closes tonight — and the same "0 days" appeared for a past-due form still in the list. Now
+   * today says TODAY, tomorrow LAST DAY, and anything already past is filtered out by the callers.
+   */
+  function daysBadgeHtml_(days) {
+    if (days == null) return '';
+    var big, small;
+    if (days <= 0) { big = '!'; small = 'today'; }
+    else if (days === 1) { big = '1'; small = 'last day'; }
+    else { big = String(days); small = 'days'; }
+    return '<div class="portal-urgent-days"><b>' + big + '</b><span>' + small + '</span></div>';
+  }
+
+  function renderPortalHome(role, email, apps, closingSoon, globalForms, parentToken, students, canBridge, alsoStaff, builderUrl, builderEditorUrl, devOverride) {
+    var roleLabel = role === 'staff' ? 'Staff' : role === 'student' ? 'Student' : 'Parent';
+    // Same admin-only warning as apps/builder's dashboard (Builder.html's devOverrideBannerHtml_)
+    // — getPortalView only populates this for a signed-in staff admin (never for a parent), so
+    // no extra gating needed here. Previously this had zero visibility outside the builder, so
+    // an admin testing submissions/receipts via runner-staff had no on-screen sign every outbound
+    // email (OTP codes, confirmations, approvals) was silently rerouting to DEV_EMAIL.
+    var devOverrideBanner = (devOverride && devOverride.active)
+      ? '<div class="notice err" style="margin-bottom:12px">Dev override is ON — every outbound email ' +
+        '(OTP codes, confirmations, approvals) is being redirected to ' + FormsUI.esc(devOverride.devEmail) +
+        ' instead of the real recipient. Turn off DEVELOPER_OVERRIDE in Script Properties before go-live.</div>'
+      : '';
+
+    var closingHtml = (closingSoon && closingSoon.length)
+      ? '<section class="portal-urgent"><h2 class="portal-section-h portal-urgent-h">Closing soon</h2>' +
+        closingSoon.map(function (f) {
+          return '<a class="portal-urgent-row" href="' + FormsUI.esc(f.url) + '" target="_blank" rel="noopener">' +
+            daysBadgeHtml_(daysUntil_(f.closeDate)) +
+            '<span class="portal-urgent-body"><span class="portal-urgent-t" title="' + FormsUI.esc(f.title) + '">' + FormsUI.esc(f.title) + '</span></span>' +
+            '<span class="tile-chev">›</span></a>';
+        }).join('') +
+        '</section>'
+      : '';
+
+    // Every form/app a parent/staff member can reach globally (not tied to a specific
+    // student), grouped by category — apps fold into the same categories as forms (or
+    // "General" if uncategorized), never a separate "Apps" bucket.
+    var globalItems = (globalForms || []).map(function (f) { return formItem_(f); }).concat((apps || []).map(appItem_))
+      .sort(function (a, b) { return a.title.localeCompare(b.title); });
+    globalItems.forEach(function (it, i) { it.idx = i; });
+    var byCat = {};
+    globalItems.forEach(function (it) {
+      var cat = it.data.category || 'General';
+      (byCat[cat] = byCat[cat] || []).push(it);
+    });
+    var catOrder = Object.keys(byCat).sort(function (a, b) {
+      if (a === 'General') return 1; if (b === 'General') return -1;
+      return a.localeCompare(b);
+    });
+    var globalHtml = '<section class="portal-section">' +
+      (globalItems.length
+        ? catOrder.map(function (cat) {
+            return (catOrder.length > 1 ? '<h3 class="portal-subhead">' + FormsUI.esc(cat) + '</h3>' : '') +
+              '<div class="tilegrid">' + byCat[cat].map(function (it) { return portalTile_(it, it.idx); }).join('') + '</div>';
+          }).join('')
+        : '<p class="help">Nothing here yet.</p>') +
+      '</section>';
+
+    var studentsHtml = (students || []).length
+      ? '<section class="portal-section"><h2 class="portal-section-h">My students</h2>' +
+        '<div class="portal-students">' + (students || []).map(function (s) {
+          var sub = [s.grade ? 'Grade ' + s.grade : '', s.homeroomTeacher ? 'Homeroom: ' + s.homeroomTeacher : '']
+            .filter(Boolean).join(' · ');
+          var classDescByCode = {};
+          (s.classes || []).forEach(function (c) { classDescByCode[c.classCode] = c.classDescription || c.classCode; });
+          var formList = s.forms || [];
+          var studentForms = formList.map(function (f) { return portalTile_(formItem_(f, classDescByCode[f.classCode] || '')); }).join('');
+          return '<div class="portal-student-card">' +
+            '<div class="portal-student-head">' +
+              '<div class="portal-student-name">' + FormsUI.esc(s.displayName) + '</div>' +
+              (sub ? '<div class="portal-student-sub">' + FormsUI.esc(sub) + '</div>' : '') +
+              '<div class="portal-student-count">' + formList.length + (formList.length === 1 ? ' form' : ' forms') + '</div>' +
+            '</div>' +
+            (studentForms ? '<div class="tilegrid" style="margin-top:10px">' + studentForms + '</div>'
+              : '<p class="help" style="margin-top:8px">No class forms right now.</p>') +
+          '</div>';
+        }).join('') + '</div></section>'
+      : '';
+
+    var signOutBtn = role === 'parent'
+      ? '<button id="portalSignOut" class="btn ghost sm block" type="button">Sign out</button>' : '';
+    // Shown on EITHER app whenever the signed-in email is both a FACTS guardian and staff —
+    // never both true+true here (each app resolves identity its own way), so exactly one
+    // branch fires. Staff->Parent needs the bridge (different app/session, see
+    // epParentBridge_); Parent->Staff is just a link — Builder's DOMAIN deployment
+    // recognizes their Google session with no ticket involved. Lives inside the profile
+    // dropdown now (opts.profileBody), not a brandbar pill — plain .btn styling, since the
+    // dropdown has a normal card background.
+    // Wording deliberately avoids "View as" — this is a real navigation into a fully
+    // authenticated session in the other role (able to submit forms, not a read-only preview),
+    // so it should read like going somewhere, not toggling a simulation.
+    var roleToggleBody = (role !== 'parent' && canBridge)
+      ? '<button id="toggleToParent" class="btn ghost sm block" type="button">Switch to Parent view</button>'
+      : (role === 'parent' && alsoStaff && builderUrl)
+      ? '<a id="toggleToStaff" href="' + FormsUI.esc(builderUrl) + '" target="_top" class="btn ghost sm block" style="text-align:center">Go to Staff Portal</a>'
+      : '';
+    // Cross-link lives in the topbar (permanent, matches Builder's reciprocal link to
+    // Portal) instead of a body button that only appeared for staff on the home view.
+    // role === 'staff' only ever occurs on apps/runner-staff (runner-public is ANONYMOUS —
+    // Session.getActiveUser() is always empty there, so identifyVisitor_ never resolves a
+    // staff/student identity on that app).
+    // If BUILDER_URL isn't set in Script Properties, builderEditorUrl comes back blank and the
+    // link would otherwise just silently vanish with nothing telling anyone why — show a muted
+    // note instead so a misconfiguration is visible, not invisible.
+    var builderMissingNote = (role === 'staff' && !builderEditorUrl)
+      ? '<p class="help" style="text-align:center;margin:2px 0 0">Form Builder link isn’t configured — ask an admin to set BUILDER_URL.</p>' : '';
+    shell(
+      '<div class="stack" style="margin-top:18px">' +
+        devOverrideBanner +
+        '<div><h1 class="form-title">' + roleLabel + ' Forms Portal</h1></div>' +
+        closingHtml +
+        studentsHtml +
+        globalHtml +
+        '<div id="portalErr" class="notice err" role="alert" style="display:none"></div>' +
+      '</div>',
+      { wide: true, crossLinkUrl: (role === 'staff' ? builderEditorUrl : ''), crossLinkLabel: 'Open Form Builder',
+        profileEmail: email, profileBody: roleToggleBody + signOutBtn + builderMissingNote });
+    globalItems.forEach(function (it, i) {
+      if (it.kind !== 'app') return;
+      var btn = document.querySelector('.tile[data-i="' + i + '"]');
+      if (btn) btn.onclick = function () { openApp(it.data, parentToken, btn); };
+    });
+    var so = document.getElementById('portalSignOut');
+    if (so) so.addEventListener('click', signOut);
+    var bb = document.getElementById('toggleToParent');
+    if (bb) bb.addEventListener('click', function () {
+      bb.disabled = true; bb.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-color:rgba(139,30,30,.3);border-top-color:var(--hcs-red)"></span> Opening…';
+      google.script.run.withSuccessHandler(function (r) {
+        if (r && r.ok && r.url) {
+          // A real <a target="_top"> the user clicks themselves, not a JS-triggered nav from
+          // an async callback — some browsers/sandboxed iframes silently drop the latter
+          // (the "click does nothing" bug), since the click's user-activation doesn't carry
+          // through the google.script.run round trip.
+          bb.outerHTML = '<a id="toggleToParent" href="' + FormsUI.esc(r.url) + '" target="_top" class="btn ghost sm block" style="text-align:center">Continue as Parent →</a>';
+          return;
+        }
+        bb.disabled = false; bb.textContent = 'Switch to Parent view';
+        var err = document.getElementById('portalErr');
+        if (err) {
+          err.style.display = '';
+          err.textContent = (r && r.code === 'NO_URL')
+            ? 'The parent view link isn’t configured yet. Contact the school office.'
+            : 'Could not open the parent view. Try again.';
+        }
+      }).withFailureHandler(function (e) {
+        bb.disabled = false; bb.textContent = 'Switch to Parent view';
+        var err = document.getElementById('portalErr');
+        if (err) { err.style.display = ''; err.textContent = friendlyErr_(e); }
+      }).getParentBridgeUrl();
+    });
+  }
+
+  function signOut() {
+    PARENT_TOKEN = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    // Same shared-device concern Runner.html's signOut addresses (P16) — a second parent
+    // signing in on this browser must not inherit the first parent's saved form drafts.
+    // Prefixes must match Runner.html's DRAFT_PREFIX/ATTACH_PREFIX (Portal has no FORM_ID
+    // of its own to scope a single form's draft, so it clears every form's).
+    FormsUI.clearAllDrafts(['hcsFormsDraft:', 'hcsFormsAttach:']);
+    renderOtp();
+  }
+
+  function openApp(a, parentToken, btn) {
+    if (!a.supportsHandoff) { window.open(a.url, '_blank'); return; }
+    var label = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Opening…';
+    google.script.run.withSuccessHandler(function (r) {
+      btn.disabled = false; btn.innerHTML = label;
+      if (r && r.url) { window.open(r.url, '_blank'); }
+      else portalError('That link isn’t set up yet. Contact the school office.');
+    }).withFailureHandler(function (e) {
+      btn.disabled = false; btn.innerHTML = label;
+      portalError(friendlyErr_(e));
+    }).getAppHandoffUrl(parentToken, a.slug);
+  }
+  function portalError(msg) { var e = document.getElementById('portalErr'); if (e) { e.style.display = 'block'; e.textContent = msg; } }
+})();
+</script>
+
+  
+</body>
+</html>

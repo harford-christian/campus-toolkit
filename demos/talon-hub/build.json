@@ -1,8 +1,8 @@
 {
-  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/talon-hub/build.json. Written 2026-09-16 so this demo stops needing reverse-engineering on every rebuild — the previous build (2026-07-17) had no checked-in config. includeDir is the APP ROOT, not the pages folder, because the includes are written include('pages/Theme') with the prefix. No nested includes, so the builder's single pass is enough.",
+  "_note": "Config for tools/build-demo.mjs (the STAFF app; the fan pages are build.fan.json + build.widget.json). Run from the repo root: node tools/build-demo.mjs demos/talon-hub/build.json. Written 2026-09-16 so this demo stops needing reverse-engineering on every rebuild — the previous build (2026-07-17) had no checked-in config. includeDir is the APP ROOT, not the pages folder, because the includes are written include('pages/Theme') with the prefix. No nested includes, so the builder's single pass is enough. Moved 2026-10-08 from index.html to staff.html: index.html is now a hand-written switcher between the staff app and the public fan pages.",
   "_blocker": "RESOLVED 2026-09-17 (commit 6923e59): the mock now answers every op it has not reproduced with an honest DEMO_ONLY notice, so a rebuild no longer publishes dead buttons. Rebuilt 2026-10-05 on the 2026-10-03 source: ops 246 -> 247 (+soccerTapBatch, +soccerUndo, -raceTap); coverage still 113/247. The portfolio scanner still cannot see envelope-op changes for this app — before any rebuild, compare the call('op') set of the published page vs the rebuilt one and run demos/talon-hub/coverage.mjs + verify.mjs.",
   "src": "../athletics/talon-hub/apps/staff/pages/Staff.html",
-  "dst": "demos/talon-hub/index.html",
+  "dst": "demos/talon-hub/staff.html",
   "includeDir": "../athletics/talon-hub/apps/staff",
   "demoName": "Talon Hub · Staff",
   "replace": [
@@ -49,6 +49,10 @@
     "WHO": "Fabricated; whoEmail() lowercases it and it drives who the app thinks is signed in.",
     "EXEC_URL": "Deliberately empty — it is the live /exec URL and must never reach a published page.",
     "VOL_MEET": "Meet-volunteer code; empty so the demo never enters volunteer mode.",
-    "scrubs": "Real-world identifiers (the school domain, live /exec URLs, AKfycb deployment ids) are scrubbed BY PATTERN in tools/build-demo.mjs, not listed here — a config that names the secrets it removes publishes them, and this repo is public. Verify with node tools/privacy-scan.mjs, which fails the build on any that survive."
+    "scrubs": "Real-world identifiers (the school domain, live /exec URLs, AKfycb deployment ids) are scrubbed BY PATTERN in tools/build-demo.mjs, not listed here — a config that names the secrets it removes publishes them, and this repo is public. Verify with node tools/privacy-scan.mjs, which fails the build on any that survive.",
+    "nameAliases": "A real student (the team manager the live game pad was rebuilt for) is named in three StaffApp.html comments. nameAliases swaps that name for a fabricated one; keys are sha256 of the lowercased word (first 16 hex), so this public file never names anyone."
+  },
+  "nameAliases": {
+    "9fbb8412cdc93b8c": "Riley"
   }
 }

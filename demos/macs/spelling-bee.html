@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_self">
+  <script src="logic-spelling.js"></script>
+  <script src="mock-competitions.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --md-red: #c8102e;
+      --md-red-deep: #8c0a1f;
+      --md-cream: #f2ead9;
+      --danger: #7a1220;
+      --bg: #2b2b2d;
+      --surface: #ffffff;
+      --border: #ecdfd8;
+      --text: #241414;
+      --text-muted: #7a6a63;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg); color: var(--text); margin: 0; padding: 0 0 80px; line-height: 1.5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .page {
+      max-width: 1000px; margin: 0 auto; background: var(--surface); min-height: 100vh;
+      border: 1px solid var(--border); box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .page::before {
+      content: ''; display: block; height: 8px;
+      background: repeating-linear-gradient(90deg, var(--md-red) 0 25px, #ffffff 25px 50px);
+    }
+    .masthead { display: flex; align-items: center; gap: 20px; padding: 20px 32px 16px; }
+    .crest { width: 76px; height: auto; flex-shrink: 0; border-radius: 8px; box-shadow: 0 6px 16px rgba(140,10,31,.3); }
+    .masthead-title h1 { font-size: 28px; margin: 0; color: var(--md-red-deep); font-weight: 800; }
+    .masthead-title p { margin: 4px 0 0; font-size: 16px; color: var(--md-red); font-weight: 700; }
+
+    .content { padding: 4px 32px 32px; }
+
+    .section-title {
+      font-size: 18px; font-weight: 800; color: var(--md-red-deep); margin: 28px 0 4px;
+      padding-bottom: 8px; border-bottom: 2px solid var(--border);
+    }
+    .section-title:first-of-type { margin-top: 8px; }
+    .section-sub { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; }
+
+    label { display: block; font-size: 13px; font-weight: 700; color: var(--md-red-deep); margin-bottom: 6px; }
+    select, input {
+      width: 100%; padding: 11px 12px; font-size: 15px; border: 2px solid var(--border);
+      border-radius: 8px; background: #fff; color: var(--text); font-family: inherit;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--md-red); box-shadow: 0 0 0 3px rgba(200,16,46,.15); }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .field { margin-bottom: 14px; }
+
+    .data-card {
+      border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; background: #fffdfb;
+      box-shadow: 0 2px 8px rgba(140,10,31,.06); margin-bottom: 16px;
+    }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .card-head h3 { margin: 0; font-size: 16px; color: var(--md-red-deep); font-weight: 800; }
+
+    .toggle-pill { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .toggle-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-pill .pill {
+      width: 42px; height: 24px; border-radius: 999px; background: #e5dcd6; position: relative;
+      transition: background .15s; flex-shrink: 0;
+    }
+    .toggle-pill .pill::after {
+      content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s;
+    }
+    .toggle-pill input:checked + .pill { background: var(--md-red); }
+    .toggle-pill input:checked + .pill::after { transform: translateX(18px); }
+    .toggle-pill .toggle-label { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+
+    .student-fields { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .student-fields.empty { display: none; }
+
+    .notice { border-left: 4px solid var(--md-red-deep); background: #f7f0ee; padding: 12px 16px; border-radius: 8px; font-size: 14px; }
+    .notice.warn { border-left-color: var(--danger); background: #fdf0ee; color: #7f1d1d; font-weight: 600; }
+    .notice.success { border-left-color: var(--md-red); background: #fdf1ee; color: var(--md-red-deep); font-weight: 600; }
+
+    .payment-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+    .payment-links a {
+      display: inline-block; background: #fff; color: var(--md-red-deep); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 700; text-decoration: none;
+    }
+    .payment-links a:hover { background: #fdf1ee; }
+
+    button { cursor: pointer; border: none; border-radius: 9px; padding: 12px 20px; font-size: 14.5px; font-weight: 700; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    button.submit-final {
+      background: var(--md-red); color: #fff; border: none; border-radius: 8px; padding: 13px 28px;
+      font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 20px;
+      box-shadow: 0 4px 12px rgba(224,60,49,.3); transition: transform .1s, box-shadow .1s;
+    }
+    button.submit-final:hover { background: var(--md-red-deep); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(200,16,46,.4); }
+    button.submit-final:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .status-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; padding: 6px 13px; border-radius: 999px; margin-left: 12px; }
+    .status-chip:empty { display: none; }
+    .status-chip.saving { background: #f6dde1; color: var(--md-red-deep); }
+    .status-chip.success { background: #e3f6e9; color: #15803d; }
+    .status-chip.error { background: #fdeceb; color: var(--danger); }
+    .spinner {
+      width: 12px; height: 12px; border: 2px solid rgba(0,0,0,.15); border-top-color: currentColor;
+      border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "MACS Fine Arts" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <div class="masthead">
+      <img class="crest" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23c8102e'/%3E%3Ccircle cx='32' cy='32' r='24' fill='none' stroke='white' stroke-width='2'/%3E%3Ctext x='32' y='38' font-family='Inter,Arial,sans-serif' font-size='15' font-weight='800' fill='white' text-anchor='middle'%3EMACS%3C/text%3E%3C/svg%3E" alt="MACS logo">
+      <div class="masthead-title">
+        <h1>MACS Fine Arts Competition</h1>
+        <p>Spelling Bee Registration Form 2026</p>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="warning" class="notice warn" style="display:none; margin-bottom:16px"></div>
+      <div id="success" class="notice success" style="display:none; margin-bottom:16px"></div>
+
+      <div id="form-body">
+        <div class="section-title">School Information</div>
+        <div class="field-row">
+          <div class="field">
+            <label>School's Name &amp; Code*</label>
+            <select id="schoolSelect"><option value="">Select a school…</option></select>
+          </div>
+          <div></div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>School Sponsor* — First Name</label>
+            <input type="text" id="sponsorFirst">
+          </div>
+          <div class="field">
+            <label>School Sponsor* — Last Name</label>
+            <input type="text" id="sponsorLast">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>School Sponsor's Phone Number*</label>
+            <input type="text" id="sponsorPhone" placeholder="(000) 000-0000">
+            <p class="section-sub" style="margin:4px 0 0">Format: (000) 000-0000.</p>
+          </div>
+          <div class="field">
+            <label>Email*</label>
+            <input type="email" id="sponsorEmail">
+          </div>
+        </div>
+
+        <p class="section-sub">*Please do not submit until you have completed everything on your registration. Only the first submission for each school will be accepted.</p>
+
+        <div id="gradeGroups"></div>
+
+        <div class="section-title">Payment</div>
+        <p class="section-sub">*Please note a $200.00 participation fee is automatically added for
+          out-of-state schools. If your school has already paid this fee with another MACS registration
+          for the 25-26 school year, you can subtract the $200.00 from your payment total. **Non-MACS
+          schools will need to add extra fees per entry. This is indicated on the correct participation
+          fee form below.</p>
+        <p class="section-sub" style="font-weight:700">**Please use the correct participation fee form below:</p>
+        <div class="payment-links" id="paymentLinks"></div>
+        <div class="notice" style="margin-top:14px" id="deadlineNote"></div>
+
+        <button class="submit-final" id="submitBtn" onclick="submitForm()">Submit Registration</button>
+        <span class="status-chip" id="statusChip"></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var gradeGroups = [];
+    var schools = [];
+
+    function init() {
+      google.script.run.withSuccessHandler(function (groups) {
+        gradeGroups = groups;
+        renderGradeGroups();
+      }).getGradeGroups();
+
+      google.script.run.withSuccessHandler(function (list) {
+        schools = list;
+        var sel = document.getElementById('schoolSelect');
+        list.forEach(function (s) {
+          var opt = document.createElement('option');
+          opt.value = s.code;
+          opt.textContent = s.code + ' — ' + s.name;
+          opt.dataset.name = s.name;
+          sel.appendChild(opt);
+        });
+      }).getSchoolList();
+
+      google.script.run.withSuccessHandler(function (info) {
+        document.getElementById('deadlineNote').textContent =
+          'This form must be postmarked and mailed along with the check by ' + (info.deadline || '') +
+          (info.mailingAddress ? '. Checks should be made out to MACS and mailed to ' + info.mailingAddress + '.' : '.');
+        var links = document.getElementById('paymentLinks');
+        if (info.macsPaymentPdfLink) {
+          links.appendChild(makeLink('MACS School Spelling Bee Participation Fee Form', info.macsPaymentPdfLink));
+        }
+        if (info.nonMacsPaymentPdfLink) {
+          links.appendChild(makeLink('Non-MACS School Spelling Bee Participation Fee Form', info.nonMacsPaymentPdfLink));
+        }
+      }).getPaymentInfo();
+
+      document.getElementById('schoolSelect').addEventListener('change', onSchoolChange);
+    }
+
+    function makeLink(label, url) {
+      var a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.textContent = label;
+      return a;
+    }
+
+    function onSchoolChange() {
+      var code = document.getElementById('schoolSelect').value;
+      if (!code) return;
+      google.script.run.withSuccessHandler(function (status) {
+        if (status.alreadySubmitted) {
+          showWarning('This school has already submitted entries. To make a change, please email the competition admin directly — the form does not allow a second submission.');
+          document.getElementById('submitBtn').disabled = true;
+        } else {
+          hideWarning();
+          document.getElementById('submitBtn').disabled = false;
+        }
+      }).checkSchoolStatus(code);
+    }
+
+    function renderGradeGroups() {
+      var container = document.getElementById('gradeGroups');
+      container.innerHTML = '';
+      gradeGroups.forEach(function (g) {
+        var card = document.createElement('div');
+        card.className = 'data-card';
+        card.dataset.groupKey = g.key;
+
+        var head = document.createElement('div');
+        head.className = 'card-head';
+        var h3 = document.createElement('h3');
+        h3.textContent = g.label;
+        head.appendChild(h3);
+
+        var fieldsWrap = document.createElement('div');
+        fieldsWrap.className = 'student-fields empty';
+
+        if (g.yesNo) {
+          var toggleLabel = document.createElement('label');
+          toggleLabel.className = 'toggle-pill';
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          var pillSpan = document.createElement('span');
+          pillSpan.className = 'pill';
+          var textSpan = document.createElement('span');
+          textSpan.className = 'toggle-label';
+          textSpan.textContent = 'Do you have a Grade 1 entry?';
+          toggleLabel.appendChild(cb);
+          toggleLabel.appendChild(pillSpan);
+          toggleLabel.appendChild(textSpan);
+          head.appendChild(toggleLabel);
+
+          cb.addEventListener('change', function () {
+            fieldsWrap.classList.toggle('empty', !cb.checked);
+            fieldsWrap.innerHTML = '';
+            if (cb.checked) fieldsWrap.appendChild(makeStudentInput('Name of Student (Grade 1 Entry)'));
+          });
+        } else {
+          var selectWrap = document.createElement('div');
+          selectWrap.style.textAlign = 'right';
+          var selectLabel = document.createElement('label');
+          selectLabel.textContent = 'Choose the number of ' + g.label + ' students you would like to enter.';
+          selectLabel.style.marginBottom = '6px';
+          var select = document.createElement('select');
+          select.style.width = '160px';
+          for (var i = 0; i <= g.maxStudents; i++) {
+            var opt = document.createElement('option');
+            opt.value = i; opt.textContent = i + (i === 1 ? ' student' : ' students');
+            select.appendChild(opt);
+          }
+          selectWrap.appendChild(selectLabel);
+          selectWrap.appendChild(select);
+          head.appendChild(selectWrap);
+
+          select.addEventListener('change', function () {
+            var n = parseInt(select.value, 10);
+            fieldsWrap.innerHTML = '';
+            fieldsWrap.classList.toggle('empty', n === 0);
+            for (var j = 1; j <= n; j++) {
+              fieldsWrap.appendChild(makeStudentInput('Name of Student #' + j + ' (' + g.label + ')'));
+            }
+          });
+        }
+
+        card.appendChild(head);
+        card.appendChild(fieldsWrap);
+        container.appendChild(card);
+      });
+    }
+
+    function makeStudentInput(labelText) {
+      var wrap = document.createElement('div');
+      wrap.className = 'field';
+      var label = document.createElement('label');
+      label.textContent = labelText;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'student-name-input';
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      return wrap;
+    }
+
+    function showWarning(msg) {
+      var el = document.getElementById('warning');
+      el.textContent = msg; el.style.display = 'block';
+    }
+    function hideWarning() {
+      document.getElementById('warning').style.display = 'none';
+    }
+    function setStatus(state, text) {
+      var chip = document.getElementById('statusChip');
+      chip.className = 'status-chip ' + state;
+      chip.innerHTML = state === 'saving' ? '<span class="spinner"></span>' + text : text;
+    }
+
+    function submitForm() {
+      hideWarning();
+      var sel = document.getElementById('schoolSelect');
+      var schoolCode = sel.value;
+      var schoolName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].dataset.name : '';
+      if (!schoolCode) { showWarning('Please select a school.'); return; }
+
+      var contact = {
+        firstName: document.getElementById('sponsorFirst').value.trim(),
+        lastName: document.getElementById('sponsorLast').value.trim(),
+        phone: document.getElementById('sponsorPhone').value.trim(),
+        email: document.getElementById('sponsorEmail').value.trim()
+      };
+      if (!contact.firstName || !contact.lastName || !contact.phone || !contact.email) {
+        showWarning('Sponsor name, phone, and email are required.');
+        return;
+      }
+
+      var groups = [];
+      document.querySelectorAll('#gradeGroups .data-card').forEach(function (card) {
+        var names = Array.prototype.map.call(card.querySelectorAll('.student-name-input'), function (input) {
+          return input.value.trim();
+        }).filter(Boolean);
+        if (names.length) groups.push({ groupKey: card.dataset.groupKey, students: names });
+      });
+      if (groups.length === 0) { showWarning('Please enter at least one student.'); return; }
+
+      setStatus('saving', 'Submitting…');
+      document.getElementById('submitBtn').disabled = true;
+      google.script.run
+        .withSuccessHandler(function (result) {
+          setStatus('success', 'Submitted');
+          document.getElementById('success').textContent = 'Registration submitted — ' + result.count + ' student(s) entered.';
+          document.getElementById('success').style.display = 'block';
+          document.getElementById('form-body').querySelectorAll('input, select, button').forEach(function (el) { el.disabled = true; });
+        })
+        .withFailureHandler(function (err) {
+          setStatus('error', 'Error');
+          showWarning(err.message || String(err));
+          document.getElementById('submitBtn').disabled = false;
+        })
+        .submitRegistration(schoolCode, schoolName, groups, contact);
+    }
+
+    init();
+  </script>
+</body>
+</html>

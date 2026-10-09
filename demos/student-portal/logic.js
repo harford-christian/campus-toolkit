@@ -443,6 +443,9 @@ var Due = (function () {
   /* ------------------------------------------------------------------ no-homework days ---- */
   // Leading "No HW" / "No homework" marks the whole day; the rest (often "CLASSWORK: …") is info only.
   var NO_HW_LEAD = /^\s*(homework\s*[-:]?\s*)?(no|none|not any)\s*(hw|homework|home work)\b/i;
+  // The whole entry is just "None" / "none." / "N/A" — real, e.g. class 7313 every day of week 1, and it was being
+  // listed to students as a homework item called "none" (release review 2026-10-08).
+  var NO_HW_ONLY = /^\s*(none|n\/a|nothing)\s*[.!]*\s*$/i;
   var NO_HW_ANY = /\b(no|none)\s+(hw|homework)(\s+tonight|\s+today|\s+this weekend|\s+over the weekend)?\b[!.~]*/ig;
   var PLEASANTRY = /\b(happy|have a|enjoy( your)?)\b[^.!~\n]*(weekend|break|holiday|thanksgiving|christmas|summer|first day)[^.!~\n]*[.!~]*/ig;
 
@@ -566,6 +569,43 @@ var Due = (function () {
    * @param {Object=} opts       { noSchool: Set<'YYYY-MM-DD'> }
    * @return {{noHomework:boolean, info:string, lines:Array<string>, segments:Array<{text:string, dueOn:string, dueSource:string, anchor:string}>}}
    */
+  /**
+   * "due Wed 9/9", "by Monday, 9/14", "Tues. 10/6": a weekday and a date that name the SAME day are one anchor.
+   * Left as two, the line was split between them and students saw a separate task called "9/9)" or "12th)"
+   * (real corpus, release review 2026-10-08). Merged only when both resolve to the same due date AND nothing but
+   * punctuation/space sits between them, so a genuine "9-24 … 9-29" pair still splits into two tasks.
+   */
+  function mergeSameDayAnchors(anchors, line, planDate, noSchool) {
+    var out = [];
+    (anchors || []).forEach(function (a0) {
+      /* findAnchors already folds "Wed 9/9" into ONE anchor but its span covers only "Wed", so the "9/9)" after it
+         used to become its own task. Extend the span over any directly-following date naming the same day. */
+      var a = a0, guard = 0;
+      while (guard++ < 3) {
+        var sub = line.slice(a.end), nx = findAnchors(sub, planDate, noSchool)[0];
+        if (nx && nx.dueOn === a.dueOn && /^[\s,.;:\-–—(]*$/.test(sub.slice(0, nx.start))) {
+          a = Object.assign({}, a, { end: a.end + nx.end, raw: line.slice(a.start, a.end + nx.end) });
+          continue;
+        }
+        /* "(Due Mon. 12th)" — REAL, English 9, planDate 2026-10-05: a bare day-of-month ordinal is not an anchor on
+           its own, so it was left behind as a task called "12th)". Join it when its number IS the anchor's day. */
+        var ord = /^[\s,.;:\-–—(]*(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/i.exec(sub);
+        if (ord && Number(ord[1]) === Number(String(a.dueOn).slice(8, 10))) {
+          a = Object.assign({}, a, { end: a.end + ord[0].length, raw: line.slice(a.start, a.end + ord[0].length) });
+          continue;
+        }
+        break;
+      }
+      var prev = out[out.length - 1];
+      if (prev && prev.dueOn === a.dueOn && /^[\s,.;:\-–—(]*$/.test(line.slice(prev.end, a.start))) {
+        out[out.length - 1] = Object.assign({}, prev, { end: a.end, raw: line.slice(prev.start, a.end) });
+        return;
+      }
+      out.push(a);
+    });
+    return out;
+  }
+
   function parseHomework(htmlOrText, planDate, opts) {
     opts = opts || {};
     var noSchool = opts.noSchool || null;
@@ -574,7 +614,7 @@ var Due = (function () {
     var result = { noHomework: false, info: '', lines: [], segments: [] };
     if (!raw) { result.noHomework = true; return result; }
 
-    if (NO_HW_LEAD.test(raw)) { result.noHomework = true; result.info = raw; return result; }
+    if (NO_HW_LEAD.test(raw) || NO_HW_ONLY.test(raw)) { result.noHomework = true; result.info = raw; return result; }
     var body = multiline.replace(NO_HW_ANY, ' ').replace(PLEASANTRY, ' ');
     if (clean(body).replace(/[^a-z0-9]/ig, '').length < 3) { result.noHomework = true; result.info = raw; return result; }
 
@@ -590,7 +630,7 @@ var Due = (function () {
         result.segments[result.segments.length - 1].text += ' ' + line;
         return;
       }
-      var anchors = findAnchors(line, planDate, noSchool);
+      var anchors = mergeSameDayAnchors(findAnchors(line, planDate, noSchool), line, planDate, noSchool);
       if (!anchors.length) {
         result.segments.push({ text: line, dueOn: defaultDue, dueSource: 'nextSchoolDay', anchor: '' });
         return;
@@ -638,7 +678,9 @@ var Due = (function () {
       if (rest.replace(/[^a-z0-9]/ig, '').length >= 2) {
         // trailing text with no date: a qualifier ("by memory", "- Will be graded.", "! Make sure…", a lowercase
         // continuation) glues to the last task
-        var punct = /^[-–,;:.!?)]|^['’]s\b/.test(rest);
+        // A leftover that is ONLY a date token ("12th)", "9/9)", "the 13th.") is never a task of its own.
+        var dateOnly = /^\(?(?:the\s+)?\d{1,2}(?:st|nd|rd|th|[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)?\)?[.!]*$/i.test(rest);
+        var punct = dateOnly || /^[-–,;:.!?)]|^['’]s\b/.test(rest);
         var glue = punct || GLUE_WORDS.test(rest) || /^[a-z]/.test(rest);
         if (glue && result.segments.length) {
           var last = result.segments[result.segments.length - 1];
@@ -2132,6 +2174,30 @@ function RUN_gate0Self() {
   Logger.log('%s %s', APP_NAME, APP_VERSION);
   Logger.log('effective user=%s  ou=%s  error=%s', me, d.ou || '(none)', d.error || '(none)');
   Logger.log('AdminDirectory reachable: %s', d.error ? 'NO — accept the OAuth prompt, then re-run' : 'yes');
+}
+
+/**
+ * Editor check (Code.gs, Run menu): the RAW stored homework for one class over a date range, and exactly how the
+ * due engine splits it. Read-only. Use it whenever a student's list shows an odd fragment — fix the parser
+ * against the real text, never a guessed phrasing. Edit CLASS_ID / FROM / TO below.
+ */
+function RUN_homeworkRaw() {
+  requireOperator_();
+  var CLASS_ID = '7384', FROM = '2026-10-01', TO = '2026-10-07';   // English 9, the "12th)" fragment (2026-10-08)
+  var data = loadDataTabs_(['homework']) || { homework: [] };
+  var rows = data.homework.filter(function (r) {
+    var d = String(r['Plan Date'] || '').slice(0, 10);
+    return String(r['Class ID']) === CLASS_ID && d >= FROM && d <= TO;
+  });
+  Logger.log('class %s, %s..%s: %s row(s)', CLASS_ID, FROM, TO, rows.length);
+  rows.forEach(function (r) {
+    var d = String(r['Plan Date']).slice(0, 10), html = String(r['Homework HTML'] || r['Homework'] || '');
+    Logger.log('=== planDate %s · autoNum %s', d, r['AutoNum']);
+    Logger.log('HTML: %s', JSON.stringify(html));
+    Logger.log('LINES: %s', JSON.stringify(Due.htmlToLines(html).split(/\n+/)));
+    var p = Due.parseHomework(html, d, {});
+    Logger.log('SEGMENTS: %s', JSON.stringify(p.segments.map(function (s) { return [s.dueOn, s.dueSource, s.text]; })));
+  });
 }
 
 /* ===== Sports.gs ===== */

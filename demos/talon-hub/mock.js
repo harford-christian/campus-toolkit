@@ -6,7 +6,17 @@
    Every response is {ok:true,...} or {ok:false,code[,msg]}. State is held in memory
    and mutated in place, so writes change the data and reads reflect it. Event dates
    are resolved here (relative to today) so events stay upcoming. The _demo flag the
-   real client adds is ignored — this mock always serves demo data. */
+   real client adds is ignored — this mock always serves demo data.
+
+   ONE BACKEND, TWO APPS. The same dispatcher also answers the public FAN pages (fan.html,
+   widget.html): publicSchedule + liveNow, the fan app's whole endpoint list. publicSchedule
+   builds full SCHEDULE rows from the SAME state the staff app edits and passes them through the
+   fan app's own FanView whitelist (fan-logic.js, vendored verbatim), exactly as the real endpoint
+   does — so a score, cancellation or stream link a coach enters in staff.html shows on the fan
+   board, and nothing the whitelist drops (StaffNotes, travel, absences, guardians) can.
+   The switcher swaps one <iframe>'s src, so each surface is a fresh document; the event edits and
+   announcements are therefore kept in sessionStorage under one key (SHARED_KEY). If a browser
+   denies storage to a file:// frame that is caught and each page keeps its own state instead. */
 window.MOCK_BACKEND = (function () {
   'use strict';
 
@@ -374,7 +384,11 @@ window.MOCK_BACKEND = (function () {
     state.announcements.unshift({
       AnnouncementID: uid('ANN'), Audience: args.audience || 'Team', TeamID: args.audience === 'Team' ? (args.teamId || '') : '',
       Title: String(args.title).slice(0, 120), Body: String(args.body || '').slice(0, 600), Severity: args.severity === 'urgent' ? 'urgent' : 'info',
-      CreatedAt: nowIso(), ExpiresAt: args.expiresAt || '', PostedByName: 'Coach Turner', PostedByEmail: D.email, Status: 'Active'
+      CreatedAt: nowIso(), ExpiresAt: args.expiresAt || '', PostedByName: 'Coach Turner', PostedByEmail: D.email, Status: 'Active',
+      // Per-audience toggles as the real row stores them ('1'/'0'); ShowFans is opt-in (fan board).
+      ShowPlayers: args.showPlayers === false ? '0' : '1', ShowParents: args.showParents === false ? '0' : '1',
+      ShowFans: args.showFans ? '1' : '0',
+      TeamIDs: args.audience === 'Team' && Array.isArray(args.teamIds) ? args.teamIds.join(',') : ''
     });
     return { ok: true, announcements: state.announcements.filter(activeAnn).map(annRow), emailed: { sent: args.alsoEmail ? 24 : 0, refused: false } };
   }
@@ -690,9 +704,71 @@ window.MOCK_BACKEND = (function () {
   }
 
   // =====================================================================
+  // Fan surface (apps/fan) — public, anonymous, read-only
+  // =====================================================================
+  /* The real epPublicSchedule_ (apps/fan/server/FanApi.js) reads raw SCHEDULE + TEAMS rows,
+     applies a 45-day floor, and hands the rows to FanView.publicSchedule with Labels.teamLabel and
+     Scoreboard.recordedResult; then drops Cancelled, sorts, and adds fan-flagged Program
+     announcements via Announcements.active(…,'fan') + Projection.forParent. Same steps here, same
+     modules (window.TalonFanLogic, from fan-logic.js). The rows handed to the whitelist are
+     deliberately the FULL internal event — StaffNotes, travel, absences with guardian emails,
+     return plans — so the whitelist, not this mock, is what keeps them off the public page.
+     Omitted: the team default-stream fallback (no demo team sets TEAMS.StreamUrl), tournament
+     game lists (SoccerLive parsing of StaffNotes) and the output cache. */
+  function fanRawRow(ev) { return Object.assign(clone(ev), eventRow(ev)); }
+  function hhmm() { var d = new Date(); return pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function publicSchedule() {
+    var L = window.TalonFanLogic;
+    if (!L) return { ok: false, code: 'SERVER_ERROR', msg: 'Something went wrong.' };
+    var floor = fmtDate(-45);
+    var practiceTeams = {};
+    state.teams.forEach(function (t) { if (String(t.ShowPracticesPublic) === '1') practiceTeams[String(t.TeamID)] = true; });
+    var rows = state.events.map(fanRawRow).filter(function (e) { return e.Date >= floor; });
+    var pub = L.FanView.publicSchedule(rows, {
+      labelFn: function (ev) { return L.Labels.teamLabel(ev.Gender, ev.Level, ev.Sport); },
+      resultFn: function (ev) { return L.Scoreboard.recordedResult(ev); },
+      practiceTeamIds: practiceTeams
+    });
+    pub = pub.filter(function (e) { return e.status !== 'Cancelled'; });
+    pub.sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : (a.time < b.time ? -1 : 1)); });
+    var annc = L.Projection.forParent('ANNOUNCEMENTS',
+      L.Announcements.active(state.announcements.map(annRow), [], fmtDate(0) + ' ' + hhmm(), 'fan'), []);
+    return { ok: true, today: fmtDate(0), events: pub, announcements: annc, liveNow: [], generatedAt: nowIso() };
+  }
+  /* liveNow: games broadcasting RIGHT NOW (LIVE_SCORE rows via GameCenter.publicLive). The staff
+     demo's live game tools are not reproduced, so nothing is ever broadcasting — an honest empty
+     list, which is also what the real endpoint returns most hours. */
+  function liveNow() { return { ok: true, live: [] }; }
+
+  // =====================================================================
+  // Seeds + the state shared between the staff and fan pages
+  // =====================================================================
+  state.events.forEach(function (ev) {
+    if (ev.seedScore) setScore({ eventId: ev.EventID, model: 'goals', ourScore: ev.seedScore.our, oppScore: ev.seedScore.opp });
+    if (ev.seedMedia) state.eventMedia[ev.EventID] = { live: ev.seedMedia.live || '', highlight: ev.seedMedia.highlight || '' };
+  });
+  var SHARED_KEY = 'talonhub-demo-shared-v1';
+  var SHARED = ['eventStatus', 'eventScore', 'eventMedia', 'eventFood', 'announcements'];
+  var WRITES = { setEventStatus: 1, setScore: 1, setEventMedia: 1, setFoodStop: 1, postAnnouncement: 1, deleteAnnouncement: 1 };
+  (function restoreShared() {
+    try {
+      var raw = window.sessionStorage && window.sessionStorage.getItem(SHARED_KEY);
+      var saved = raw ? JSON.parse(raw) : null;
+      if (saved) SHARED.forEach(function (k) { if (saved[k]) state[k] = saved[k]; });
+    } catch (e) { /* storage denied (file:// frame, private mode): this page keeps its own state */ }
+  })();
+  function saveShared() {
+    try {
+      var o = {}; SHARED.forEach(function (k) { o[k] = state[k]; });
+      window.sessionStorage.setItem(SHARED_KEY, JSON.stringify(o));
+    } catch (e) {}
+  }
+
+  // =====================================================================
   // Single dispatcher
   // =====================================================================
   var ENDPOINTS = {
+    publicSchedule: publicSchedule, liveNow: liveNow,
     lostFoundList: lostFoundList, postLostItem: postLostItem,
     returnLostItem: returnLostItem, removeLostItem: removeLostItem,
     getStaffBundle: getStaffBundle, getDeptSchedule: getDeptSchedule, globalSearch: globalSearch,
@@ -738,7 +814,9 @@ window.MOCK_BACKEND = (function () {
       return { ok: false, code: 'DEMO_ONLY',
                msg: 'Not part of this demo — this screen is live in the real Talon Hub.' };
     }
-    return h(args || {});
+    var out = h(args || {});
+    if (WRITES[fn] && out && out.ok) saveShared();
+    return out;
   }
 
   return { api: api };

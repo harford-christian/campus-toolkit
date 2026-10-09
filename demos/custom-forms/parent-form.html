@@ -1,0 +1,2721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <base target="_self">
+  <script>var DEMO_APP = 'runner-public', DEMO_SURFACE = 'parent-form'; // demo: which Apps Script project and which doGet branch this page is</script>
+  <script src="logic.js"></script>
+  <!-- GENERATED FILE — DO NOT HAND-EDIT. Produced by tools/wrap.js from Theme.html. Edit the source, then run `npm run build`. -->
+<!-- Theme.html — the ONE HCS Forms design system. Included by Index.html into both
+     the builder and the runner so every form looks like one branded product.
+     Canonical palette (resolves the red/gold drift across older projects):
+       HCS Red #8B1E1E  ·  Gold #D4AF37  ·  White  ·  Inter.
+     Verify exact hex against example.edu before go-live (M0 checkpoint). -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Values are per-context (HCS red/gold by default, MACS black/gray/red, etc.) — see
+     Theme.js's ThemeLogic.renderThemeCss_(). Var NAMES stay fixed so no consuming file
+     (Builder.html/Portal.html/Runner.html) needs to change when a context's palette does. */
+  :root {
+    /* themeCss: added at load by mock.js — what this app's include_('pages/Theme') renders */
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { background:var(--bg); color:var(--text); line-height:1.5;
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+
+  /* ---- layout ---- */
+  .page { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
+  .page.wide { max-width:1080px; }
+  .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
+    padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
+  /* full-bleed variant — Portal's site shell (matches Builder's always-full-width .topbar);
+     the default (unrounded-top removed) is still used by boxed contexts like the runner's
+     access-denied page, which keep the rounded-top-of-a-card look. */
+  .brandbar.flush { border-radius:0; }
+  .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
+  .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
+  .brandbar .spacer { margin-left:auto; }
+  .goldrule { height:4px; background:var(--hcs-gold); }
+
+  /* ---- card / surfaces ---- */
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .card.flush-top { border-top-left-radius:0; border-top-right-radius:0; }
+  .card-pad { padding:22px; }
+  .stack > * + * { margin-top:16px; }
+  .formpage.stack > .field + .field { margin-top:32px; }
+  .divider { height:1px; background:var(--line); border:0; margin:20px 0; }
+
+  /* ---- headings / text ---- */
+  .form-title { font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.02em; }
+  .form-desc { color:var(--muted); margin:0; }
+  .section-head { font-size:1.05rem; font-weight:700; color:var(--hcs-red); margin:8px 0 2px;
+    padding-bottom:6px; border-bottom:2px solid var(--hcs-gold-soft); }
+  .help { font-size:.83rem; color:var(--muted); margin:3px 0 0; }
+  .muted { color:var(--muted); } .center { text-align:center; }
+
+  /* ---- fields ---- */
+  .field { margin:0; }
+  .field > label { display:block; font-weight:600; font-size:.92rem; margin-bottom:6px; }
+  .req { color:var(--err); margin-left:2px; }
+  .control, input.control, select.control, textarea.control {
+    width:100%; font:inherit; font-size:1rem; color:var(--text); background:var(--card);
+    border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; transition:border-color .12s, box-shadow .12s; }
+  textarea.control { min-height:96px; resize:vertical; }
+  .control:focus, .control:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .control:disabled, .control[readonly] { background:#f3f4f6; color:#4b5563; cursor:not-allowed; }
+  .field.invalid .control { border-color:var(--err); }
+  .field .error { display:none; color:var(--err); font-size:.82rem; margin-top:5px; }
+  .field.invalid .error { display:block; }
+
+  /* choice groups (radio/checkbox) */
+  .choices { display:flex; flex-direction:column; gap:8px; }
+  .choice { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line);
+    border-radius:var(--radius-sm); cursor:pointer; background:var(--card); }
+  .choice:hover { border-color:var(--line-strong); }
+  .choice:focus-within { border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .choice input { margin-top:2px; accent-color:var(--hcs-red); width:18px; height:18px; }
+  .choice.selected { border-color:var(--hcs-red); background:#fbf4f4; }
+
+  /* ---- buttons ---- */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    border:1px solid transparent; border-radius:var(--radius-sm); font-weight:700; font-size:.95rem;
+    padding:11px 18px; background:var(--hcs-red); color:#fff; transition:background .12s, box-shadow .12s; }
+  .btn:hover { background:var(--hcs-red-hover); }
+  .btn:focus-visible { outline:none; box-shadow:var(--ring); }
+  .btn:disabled { opacity:.55; cursor:not-allowed; }
+  .btn.block { width:100%; }
+  .btn.ghost { background:transparent; color:var(--hcs-red); border-color:var(--line-strong); }
+  .btn.ghost:hover { background:#fbf4f4; }
+  .btn.gold { background:var(--hcs-gold); color:#3a2e00; }
+  .btn.sm { padding:7px 12px; font-size:.85rem; }
+
+  /* ---- badges / pills (status system, reused from purchasing) ---- */
+  .pill { display:inline-block; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; text-transform:capitalize; }
+  .pill.draft { background:#eef1f5; color:#475467; }
+  .pill.published, .pill.open, .pill.approved { background:var(--ok-bg); color:var(--ok); }
+  .pill.private { background:var(--hcs-gold-soft); color:#7a5b00; }
+  .pill.staff { background:#e7edfb; color:#2b4a9b; }
+  .pill.locked, .pill.closed, .pill.rejected { background:var(--err-bg); color:var(--err); }
+  .pill.pending { background:var(--warn-bg); color:var(--warn); }
+
+  /* ---- notices ---- */
+  .notice { border-radius:var(--radius-sm); padding:12px 14px; font-size:.9rem; }
+  .notice.info { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; }
+  .notice.err { background:var(--err-bg); border:1px solid #f3c6c2; color:var(--err); }
+  .notice.ok { background:var(--ok-bg); border:1px solid #bfe0c1; color:var(--ok); }
+
+  /* ---- pre-fill component (MACS school forms) ----
+     Two phases, one component: .pf-step is the OFFER (something to act on), .pf-row is the
+     RECORD (what happened). Deliberately NOT a .notice — a tinted rectangle reads as
+     boilerplate on a long form and gets skipped, and tint alone must never carry the meaning.
+     State is carried by an icon plus words; colour appears only on the icon and the button. */
+  .pf-row {
+    display:flex; align-items:flex-start; gap:12px;
+    /* full-bleed to the card's edges, so it reads as a band separating title from fields
+       rather than a box sitting among them. Tracks .card-pad, including its 520px step. */
+    margin:0 -22px; padding:14px 22px;
+    border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+    background:#fbfbfc; font-size:.94rem;
+  }
+  .pf-row .pf-ico { flex:none; width:20px; height:20px; margin-top:2px; color:var(--muted); }
+  .pf-row.is-ok .pf-ico { color:var(--ok); }
+  .pf-row.is-attn .pf-ico { color:var(--hcs-red); }
+  .pf-row .pf-body { flex:1; min-width:0; }
+  .pf-row .pf-t { font-weight:600; margin:0; }
+  /* the count must not reflow as it changes */
+  .pf-row .pf-t .pf-num { font-variant-numeric:tabular-nums; }
+  .pf-row .pf-d { font-size:.85rem; color:var(--muted); margin:2px 0 0; }
+  .pf-row .pf-side { flex:none; }
+  /* .stack's 16px gap would otherwise show above an empty slot */
+  #formNotices { margin:0; }
+  #formNotices > div:empty { display:none; }
+
+  /* per-field provenance — the chip IS the record, so nothing has to be summarised up top */
+  .pf-mark { display:inline-flex; align-items:center; gap:5px; vertical-align:middle;
+    font-size:.68rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--ok); background:var(--ok-bg); border:1px solid #bfe0c1;
+    border-radius:999px; padding:2px 8px; margin-left:8px; }
+  .pf-mark .hcsi { width:11px; height:11px; }
+  .pf-undo { font:inherit; font-size:.78rem; font-weight:600; cursor:pointer; background:none;
+    border:0; color:var(--hcs-red); text-decoration:underline; text-underline-offset:2px;
+    padding:6px 4px; margin-left:2px; }
+  .pf-undo:hover { color:var(--hcs-red-hover); }
+
+  .pf-step { border:1px solid var(--line-strong); border-radius:var(--radius);
+    background:#fbfbfc; padding:16px; }
+  .pf-step .pf-kick { font-size:.68rem; font-weight:700; letter-spacing:.11em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 8px; }
+  .pf-step .pf-head { display:flex; align-items:flex-start; gap:12px; }
+  .pf-step .pf-ico { flex:none; width:22px; height:22px; margin-top:1px; color:var(--hcs-red); }
+  .pf-step .pf-t { font-size:1rem; font-weight:700; margin:0 0 4px; }
+  .pf-step .pf-d { font-size:.88rem; color:var(--muted); margin:0; max-width:52ch; }
+  .pf-step .pf-actions { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px; }
+  .pf-step .pf-otp { margin-top:14px; border-top:1px solid var(--line); padding-top:14px; }
+  .pf-step .pf-otp .control { max-width:22rem; }
+  /* a text button that is still a 44px target */
+  .btn.plain { background:none; border:0; color:var(--hcs-red); font-weight:600;
+    text-decoration:underline; text-underline-offset:3px; padding:11px 4px; }
+  .btn.plain:hover { color:var(--hcs-red-hover); }
+  @media (max-width:520px) { .pf-row { margin:0 -16px; padding:14px 16px; } }
+
+  /* ---- toast + spinner ---- */
+  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#1f2430; color:#fff;
+    padding:11px 18px; border-radius:999px; font-size:.88rem; font-weight:600; box-shadow:var(--shadow); z-index:60; }
+  .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%;
+    display:inline-block; animation:spin .7s linear infinite; }
+  .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; overflow-y:auto; }
+  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; max-height:calc(100vh - 32px); overflow-y:auto; margin:auto; }
+  .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
+  .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
+  /* Signature pad — the wrapper positions a "Sign here" cue + baseline over an EMPTY canvas
+     (P10). Both vanish as soon as the canvas has ink (.has-ink, set on first stroke / on a
+     restored draft) so they can never be mistaken for part of the signature or exported into it
+     — they're DOM siblings, never drawn onto the canvas. */
+  .sigwrap { position:relative; }
+  .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; position:relative; z-index:1; }
+  .sigwrap .sigcue { position:absolute; left:0; right:0; bottom:34px; text-align:center; color:var(--muted);
+    font-size:.85rem; pointer-events:none; z-index:0; }
+  .sigwrap .sigcue::after { content:''; position:absolute; left:12%; right:12%; bottom:-8px; border-bottom:1px solid var(--line-strong); }
+  .sigpad.has-ink + .sigcue { display:none; }
+  .sigbar { margin-top:6px; }
+  .filelist { margin-top:6px; }
+  .filelist .fitem { display:flex; align-items:center; gap:8px; font-size:.82rem; color:var(--text); }
+  .desc-block { font-size:.9rem; color:var(--text); white-space:pre-wrap; line-height:1.5; margin:0; }
+  .desc-block + .desc-block { margin-top:10px; }
+  .progress { height:6px; background:var(--line); border-radius:999px; overflow:hidden; margin-bottom:4px; }
+  .progress-bar { height:100%; background:var(--hcs-red); transition:width .2s ease; }
+  .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
+  .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
+  @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
+  /* ---- shared shell nav (cross-app link + role-toggle + "signed in as", topbar/brandbar) ----
+     One wrapper claims margin-left:auto so however many of these three are present, they
+     cluster together at the right edge instead of splitting apart. */
+  .brandbar-right, .topbar-right { margin-left:auto; display:flex; align-items:center; gap:16px; min-width:0; flex-wrap:wrap; row-gap:8px; justify-content:flex-end; }
+  .shell-topbar-link { color:#fff; text-decoration:none; font-weight:700;
+    font-size:.85rem; background:rgba(255,255,255,.14); border-radius:999px; padding:7px 14px;
+    transition:background .12s; }
+  .shell-topbar-link:hover { background:rgba(255,255,255,.24); }
+  /* shared "signed in as" badge — same look Builder's .topbar .who used one-off; now used
+     by Portal/Builder/Runner's brandbar alike. */
+  .shell-who { font-size:.8rem; color:rgba(255,255,255,.92); display:flex;
+    align-items:center; gap:8px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Sign-out lives inside .shell-who now (header, not a body banner) — override .btn.ghost's
+     red-on-transparent look (meant for light card backgrounds; invisible on this dark red
+     bar) with a white outline pill matching the other header controls. */
+  .shell-who button.btn { padding:5px 12px; border-radius:999px; font-size:.78rem; font-weight:700;
+    color:#fff; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.4); }
+  .shell-who button.btn:hover { background:rgba(255,255,255,.24); }
+  /* Profile chip — compact avatar + dropdown, replaces a plain "Signed in as x@y.com" label. */
+  .profile-chip { position:relative; }
+  .profile-avatar { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.16);
+    color:#fff; border:1px solid rgba(255,255,255,.45); font-weight:800; font-size:.85rem;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+  .profile-avatar:hover { background:rgba(255,255,255,.28); }
+  .profile-menu { position:absolute; right:0; top:calc(100% + 10px); background:var(--card);
+    color:var(--text); border:1px solid var(--line); border-radius:var(--radius-sm);
+    box-shadow:var(--shadow); min-width:230px; padding:10px; z-index:50; text-align:left; }
+  .profile-menu-email { font-size:.8rem; color:var(--muted); padding:0 2px 8px; word-break:break-all;
+    border-bottom:1px solid var(--line); margin-bottom:8px; }
+  .profile-menu .btn.block { margin-bottom:6px; }
+  .profile-menu .btn.block:last-child { margin-bottom:0; }
+  .profile-menu-admin { margin-bottom:8px; }
+  /* "View as: X · Y" toggle — lives in the brandbar, not a body notice (was easy to miss
+     between the title and the students block). Same pill language as .shell-topbar-link
+     (identical rgba values) so every header control reads as one consistent family instead
+     of competing pill styles. */
+  .role-toggle { display:inline-flex; align-items:center; gap:8px; font-size:.85rem; color:rgba(255,255,255,.85); }
+  .role-toggle .rt-active { color:#fff; font-weight:700; }
+  .role-toggle button, .role-toggle a { padding:6px 12px; border-radius:999px; font:inherit;
+    font-weight:700; color:#fff; background:rgba(255,255,255,.14); border:0; cursor:pointer;
+    text-decoration:none; transition:background .12s; }
+  .role-toggle button:hover, .role-toggle a:hover { background:rgba(255,255,255,.24); }
+  .role-toggle button:disabled { opacity:.6; cursor:not-allowed; }
+  .adminchip { background:var(--hcs-gold); color:#3a2e00; font-size:.62rem; font-weight:800; padding:2px 7px; border-radius:999px; text-transform:uppercase; }
+
+  /* ---- tile grid (Portal's full-site home view — same visual language as Builder's
+     .chipgrid/.chip, generically named so Portal doesn't need Builder's CSS) ---- */
+  .tilegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; padding:16px;
+    text-decoration:none; color:inherit; font:inherit; cursor:pointer; text-align:left;
+    transition:border-color .12s, transform .12s; }
+  .tile:hover { border-color:var(--hcs-gold); transform:translateY(-1px); }
+  .tile:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
+  .tile:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+  .tile-icon { flex:0 0 auto; width:40px; height:40px; border-radius:10px; background:var(--hcs-gold-soft);
+    color:var(--hcs-red); display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+  .tile-body { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  /* P8: real form titles are long ("2026-27 Athletic Participation & Physical Form"), and a
+     single ellipsised line made two different forms look identical on a phone. Clamp to two
+     lines instead, and every truncatable label also carries a title attribute (see portalTile_
+     / formCardHtml) so the full text is reachable. */
+  .tile-name { font-weight:700; color:var(--text); overflow:hidden;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-clamp:2; }
+  /* which class a student-section form belongs to, in place of a separate class-roster list */
+  .tile-sub { font-size:.76rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .tile-chev { flex:0 0 auto; color:var(--muted); font-size:1.1rem; }
+  /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
+  .identity-collapsed { display:none !important; }
+  /* FAQ accordion (faq field type) */
+  .faq-block { margin:4px 0 8px; }
+  .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
+  .faq-item > summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:.95rem; list-style:none; position:relative; padding-right:34px; }
+  .faq-item > summary::-webkit-details-marker { display:none; }
+  .faq-item > summary::after { content:'+'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--hcs-red); font-size:1.15rem; }
+  .faq-item[open] > summary::after { content:'\2013'; }
+  .faq-item > summary:hover { color:var(--hcs-red); }
+  .faq-a { padding:0 14px 12px; color:#444; font-size:.92rem; line-height:1.5; white-space:pre-wrap; }
+  /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
+  .hcsi { display:inline-block; vertical-align:middle; flex:none; }
+  .hcsi-lg { width:44px; height:44px; }
+  .infoicon { color:var(--muted); cursor:help; }
+  .infoicon:hover { color:var(--hcs-red); }
+  .infotip { position:fixed; max-width:260px; background:var(--card); border:1px solid var(--line-strong);
+    border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.18); padding:9px 12px; font-size:.8rem;
+    line-height:1.4; color:var(--text); z-index:200; }
+</style>
+
+<script>
+  /* HCS logo (base64 data URI, downscaled from example.edu) — embedded so it never 404s. */
+  var HCS_LOGO = "data:image/png;base64,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";
+  /* FormsUI — tiny dependency-free client helpers shared by builder + runner. */
+  var FormsUI = (function () {
+    // textContent→innerHTML escapes & < > but NOT quotes, and esc() output is interpolated into
+    // quoted attributes (value="…", data-*="…") all over — so escape both quote kinds too.
+    function esc(s){ var d=document.createElement('div'); d.textContent = (s==null?'':String(s)); return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function toast(msg, ms){ var t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.setAttribute('aria-live','polite'); t.textContent=msg;
+      document.body.appendChild(t); setTimeout(function(){ t.remove(); }, ms||2600); }
+    function el(tag, attrs, html){ var e=document.createElement(tag);
+      if(attrs) Object.keys(attrs).forEach(function(k){ e.setAttribute(k, attrs[k]); });
+      if(html!=null) e.innerHTML=html; return e; }
+    function trap_(ov){
+      ov.addEventListener('keydown', function(e){
+        if(e.key!=='Tab') return;
+        var f=ov.querySelectorAll('button,input,select,textarea,a[href]'); if(!f.length) return;
+        var first=f[0], last=f[f.length-1];
+        if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+      });
+    }
+    function modal(title, bodyHtml, btnLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div><button class="btn block">'+esc(btnLabel||'Got it')+'</button></div>';
+        var b=ov.querySelector('button');
+        b.onclick=function(){ ov.remove(); resolve(); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape'){ ov.remove(); resolve(); } });
+        document.body.appendChild(ov); trap_(ov); b.focus();
+      });
+    }
+    function confirm(title, bodyHtml, okLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(okLabel||'OK')+'</button></div></div>';
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(false); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(true); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape') done(false); });
+        document.body.appendChild(ov); trap_(ov); ov.querySelector('[data-x="1"]').focus();
+      });
+    }
+    /* Two labelled choices, neither of which is "cancel". Escape and backdrop resolve to the
+       PRIMARY label, which callers must make the non-destructive option — confirm() resolves
+       Escape to false, and using it here would let a stray keypress throw away typed work. */
+    function choose(title, bodyHtml, primaryLabel, secondaryLabel){
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+bodyHtml+'</div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn block" data-x="1" type="button">'+esc(primaryLabel)+'</button>'+
+          '<button class="btn ghost block" data-x="0" type="button">'+esc(secondaryLabel)+'</button></div></div>';
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(true); };
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(false); };
+        ov.addEventListener('keydown', function(e){ if(e.key==='Escape') done(true); });
+        document.body.appendChild(ov); trap_(ov); ov.querySelector('[data-x="1"]').focus();
+      });
+    }
+    function prompt(title, opts){
+      opts = opts || {};
+      return new Promise(function(resolve){
+        var ov=document.createElement('div'); ov.className='modal-overlay';
+        var input = opts.multiline ? '<textarea class="control" id="_pmt"></textarea>'
+          : '<input class="control" id="_pmt" value="'+esc(opts.value||'')+'" placeholder="'+esc(opts.placeholder||'')+'">';
+        ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3><div class="mbody">'+(opts.body||'')+input+'</div>'+
+          '<div style="display:flex;gap:10px"><button class="btn ghost block" data-x="0" type="button">Cancel</button><button class="btn block" data-x="1" type="button">'+esc(opts.okLabel||'OK')+'</button></div></div>';
+        var field=ov.querySelector('#_pmt'); if(opts.multiline && opts.value) field.value=opts.value;
+        function done(v){ ov.remove(); resolve(v); }
+        ov.querySelector('[data-x="0"]').onclick=function(){ done(null); };
+        ov.querySelector('[data-x="1"]').onclick=function(){ done(field.value); };
+        field.addEventListener('keydown', function(e){ if(e.key==='Enter' && !opts.multiline){ e.preventDefault(); done(field.value); } if(e.key==='Escape') done(null); });
+        document.body.appendChild(ov); trap_(ov); field.focus();
+      });
+    }
+    /* Inline SVG icon set (stroke = currentColor). Replaces emoji glyphs so the UI renders
+       identically across platforms/fonts. Usage: FormsUI.icon('trash') or icon('info',{size:14}). */
+    var ICON_PATHS = {
+      up:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+      down:'<path d="M12 5v14M19 12l-7 7-7-7"/>',
+      dup:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/>',
+      trash:'<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
+      chevron:'<path d="M6 9l6 6 6-6"/>',
+      check:'<path d="M20 6L9 17l-5-5"/>',
+      eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
+      clip:'<path d="M21 8.5l-9.2 9.2a4 4 0 0 1-5.7-5.7l8.5-8.5a2.5 2.5 0 0 1 3.5 3.5l-8.5 8.5a1 1 0 0 1-1.4-1.4l7.8-7.8"/>',
+      plus:'<path d="M12 5v14M5 12h14"/>',
+      minus:'<path d="M5 12h14"/>',
+      info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+      edit:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+      more:'<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+      grip:'<circle cx="9" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="6" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="9" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="18" r="1.3" fill="currentColor" stroke="none"/>',
+      /* pre-fill component states — same family/stroke as the rest of this set */
+      clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7.5v5l3.5 2"/>',
+      shield:'<path d="M12 3l8 3.5V11c0 4.2-3.3 7.2-8 8-4.7-.8-8-3.8-8-8V6.5z"/><path d="M12 9.5v3"/><path d="M12 15.5h.01"/>',
+      mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7.5l8.5 5.5 8.5-5.5"/>',
+      download:'<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>'
+    };
+    function icon(name, opts){
+      opts = opts || {}; var s = opts.size || 16;
+      return '<svg class="hcsi'+(opts.cls?' '+opts.cls:'')+'" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(ICON_PATHS[name]||'')+'</svg>';
+    }
+    /* ---- OTP resend cooldown, shared by BOTH code-entry screens ----
+       Mirrors the real server-side limiter (10 requests / 15 min / email — AUTH.OTP_PER_EMAIL_15MIN
+       in gas-shared/AuthKit.js) in localStorage, so the UI warns BEFORE walking into the server's
+       15-minute lockout, and so a page refresh can't reset the cooldown for free.
+
+       This lived only in Portal.html. Runner.html — the screen parents actually reach, since
+       private-form links are emailed to them — still had a purely in-memory 20s countdown that a
+       refresh wiped, letting a parent hammer Resend straight into a silent lockout. Hoisted here
+       so the two screens cannot diverge again. */
+    var OTP_WINDOW_MS = 15 * 60 * 1000, OTP_SOFT_LIMIT = 8;  // stay under the real limit of 10
+    function otpSendLogKey_(email){ return 'hcsOtpSends:' + String(email||'').trim().toLowerCase(); }
+    function otpRecentSends(email){
+      var raw; try { raw = JSON.parse(localStorage.getItem(otpSendLogKey_(email)) || '[]'); } catch(e){ raw = []; }
+      var cutoff = Date.now() - OTP_WINDOW_MS;
+      return Array.isArray(raw) ? raw.filter(function(t){ return t > cutoff; }) : [];
+    }
+    function otpRecordSend(email){
+      var log = otpRecentSends(email); log.push(Date.now());
+      try { localStorage.setItem(otpSendLogKey_(email), JSON.stringify(log)); } catch(e){}
+      return log;
+    }
+    /** ms until another request is safe, or 0 — based on the persisted rolling window. */
+    function otpCooldownRemainingMs(email){
+      var log = otpRecentSends(email);
+      if (log.length < OTP_SOFT_LIMIT) return 0;
+      return Math.max(0, (log[0] + OTP_WINDOW_MS) - Date.now());
+    }
+    /* ---- announcing view changes (P9) ----
+       Every shell in this app replaces app.innerHTML wholesale on each state change (form ->
+       submitted, step 1 -> step 2, portal -> OTP). For a sighted user that's obvious; for a
+       screen-reader or keyboard user it was silent, and focus silently reset to the top of the
+       document. announce() speaks the change through one persistent polite live region (created
+       once, OUTSIDE the swapped container so it survives the swap), and focusView() moves focus
+       to the new view's heading so the next Tab starts in the right place. */
+    function liveRegion_(){
+      var el = document.getElementById('hcsLive');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'hcsLive';
+        el.setAttribute('role','status');
+        el.setAttribute('aria-live','polite');
+        el.setAttribute('aria-atomic','true');
+        // Visually hidden but not display:none — display:none is not announced.
+        el.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;padding:0;margin:-1px';
+        document.body.appendChild(el);
+      }
+      return el;
+    }
+    function announce(msg){
+      var el = liveRegion_();
+      // Re-setting identical text isn't re-announced; clearing first forces it.
+      el.textContent = '';
+      setTimeout(function(){ el.textContent = String(msg || ''); }, 30);
+    }
+    /** Focus a container's heading (or the container) without scrolling the page again. */
+    function focusView(rootEl){
+      if (!rootEl) return;
+      var h = rootEl.querySelector('h1, h2, .form-title, .section-head') || rootEl;
+      if (!h.hasAttribute('tabindex')) h.setAttribute('tabindex','-1');
+      try { h.focus({ preventScroll: true }); } catch (e) { try { h.focus(); } catch (x) {} }
+    }
+
+    /* ---- per-context branding, resolved once for every shell ----
+       SITE_NAME / SITE_LOGO / ORG_NAME come from each app's Index.html (server-side
+       brandTokens_, Theme.js). Unset SITE_LOGO falls back to the built-in HCS eagle above, and
+       unset ORG_NAME to "Harford Christian School" — so HCS's apps render exactly as before,
+       while MACS stops showing HCS's logo and footer. */
+    function brand(){
+      return {
+        name: (typeof SITE_NAME !== 'undefined' && SITE_NAME) || 'HCS Forms',
+        logo: (typeof SITE_LOGO !== 'undefined' && SITE_LOGO) || HCS_LOGO,
+        org:  (typeof ORG_NAME  !== 'undefined' && ORG_NAME)  || 'Harford Christian School'
+      };
+    }
+    /* Standard brandbar inner markup (logo + name), optionally wrapped in a link. */
+    function brandbarInner(hrefOrNull){
+      var b = brand();
+      var img = '<img class="logo" src="' + esc(b.logo) + '" alt="' + esc(b.name) + '"><span class="name">' + esc(b.name) + '</span>';
+      return hrefOrNull
+        ? '<a href="' + esc(hrefOrNull) + '" target="_top" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit">' + img + '</a>'
+        : img;
+    }
+    /* Footer line — the organisation, not a hardcoded school name. */
+    function brandFooter(){ return '<div class="footer">' + esc(brand().org) + '</div>'; }
+
+    /**
+     * The one honest way out of the OTP screens, shared by Portal.html and Runner.html.
+     *
+     * authRequestOtp deliberately returns the SAME "a code is on its way" answer whether or not
+     * the address is on file (anti-enumeration, gas-shared/AuthKit.js), and both screens repeat
+     * that as fact. For a parent whose FACTS record holds a different address, the result was a
+     * silent dead end: no code ever arrives, nothing on screen admits that's possible, and there
+     * is no support path or way back to the other sign-in options.
+     *
+     * opts: { supportContact, chooserUrl, stage: 'email'|'code' }. Both URLs/strings are optional
+     * — whatever isn't configured simply isn't rendered, so an unset Config key degrades to the
+     * generic wording rather than a broken link.
+     */
+    function otpHelpHtml(opts){
+      opts = opts || {};
+      var contact = String(opts.supportContact || '').trim();
+      var who = contact
+        ? 'contact the school office at <strong>' + esc(contact) + '</strong>'
+        : 'contact the school office';
+      var lines = [];
+      if (opts.stage === 'code') {
+        lines.push('<p class="help" style="margin:0">No code after about 5 minutes? Check your spam folder first. ' +
+          'If it still hasn\'t arrived, the school may have a different email address on file for you — ' + who + '.</p>');
+      } else {
+        lines.push('<p class="help" style="margin:0">Use the email address the school has on file for you. ' +
+          'If you\'re not sure which that is, ' + who + '.</p>');
+      }
+      if (opts.chooserUrl) {
+        lines.push('<p class="help" style="margin:6px 0 0"><a href="' + esc(opts.chooserUrl) + '" target="_top">' +
+          'Not a parent? See the other ways to sign in</a></p>');
+      }
+      return '<div style="margin-top:4px">' + lines.join('') + '</div>';
+    }
+    /**
+     * Wipe every saved form draft/attachment-draft on this device (localStorage), regardless of
+     * which form(s) they belong to. Both sign-outs need this so a shared device doesn't hand the
+     * next person's answers, signature, or attachments to whoever signs in after them — Runner.html
+     * had its own copy (draft keys are per-FORM_ID there); Portal.html's signOut had none at all
+     * (P16), the gap a second parent on the same browser fell into. Hoisted here so the two
+     * screens can't diverge again — same move already made for the OTP cooldown above.
+     */
+    function clearAllDrafts(prefixes){
+      try {
+        var kill = [];
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (k && prefixes.some(function(p){ return k.indexOf(p) === 0; })) kill.push(k);
+        }
+        kill.forEach(function (k) { localStorage.removeItem(k); });
+      } catch (e) {}
+    }
+    /**
+     * Base error-code -> friendly-sentence map shared by every parent/MACS-facing screen
+     * (M13 — the MACS gate in apps/runner-macs/pages/Index.html can't see Runner.html's private
+     * friendlyErr_, and duplicating the map there would let the two drift, same as clearAllDrafts
+     * above). Runner.html/Portal.html wrap this with their own recovery-text/edit-mode copy;
+     * callers with nothing extra to add (the gate) can use it directly. Passes through unknown
+     * input — a genuine prose message from the server, not a bare code — unchanged.
+     */
+    var ERROR_CODE_MAP_ = {
+      AUTH_EXPIRED: 'Your session has expired. Please verify your email again.',
+      AUTH_INVALID: 'Your session is no longer valid. Please verify your email again.',
+      AUTH_REQUIRED: 'Please sign in again to continue.',
+      AUTH_LOOKUP_FAILED: 'Could not verify your account right now. Please try again in a moment.',
+      RATE_LIMITED: 'You have requested too many codes for this email. Please wait 15 minutes and try again.',
+      LOCKED: 'Too many attempts. Try again in 15 minutes.',
+      CODE_EXPIRED: 'Code expired or not found. Request a new one.',
+      CODE_INVALID: 'That code is not correct.'
+    };
+    function friendlyErrCode(e){
+      var code = String((e && e.message) || e || '');
+      return ERROR_CODE_MAP_[code] || code;
+    }
+    /* Compact header identity control — an avatar button that opens a dropdown, instead of
+       a "Signed in as x@y.com" text label. bodyHtml is whatever actions belong under the
+       identity (role-toggle, sign-out) — rendered on a normal card background, so use
+       ordinary .btn styles there, not the brandbar's white-on-red pill treatment. */
+    function profileChip(email, bodyHtml){
+      var initials = String(email||'?').trim().slice(0,1).toUpperCase();
+      return '<div class="profile-chip">' +
+        '<button id="profileBtn" class="profile-avatar" type="button" aria-haspopup="true" aria-expanded="false" title="'+esc(email)+'">'+esc(initials)+'</button>' +
+        '<div id="profileMenu" class="profile-menu" hidden>' +
+          '<div class="profile-menu-email">'+esc(email)+'</div>' +
+          (bodyHtml||'') +
+        '</div>' +
+      '</div>';
+    }
+    /* Call once after inserting profileChip()'s HTML into the DOM. */
+    function wireProfileChip(){
+      var btn = document.getElementById('profileBtn'), menu = document.getElementById('profileMenu');
+      if (!btn || !menu) return;
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var opening = menu.hidden;
+        menu.hidden = !opening;
+        btn.setAttribute('aria-expanded', String(opening));
+      };
+      document.addEventListener('click', function (e) {
+        if (!menu.hidden && e.target !== btn && !menu.contains(e.target)) { menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+      });
+    }
+    return { esc:esc, toast:toast, el:el, modal:modal, confirm:confirm, choose:choose, prompt:prompt, icon:icon,
+      profileChip:profileChip, wireProfileChip:wireProfileChip,
+      otpRecentSends:otpRecentSends, otpRecordSend:otpRecordSend, otpCooldownRemainingMs:otpCooldownRemainingMs,
+      otpHelpHtml:otpHelpHtml, brand:brand, brandbarInner:brandbarInner, brandFooter:brandFooter,
+      announce:announce, focusView:focusView, clearAllDrafts:clearAllDrafts, friendlyErrCode:friendlyErrCode };
+  })();
+</script>
+
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "HCS Forms — Form" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+  <script>
+    var APP_MODE     = DEMO_DOGET.mode;
+    var FORM_ID      = DEMO_DOGET.formId;
+    var PREVIEW_MODE = DEMO_DOGET.preview;
+    var URL_PREFILL  = JSON.parse(DEMO_DOGET.prefillParams);
+    var EDIT_SUB     = DEMO_DOGET.editSub;
+    var EDIT_TOKEN   = DEMO_DOGET.editToken;
+    var BRIDGE_TOKEN = DEMO_DOGET.bridgeToken;
+    // Per-context branding (see brandTokens_ in Theme.js). SITE_LOGO empty => the shells fall
+    // back to the built-in HCS_LOGO const in Theme.html, so HCS is unchanged.
+    var SITE_NAME    = DEMO_DOGET.siteName;
+    var SITE_LOGO    = DEMO_DOGET.brandLogo;
+    var ORG_NAME     = DEMO_DOGET.orgName;
+  </script>
+
+  <!-- Shared conditional-logic + calculation (generated from Logic.js) — must load before Runner. -->
+  <!-- GENERATED FILE — DO NOT HAND-EDIT. Produced by tools/wrap.js from SharedLogic.html. Edit the source, then run `npm run build`. -->
+<!-- GENERATED from Logic.js by tools/build-shared-logic.js — DO NOT EDIT BY HAND.
+     This is the client copy of the shared conditional-logic + calculation code.
+     Regenerate after editing Logic.js: node tools/build-shared-logic.js -->
+<script>
+/**
+ * Logic.js — the SINGLE canonical source for conditional-logic + calculation, used by
+ * the server directly (globals) AND by the client verbatim: tools/build-shared-logic.js
+ * regenerates SharedLogic.html from this file, so the runner never keeps its own copy.
+ * Kept tiny and dependency-free; unit-tested in Node (tests/logic.test.js).
+ *
+ * A showIf rule is either:
+ *   - legacy flat:     { field, op: 'equals'|'notEquals'|'contains'|'notEmpty'|'empty', value }
+ *   - multi-condition: { mode: 'all'|'any', rules: [ {field, op, value}, ... ] }
+ * No rule (null/empty/no field, or an empty rules array) → always visible / condition met.
+ * Both shapes are accepted forever — Builder only WRITES the array shape once a field's
+ * conditional-logic editor is touched (see condRules_/wireCondLogic_ in Builder.html), so a
+ * form saved before multi-condition support needs no migration.
+ */
+function evalShowIf(rule, answers) {
+  if (!rule) return true;
+  if (Array.isArray(rule.rules)) {
+    if (!rule.rules.length) return true;
+    var results = rule.rules.map(function (r) { return evalShowIfRule_(r, answers); });
+    return rule.mode === 'any' ? results.some(function (x) { return x; }) : results.every(function (x) { return x; });
+  }
+  return evalShowIfRule_(rule, answers);
+}
+
+/** One single {field, op, value} check — the whole of evalShowIf before multi-condition support. */
+function evalShowIfRule_(rule, answers) {
+  if (!rule || !rule.field) return true;
+  var raw = answers ? resolveFieldValue_(answers, rule.field) : undefined;
+  var target = rule.value == null ? '' : String(rule.value);
+
+  if (Array.isArray(raw)) {
+    switch (rule.op) {
+      case 'contains':  return raw.indexOf(target) > -1;
+      case 'notEmpty':  return raw.length > 0;
+      case 'empty':     return raw.length === 0;
+      case 'equals':    return raw.join(', ') === target;
+      case 'notEquals': return raw.join(', ') !== target;
+      default:          return true;
+    }
+  }
+  var val = raw == null ? '' : String(raw);
+  switch (rule.op) {
+    case 'equals':    return val === target;
+    case 'notEquals': return val !== target;
+    case 'contains':  return val.toLowerCase().indexOf(target.toLowerCase()) > -1;
+    case 'notEmpty':  return val.trim() !== '';
+    case 'empty':     return val.trim() === '';
+    default:          return true;
+  }
+}
+
+/**
+ * A field key is either a plain fieldId, or "fieldId::subLabel" pointing at one sub-row of a
+ * multiAnswer field (answers[fieldId] is an object keyed by sub-row label there — see
+ * Runner.html's readValue). Plain fieldId lookups are unaffected either way. Shared by
+ * evalShowIf (a showIf.field can target one sub-row) and computeCalc (same, for calc.fields).
+ */
+function resolveFieldValue_(answers, key) {
+  var i = String(key).indexOf('::');
+  if (i === -1) return answers[key];
+  var obj = answers[key.slice(0, i)];
+  return (obj && typeof obj === 'object') ? obj[key.slice(i + 2)] : undefined;
+}
+
+/**
+ * Compute a calculation field's value. op 'count' = number of non-empty source answers
+ * (each selected checkbox counts once); anything else = sum of numeric source answers.
+ * Callers must pass VISIBLE-only answers (hidden fields blanked) so client + server agree.
+ */
+function computeCalc(field, answers) {
+  var calc = (field && field.calc) || {}, src = calc.fields || [];
+  if (calc.op === 'count') {
+    var n = 0;
+    src.forEach(function (fid) { var v = resolveFieldValue_(answers, fid); n += Array.isArray(v) ? v.length : (v !== '' && v != null ? 1 : 0); });
+    return String(n);
+  }
+  if (calc.op === 'multiply') {
+    var base = parseFloat(resolveFieldValue_(answers, src[0]));
+    if (!isFinite(base)) base = 0;
+    var factor = parseFloat(calc.factor);
+    if (!isFinite(factor)) factor = 1;
+    return String(Math.round(base * factor * 100) / 100);
+  }
+  var sum = 0;
+  src.forEach(function (fid) {
+    var v = resolveFieldValue_(answers, fid);
+    if (Array.isArray(v)) v.forEach(function (x) { var num = parseFloat(x); if (isFinite(num)) sum += num; });
+    else { var num = parseFloat(v); if (isFinite(num)) sum += num; }
+  });
+  return String(Math.round(sum * 100) / 100);
+}
+
+/**
+ * The grade AFTER the given one, for "registering for next year" defaults. Handles the HCS
+ * ladder K3→K4→K5→1→…→12; a graduating 12th-grader returns 'Graduated'. Tolerates FACTS
+ * formatting ('09'→'9', bare 'K'→'K5'). Unknown/blank grade → '' (leave the field for the user).
+ */
+function nextGrade(g) {
+  var norm = String(g == null ? '' : g).trim().toUpperCase().replace(/^0+(?=\d)/, '');
+  if (norm === 'K') norm = 'K5';
+  var ladder = ['K3', 'K4', 'K5', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  var i = ladder.indexOf(norm);
+  if (i === -1) return '';
+  return i === ladder.length - 1 ? 'Graduated' : ladder[i + 1];
+}
+
+// ---------- shared predicates (single source for server + client — no more copy-paste drift) ----------
+
+/** The one email-shape check used everywhere (client hints + server validation). */
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** A field whose answer is an ARRAY (checkboxes, or a multi student/staff picker). */
+function isMultiField(field) {
+  return field.type === 'checkboxes' ||
+    ((field.type === 'studentPicker' || field.type === 'staffPicker') && field.multiple);
+}
+
+/** "Remember from last time" is per-field (field.priorYear) EXCEPT multiAnswer, where it's
+ *  per-sub-row (field.subPriorYear = {subLabel: true}) — a plain field's whole answer is one
+ *  thing to remember, a multiAnswer's isn't. True if there's anything at all to remember. */
+function fieldHasPriorYear(field) {
+  if (field.type === 'multiAnswer') return !!(field.subPriorYear && Object.keys(field.subPriorYear).length);
+  return !!field.priorYear;
+}
+
+/** Static content types: no answer, no validation, no response column. */
+function isContentType(type) {
+  return type === 'sectionHeader' || type === 'description' || type === 'pageBreak' || type === 'faq' || type === 'sectionEnd';
+}
+
+/**
+ * Form-level settings persisted via setFormState, by coercion kind — the single list the server
+ * (Forms.setFormState) and the builder (stateFromSettings_) both iterate. Add a new simple setting
+ * HERE and it round-trips automatically; special-cased elsewhere: lifecycle (template guard),
+ * access + approval (use-as-is lock guard), locked (registry column), maxResponses (number),
+ * notifyEmails (domain filter).
+ */
+var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames'];
+var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage', 'humanDriveNameField'];
+
+/**
+ * Server error CODES → a sentence a school staff member can act on.
+ *
+ * Privileged endpoints throw bare codes on purpose (`throw new Error('DENIED')` in
+ * assertCanEdit_, 'CONFLICT' from checkAndBumpVersion_, 'ACCESS_DENIED_STUDENT' from
+ * requireStaff_, …) so the wire never carries a human-readable reason a caller could mine.
+ * The Builder then rendered those codes verbatim: opening a colleague's form produced a modal
+ * whose entire body was the word "DENIED". Only doSave had a hand-rolled map, and only for two
+ * codes — this replaces it.
+ *
+ * Unknown input passes through UNCHANGED — a genuine prose message from a thrown Error must not
+ * be swallowed or replaced by a vague catch-all.
+ */
+var ERROR_MESSAGES = {
+  DENIED: 'You don’t have access to that form. Only its owner or an admin can open it — ask them to share it, or to add you as an admin.',
+  CONFLICT: 'Someone else saved changes to this form while you were editing. Reload the form before saving again, or you’ll overwrite their work.',
+  LAYOUT_LOCKED: 'This form’s layout is locked (use as-is), so its fields can’t be changed. An admin can unlock it.',
+  AUTH_REQUIRED: 'Please sign in with your Harford Christian account and try again.',
+  AUTH_LOOKUP_FAILED: 'Couldn’t confirm your account with Google just now. Wait a moment and try again.',
+  AUTH_EXPIRED: 'Your session has expired. Reload the page to sign in again.',
+  AUTH_INVALID: 'Your session is no longer valid. Reload the page to sign in again.',
+  ACCESS_DENIED_ADMIN: 'That action is admin-only. Ask an HCS Forms admin to do it, or to add you as an admin.',
+  ACCESS_DENIED_STUDENT: 'Student accounts can’t use the form builder.',
+  'Form not found': 'That form no longer exists — it may have been deleted, or moved to another context.'
+};
+function friendlyError(code) {
+  var key = String((code && code.message) || code || '').trim();
+  return ERROR_MESSAGES[key] || key;
+}
+
+/**
+ * Attachment size limits — ONE source for the client preflight, the server guard, and every
+ * message either shows. There used to be three different numbers in play: Runner.html blocked
+ * per-file at 10 MB, RunnerApi.js's processAnswers_ flagged tooLarge above 25 MB, and the
+ * resulting message told the submitter "under about 20 MB". A parent attaching three 8 MB
+ * photos therefore passed every visible check and only failed at submit, after filling the
+ * whole form, against a number nothing on screen had mentioned.
+ *
+ * MAX_TOTAL_BYTES is deliberately the 25 MB the server ALREADY enforced, not the 20 MB the
+ * message claimed — tightening to 20 would have rejected submissions that previously worked.
+ * The messages moved to match the code, not the reverse.
+ */
+var ATTACH_LIMITS = {
+  MAX_FILE_BYTES: 10 * 1024 * 1024,   // per individual file (Runner.html + uploadAnswerFiles_)
+  MAX_TOTAL_BYTES: 25 * 1024 * 1024   // all attachments on one submission (processAnswers_)
+};
+
+/** Human file size for UI copy: 1.4 MB, 812 KB, 0 KB. Same wording client and server. */
+function formatBytes(n) {
+  var b = Number(n) || 0;
+  if (b >= 1024 * 1024) return (Math.round(b / (1024 * 1024) * 10) / 10) + ' MB';
+  return Math.round(b / 1024) + ' KB';
+}
+
+/** Shared limit copy so the client's warning and the server's rejection can't drift apart. */
+function attachTotalTooLargeMsg() {
+  return 'Your attachments add up to more than ' + formatBytes(ATTACH_LIMITS.MAX_TOTAL_BYTES) +
+    ' in total — please remove or shrink one before submitting.';
+}
+function attachFileTooLargeMsg(name) {
+  return (name ? '"' + name + '" is' : 'That file is') + ' larger than ' +
+    formatBytes(ATTACH_LIMITS.MAX_FILE_BYTES) + ' and can\'t be attached.';
+}
+
+/**
+ * What to say about last year's answers on a MACS school form.
+ *
+ * Nothing is ever filled in unprompted. The form OFFERS, the respondent accepts, and only then
+ * does anything touch a field — including when a verified session from earlier in the visit is
+ * already in hand, which skips the code but still asks. Two silent writers to the same inputs
+ * (a restored draft and a prior-year fill) is exactly what made those two features
+ * indistinguishable, so neither writes without being asked.
+ *
+ * Once accepted, the component names the verified email: a form that has just filled itself in
+ * has to answer "on whose authority", and the address is the answer.
+ *
+ * Returns null (say nothing — this school can't verify at all), or
+ * { phase:'offer', icon, title, detail, action:{kind:'verify'|'use', label}, dismissible:true }, or
+ * { phase:'verified', icon, title, detail, action:null, dismissible:false }.
+ */
+function schoolPrefillNotice(state) {
+  if (!state || !state.school || !state.otpAvailable) return null;
+  var school = String(state.school);
+
+  if (state.verified) {
+    var filled = Number(state.filled) || 0;
+    var email = state.email ? String(state.email) : '';
+    return {
+      phase: 'verified', icon: filled > 0 ? 'check' : 'info',
+      title: email ? 'Verified as ' + email : 'Verified',
+      detail: filled > 0
+        ? filled + (filled === 1 ? ' answer ' : ' answers ') + 'from last year filled in — marked below.'
+        : 'No previous answers on file for ' + school + '.',
+      action: null, dismissible: false
+    };
+  }
+  return {
+    phase: 'offer', icon: 'shield',
+    title: 'Save time — reuse last year’s answers',
+    detail: 'Verify an email on file for ' + school + ' and the answers that don’t change year ' +
+      'to year will be filled in for you. First time filling this out? Verify anyway — it\'s what ' +
+      'lets next year\'s form fill itself in from what you enter today.',
+    // A session already verified earlier this visit shouldn't be asked for a code again, but it
+    // still doesn't get to fill anything until this button is pressed.
+    action: state.hasToken
+      ? { kind: 'use', label: 'Use last year’s answers' }
+      : { kind: 'verify', label: 'Verify my email' },
+    dismissible: true
+  };
+}
+</script>
+
+
+  <div id="app"></div>
+
+  
+    <!-- GENERATED FILE — DO NOT HAND-EDIT. Produced by tools/wrap.js from Runner.html. Edit the source, then run `npm run build`. -->
+<!-- Runner.html — respondent form-fill UI (raw include).
+     Open forms: render → validate → submit. Private forms: FACTS email OTP login,
+     then the form auto-fills the parent's name, email (locked), and student(s).
+     Access is enforced server-side; this UI only mirrors it. -->
+<script>
+(function () {
+  // A focused number input silently changes value on mouse-wheel scroll in every major
+  // browser — easy to trigger by just scrolling the page with the cursor over one. Blurring it
+  // on wheel is the standard fix: only a FOCUSED number input reacts to wheel deltas, so losing
+  // focus stops the value from changing, and the page keeps scrolling normally underneath
+  // (nothing here calls preventDefault, so scrolling itself is never blocked). Delegated on
+  // `document` so it covers every number field across every page/re-render, not just the ones
+  // present at load.
+  document.addEventListener('wheel', function (e) {
+    if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'number' && document.activeElement === e.target) {
+      e.target.blur();
+    }
+  }, { passive: true });
+  var app = document.getElementById('app');
+  var TOKEN_KEY = 'hcsFormsToken';
+  var TOKEN = null; try { TOKEN = localStorage.getItem(TOKEN_KEY); } catch (e) {}
+  // MACS-only: a school requiring OTP hands its verified session token through the URL (no
+  // localStorage concept there — it's per-school, minted at the schoolGate, see Router.js/
+  // Index.html), not the parent-OTP localStorage token above. Wins when present.
+  if (typeof SCHOOL_TOKEN !== 'undefined' && SCHOOL_TOKEN) TOKEN = SCHOOL_TOKEN;
+  // ...or one verified earlier this browser session for the same school (renderSchoolCode), so a
+  // second private form in the same visit doesn't ask again.
+  if (!TOKEN && typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) {
+    try { TOKEN = sessionStorage.getItem('hcsSchoolToken:' + URL_PREFILL.School) || TOKEN; } catch (e) {}
+  }
+  var IS_PREVIEW = (typeof PREVIEW_MODE !== 'undefined' && PREVIEW_MODE === '1');
+  var EDIT_ID = (typeof EDIT_SUB !== 'undefined' && EDIT_SUB) ? EDIT_SUB : '';
+  var EDIT_T  = (typeof EDIT_TOKEN !== 'undefined' && EDIT_TOKEN) ? EDIT_TOKEN : '';
+  var IS_EDIT = !!EDIT_ID;
+  var EDIT_ANSWERS = null; // stored answers to pre-fill when editing
+  var ON_FILE = {};        // fieldId -> true when a file/signature is already on record
+  var FIELDS = [];      // flat INPUT-field metadata (values + validation)
+  var VISALL = [];      // ALL fields incl. section headers/descriptions (for show/hide)
+  var PREFILL = null;   // { parent:{first,last,email}, students:[...] } for verified parents
+  var PRIOR_WROTE = [];      // cells applyPriorAnswers_ filled, for the pre-fill component's undo
+  var PF_OFFER_HIDDEN = false; // respondent chose "Start from blank" on this page load
+  var VIA = 'open';
+  var WHO = '';         // signed-in email for the brandbar badge (sso only — otp has its own inline banner)
+  var PORTAL_URL = '';  // logo click target — that visitor's own portal (public or staff, by access)
+  var otpEmail = '';
+  var ATTACH = {};      // fieldId -> [{ name, mimeType, b64 }] for file/signature fields
+  var SIG_DRAWN = {};   // fieldId -> true once the signature canvas has strokes
+  var PENDING_READS = 0; // in-flight FileReader count; block submit/next until 0
+  var PAGES = [];       // [{ title, fields:[...] }] split at pageBreak markers
+  var CUR = 0;          // current page index
+  var LOCKED = false;
+  var FORM = null;      // the current form object (for "save & add another child")
+  var LAST_ANSWERS = null; // answers of the just-submitted response (to carry over between children)
+  var REVIEW_SHOWN = false; // show the review-mode "two emails" notice only once per session
+  // Optional Config keys (SUPPORT_CONTACT / CHOOSER_URL) delivered on the auth-required
+  // response. Blank when unset — FormsUI.otpHelpHtml degrades to generic wording.
+  var SIX_DIGITS_RE = new RegExp('^[0-9]{6}$');
+  var SUPPORT_CONTACT_ = '';
+  var CHOOSER_URL_ = '';
+
+  loadForm();
+
+  function loadForm() {
+    shell('<div class="card flush-top card-pad center"><span class="spinner" style="border-color:rgba(139,30,30,.25);border-top-color:var(--hcs-red)"></span><p class="help" style="margin-top:10px">Loading form…</p></div>');
+    var runner = google.script.run
+      .withSuccessHandler(onForm)
+      .withFailureHandler(function (e) { message('Something went wrong', friendlyErr_(e)); });
+    if (IS_PREVIEW) runner.getFormPreview(FORM_ID);
+    else if (IS_EDIT) runner.getSubmissionForEdit(FORM_ID, EDIT_ID, EDIT_T);
+    else runner.getPublicForm(FORM_ID, TOKEN);
+  }
+
+  function onForm(res) {
+    if (!res) return message('Unavailable', 'This form can’t be shown right now.');
+    if (!res.ok) {
+      SUPPORT_CONTACT_ = res.supportContact || '';
+      CHOOSER_URL_ = res.chooserUrl || '';
+      // P14: every dead-end (not-found, closed, edit-disabled, bad-token, ...) now carries the
+      // same portalUrl a successful load would — set it before renderOtp/message so the
+      // brandbar logo (shell()) links somewhere real instead of nowhere on a dead-end page.
+      PORTAL_URL = res.portalUrl || '';
+      if (res.reason === 'auth-required' && res.access === 'private') {
+        // A Private form means different things per context. On an 'open-picker' context (MACS)
+        // there is no FACTS directory to check a guardian against - "private" there means
+        // verifying against the picked school's own email allowlist (requireSchool_ /
+        // macsVerifyOtp). The server tells us which credential it can actually accept.
+        return res.verifyWith === 'school' ? renderSchoolVerify() : renderOtp();
+      }
+      return message.apply(null, reasonText(res));
+    }
+    PREFILL = res.prefill || null;
+    VIA = res.verifiedVia || 'open';
+    WHO = res.who || '';
+    PORTAL_URL = res.portalUrl || '';
+    if (IS_EDIT) {
+      EDIT_ANSWERS = res.answers || {}; ON_FILE = res.onFile || {};
+      // No FACTS session in edit mode — rebuild a minimal prefill so any studentPicker
+      // renders its stored option(s) and can show the saved selection.
+      var studs = [];
+      (res.form.pages || []).forEach(function (pg) { (pg.fields || []).forEach(function (f) {
+        if (f.type !== 'studentPicker') return;
+        var v = EDIT_ANSWERS[f.id];
+        (Array.isArray(v) ? v : (v ? [v] : [])).forEach(function (name) {
+          if (name && !studs.some(function (s) { return s.displayName === name; })) studs.push({ displayName: name, grade: '', first: '', last: '' });
+        });
+      }); });
+      PREFILL = { parent: {}, students: studs };
+    }
+    renderForm(res.form);
+  }
+
+  // ---------- shell / messages ----------
+  function shell(inner) {
+    // Logo links back to the visitor's own portal once known (after the form loads) —
+    // a real navigation (target=_top), not a client-side reset, since Runner has no
+    // "home" state of its own to reset to.
+    // Logo/name/footer come from this context's brand tokens (FormsUI.brand) — the HCS eagle
+    // and the literal "Harford Christian School" used to be hardcoded here, so a MACS form was
+    // HCS-branded with MACS colours.
+    var logo = FormsUI.brandbarInner(PORTAL_URL || null);
+    // Identity + sign-out live in a compact profile chip (avatar + dropdown), not a separate
+    // body banner or a plain "Signed in as x@y.com" label. Three cases: verified parent
+    // (otp), verified staff (sso, no sign-out — that's a real Google session), or a stale
+    // parent session left on this device from a previous form that this one didn't need.
+    var profileEmail = '', profileBody = '';
+    if (VIA === 'otp' && PREFILL && PREFILL.parent) {
+      var pName = ((PREFILL.parent.first || '') + ' ' + (PREFILL.parent.last || '')).trim();
+      profileEmail = pName || PREFILL.parent.email;
+      profileBody = '<button id="signOutHeader" class="btn ghost sm block" type="button">Sign out</button>';
+    } else if (VIA === 'sso' && WHO) {
+      profileEmail = WHO;
+    } else if (TOKEN && !IS_EDIT) {
+      profileEmail = 'Signed in on this device';
+      profileBody = '<button id="signOutHeader" class="btn ghost sm block" type="button">Sign out</button>';
+    }
+    var who = profileEmail ? '<span class="brandbar-right">' + FormsUI.profileChip(profileEmail, profileBody) + '</span>' : '';
+    app.innerHTML =
+      '<div class="page">' +
+        '<div class="brandbar">' + logo + who +
+        '</div><div class="goldrule"></div>' +
+        inner +
+        FormsUI.brandFooter() +
+      '</div>';
+    FormsUI.wireProfileChip();
+    var so = document.getElementById('signOutHeader'); if (so) so.addEventListener('click', signOut);
+  }
+  /**
+   * P14: dead-end screens (form closed, link expired, not found) previously had no way out
+   * except the back button — the actions row below offers whichever routes the server actually
+   * resolved (never a dead link: each piece renders only when its value exists).
+   */
+  function deadEndActionsHtml_() {
+    var rows = [];
+    if (PORTAL_URL) rows.push('<a class="btn ghost sm" href="' + FormsUI.esc(PORTAL_URL) + '" target="_top">See your forms</a>');
+    if (CHOOSER_URL_) rows.push('<a class="btn ghost sm" href="' + FormsUI.esc(CHOOSER_URL_) + '" target="_top">Other ways to sign in</a>');
+    if (!rows.length && !SUPPORT_CONTACT_) return '';
+    var contact = SUPPORT_CONTACT_
+      ? '<p class="help" style="margin-top:10px">Questions? Contact the school office at <strong>' + FormsUI.esc(SUPPORT_CONTACT_) + '</strong>.</p>' : '';
+    return (rows.length ? '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">' + rows.join('') + '</div>' : '') + contact;
+  }
+  function message(title, body) {
+    shell('<div class="card flush-top card-pad"><h1 class="form-title">' + FormsUI.esc(title) + '</h1>' +
+      '<p class="form-desc">' + FormsUI.esc(body || '') + '</p>' + deadEndActionsHtml_() + '</div>');
+    // These are dead ends (form closed, link expired, not found) — the most important thing on
+    // the page and previously announced to nobody.
+    FormsUI.announce(title + '. ' + (body || ''));
+    FormsUI.focusView(document.querySelector('#app .card'));
+  }
+  function reasonText(res) {
+    var r = res && res.reason;
+    if (r === 'not-found') return ['Form not found', 'This form does not exist or the link is incorrect.'];
+    if (r === 'not-open') return ['Not open yet', 'This form opens ' + fmtWhen(res.openDate) + '. Please check back then.'];
+    if (r === 'closed') return ['This form is closed', 'The deadline' + (res.closeDate ? ' (' + fmtWhen(res.closeDate) + ')' : '') + ' has passed.'];
+    if (r === 'full') return ['This form is full', 'It has reached its response limit and can no longer accept submissions.'];
+    if (r === 'locked' || r === 'not-published') return ['Form unavailable', 'This form is not currently accepting responses.'];
+    if (r === 'auth-required') return ['Sign-in required', 'This form is only available to staff.'];
+    if (r === 'bad-token') return ['Link expired', 'This edit link is no longer valid. Please use the most recent confirmation email.'];
+    if (r === 'edit-disabled') return ['Editing is off', 'This form’s responses can’t be edited after submitting.'];
+    if (r === 'not-editable') return ['Can’t edit this response', 'This response has already been ' + (String(res.status || '').toLowerCase() || 'processed') + ' and can no longer be changed.'];
+    return ['Unavailable', 'This form can’t be shown right now.'];
+  }
+  /** Map raw server error codes (TokenLogic.verify's AUTH_* — see requireParent_) to a message
+   *  a parent can act on, instead of showing the bare code. Draft answers are never lost when
+   *  this fires — see the per-form localStorage autosave in saveDraft/loadDraft. */
+  function friendlyErr_(e) {
+    var code = String(e && e.message || e);
+    // Only promise what's actually recoverable. saveDraft()/saveAttachDraft() are both no-ops
+    // in edit mode (P17 — an edit draft silently outliving a submitted response is its own
+    // trap), so an editing session that expires must NOT claim the autosave it never got.
+    // Attachments ARE persisted for a new submission, but not when they exceeded the device
+    // cap (ATTACH_DRAFT_SKIPPED) — in that case say so plainly instead of telling a parent
+    // their answers "will still be here" and losing their signature.
+    var recovery = IS_EDIT
+      ? ' Your changes on this page have not been saved — please verify again and re-enter them.'
+      : (ATTACH_DRAFT_SKIPPED
+        ? ' Your typed answers are saved on this device, but your attachments are too large to save — you’ll need to attach them again.'
+        : ' Your answers are saved on this device and will still be here.');
+    // AUTH_EXPIRED/AUTH_INVALID need the recovery sentence appended (draft-state specific to this
+    // page); everything else comes straight from FormsUI's shared base map (M13) so this file and
+    // the MACS gate can't drift apart on wording.
+    var map = {
+      AUTH_EXPIRED: 'Your session has expired. Please refresh this page and verify your email again.' + recovery,
+      AUTH_INVALID: 'Your session is no longer valid. Please refresh this page and verify your email again.' + recovery
+    };
+    // Pass through unknown input — a genuine prose message from the server (not a bare code)
+    // must still show verbatim rather than being swallowed by the map miss.
+    return map[code] || FormsUI.friendlyErrCode(code);
+  }
+  function fmtWhen(s) {
+    if (!s) return 'soon';
+    var d = new Date(String(s).indexOf('T') === -1 ? s + 'T00:00:00' : s);
+    if (isNaN(d.getTime())) return String(s);
+    try { return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); } catch (e) { return d.toLocaleString(); }
+  }
+
+  // ---------- OTP login (Private forms) ----------
+  function renderOtp() {
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Verify your email</h1>' +
+        '<p class="form-desc">Enter the email ' + FormsUI.esc(FormsUI.brand().org) + ' has on file. We’ll send you a 6-digit code.</p></div>' +
+        '<div class="field"><label for="otpEmail">Email address</label><input class="control" id="otpEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>' +
+        '<div id="otpErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="otpSend" class="btn block" type="button">Send code</button>' +
+        FormsUI.otpHelpHtml({ supportContact: SUPPORT_CONTACT_, chooserUrl: CHOOSER_URL_, stage: 'email' }) +
+      '</div>');
+    document.getElementById('otpSend').addEventListener('click', sendCode);
+    document.getElementById('otpEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendCode(); });
+  }
+
+  function sendCode() {
+    var email = (document.getElementById('otpEmail').value || '').trim();
+    if (!EMAIL_RE.test(email)) return otpError('Enter a valid email address.');
+    // Warn BEFORE the server's real 15-minute lockout, using the same persisted send log
+    // Portal.html uses (FormsUI.otpCooldownRemainingMs) — a refresh can't reset it.
+    var waitMs = FormsUI.otpCooldownRemainingMs(email);
+    if (waitMs > 0) return otpError('Too many code requests for this email. Please try again in about ' + Math.ceil(waitMs / 60000) + ' minute(s).');
+    otpEmail = email;
+    var btn = document.getElementById('otpSend'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending…';
+    FormsUI.otpRecordSend(email);
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.ok === false) { btn.disabled = false; btn.textContent = 'Send code'; otpError(res.msg); return; }
+      renderCodeEntry();
+    }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Send code'; otpError(friendlyErr_(e)); })
+      .authRequestOtp(email);
+  }
+
+  function renderCodeEntry() {
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Enter your code</h1>' +
+        '<p class="form-desc">If <strong>' + FormsUI.esc(otpEmail) + '</strong> is on file, a 6-digit code is on its way. It expires in 10 minutes.</p></div>' +
+        '<div class="field"><label for="otpCode">6-digit code</label><input class="control" id="otpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>' +
+        '<div id="otpErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="otpVerify" class="btn block" type="button">Verify</button>' +
+        '<div style="display:flex;gap:10px;margin-top:8px"><button id="otpResend" class="btn ghost block" type="button">Resend code</button>' +
+        '<button id="otpBack" class="btn ghost block" type="button">Use a different email</button></div>' +
+        FormsUI.otpHelpHtml({ supportContact: SUPPORT_CONTACT_, chooserUrl: CHOOSER_URL_, stage: 'code' }) +
+      '</div>');
+    document.getElementById('otpVerify').addEventListener('click', verifyCode);
+    document.getElementById('otpBack').addEventListener('click', renderOtp);
+    var resend = document.getElementById('otpResend');
+    // Cooldown state is restored from the PERSISTED send log on every render, so a refresh no
+    // longer buys a free reset — this screen used to have only an in-memory 20s countdown and
+    // would happily let a parent walk into the server's 15-minute lockout with no warning.
+    // Mirrors Portal.html's behavior exactly (same FormsUI helpers).
+    var armResendCooldown_ = function (seconds) {
+      var n = Math.ceil(seconds);
+      resend.disabled = true; resend.textContent = 'Resend in ' + n + 's';
+      var t = setInterval(function () {
+        n--; resend.textContent = n > 0 ? 'Resend in ' + n + 's' : 'Resend code';
+        if (n <= 0) { clearInterval(t); resend.disabled = false; }
+      }, 1000);
+    };
+    var lockMs = FormsUI.otpCooldownRemainingMs(otpEmail);
+    if (lockMs > 0) {
+      resend.disabled = true;
+      resend.textContent = 'Try again in ' + Math.ceil(lockMs / 60000) + 'm';
+      setTimeout(function () { resend.disabled = false; resend.textContent = 'Resend code'; }, lockMs);
+    } else {
+      armResendCooldown_(20);
+    }
+    resend.addEventListener('click', function () {
+      var waitMs = FormsUI.otpCooldownRemainingMs(otpEmail);
+      if (waitMs > 0) { FormsUI.toast('Too many requests — try again in ' + Math.ceil(waitMs / 60000) + ' minute(s).'); return; }
+      FormsUI.otpRecordSend(otpEmail);
+      armResendCooldown_(20);
+      google.script.run.withSuccessHandler(function (res) {
+        FormsUI.toast(res && res.ok === false ? res.msg : 'New code sent (if the email is on file)');
+      }).authRequestOtp(otpEmail);
+    });
+    FormsUI.announce('Enter the 6-digit code we sent to ' + otpEmail + '.');
+    var codeEl = document.getElementById('otpCode');
+    codeEl.focus();
+    codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') verifyCode(); });
+  }
+
+  function verifyCode() {
+    var code = (document.getElementById('otpCode').value || '').trim();
+    if (!/^\d{6}$/.test(code)) return otpError('Enter the 6-digit code.');
+    var btn = document.getElementById('otpVerify'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Verifying…';
+    google.script.run.withSuccessHandler(function (res) {
+      if (res && res.ok && res.token) {
+        TOKEN = res.token; try { localStorage.setItem(TOKEN_KEY, TOKEN); } catch (e) {}
+        loadForm();
+      } else {
+        btn.disabled = false; btn.textContent = 'Verify';
+        otpError((res && res.msg) || 'That code is not correct.');
+      }
+    }).withFailureHandler(function (e) { btn.disabled = false; btn.textContent = 'Verify'; otpError(friendlyErr_(e)); })
+      .authVerifyOtp(otpEmail, code);
+  }
+
+  function otpError(msg) { var e = document.getElementById('otpErr'); if (e) { e.style.display = 'block'; e.textContent = msg; } }
+
+  // ---------- school-email verification (Private forms on an 'open-picker' context) ----------
+  /** The school this visitor picked at the gate - it rides on the URL as ?School=... */
+  function pickedSchool_() {
+    return (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
+  }
+  function renderSchoolVerify() {
+    var school = pickedSchool_();
+    if (!school) {
+      // Shouldn't happen (runner-macs's doGet sends any ?form= without a School to the gate
+      // first), but never leave a dead end if it does.
+      return message('Choose your school first',
+        'Open this form from your school\u2019s forms list so we know which school you\u2019re with.');
+    }
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Verify your email</h1>' +
+        '<p class="form-desc">This form is limited to <strong>' + FormsUI.esc(school) + '</strong>. ' +
+        'Enter an email address on file for your school and we\u2019ll send you a 6-digit code.</p></div>' +
+        '<div class="field"><label for="svEmail">Email address</label>' +
+          '<input class="control" id="svEmail" type="email" autocomplete="email" placeholder="you@example.com"></div>' +
+        '<div id="svErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="svSend" class="btn block" type="button">Send code</button>' +
+        FormsUI.otpHelpHtml({ supportContact: SUPPORT_CONTACT_, stage: 'email' }) +
+      '</div>');
+    FormsUI.focusView(document.querySelector('#app .card'));
+    var send = function () {
+      var email = (document.getElementById('svEmail').value || '').trim();
+      if (!EMAIL_RE.test(email)) return svError('Enter a valid email address.');
+      var waitMs = FormsUI.otpCooldownRemainingMs(email);
+      if (waitMs > 0) return svError('Too many code requests for this email. Please try again in about ' + Math.ceil(waitMs / 60000) + ' minute(s).');
+      otpEmail = email;
+      var btn = document.getElementById('svSend');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
+      FormsUI.otpRecordSend(email);
+      google.script.run.withSuccessHandler(function (res) {
+        if (res && res.ok === false) { btn.disabled = false; btn.textContent = 'Send code'; svError(res.msg); return; }
+        renderSchoolCode(school);
+      }).withFailureHandler(function (e) {
+        btn.disabled = false; btn.textContent = 'Send code'; svError(friendlyErr_(e));
+      }).macsRequestOtp(school, email);
+    };
+    document.getElementById('svSend').addEventListener('click', send);
+    document.getElementById('svEmail').addEventListener('keydown', function (e) { if (e.key === 'Enter') send(); });
+  }
+  function renderSchoolCode(school) {
+    shell(
+      '<div class="card flush-top card-pad stack">' +
+        '<div><h1 class="form-title">Enter your code</h1>' +
+        '<p class="form-desc">If <strong>' + FormsUI.esc(otpEmail) + '</strong> is on file for ' +
+        FormsUI.esc(school) + ', a 6-digit code is on its way. It expires in 10 minutes.</p></div>' +
+        '<div class="field"><label for="svCode">6-digit code</label>' +
+          '<input class="control" id="svCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>' +
+        '<div id="svErr" class="notice err" role="alert" style="display:none"></div>' +
+        '<button id="svVerify" class="btn block" type="button">Verify</button>' +
+        '<button id="svBack" class="btn ghost block" type="button" style="margin-top:8px">Use a different email</button>' +
+        FormsUI.otpHelpHtml({ supportContact: SUPPORT_CONTACT_, stage: 'code' }) +
+      '</div>');
+    FormsUI.announce('Enter the 6-digit code we sent to ' + otpEmail + '.');
+    var verify = function () {
+      var code = (document.getElementById('svCode').value || '').trim();
+      if (!SIX_DIGITS_RE.test(code)) return svError('Enter the 6-digit code.');
+      var btn = document.getElementById('svVerify');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Verifying...';
+      google.script.run.withSuccessHandler(function (res) {
+        if (res && res.ok && res.token) {
+          // Same session token the gate mints. Held in sessionStorage rather than the parent-OTP
+          // localStorage key: it is school-scoped, not person-scoped, and shouldn't outlive the
+          // browser session on a shared office machine.
+          TOKEN = res.token;
+          try { sessionStorage.setItem('hcsSchoolToken:' + school, res.token); } catch (e) {}
+          loadForm();
+          return;
+        }
+        btn.disabled = false; btn.textContent = 'Verify';
+        svError((res && res.msg) || 'That code is not correct.');
+      }).withFailureHandler(function (e) {
+        btn.disabled = false; btn.textContent = 'Verify'; svError(friendlyErr_(e));
+      }).macsVerifyOtp(school, otpEmail, code);
+    };
+    document.getElementById('svVerify').addEventListener('click', verify);
+    document.getElementById('svBack').addEventListener('click', function () { renderSchoolVerify(); });
+    var codeEl = document.getElementById('svCode');
+    codeEl.focus();
+    codeEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') verify(); });
+  }
+  function svError(msg) { var e = document.getElementById('svErr'); if (e) { e.style.display = 'block'; e.textContent = msg; } }
+
+  function signOut() {
+    TOKEN = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    // Signing out on a shared device must not leave this person's answers, signature, or
+    // attachments behind for whoever sits down next (see draftScope_).
+    clearAllDrafts_();
+    ATTACH = {}; SIG_DRAWN = {}; ATTACH_DRAFT_SKIPPED = false;
+    loadForm();
+  }
+
+  // "Start over" / "Submit another response": a fresh, empty copy of this form. Never
+  // location.reload() — the Runner lives inside HtmlService's googleusercontent sandbox iframe,
+  // and reloading that inner frame on its own drops the page payload and leaves a blank white
+  // screen. Re-fetching through loadForm() re-renders in place and keeps the sign-in session.
+  function restartForm_() {
+    ATTACH = {}; SIG_DRAWN = {}; ATTACH_DRAFT_SKIPPED = false;
+    LAST_ANSWERS = null; PRIOR_WROTE = []; PF_OFFER_HIDDEN = false;
+    loadForm();
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+
+  // ---------- render form ----------
+  function renderForm(form) {
+    FORM = form;
+    FIELDS = []; VISALL = [];
+    var body = '<div class="card flush-top card-pad stack">';
+    if (IS_PREVIEW) body += '<div class="notice info">' + FormsUI.icon('eye') + ' <strong>Preview</strong> — this is exactly what submitters see (with sample data). Nothing is saved.</div>';
+    if (IS_EDIT) body += '<div class="notice info">' + FormsUI.icon('edit') + ' <strong>Editing your response</strong> — make your changes below and save. You can also withdraw it entirely.</div>';
+    // honeypot (bots fill it; humans never see it) — server drops any submission with this set
+    body += '<input type="text" id="hpField" name="hp_addr" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute!important;left:-9999px;top:auto;width:1px;height:1px;opacity:0">';
+    // Identity + sign-out now live in the header (shell()'s brandbar-right), matching
+    // Portal/Builder — not a separate body banner. "Update my info" (collapseIdentityBlock's
+    // reveal link) is the one thing that stays in the body since it's tied to specific fields.
+    body += '<a href="#" id="showIdentity" class="help" style="display:none">Update my info</a>';
+    body += '<div><h1 class="form-title">' + FormsUI.esc(form.title) + '</h1>' +
+            (form.description ? '<p class="form-desc">' + FormsUI.esc(form.description) + '</p>' : '') + '</div>';
+    if (form.locked) body += '<div class="notice err">This form is not currently accepting responses.</div>';
+    // Exactly ONE thing can stand here: the offer to reuse last year's answers, and only until
+    // it's used or dismissed. The draft is a modal question answered before this, and its
+    // outcome is a toast; per-field marks are the record of what was carried over. Nothing
+    // accumulates at the top of the form.
+    body += '<div id="formNotices"><div id="pfSlot"></div></div>';
+    body += '<div id="fields"></div>';
+    body += '<div id="attachTotal" style="margin-top:10px"></div>';
+    body += '<div id="formErr" class="notice err" role="alert" style="display:none"></div>';
+    body += '<div id="pageNav"></div>';
+    body += '</div>';
+    shell(body);
+
+    LOCKED = !!form.locked;
+    var flat = [];
+    (form.pages || []).forEach(function (pg) { (pg.fields || []).forEach(function (f) { flat.push(f); }); });
+    PAGES = [{ title: '', fields: [] }];
+    flat.forEach(function (f) {
+      if (f.type === 'pageBreak') PAGES.push({ title: f.label || '', fields: [] });
+      else PAGES[PAGES.length - 1].fields.push(f);
+    });
+    var host = document.getElementById('fields');
+    PAGES.forEach(function (pg, pi) {
+      var pdiv = FormsUI.el('div', { 'class': 'formpage stack', 'data-page': pi });
+      if (PAGES.length > 1 && pg.title) pdiv.appendChild(FormsUI.el('div', { 'class': 'section-head' }, FormsUI.esc(pg.title)));
+      pg.fields.forEach(function (f) { pdiv.appendChild(renderField(f)); });
+      host.appendChild(pdiv);
+    });
+    buildDupGroups();
+    if (!LOCKED && !IS_PREVIEW && FIELDS.some(function (f) { return f.required; })) {
+      // Say what actually gets saved. This used to read "your progress saves automatically on
+      // this device" full stop, while saveDraft() skipped file/signature fields entirely — so a
+      // parent who signed and attached a photo, then hit an expired session, lost exactly the
+      // work the sentence had promised was safe. Those are persisted now (saveAttachDraft), but
+      // only up to a size cap, so the caveat is named rather than implied.
+      var hasAttachFields = FIELDS.some(function (f) { return f.type === 'file' || f.type === 'signature'; });
+      host.parentNode.insertBefore(
+        FormsUI.el('p', { 'class': 'help', 'style': 'margin:0 0 2px' },
+          '<span class="req" aria-hidden="true">*</span> Required — your progress saves automatically on this device' +
+          (hasAttachFields ? ', including your signature and small attachments.' : '.')),
+        host);
+    }
+
+    if (!IS_EDIT) { applyPrefill(); applySchoolPrefill(); }
+    initSignatures();
+    if (IS_EDIT) {
+      FIELDS.forEach(function (f) { if (EDIT_ANSWERS && EDIT_ANSWERS[f.id] != null) writeValue(f, EDIT_ANSWERS[f.id]); });
+      markOnFileFields();
+    } else {
+      // URL-parameter prefill (staff-shared links): ?fieldId=value
+      if (typeof URL_PREFILL === 'object' && URL_PREFILL) {
+        FIELDS.forEach(function (f) { if (URL_PREFILL[f.id] != null && URL_PREFILL[f.id] !== '') writeValue(f, URL_PREFILL[f.id]); });
+      }
+      // The draft question is answered FIRST, and only then do last year's answers get a chance
+      // to fill anything. Strictly sequential — two silent writers to the same inputs is what
+      // made the two features indistinguishable in the first place.
+      resolveDraftThen_(offerPriorYear_);
+    }
+    recomputeCalc();
+    applyVisibility();
+    host.addEventListener('input', onFieldChange);
+    host.addEventListener('change', onFieldChange);
+    CUR = 0; showPage(0, false); // initial paint: don't announce or grab focus
+
+    if (form.reviewMode && !REVIEW_SHOWN) {
+      REVIEW_SHOWN = true;
+      var demo = (typeof window !== 'undefined' && window.PREVIEW) ? ' <em>(This is a demo — no email is actually sent.)</em>' : '';
+      FormsUI.modal('Before you begin',
+        'The email address you enter will receive <strong>two emails</strong> after you submit: a <strong>confirmation</strong> (to you as the requester) and a copy of the <strong>notification the form’s owner receives</strong>.' + demo,
+        'Got it');
+    }
+  }
+
+  // ---------- pagination ----------
+  function showPage(i, announceStep) {
+    CUR = Math.max(0, Math.min(i, PAGES.length - 1));
+    document.querySelectorAll('.formpage').forEach(function (p) {
+      p.style.display = (LOCKED || Number(p.getAttribute('data-page')) === CUR) ? '' : 'none';
+    });
+    renderNav();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+    // P9: scrolling is not a change of state to anyone who can't see it. Announce the step and
+    // put focus at the top of it, so Tab continues from the new page rather than the document.
+    if (announceStep !== false && PAGES.length > 1) {
+      var pageEl = document.querySelector('.formpage[data-page="' + CUR + '"]');
+      FormsUI.announce('Step ' + (CUR + 1) + ' of ' + PAGES.length + (PAGES[CUR].title ? ': ' + PAGES[CUR].title : ''));
+      FormsUI.focusView(pageEl);
+    }
+  }
+  function renderNav() {
+    var nav = document.getElementById('pageNav'); if (!nav) return;
+    if (LOCKED) { nav.innerHTML = ''; document.querySelectorAll('.formpage').forEach(function (p) { p.style.display = ''; }); return; }
+    var multi = PAGES.length > 1;
+    var prog = multi ? '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + PAGES.length + '" aria-valuenow="' + (CUR + 1) + '" aria-label="Step ' + (CUR + 1) + ' of ' + PAGES.length + '"><div class="progress-bar" style="width:' + Math.round((CUR + 1) / PAGES.length * 100) + '%"></div></div>' +
+      '<p class="help center">Step ' + (CUR + 1) + ' of ' + PAGES.length + (PAGES[CUR].title ? ' — ' + FormsUI.esc(PAGES[CUR].title) : '') + '</p>'
+      : (FIELDS.length > 8 ? '<p class="help center" id="ansCount" aria-live="polite"></p>' : '');
+    var btns = '<div style="display:flex;gap:10px;margin-top:14px">';
+    if (multi && CUR > 0) btns += '<button class="btn ghost" id="prevBtn" type="button">← Back</button>';
+    var lastPage = CUR >= PAGES.length - 1;
+    btns += lastPage
+      ? '<button class="btn block" id="submitBtn" type="button">' + (IS_EDIT ? 'Save changes' : 'Submit') + '</button>'
+      : '<button class="btn block" id="nextBtn" type="button">Next →</button>';
+    btns += '</div>';
+    if (IS_EDIT && lastPage) btns += '<div style="margin-top:10px"><button class="btn ghost block" id="withdrawBtn" type="button" style="color:var(--hcs-red)">Withdraw this response</button></div>';
+    // Clearing your own typing is a reset, so it belongs down here with submit — not in a
+    // standing banner at the top competing with the pre-fill offer for attention.
+    if (!IS_EDIT && !IS_PREVIEW && lastPage) btns += '<p class="help center" style="margin-top:12px">' +
+      '<button class="btn plain" id="startOver" type="button">Start over</button></p>';
+    nav.innerHTML = prog + btns;
+    var pv = document.getElementById('prevBtn'); if (pv) pv.onclick = function () { showPage(CUR - 1); };
+    var nx = document.getElementById('nextBtn'); if (nx) nx.onclick = onNext;
+    var sb = document.getElementById('submitBtn'); if (sb) sb.onclick = onSubmit;
+    var wb = document.getElementById('withdrawBtn'); if (wb) wb.onclick = onWithdraw;
+    var so = document.getElementById('startOver');
+    if (so) so.onclick = function () {
+      FormsUI.confirm('Start over?', 'This clears everything you have typed on this device. ' +
+        'Anything already submitted is unaffected.', 'Start over').then(function (ok) {
+        if (ok) { clearDraft(); restartForm_(); }
+      });
+    };
+    updateAnswerCount();
+  }
+  // "X of N required questions answered" — orientation on long single-page forms.
+  function updateAnswerCount() {
+    var el = document.getElementById('ansCount'); if (!el) return;
+    var ans = currentAnswers();
+    var req = FIELDS.filter(function (f) { return f.required && f.type !== 'calculation' && evalShowIf(f.showIf, ans); });
+    if (!req.length) { el.textContent = ''; return; }
+    var done = req.filter(function (f) {
+      // A typed name alone no longer counts as "answered" for a signature — must be drawn
+      // ink (or, editing, already on file) — same bar processAnswers_ enforces server-side.
+      if (f.type === 'signature') return (ATTACH[f.id] && ATTACH[f.id].length) || (IS_EDIT && ON_FILE[f.id]);
+      if (f.type === 'file') return (ATTACH[f.id] && ATTACH[f.id].length) || !fieldEmpty(f, ans[f.id]);
+      return !fieldEmpty(f, ans[f.id]);
+    }).length;
+    el.textContent = done + ' of ' + req.length + ' required questions answered';
+  }
+  function onNext() {
+    if (uploadsPending('nextBtn')) return;
+    var r = validatePage(CUR);
+    var formErr = document.getElementById('formErr');
+    if (!r.ok) { formErr.style.display = 'block'; formErr.textContent = 'Please fix the highlighted fields.'; navigateToField(r.firstBad); return; }
+    formErr.style.display = 'none';
+    showPage(CUR + 1);
+  }
+  // if files are still being read, wait and retry so an attachment is never dropped
+  function uploadsPending(btnId) {
+    if (PENDING_READS <= 0) return false;
+    var fe = document.getElementById('formErr'); if (fe) { fe.style.display = 'block'; fe.textContent = 'Your file is still attaching — one moment…'; }
+    setTimeout(function () { var b = document.getElementById(btnId); if (b) b.click(); }, 350);
+    return true;
+  }
+  function validatePage(pi) {
+    var ans = currentAnswers(), ok = true, firstBad = null;
+    PAGES[pi].fields.forEach(function (f) {
+      if (isContentType(f.type) || f.type === 'calculation') return;
+      if (!evalShowIf(f.showIf, ans)) { setErr(f, ''); return; }
+      var msg = '';
+      if (f.type === 'file') { if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please attach a file.'; }
+      else if (f.type === 'signature') { captureSignature(f); if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please sign in the box.'; }
+      else {
+        var v = readValue(f);
+        if (f.required && fieldEmpty(f, v)) msg = 'This field is required.';
+        else if (!fieldEmpty(f, v) && f.type === 'email' && !EMAIL_RE.test(v)) msg = 'Enter a valid email address.';
+        else if (!fieldEmpty(f, v)) msg = patternErr(f, v);
+      }
+      setErr(f, msg); if (msg) { ok = false; if (!firstBad) firstBad = f; }
+    });
+    return { ok: ok, firstBad: firstBad };
+  }
+  function pageOfField(fid) { for (var i = 0; i < PAGES.length; i++) if (PAGES[i].fields.some(function (f) { return f.id === fid; })) return i; return CUR; }
+  function navigateToField(f) {
+    if (!f) return; var pi = pageOfField(f.id); if (pi !== CUR) showPage(pi);
+    var w = document.querySelector('[data-fid="' + f.id + '"]'); if (!w) return;
+    w.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var c = w.querySelector('input:not([type=hidden]),select,textarea,canvas'); if (c) { try { c.focus({ preventScroll: true }); } catch (e) { try { c.focus(); } catch (x) {} } }
+  }
+  function onFieldChange(e) { applyVisibility(); recomputeCalc(); saveDraft(); updateAnswerCount(); mirrorDuplicateQuestion(e); }
+
+  // ---------- duplicate questions auto-fill each other ----------
+  // Same label + type asked twice on one form (e.g. repeated in different sections) — answering
+  // either one fills the other, live. Only plain single-control types are mirrored; file/
+  // signature/multiAnswer/calculation/content-types are excluded (no sensible generic copy).
+  var DUP_GROUPS = {}; // fieldId -> [other fieldIds sharing its label+type]
+  var DUP_MIRRORABLE_TYPES = { text: 1, textarea: 1, number: 1, email: 1, phone: 1, date: 1, time: 1,
+    dropdown: 1, radio: 1, checkboxes: 1, yesno: 1, rating: 1, studentPicker: 1, staffPicker: 1 };
+  function buildDupGroups() {
+    // Same label used under DIFFERENT sections (e.g. "Name" under "Administrator" AND under
+    // "Fine Arts Director") must never mirror each other — they're clearly different people.
+    // Fields with no section at all (or two fields in the SAME section) are unaffected and
+    // still mirror. sectionOf[fid] = the enclosing sectionHeader's id, or '' if none/reset by
+    // a sectionEnd — walked once over VISALL (the full ordered content+input list) since
+    // FIELDS alone has no section markers to walk.
+    var sectionOf = {}, curSection = '';
+    VISALL.forEach(function (f) {
+      if (f.type === 'sectionHeader') { curSection = f.id; return; }
+      if (f.type === 'sectionEnd') { curSection = ''; return; }
+      sectionOf[f.id] = curSection;
+    });
+    var byKey = {};
+    FIELDS.forEach(function (f) {
+      if (!DUP_MIRRORABLE_TYPES[f.type]) return;
+      var norm = String(f.label || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!norm) return;
+      var key = f.type + '::' + norm + '::' + (sectionOf[f.id] || '');
+      (byKey[key] = byKey[key] || []).push(f.id);
+    });
+    DUP_GROUPS = {};
+    Object.keys(byKey).forEach(function (k) {
+      var ids = byKey[k];
+      if (ids.length < 2) return;
+      ids.forEach(function (id) { DUP_GROUPS[id] = ids.filter(function (x) { return x !== id; }); });
+    });
+  }
+  function mirrorDuplicateQuestion(e) {
+    if (!e || !e.target || !e.target.closest) return;
+    var wrap = e.target.closest('[data-fid]'); if (!wrap) return;
+    var fid = wrap.getAttribute('data-fid');
+    var mates = DUP_GROUPS[fid]; if (!mates || !mates.length) return;
+    var f = FIELDS.filter(function (x) { return x.id === fid; })[0]; if (!f) return;
+    var v = readValue(f);
+    mates.forEach(function (mid) {
+      var mf = FIELDS.filter(function (x) { return x.id === mid; })[0];
+      if (mf) writeValue(mf, v);
+    });
+  }
+
+  // ---------- calculation fields ----------
+  // evalShowIf + computeCalc come from SharedLogic.html (generated from Logic.js) — one source, server-identical.
+  function recomputeCalc() {
+    var ans = currentAnswers();
+    // mirror the server: hidden fields don't count
+    FIELDS.forEach(function (f) { if (!evalShowIf(f.showIf, ans)) ans[f.id] = isMultiField(f) ? [] : ''; });
+    FIELDS.forEach(function (f) { if (f.type === 'calculation') { var el = document.getElementById('f_' + f.id); if (el) el.textContent = computeCalc(f, ans); } });
+  }
+
+  // ---------- save & resume (localStorage) ----------
+  var DRAFT_PREFIX = 'hcsFormsDraft:', ATTACH_PREFIX = 'hcsFormsAttach:';
+  // Signature/file payloads are base64 and can be large; localStorage is ~5 MB per origin for
+  // ALL keys combined. Cap what we persist well under that, and NEVER pretend we saved
+  // something we dropped (see attachRestoreNotice_).
+  var ATTACH_DRAFT_MAX_CHARS = 2 * 1024 * 1024; // ~1.5 MB of binary once base64-decoded
+  var ATTACH_DRAFT_SKIPPED = false;             // true when the payload was too big to persist
+
+  /**
+   * Drafts are scoped to WHO is filling the form, not just which form it is.
+   * The old key was 'hcsFormsDraft:<formId>' — form-scoped only — so on a shared family or
+   * library computer the next person to open the same form got the previous person's answers
+   * restored under a friendly "We restored your saved progress" notice. Scoping by verified
+   * email (or picked school, for MACS) keeps that from crossing between people on one device.
+   */
+  function draftScope_() {
+    if (VIA === 'otp' && PREFILL && PREFILL.parent && PREFILL.parent.email) return String(PREFILL.parent.email).toLowerCase();
+    var school = (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
+    if (school) return 'school:' + String(school).toLowerCase();
+    return 'anon';
+  }
+  function draftKey() { return DRAFT_PREFIX + FORM_ID + ':' + draftScope_(); }
+  function attachDraftKey() { return ATTACH_PREFIX + FORM_ID + ':' + draftScope_(); }
+
+  function saveDraft() {
+    if (IS_EDIT) return; // editing an existing response — don't touch the new-submission draft
+    try {
+      var d = {};
+      FIELDS.forEach(function (f) { if (f.type === 'file' || f.type === 'signature' || f.type === 'calculation') return; d[f.id] = readValue(f); });
+      // Underscore-prefixed so it can never collide with a field id. A draft written before this
+      // existed simply has no timestamp — draftAgeLabel_ says "earlier" for those.
+      d._savedAt = new Date().getTime();
+      localStorage.setItem(draftKey(), JSON.stringify(d));
+    } catch (e) {}
+  }
+
+  /**
+   * Persist the attachments too. Previously saveDraft() skipped file/signature fields entirely
+   * while the form promised "your progress saves automatically on this device" and
+   * friendlyErr_ told a parent whose session expired that their answers "will still be here" —
+   * so a signed, photographed physical form was silently lost on the refresh we told them to do.
+   * Called after any change to ATTACH (handleFiles / captureSignature / clearSignature).
+   */
+  function saveAttachDraft() {
+    if (IS_EDIT) return;
+    try {
+      var payload = JSON.stringify(ATTACH || {});
+      if (payload === '{}') { localStorage.removeItem(attachDraftKey()); ATTACH_DRAFT_SKIPPED = false; return; }
+      if (payload.length > ATTACH_DRAFT_MAX_CHARS) {
+        // Too big to keep. Drop any stale copy and remember to SAY so, rather than leaving a
+        // half-truthful "we saved everything" impression.
+        localStorage.removeItem(attachDraftKey());
+        ATTACH_DRAFT_SKIPPED = true;
+        return;
+      }
+      localStorage.setItem(attachDraftKey(), payload);
+      ATTACH_DRAFT_SKIPPED = false;
+    } catch (e) {
+      // Quota or private-mode failure — same rule: don't claim it's saved.
+      ATTACH_DRAFT_SKIPPED = true;
+      try { localStorage.removeItem(attachDraftKey()); } catch (e2) {}
+    }
+  }
+
+  /** Re-hydrate ATTACH from the draft, redrawing any signature back onto its canvas. */
+  function restoreAttachDraft() {
+    var raw; try { raw = localStorage.getItem(attachDraftKey()); } catch (e) { return false; }
+    if (!raw) return false;
+    var saved; try { saved = JSON.parse(raw); } catch (e) { return false; }
+    var restored = 0;
+    Object.keys(saved).forEach(function (fid) {
+      var f = FIELDS.filter(function (x) { return x.id === fid; })[0];
+      if (!f || !saved[fid] || !saved[fid].length) return;
+      ATTACH[fid] = saved[fid];
+      restored++;
+      if (f.type === 'signature') {
+        SIG_DRAWN[fid] = true;
+        var c = document.getElementById('sig_' + fid);
+        if (c) {
+          c.classList.add('has-ink');
+          var img = new Image();
+          img.onload = function () {
+            var ratio = window.devicePixelRatio || 1;
+            try { c.getContext('2d').drawImage(img, 0, 0, c.width / ratio, c.height / ratio); } catch (e) {}
+          };
+          img.src = 'data:' + (saved[fid][0].mimeType || 'image/png') + ';base64,' + saved[fid][0].b64;
+        }
+      } else {
+        var list = document.getElementById('fl_' + fid);
+        if (list) {
+          list.innerHTML = saved[fid].map(function (at) {
+            return '<div class="fitem">📎 ' + FormsUI.esc(at.name || 'file') + ' <span class="muted">(restored)</span></div>';
+          }).join('');
+        }
+      }
+    });
+    return restored > 0;
+  }
+
+  function clearAllDrafts_() { FormsUI.clearAllDrafts([DRAFT_PREFIX, ATTACH_PREFIX]); }
+  // In edit mode, note which file/signature fields already have a value so re-upload is optional.
+  function markOnFileFields() {
+    Object.keys(ON_FILE || {}).forEach(function (id) {
+      var wrap = document.querySelector('[data-fid="' + id + '"]');
+      if (wrap) wrap.appendChild(FormsUI.el('div', { 'class': 'help' }, FormsUI.icon('clip', { size: 14 }) + ' A file is already on record — leave blank to keep it, or add a new one to replace it.'));
+    });
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(draftKey()); localStorage.removeItem(attachDraftKey()); } catch (e) {}
+  }
+  /** "Tuesday", "earlier today", or "earlier" for a draft written before _savedAt existed. */
+  function draftAgeLabel_(ms) {
+    if (!ms) return 'earlier';
+    var then = new Date(ms), now = new Date();
+    var sameDay = then.toDateString() === now.toDateString();
+    if (sameDay) return 'earlier today';
+    var days = Math.round((now.getTime() - ms) / 86400000);
+    if (days <= 1) return 'yesterday';
+    if (days < 7) return 'on ' + ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][then.getDay()];
+    return 'on ' + (then.getMonth() + 1) + '/' + then.getDate();
+  }
+
+  /**
+   * Ask before touching a single field, then run `next`.
+   *
+   * This used to restore silently and explain itself afterwards in a banner — which put TWO
+   * invisible writers (this and last year's answers) into the same inputs and left the
+   * respondent to work out from two stacked rows which was which. Nothing fills a field now
+   * until this resolves, so there is only ever one source in play at a time.
+   *
+   * The modal's primary action is "Continue my draft" because Escape resolves to the primary
+   * (see FormsUI.choose) and discarding typed work must never be the accidental outcome.
+   */
+  function resolveDraftThen_(next) {
+    if (IS_EDIT || IS_PREVIEW) return next();
+    var raw; try { raw = localStorage.getItem(draftKey()); } catch (e) { raw = null; }
+    var saved = null; try { saved = raw ? JSON.parse(raw) : null; } catch (e) { saved = null; }
+    var hasAttach = false;
+    try { hasAttach = !!localStorage.getItem(attachDraftKey()); } catch (e) {}
+    var hasFields = false;
+    if (saved) Object.keys(saved).forEach(function (k) {
+      if (k === '_savedAt') return;
+      var v = saved[k];
+      if (v !== '' && !(Array.isArray(v) && !v.length)) hasFields = true;
+    });
+    if (!hasFields && !hasAttach) return next();
+
+    var when = draftAgeLabel_(saved && saved._savedAt);
+    FormsUI.choose(
+      'Pick up where you left off?',
+      '<p>You started filling out this form on this device ' + when + ' and didn’t submit it.' +
+        (hasAttach ? ' Your signature and attachments were saved too.' : '') + '</p>' +
+        '<p class="help">Starting new clears what you had typed on this device. It doesn’t ' +
+        'affect anything already submitted.</p>',
+      'Continue my draft', 'Start new'
+    ).then(function (continueDraft) {
+      if (continueDraft) {
+        var n = applyDraft_(saved);
+        FormsUI.toast(n.attach ? 'Draft restored, including your attachments' : 'Draft restored');
+      } else {
+        clearDraft();
+      }
+      next();
+    });
+  }
+
+  /** Write a previously-saved draft into the fields. Returns what came back. */
+  function applyDraft_(saved) {
+    var any = false;
+    if (saved) {
+      FIELDS.forEach(function (f) {
+        if (f.type === 'studentPicker' || f.prefillFrom) return; // verified/locked values always win
+        if (!(f.id in saved)) return;
+        var v = saved[f.id];
+        if (v === '' || (Array.isArray(v) && !v.length)) return;
+        writeValue(f, v); any = true;
+      });
+    }
+    var attachAny = restoreAttachDraft();
+    if (any || attachAny) { recomputeCalc(); applyVisibility(); }
+    return { fields: any, attach: attachAny };
+  }
+
+  function writeValue(f, v) {
+    var name = 'f_' + f.id;
+    if (isMultiField(f) || f.type === 'radio' || f.type === 'yesno' || f.type === 'rating') {
+      var arr = Array.isArray(v) ? v : [v];
+      document.querySelectorAll('input[name="' + name + '"]').forEach(function (inp) {
+        if (arr.indexOf(inp.value) > -1) { inp.checked = true; var box = inp.closest('.choice'); if (box) box.classList.add('selected'); }
+      });
+    } else { var el = document.getElementById(name); if (el && v != null) el.value = v; }
+  }
+
+  // Text block (description field) styling — f.style = {align, lineHeight, fontFamily, fontSize},
+  // set in Builder's "Text block" editor. See Builder.html's descInlineStyle_ (same mapping).
+  var DESC_FONT_STACKS = {
+    serif: 'Georgia, Times New Roman, serif',
+    mono: 'SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace',
+    rounded: 'Segoe UI Rounded, -apple-system, Segoe UI, system-ui, sans-serif'
+  };
+  var DESC_SIZE_REMS = { sm: '.8rem', '': '.9rem', lg: '1.05rem', xl: '1.25rem' };
+  // Splits on blank lines only — see Builder.html's descParagraphs_ (must match exactly, same
+  // schema data). Each paragraph falls back to f.style for anything it doesn't itself override.
+  function descParagraphs(label) { return String(label || '').split(/\n[ \t]*\n+/); }
+  function descParagraphStyle(f, i) {
+    var over = (f.paragraphStyles && f.paragraphStyles[i]) || {};
+    var base = f.style || {};
+    return { align: over.align || base.align, lineHeight: over.lineHeight || base.lineHeight,
+      fontFamily: over.fontFamily || base.fontFamily, fontSize: over.fontSize || base.fontSize };
+  }
+  function descInlineStyle(st) {
+    var out = [];
+    if (st.align) out.push('text-align:' + st.align);
+    if (st.lineHeight) out.push('line-height:' + st.lineHeight);
+    if (st.fontFamily && DESC_FONT_STACKS[st.fontFamily]) out.push('font-family:' + DESC_FONT_STACKS[st.fontFamily]);
+    if (DESC_SIZE_REMS[st.fontSize || '']) out.push('font-size:' + DESC_SIZE_REMS[st.fontSize || '']);
+    return out.join(';');
+  }
+  // Live-format a phone field to 555-123-4567 as the submitter types — strips anything that
+  // isn't a digit first, so pasted "(555) 123-4567" etc. still comes out consistent.
+  function formatPhone(v) {
+    var d = String(v || '').replace(/\D/g, '').slice(0, 10);
+    if (d.length > 6) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+    if (d.length > 3) return d.slice(0, 3) + '-' + d.slice(3);
+    return d;
+  }
+  // One multiAnswer sub-row's control — text/number/email/phone/date/time/textarea/dropdown all
+  // read back via a single element's .value, so readValue() needs no per-type branching.
+  function multiSubCtrl(f, subId) {
+    var t = f.subType || 'text';
+    if (t === 'textarea') return '<textarea class="control" id="' + subId + '"></textarea>';
+    if (t === 'dropdown') return '<select class="control" id="' + subId + '"><option value="">— Choose —</option>' +
+      (f.subOptions || []).map(function (o) { return '<option value="' + FormsUI.esc(o) + '">' + FormsUI.esc(o) + '</option>'; }).join('') + '</select>';
+    var type = ({ number: 'number', email: 'email', phone: 'tel', date: 'date', time: 'time' })[t] || 'text';
+    return '<input class="control" type="' + type + '" id="' + subId + '">';
+  }
+  function renderField(f) {
+    if (f.type === 'sectionHeader') { VISALL.push(f); return FormsUI.el('div', { 'class': 'section-head', 'data-fid': f.id }, FormsUI.esc(f.label)); }
+    if (f.type === 'sectionEnd') { VISALL.push(f); return FormsUI.el('hr', { 'class': 'section-end', 'data-fid': f.id }); }
+    if (f.type === 'description') {
+      VISALL.push(f);
+      var descHtml = descParagraphs(f.label).map(function (para, i) {
+        return '<p class="desc-block" style="' + FormsUI.esc(descInlineStyle(descParagraphStyle(f, i))) + '">' + FormsUI.esc(para) + '</p>';
+      }).join('');
+      return FormsUI.el('div', { 'data-fid': f.id }, descHtml);
+    }
+    if (f.type === 'faq') {
+      VISALL.push(f);
+      var acc = (Array.isArray(f.items) ? f.items : []).map(function (it) {
+        return '<details class="faq-item"><summary>' + FormsUI.esc(it.q || '') + '</summary><div class="faq-a">' + FormsUI.esc(it.a || '') + '</div></details>';
+      }).join('');
+      return FormsUI.el('div', { 'class': 'faq-block', 'data-fid': f.id },
+        (f.label ? '<div class="section-head">' + FormsUI.esc(f.label) + '</div>' : '') + acc);
+    }
+
+    FIELDS.push(f); VISALL.push(f);
+    // A calc field marked "hidden" still needs to exist (computed + saved to the sheet,
+    // available to PDF templates) — it just takes no visible space on the form itself.
+    var calcHidden = f.type === 'calculation' && f.calc && f.calc.hidden;
+    var wrap = FormsUI.el('div', { 'class': 'field' + (calcHidden ? ' identity-collapsed' : ''), 'data-fid': f.id });
+    var lbl = '<label id="lbl-' + f.id + '" class="fieldlabel">' + FormsUI.esc(f.label) + (f.required ? '<span class="req" aria-hidden="true">*</span>' : '') + '</label>';
+    var name = 'f_' + f.id;
+    var ctrl = '';
+
+    switch (f.type) {
+      case 'textarea':
+        ctrl = '<textarea class="control" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '"' + patternAttrs(f) + '></textarea>'; break;
+      case 'studentPicker': {
+        var studs = (PREFILL && PREFILL.students) || [];
+        var sOpts = studs.map(function (s) { return { v: s.displayName, label: s.displayName + (s.grade ? ' (Grade ' + s.grade + ')' : '') }; });
+        ctrl = pickerControl(name, sOpts, f.multiple, '— Choose student —'); break;
+      }
+      case 'staffPicker': {
+        var tOpts = (f.options || []).map(function (o) { return { v: o, label: o }; });
+        ctrl = pickerControl(name, tOpts, f.multiple, '— Choose —'); break;
+      }
+      case 'dropdown':
+        ctrl = '<select class="control" id="' + name + '"><option value="">— Choose —</option>' +
+          (f.options || []).map(function (o) { var c = capNote(f, o); return '<option value="' + FormsUI.esc(o) + '"' + (c.full ? ' disabled' : '') + '>' + FormsUI.esc(o) + c.suffix + '</option>'; }).join('') + '</select>'; break;
+      case 'radio':
+      case 'yesno': {
+        var opts = f.type === 'yesno' ? ['Yes', 'No'] : (f.options || []);
+        ctrl = '<div class="choices">' + opts.map(function (o) {
+          var c = capNote(f, o);
+          return '<label class="choice"' + (c.full ? ' style="opacity:.55"' : '') + '><input type="radio" name="' + name + '" value="' + FormsUI.esc(o) + '"' + (c.full ? ' disabled' : '') + '><span>' + FormsUI.esc(o) + c.suffix + '</span></label>';
+        }).join('') + '</div>'; break;
+      }
+      case 'checkboxes':
+        ctrl = '<div class="choices">' + (f.options || []).map(function (o) {
+          var c = capNote(f, o);
+          return '<label class="choice"' + (c.full ? ' style="opacity:.55"' : '') + '><input type="checkbox" name="' + name + '" value="' + FormsUI.esc(o) + '"' + (c.full ? ' disabled' : '') + '><span>' + FormsUI.esc(o) + c.suffix + '</span></label>';
+        }).join('') + '</div>'; break;
+      case 'file': {
+        var acc = f.accept ? ' accept="' + FormsUI.esc(f.accept) + '"' : '';
+        ctrl = '<input class="control" type="file" id="' + name + '"' + (f.multiple ? ' multiple' : '') + acc + '><div class="filelist help" id="fl_' + f.id + '"></div>'; break;
+      }
+      case 'signature': {
+        // P10: the empty pad was a bare dashed box with no cue that you draw in it, and the
+        // printed-name fallback had only a placeholder (which disappears on focus and isn't a
+        // label). Both are real affordances now.
+        ctrl = '<div class="sigwrap"><canvas class="sigpad" id="sig_' + f.id + '"></canvas>' +
+            '<span class="sigcue" aria-hidden="true">Sign here</span></div>' +
+          '<div class="sigbar"><button type="button" class="btn ghost sm" id="sigclr_' + f.id + '">Clear</button></div>' +
+          '<label class="lbl" for="' + name + '" style="margin-top:8px;display:block">Printed name (optional)</label>' +
+          '<input class="control" id="' + name + '" autocomplete="name" placeholder="Your full name">'; break;
+      }
+      case 'date':  ctrl = '<input class="control" type="date" id="' + name + '">'; break;
+      case 'time':  ctrl = '<input class="control" type="time" id="' + name + '">'; break;
+      case 'rating': {
+        var rmax = Number(f.max) || 5;
+        var rOpts = []; for (var ri = 1; ri <= rmax; ri++) rOpts.push(String(ri));
+        ctrl = '<div class="choices" style="flex-direction:row;flex-wrap:wrap">' + rOpts.map(function (o) {
+          return '<label class="choice" style="flex:0 0 auto"><input type="radio" name="' + name + '" value="' + o + '"><span>' + o + '</span></label>';
+        }).join('') + '</div>'; break;
+      }
+      case 'multiAnswer': {
+        var subs = f.subLabels || [], reqMap = f.subRequired || {};
+        ctrl = '<div class="multians">' + subs.map(function (lbl, si) {
+          var reqMark = reqMap[lbl] ? '<span class="req" aria-hidden="true">*</span>' : '';
+          var subId = name + '__' + si;
+          return '<div class="mafield"><label class="malabel" for="' + subId + '">' + FormsUI.esc(lbl) + reqMark + '</label>' +
+            multiSubCtrl(f, subId) + '</div>';
+        }).join('') + '</div>'; break;
+      }
+      case 'number':ctrl = '<input class="control" type="number" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '">'; break;
+      case 'email': ctrl = '<input class="control" type="email" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '"' + patternAttrs(f) + '>'; break;
+      case 'phone': ctrl = '<input class="control" type="tel" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '"' + patternAttrs(f) + '>' +
+        '<p class="help" id="phonehelp_' + f.id + '" style="display:none">Only the first 10 digits are kept — add an extension in a separate field or note if you need one.</p>'; break;
+      case 'calculation': ctrl = '<div class="control calc-value" id="' + name + '" aria-readonly="true">0</div>'; break;
+      default:      ctrl = '<input class="control" type="text" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '"' + patternAttrs(f) + '>';
+    }
+    wrap.innerHTML = lbl + ctrl + (f.help ? '<p class="help">' + FormsUI.esc(f.help) + '</p>' : '') + '<p class="error" id="err-' + f.id + '"></p>';
+
+    wrap.querySelectorAll('.choice input').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        if (inp.type === 'radio') wrap.querySelectorAll('.choice').forEach(function (c) { c.classList.remove('selected'); });
+        var box = inp.closest('.choice');
+        if (inp.type === 'checkbox') box.classList.toggle('selected', inp.checked);
+        else box.classList.add('selected');
+      });
+    });
+    if (f.type === 'phone') {
+      var phoneInp = document.getElementById(name);
+      if (phoneInp) phoneInp.addEventListener('input', function () {
+        // formatPhone keeps only the first 10 digits. Silently swallowing the rest looked like a
+        // bug to anyone typing an extension or a country code, so say what happened.
+        var digits = String(phoneInp.value || '').replace(/[^0-9]/g, '');
+        phoneInp.value = formatPhone(phoneInp.value);
+        var help = document.getElementById('phonehelp_' + f.id);
+        if (help) help.style.display = digits.length > 10 ? 'block' : 'none';
+      });
+    }
+    var fileInp = wrap.querySelector('input[type="file"]');
+    if (fileInp) fileInp.addEventListener('change', function () { handleFiles(f, fileInp); });
+    var clr = wrap.querySelector('#sigclr_' + f.id);
+    if (clr) clr.addEventListener('click', function () { clearSignature(f.id); });
+
+    // accessibility: associate label, mark required, describe errors, group choices
+    var lblEl = wrap.querySelector('label.fieldlabel');
+    var primary = wrap.querySelector('#f_' + f.id);            // null for choice-group fields
+    var grp = wrap.querySelector('.choices');
+    if (grp) { grp.setAttribute('role', 'group'); grp.setAttribute('aria-labelledby', 'lbl-' + f.id); grp.setAttribute('aria-describedby', 'err-' + f.id); if (f.required) grp.setAttribute('aria-required', 'true'); }
+    // P21: for signature only, `primary` (#f_<id>) is the "Or type your full name" fallback
+    // input, which already has its OWN explicit <label for>  (see the 'signature' case above) —
+    // pointing the field-level label at it too double-associated one input with two labels.
+    // The field-level label instead describes the signature canvas, via aria-labelledby.
+    if (primary && lblEl && f.type !== 'signature') lblEl.setAttribute('for', 'f_' + f.id);
+    if (primary) { if (f.required) primary.setAttribute('aria-required', 'true'); primary.setAttribute('aria-describedby', 'err-' + f.id); }
+    var canv = wrap.querySelector('canvas');
+    if (canv) { canv.setAttribute('role', 'img'); canv.setAttribute('aria-labelledby', 'lbl-' + f.id); canv.setAttribute('aria-description', 'Draw with mouse or finger'); }
+    return wrap;
+  }
+
+  // ---------- file uploads ----------
+  /** Bytes currently attached across every field (base64 is ~4/3 of the real size). */
+  function attachedBytes_() {
+    var total = 0;
+    Object.keys(ATTACH || {}).forEach(function (fid) {
+      (ATTACH[fid] || []).forEach(function (at) { total += Math.floor(((at && at.b64) || '').length * 0.75); });
+    });
+    return total;
+  }
+  /**
+   * Running total against the SAME ceiling the server enforces (ATTACH_LIMITS, Logic.js).
+   * Previously the only visible number was the per-file 10 MB, while the server rejected on a
+   * total the UI never mentioned — so three 8 MB photos passed every check on screen and then
+   * failed at submit, after the whole form was filled in.
+   */
+  function renderAttachTotal_() {
+    var host = document.getElementById('attachTotal');
+    if (!host) return;
+    var used = attachedBytes_();
+    if (!used) { host.innerHTML = ''; return; }
+    var over = used > ATTACH_LIMITS.MAX_TOTAL_BYTES;
+    host.innerHTML = '<p class="' + (over ? 'notice err' : 'help') + '" style="margin:0">' +
+      'Attachments: ' + formatBytes(used) + ' of ' + formatBytes(ATTACH_LIMITS.MAX_TOTAL_BYTES) + ' total' +
+      (over ? ' — too large to submit. Remove or shrink one.' : '') +
+      (ATTACH_DRAFT_SKIPPED ? ' <em>(too large to save on this device — don’t refresh before submitting)</em>' : '') +
+      '</p>';
+  }
+  function afterAttachChange_() { saveAttachDraft(); renderAttachTotal_(); updateAnswerCount(); }
+
+  function handleFiles(f, input) {
+    var list = document.getElementById('fl_' + f.id);
+    var arr = Array.prototype.slice.call(input.files);
+    if (!f.multiple) arr = arr.slice(0, 1);
+    ATTACH[f.id] = [];
+    list.innerHTML = '';
+    arr.forEach(function (file) {
+      if (file.size > ATTACH_LIMITS.MAX_FILE_BYTES) {
+        list.innerHTML += '<div class="fitem" style="color:var(--err)">' + FormsUI.esc(attachFileTooLargeMsg(file.name)) + '</div>';
+        return;
+      }
+      var reader = new FileReader();
+      PENDING_READS++;
+      reader.onload = function () {
+        ATTACH[f.id].push({ name: file.name, mimeType: file.type || 'application/octet-stream', b64: String(reader.result).split(',')[1] });
+        PENDING_READS = Math.max(0, PENDING_READS - 1);
+        afterAttachChange_(); // only now is the payload actually in ATTACH
+      };
+      reader.onerror = function () { PENDING_READS = Math.max(0, PENDING_READS - 1); };
+      reader.readAsDataURL(file);
+      list.innerHTML += '<div class="fitem">📎 ' + FormsUI.esc(file.name) + ' (' + formatBytes(file.size) + ')</div>';
+    });
+    if (arr.length) {
+      list.innerHTML += '<button type="button" class="btn ghost sm" id="clr_' + f.id + '" style="margin-top:4px">Remove file' + (arr.length > 1 ? 's' : '') + '</button>';
+      var clr = document.getElementById('clr_' + f.id);
+      if (clr) clr.onclick = function () { ATTACH[f.id] = []; input.value = ''; list.innerHTML = ''; afterAttachChange_(); };
+    }
+  }
+
+  // ---------- signature pad ----------
+  function initSignatures() {
+    FIELDS.forEach(function (f) { if (f.type === 'signature') { var c = document.getElementById('sig_' + f.id); if (c) setupSigPad(c, f.id); } });
+  }
+  function setupSigPad(canvas, fid) {
+    var ratio = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth || 600, h = canvas.clientHeight || 180;
+    canvas.width = w * ratio; canvas.height = h * ratio;
+    var ctx = canvas.getContext('2d'); ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1f2430';
+    var drawing = false, last = null;
+    function pos(e) {
+      var r = canvas.getBoundingClientRect();
+      var p = (e.touches && e.touches[0]) || e;
+      return { x: p.clientX - r.left, y: p.clientY - r.top };
+    }
+    function start(e) { e.preventDefault(); drawing = true; last = pos(e); canvas.classList.add('has-ink'); }
+    function move(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      var p = pos(e);
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      last = p; SIG_DRAWN[fid] = true;
+    }
+    // Persist on stroke-end (debounced) so the signature is in the draft the moment it's drawn,
+    // not only when the submitter reaches Submit — the whole point of P4b.
+    var saveT = null;
+    function end() {
+      if (!drawing) return;
+      drawing = false;
+      clearTimeout(saveT);
+      saveT = setTimeout(captureAndSaveSignatures_, 400);
+    }
+    // P10: Pointer Events, with pointerleave/pointercancel ending the stroke.
+    // Previously mousemove was bound to the canvas but mouseup to window, and nothing handled the
+    // pointer LEAVING the canvas — so dragging out and back in kept `drawing` true and the next
+    // move drew one straight line from the exit point to the re-entry point, scribbling a stray
+    // line across the signature. Pointer Events also unify mouse/touch/stylus, so the duplicated
+    // touch* handlers (which double-fired on hybrid devices) are gone.
+    if (window.PointerEvent) {
+      canvas.addEventListener('pointerdown', function (e) {
+        start(e);
+        // Keep receiving moves even if the finger/mouse strays outside, instead of cutting the
+        // stroke dead — release below restores normal routing.
+        try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
+      });
+      canvas.addEventListener('pointermove', move);
+      canvas.addEventListener('pointerup', function (e) { try { canvas.releasePointerCapture(e.pointerId); } catch (x) {} end(); });
+      canvas.addEventListener('pointercancel', end);
+      canvas.addEventListener('pointerleave', end);
+      window.addEventListener('pointerup', end); // safety net if capture was refused
+    } else {
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseleave', end);
+      window.addEventListener('mouseup', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+      canvas.addEventListener('touchcancel', end);
+    }
+  }
+  function clearSignature(fid) {
+    var c = document.getElementById('sig_' + fid);
+    if (c) { c.getContext('2d').clearRect(0, 0, c.width, c.height); c.classList.remove('has-ink'); }
+    SIG_DRAWN[fid] = false; delete ATTACH[fid];
+    afterAttachChange_();
+  }
+  /** True if every pixel in the canvas is fully transparent (nothing drawn / pixels lost).
+   *  Some browsers (notably mobile Safari, under memory pressure) silently discard an
+   *  off-screen/hidden canvas's backing store — the canvas comes back blank with no event to
+   *  say so. getImageData can itself throw on a tainted/zero-size canvas; treat that as "can't
+   *  tell" rather than "blank", so a read failure never wrongly discards a good signature. */
+  function canvasIsBlank_(c) {
+    try {
+      var data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      for (var i = 3; i < data.length; i += 4) { if (data[i] !== 0) return false; }
+      return true;
+    } catch (e) { return false; }
+  }
+  function captureSignature(f) {
+    if (SIG_DRAWN[f.id]) {
+      var c = document.getElementById('sig_' + f.id);
+      // A stroke was drawn at some point (SIG_DRAWN latches true and never clears), but the
+      // canvas itself can go blank later without warning (see canvasIsBlank_) — if that's
+      // happened AND a real capture from an earlier stroke-end is already on file, keep that
+      // one instead of overwriting it with this now-empty read. Only discard/replace when the
+      // canvas still has ink, or there's no prior good capture to fall back on.
+      if (canvasIsBlank_(c) && ATTACH[f.id] && ATTACH[f.id].length) return;
+      ATTACH[f.id] = [{ name: 'signature.png', mimeType: 'image/png', b64: c.toDataURL('image/png').split(',')[1] }];
+    } else { delete ATTACH[f.id]; }
+  }
+  /** Capture + persist every drawn signature. Called on stroke-end (see setupSigPad) so a
+   *  signature survives a refresh/session expiry, not only a submit attempt. */
+  function captureAndSaveSignatures_() {
+    FIELDS.forEach(function (f) { if (f.type === 'signature') captureSignature(f); });
+    afterAttachChange_();
+  }
+
+  // dropdown (single) or checkbox group (multiple) shared by student/staff pickers
+  function pickerControl(name, opts, multiple, ph) {
+    if (multiple) {
+      return '<div class="choices">' + opts.map(function (o) {
+        return '<label class="choice"><input type="checkbox" name="' + name + '" value="' + FormsUI.esc(o.v) + '"><span>' + FormsUI.esc(o.label) + '</span></label>';
+      }).join('') + '</div>';
+    }
+    return '<select class="control" id="' + name + '">' +
+      (opts.length !== 1 ? '<option value="">' + FormsUI.esc(ph) + '</option>' : '') +
+      opts.map(function (o) { return '<option value="' + FormsUI.esc(o.v) + '">' + FormsUI.esc(o.label) + '</option>'; }).join('') + '</select>';
+  }
+  // isMultiField comes from SharedLogic.html (generated from Logic.js) — one shared predicate.
+  // capacity remaining for an option (from server); full options are disabled + labeled
+  function capNote(f, o) {
+    if (!f.capacityLeft || f.capacityLeft[o] == null) return { full: false, suffix: '' };
+    var left = f.capacityLeft[o];
+    return { full: left <= 0, suffix: left <= 0 ? ' (full)' : ' (' + left + ' left)' };
+  }
+
+  // conditional logic (evalShowIf) + calc (computeCalc) live in SharedLogic.html — one source, generated from Logic.js.
+  function currentAnswers() { var a = {}; FIELDS.forEach(function (f) { a[f.id] = readValue(f); }); return a; }
+  function applyVisibility() {
+    var ans = currentAnswers();
+    VISALL.forEach(function (f) {
+      var w = document.querySelector('[data-fid="' + f.id + '"]');
+      if (w) w.style.display = evalShowIf(f.showIf, ans) ? '' : 'none';
+    });
+  }
+
+  // ---------- prefill ----------
+  function selectedStudent() {
+    var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
+    if (!picker || !PREFILL) return null;
+    var v = readValue(picker);
+    var arr = Array.isArray(v) ? v : (v ? [v] : []);
+    if (arr.length !== 1) return null; // grade derive only makes sense for a single selected student
+    return (PREFILL.students || []).filter(function (s) { return s.displayName === arr[0]; })[0] || null;
+  }
+  function setVal(id, v) { var el = document.getElementById('f_' + id); if (el != null && v != null) el.value = v; }
+
+  // Independent of applyPrefill()/PREFILL — MACS/open-access forms are never OTP-verified, so
+  // PREFILL is always null for them (buildPrefill_ only returns non-null for verifiedVia:'otp'),
+  // and applyPrefill() bails out immediately on that. The school-picker field has nothing to do
+  // with FACTS/OTP prefill, so it must run unconditionally.
+  function applySchoolPrefill() {
+    var schoolField = FIELDS.filter(function (f) { return f.prefillFrom === 'schoolPicker'; })[0];
+    if (!schoolField) return;
+    var schoolVal = (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
+    setVal(schoolField.id, schoolVal);
+    var sel = document.getElementById('f_' + schoolField.id);
+    if (sel) { sel.readOnly = true; sel.setAttribute('readonly', 'readonly'); }
+    // A <select> silently ignores an assignment that matches none of its <option>s, falling back
+    // to displaying its FIRST option — so a school-picker field whose hand-typed options have
+    // drifted from MACS_SCHOOLS looks correctly filled while actually holding ''. Everything
+    // downstream (prior-year lookup, the stored answer) then keys off nothing at all. Say so
+    // rather than letting it read as "pre-fill just doesn't work".
+    if (schoolVal && sel && !readValue(schoolField)) {
+      schoolPrefillBanner_({
+        phase: 'record', icon: 'info',
+        title: 'This form’s school list doesn’t include “' + schoolVal + '”',
+        detail: 'It couldn’t be filled in. Please tell the school office — the form needs updating.',
+        action: null, dismissible: false
+      }, schoolVal);
+      return;
+    }
+    // Deliberately does NOT start the prior-year lookup — resolveDraftThen_ does, once the
+    // draft question is settled. This only puts the picked school into its locked field.
+  }
+
+  /**
+   * The one banner about "remember from last time" on a school-picker form. Text/tone come from
+   * schoolPrefillNotice (SharedLogic.html, generated from Logic.js) so the four states stay
+   * Node-testable; this only paints it. Rendered above the fields, replacing itself on repaint.
+   */
+  /**
+   * Paint the pre-fill component. Two phases, one slot (see docs/prefill-banner-options.html):
+   * `offer` is a .pf-step with the email box disclosed in place, shown only while there IS
+   * something to act on; `record` is a quiet full-bleed .pf-row stating what happened. Wording
+   * and state mapping come from schoolPrefillNotice (SharedLogic.html, generated from Logic.js)
+   * so the four states stay Node-testable — this only renders.
+   */
+  function schoolPrefillBanner_(notice, school) {
+    var el = document.getElementById('pfSlot');
+    if (!el) return;
+    var gone = !notice || (notice.phase === 'offer' && PF_OFFER_HIDDEN);
+    if (gone) { el.innerHTML = ''; return; }
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
+    el.innerHTML = notice.phase === 'offer' ? pfOfferHtml_(notice) : pfRecordHtml_(notice);
+
+    var act = document.getElementById('pfAction');
+    if (act && notice.action) {
+      var openCode = function () { act.style.display = 'none'; renderSchoolVerify_(school); };
+      act.onclick = notice.action.kind === 'verify'
+        // hide the trigger once its form is open — two ways to start the same thing reads as a bug
+        ? openCode
+        // an existing session skips the code; a STALE one still has to ask for it
+        : function () {
+            act.disabled = true; act.innerHTML = '<span class="spinner"></span> Filling in…';
+            applyPriorYear_(school, function () {
+              act.disabled = false; act.textContent = notice.action.label; openCode();
+            });
+          };
+    }
+    var skip = document.getElementById('pfSkip');
+    if (skip) skip.onclick = function () { PF_OFFER_HIDDEN = true; schoolPrefillBanner_(notice, school); };
+  }
+
+  /** The OFFER phase — a real choice, so declining is a button and not just inaction. */
+  function pfOfferHtml_(n) {
+    return '<div class="pf-step">' +
+      '<p class="pf-kick">Optional, before you start</p>' +
+      '<div class="pf-head">' + FormsUI.icon(n.icon, { size: 22, cls: 'pf-ico' }) +
+        '<div><p class="pf-t">' + FormsUI.esc(n.title) + '</p>' +
+        '<p class="pf-d">' + FormsUI.esc(n.detail) + '</p></div>' +
+      '</div>' +
+      '<div class="pf-actions">' +
+        '<button class="btn" id="pfAction" type="button">' + FormsUI.esc(n.action.label) + '</button>' +
+        '<button class="btn plain" id="pfSkip" type="button">Start from blank</button>' +
+      '</div>' +
+      '<div id="schoolVerifyBox"></div>' +
+    '</div>';
+  }
+
+  /** The RECORD phase — provenance, not a notice. Digits are wrapped for tabular alignment. */
+  function pfRecordHtml_(n) {
+    var cls = n.icon === 'check' ? ' is-ok' : (n.icon === 'shield' ? ' is-attn' : '');
+    var title = FormsUI.esc(n.title).replace(/^(\d+)/, '<span class="pf-num">$1</span>');
+    return '<div class="pf-row' + cls + '">' +
+      FormsUI.icon(n.icon, { size: 20, cls: 'pf-ico' }) +
+      '<div class="pf-body"><p class="pf-t">' + title + '</p>' +
+        '<p class="pf-d">' + FormsUI.esc(n.detail) + '</p></div>' +
+      (n.action
+        ? '<div class="pf-side"><button class="btn plain" id="pfAction" type="button">' +
+            FormsUI.esc(n.action.label) + '</button></div>'
+        : '') +
+    '</div>';
+  }
+
+  /**
+   * Inline email verification, right where the pre-filled answers would land.
+   *
+   * This used to live on the school gate, which was the wrong place twice over: en route to the
+   * guest portal there is nothing to pre-fill, and the token couldn't survive the hop to a form
+   * anyway (portal tiles opened a new tab; round-2 audit M12 had moved the token from the URL
+   * into per-tab sessionStorage). Verifying here needs no carrier — the token is used by the very
+   * page that mints it. It's still ALSO written to sessionStorage under the same key the gate
+   * used, so a second form opened in the same visit doesn't ask again (see the SCHOOL_TOKEN
+   * fallback at the top of this file).
+   *
+   * Nothing about submitting depends on this — submitForm never checks a school token.
+   */
+  function renderSchoolVerify_(school) {
+    var box = document.getElementById('schoolVerifyBox');
+    if (!box) return;
+    box.innerHTML =
+      '<div class="pf-otp">' +
+        '<div class="field"><label for="schoolOtpEmail">Email on file for ' +
+          FormsUI.esc(school) + '</label>' +
+          '<input class="control" type="email" id="schoolOtpEmail" autocomplete="email" ' +
+            'placeholder="you@example.com"></div>' +
+        '<div class="pf-actions"><button class="btn ghost" id="schoolOtpSend" type="button">Send code</button></div>' +
+        '<div id="schoolOtpCodeBox"></div>' +
+        '<p class="notice err" id="schoolOtpErr" style="display:none;margin-top:10px" role="alert"></p>' +
+      '</div>';
+    var emailEl = document.getElementById('schoolOtpEmail');
+    var errEl = document.getElementById('schoolOtpErr');
+    var sendBtn = document.getElementById('schoolOtpSend');
+    emailEl.focus();
+    function fail_(msg) { errEl.style.display = 'block'; errEl.textContent = msg; }
+
+    sendBtn.onclick = function () {
+      var email = emailEl.value.trim();
+      errEl.style.display = 'none';
+      if (!email) return fail_('Enter your email address first.');
+      if (!EMAIL_RE.test(email)) return fail_('Enter a valid email address.');
+      sendBtn.disabled = true; sendBtn.innerHTML = '<span class="spinner"></span> Sending…';
+      google.script.run.withSuccessHandler(function (res) {
+        sendBtn.disabled = false; sendBtn.textContent = 'Resend code';
+        if (!res || !res.ok) return fail_((res && res.msg) || 'Could not send a code — try again.');
+        document.getElementById('schoolOtpCodeBox').innerHTML =
+          '<div class="field" style="margin-top:12px"><label for="schoolOtpCode">6-digit code</label>' +
+            '<input class="control" id="schoolOtpCode" inputmode="numeric" ' +
+            'autocomplete="one-time-code" maxlength="6" placeholder="000000" style="max-width:11rem"></div>' +
+          '<div class="pf-actions"><button class="btn" id="schoolOtpVerify" type="button">Verify</button></div>';
+        var vBtn = document.getElementById('schoolOtpVerify');
+        vBtn.onclick = function () {
+          errEl.style.display = 'none';
+          vBtn.disabled = true; vBtn.innerHTML = '<span class="spinner"></span> Verifying…';
+          google.script.run.withSuccessHandler(function (vres) {
+            if (!vres || !vres.ok) {
+              vBtn.disabled = false; vBtn.textContent = 'Verify';
+              return fail_((vres && vres.msg) || 'Could not verify — try again.');
+            }
+            TOKEN = vres.token;
+            // Same key the gate used, so another form this visit skips the prompt. Best-effort:
+            // a private-mode or quota failure must not break the pre-fill we already have.
+            try { sessionStorage.setItem('hcsSchoolToken:' + school, vres.token); } catch (e) {}
+            applyPriorYear_(school); // the offer becomes the verified confirmation
+          }).withFailureHandler(function (e) {
+            vBtn.disabled = false; vBtn.textContent = 'Verify';
+            fail_(FormsUI.friendlyErrCode(e));
+          }).macsVerifyOtp(school, email, document.getElementById('schoolOtpCode').value.trim());
+        };
+      }).withFailureHandler(function (e) {
+        sendBtn.disabled = false; sendBtn.textContent = 'Send code';
+        fail_(FormsUI.friendlyErrCode(e));
+      }).macsRequestOtp(school, email);
+    };
+  }
+
+  function applyPrefill() {
+    if (!PREFILL) return;
+    var p = PREFILL.parent || {};
+    var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
+
+    // auto-select when the parent has exactly one student
+    if (picker && (PREFILL.students || []).length === 1) {
+      if (picker.multiple) {
+        var cb = document.querySelector('input[name="f_' + picker.id + '"]');
+        if (cb) { cb.checked = true; cb.closest('.choice').classList.add('selected'); }
+      } else { setVal(picker.id, PREFILL.students[0].displayName); }
+    }
+
+    FIELDS.forEach(function (f) {
+      switch (f.prefillFrom) {
+        case 'parentFirst': setVal(f.id, p.first); break;
+        case 'parentLast':  setVal(f.id, p.last); break;
+        case 'parentEmail':
+          setVal(f.id, p.email);
+          var el = document.getElementById('f_' + f.id);
+          if (el) { el.readOnly = true; el.setAttribute('readonly', 'readonly'); }
+          break;
+      }
+    });
+    collapseIdentityBlock();
+    refreshStudentDerived();
+
+    if (picker) {
+      if (picker.multiple) {
+        document.querySelectorAll('input[name="f_' + picker.id + '"]').forEach(function (cb) { cb.addEventListener('change', refreshStudentDerived); });
+      } else {
+        var pel = document.getElementById('f_' + picker.id);
+        if (pel) pel.addEventListener('change', refreshStudentDerived);
+      }
+    }
+  }
+
+  // Verified parents shouldn't stare at inputs they never touch: hide successfully-prefilled
+  // parent identity fields (the banner already says who's submitting) and any section header
+  // left with nothing visible under it. "Update my info" reveals them for corrections.
+  function collapseIdentityBlock() {
+    if (VIA !== 'otp') return;
+    var IDENTITY = { parentFirst: 1, parentLast: 1, parentEmail: 1 };
+    var collapsed = 0;
+    FIELDS.forEach(function (f) {
+      if (!IDENTITY[f.prefillFrom]) return;
+      if (!readValue(f)) return; // never hide a still-empty required field
+      var w = document.querySelector('[data-fid="' + f.id + '"]');
+      if (w) { w.classList.add('identity-collapsed'); collapsed++; }
+    });
+    if (!collapsed) return;
+    // hide section headers whose entire section is now collapsed
+    var hdr = null, hasVisible = false;
+    var closeSection = function () {
+      if (hdr && !hasVisible) { var hw = document.querySelector('[data-fid="' + hdr.id + '"]'); if (hw) hw.classList.add('identity-collapsed'); }
+    };
+    VISALL.forEach(function (f) {
+      if (f.type === 'sectionHeader') { closeSection(); hdr = f; hasVisible = false; return; }
+      var w = document.querySelector('[data-fid="' + f.id + '"]');
+      if (w && !w.classList.contains('identity-collapsed')) hasVisible = true;
+    });
+    closeSection();
+    var link = document.getElementById('showIdentity');
+    if (link) {
+      link.style.display = '';
+      link.onclick = function (e) {
+        e.preventDefault();
+        document.querySelectorAll('.identity-collapsed').forEach(function (x) { x.classList.remove('identity-collapsed'); });
+        link.style.display = 'none';
+      };
+    }
+  }
+
+  function refreshStudentDerived() {
+    var s = selectedStudent();
+    FIELDS.forEach(function (f) {
+      if (f.prefillFrom === 'studentGradeNextYear') {
+        // seed the next grade up (current+1) but leave EDITABLE so a parent can override
+        var ng = s && typeof nextGrade === 'function' ? nextGrade(s.grade) : '';
+        if (ng) setVal(f.id, ng);
+        return;
+      }
+      if (f.prefillFrom !== 'studentGrade' && f.prefillFrom !== 'studentName') return;
+      var v = s ? (f.prefillFrom === 'studentGrade' ? s.grade : s.displayName) : '';
+      setVal(f.id, v);
+      // Only lock when we actually derived a value; otherwise leave it editable so a parent
+      // with 0 or >1 students selected can still complete a required field (no dead-end).
+      if (v) lockField(f.id, true); else lockField(f.id, false);
+    });
+    maybePriorYear();
+  }
+  // Pre-fill "remembered" fields (priorYear) from this student's most recent prior submission to
+  // this same form. Server-guarded to the OTP parent's own students; applied as editable defaults.
+  // Shared by maybePriorYear/applyPriorYear_. A plain field's remembered value is
+  // whatever readValue()/writeValue() already handle; a multiAnswer's is a PARTIAL {subLabel:
+  // value} object (server already filtered it to only the subPriorYear-flagged sub-rows) —
+  // each sub-row is written individually, skipping any the submitter already filled in.
+  function applyPriorAnswers_(answers) {
+    PRIOR_WROTE = [];   // exactly what this pass filled, so "Clear them" undoes only that
+    FIELDS.forEach(function (f) {
+      if (!fieldHasPriorYear(f) || answers[f.id] == null) return;
+      if (f.type === 'multiAnswer') {
+        var name = 'f_' + f.id;
+        (f.subLabels || []).forEach(function (lbl, si) {
+          if (answers[f.id][lbl] == null) return;
+          var el = document.getElementById(name + '__' + si);
+          if (el && !el.value) { el.value = answers[f.id][lbl]; PRIOR_WROTE.push({ id: f.id, sub: si }); }
+        });
+        return;
+      }
+      var cur = readValue(f);
+      // never clobber an edit, or anything the restored draft already put here
+      if (fieldEmpty(f, cur)) { writeValue(f, answers[f.id]); PRIOR_WROTE.push({ id: f.id }); markPriorField_(f); }
+    });
+    applyVisibility();
+  }
+
+  /**
+   * Mark a field as coming from last year, next to its label, with its own undo.
+   *
+   * This is what replaced the standing summary row at the top of the form. A tally ("57 answers
+   * carried over") can't tell you WHICH answers, which is the only thing worth knowing when you
+   * are deciding whether a value is still true — so the record lives on the fields instead, and
+   * the top of the form is left for actions not yet taken.
+   */
+  function markPriorField_(f) {
+    var wrap = document.querySelector('[data-fid="' + f.id + '"]');
+    if (!wrap) return;
+    var lbl = wrap.querySelector('label, .lbl, .fieldlabel');
+    if (!lbl || lbl.querySelector('.pf-mark')) return;
+    var mark = FormsUI.el('span', { 'class': 'pf-mark' },
+      FormsUI.icon('check', { size: 11 }) + 'Last year');
+    lbl.appendChild(mark);
+    var undo = FormsUI.el('button', { 'class': 'pf-undo', 'type': 'button',
+      'aria-label': 'Clear the value carried over for ' + (f.label || 'this field') }, 'Undo');
+    undo.onclick = function () { undoPriorField_(f); };
+    lbl.appendChild(undo);
+  }
+
+  /** Clear one carried-over field and drop its mark. */
+  function undoPriorField_(f) {
+    PRIOR_WROTE = PRIOR_WROTE.filter(function (w) { return w.id !== f.id; });
+    writeValue(f, isMultiField(f) ? [] : '');
+    var el = document.getElementById('f_' + f.id);
+    if (el && 'value' in el) el.value = '';
+    var wrap = document.querySelector('[data-fid="' + f.id + '"]');
+    if (wrap) {
+      var m = wrap.querySelector('.pf-mark'); if (m) m.remove();
+      var u = wrap.querySelector('.pf-undo'); if (u) u.remove();
+    }
+    recomputeCalc(); applyVisibility(); saveDraft();
+    if (el && el.focus) el.focus();
+  }
+
+  function maybePriorYear() {
+    if (VIA !== 'otp' || IS_PREVIEW || IS_EDIT) return;
+    if (!FIELDS.some(fieldHasPriorYear)) return;
+    var s = selectedStudent(); if (!s) return;
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res || !res.ok || !res.answers) return;
+      applyPriorAnswers_(res.answers);
+    }).getPriorAnswersForStudent(FORM_ID, TOKEN, s.displayName);
+  }
+  // Same idea as maybePriorYear(), keyed on the picked school instead of a student — MACS's
+  // anonymous "open-picker" forms have no OTP identity, so the school choice is the key.
+  /** The picked school's own allowlist flag, straight from the gate's payload — no server round
+   *  trip just to decide whether an offer is worth showing. MACS_SCHOOLS only exists on
+   *  runner-macs; the guard keeps this inert everywhere else. */
+  function schoolOtpAvailable_(school) {
+    if (typeof MACS_SCHOOLS === 'undefined' || !MACS_SCHOOLS) return false;
+    var m = MACS_SCHOOLS.filter(function (x) { return x.name === school; })[0];
+    return !!(m && m.otp);
+  }
+
+  function priorYearSchool_() {
+    var picker = FIELDS.filter(function (f) { return f.prefillFrom === 'schoolPicker'; })[0];
+    if (!picker || !FIELDS.some(fieldHasPriorYear)) return '';
+    return readValue(picker) || '';
+  }
+
+  /**
+   * OFFER last year's answers. Never fills anything on its own — not even when a verified
+   * session from an earlier form this visit is already in hand, which only changes the button
+   * from "Verify my email" to "Use last year's answers". Nothing reads the response sheet until
+   * that button is pressed, so the respondent is never handed values they didn't ask for.
+   */
+  function offerPriorYear_() {
+    if (IS_PREVIEW || IS_EDIT) return;
+    var school = priorYearSchool_(); if (!school) return;
+    schoolPrefillBanner_(schoolPrefillNotice({
+      school: school, otpAvailable: schoolOtpAvailable_(school), hasToken: !!TOKEN
+    }), school);
+  }
+
+  /**
+   * Offer accepted: fetch and apply. A stale session token comes back verified:false — fall
+   * through to the code flow rather than doing nothing visible.
+   */
+  function applyPriorYear_(school, onNeedsVerify) {
+    google.script.run.withSuccessHandler(function (res) {
+      if (!res || !res.ok) return;
+      if (!res.verified) { if (onNeedsVerify) onNeedsVerify(); return; }
+      if (res.answers) applyPriorAnswers_(res.answers);
+      schoolPrefillBanner_(schoolPrefillNotice({
+        school: school, otpAvailable: true, verified: true, filled: res.filled, email: res.email
+      }), school);
+    }).withFailureHandler(function () { /* leave the offer standing so it can be retried */ })
+      .getPriorAnswersForSchool(FORM_ID, school, TOKEN);
+  }
+
+  function lockField(id, on) {
+    var el = document.getElementById('f_' + id);
+    if (!el) return;
+    el.readOnly = !!on;
+    if (on) el.setAttribute('readonly', 'readonly'); else el.removeAttribute('readonly');
+  }
+
+  // ---------- collect + validate + submit ----------
+  function readValue(f) {
+    var name = 'f_' + f.id;
+    if (f.type === 'calculation') { var ce = document.getElementById(name); return ce ? ce.textContent.trim() : ''; }
+    if (f.type === 'multiAnswer') {
+      var out = {};
+      (f.subLabels || []).forEach(function (lbl, si) {
+        var el2 = document.getElementById(name + '__' + si);
+        out[lbl] = el2 ? el2.value.trim() : '';
+      });
+      return out;
+    }
+    if (isMultiField(f)) return Array.prototype.slice.call(document.querySelectorAll('input[name="' + name + '"]:checked')).map(function (i) { return i.value; });
+    if (f.type === 'radio' || f.type === 'yesno' || f.type === 'rating') { var c = document.querySelector('input[name="' + name + '"]:checked'); return c ? c.value : ''; }
+    var el = document.getElementById(name); return el ? el.value.trim() : '';
+  }
+  function fieldEmpty(f, v) { return isMultiField(f) ? v.length === 0 : v === ''; }
+  // Mirrors RunnerApi.js's pattern check client-side so a format mismatch (e.g. "Numbers only")
+  // shows inline instead of only bouncing back after a full submit round-trip.
+  function patternErr(f, v) {
+    var pat = f.validation && f.validation.pattern;
+    if (!pat || v === '') return '';
+    try { return new RegExp(pat).test(v) ? '' : (f.validation.patternMsg || 'Invalid format.'); }
+    catch (e) { return ''; }
+  }
+  // HTML pattern/inputmode attrs for render-time — pattern gives native browser hint/highlight,
+  // patternErr (above) still does the real check since <input pattern> alone doesn't block submit.
+  function patternAttrs(f) {
+    var pat = f.validation && f.validation.pattern;
+    if (!pat) return '';
+    var out = ' pattern="' + FormsUI.esc(pat) + '"';
+    if (pat === '^[0-9]+$') out += ' inputmode="numeric"';
+    return out;
+  }
+  function setErr(f, msg) {
+    var wrap = document.querySelector('[data-fid="' + f.id + '"]');
+    if (!wrap) return;
+    wrap.classList.toggle('invalid', !!msg);
+    wrap.querySelector('.error').textContent = msg || '';
+    var primary = wrap.querySelector('#f_' + f.id) || wrap.querySelector('.choices');
+    if (primary) { if (msg) primary.setAttribute('aria-invalid', 'true'); else primary.removeAttribute('aria-invalid'); }
+  }
+
+  function onSubmit() {
+    if (uploadsPending('submitBtn')) return;
+    // Preflight the SAME total the server enforces, so an over-limit submission is caught here
+    // — with the same wording — instead of after a full round trip. captureSignature runs in
+    // the validation loop below, but signatures already in ATTACH count now.
+    FIELDS.forEach(function (f) { if (f.type === 'signature') captureSignature(f); });
+    if (attachedBytes_() > ATTACH_LIMITS.MAX_TOTAL_BYTES) {
+      var feAtt = document.getElementById('formErr');
+      feAtt.style.display = 'block';
+      feAtt.textContent = attachTotalTooLargeMsg();
+      renderAttachTotal_();
+      try { feAtt.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+      return;
+    }
+    var answers = {}, firstBad = null, ok = true;
+    var ans0 = currentAnswers(), vis = {};
+    FIELDS.forEach(function (f) { vis[f.id] = evalShowIf(f.showIf, ans0); });
+    FIELDS.forEach(function (f) {
+      if (!vis[f.id]) return; // hidden by conditional logic — don't validate or submit
+      var msg = '';
+      if (f.type === 'file') {
+        if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please attach a file.';
+      } else if (f.type === 'signature') {
+        captureSignature(f);
+        answers[f.id] = readValue(f); // printed name (optional caption, never satisfies "required" alone)
+        if (f.required && !(ATTACH[f.id] && ATTACH[f.id].length) && !(IS_EDIT && ON_FILE[f.id])) msg = 'Please sign in the box.';
+      } else if (f.type === 'multiAnswer') {
+        var vMa = readValue(f); answers[f.id] = vMa;
+        var subs = f.subLabels || [], reqMap = f.subRequired || {};
+        for (var si2 = 0; si2 < subs.length; si2++) {
+          if (reqMap[subs[si2]] && !vMa[subs[si2]]) { msg = 'Please fill in "' + subs[si2] + '".'; break; }
+        }
+      } else {
+        var v = readValue(f); answers[f.id] = v;
+        if (f.required && fieldEmpty(f, v)) msg = 'This field is required.';
+        else if (!fieldEmpty(f, v) && f.type === 'email' && !EMAIL_RE.test(v)) msg = 'Enter a valid email address.';
+        else if (!fieldEmpty(f, v)) msg = patternErr(f, v);
+      }
+      setErr(f, msg);
+      if (msg) { ok = false; if (!firstBad) firstBad = f; }
+    });
+    var formErr = document.getElementById('formErr');
+    if (!ok) {
+      formErr.style.display = 'block'; formErr.textContent = 'Please fix the highlighted fields.';
+      FormsUI.announce('This form has errors. Please fix the highlighted fields.');
+      navigateToField(firstBad);
+      return;
+    }
+    formErr.style.display = 'none';
+    LAST_ANSWERS = answers; // remembered so "add another child" can carry the parent/common fields over
+    if (IS_PREVIEW) { onSubmitDone({ ok: true, message: 'This is a preview — your response was NOT saved.', submissionId: 'PREVIEW' }); return; }
+    var btn = document.getElementById('submitBtn'); btn.disabled = true;
+    var label = IS_EDIT ? 'Save changes' : 'Submit';
+    btn.innerHTML = '<span class="spinner"></span> ' + (IS_EDIT ? 'Saving…' : 'Submitting…');
+    // Building a PDF template (Slides fill + export) can add several seconds on top of the
+    // plain write-to-sheet — nudge the submitter after a delay so it doesn't read as hung.
+    // Fires on a delay rather than being conditioned on the form actually having a PDF
+    // template so the client never needs to know that detail.
+    var pdfHintT = setTimeout(function () {
+      if (btn.disabled) btn.innerHTML = '<span class="spinner"></span> Building your PDF copy — this can take a moment…';
+    }, 4000);
+    var clearPdfHint = function () { clearTimeout(pdfHintT); };
+    var run = google.script.run
+      .withSuccessHandler(function (res) { clearPdfHint(); onSubmitDone(res); })
+      .withFailureHandler(function (e) { clearPdfHint(); btn.disabled = false; btn.textContent = label; formErr.style.display = 'block'; formErr.textContent = friendlyErr_(e); });
+    if (IS_EDIT) run.updateSubmission(FORM_ID, EDIT_ID, EDIT_T, answers, ATTACH);
+    else run.submitForm(FORM_ID, answers, TOKEN, ATTACH, ((document.getElementById('hpField') || {}).value || ''));
+  }
+
+  function onWithdraw() {
+    FormsUI.confirm('Withdraw this response?', 'This cancels your submission. This can’t be undone, but you can submit the form again afterward.', 'Withdraw', 'Keep it')
+      .then(function (yes) {
+        if (!yes) return;
+        var wb = document.getElementById('withdrawBtn'); if (wb) { wb.disabled = true; wb.innerHTML = '<span class="spinner"></span> Withdrawing…'; }
+        google.script.run
+          .withSuccessHandler(function (res) {
+            if (res && res.ok) {
+              shell('<div class="card flush-top card-pad center stack"><div style="color:var(--hcs-red)">' + FormsUI.icon('check', { cls: 'hcsi-lg' }) + '</div>' +
+                '<h1 class="form-title">Response withdrawn</h1>' +
+                '<p class="form-desc">' + FormsUI.esc(res.message || 'Your response has been withdrawn.') + '</p></div>');
+              FormsUI.announce('Response withdrawn.');
+              FormsUI.focusView(document.querySelector('#app .card'));
+            } else {
+              if (wb) { wb.disabled = false; wb.textContent = 'Withdraw this response'; }
+              var fe = document.getElementById('formErr'); if (fe) { fe.style.display = 'block'; fe.textContent = (res && res.message) || (res && reasonText(res)[1]) || 'Could not withdraw this response.'; }
+            }
+          })
+          .withFailureHandler(function (e) { if (wb) { wb.disabled = false; wb.textContent = 'Withdraw this response'; } var fe = document.getElementById('formErr'); if (fe) { fe.style.display = 'block'; fe.textContent = friendlyErr_(e); } })
+          .withdrawSubmission(FORM_ID, EDIT_ID, EDIT_T);
+      });
+  }
+
+  function onSubmitDone(res) {
+    var btn = document.getElementById('submitBtn'), formErr = document.getElementById('formErr');
+    if (!res || !res.ok) {
+      if (btn) { btn.disabled = false; btn.textContent = IS_EDIT ? 'Save changes' : 'Submit'; }
+      if (res && res.errors) { FIELDS.forEach(function (f) { if (res.errors[f.id]) setErr(f, res.errors[f.id]); }); formErr.style.display = 'block'; formErr.textContent = 'Please fix the highlighted fields.'; }
+      else { formErr.style.display = 'block'; formErr.textContent = (res && res.message) || 'Submission failed. Please try again.'; }
+      return;
+    }
+    if (!IS_EDIT) clearDraft();
+    var canAddChild = !IS_PREVIEW && !IS_EDIT && FORM && FORM.multiStudent && VIA === 'otp' &&
+      FIELDS.some(function (f) { return f.type === 'studentPicker'; });
+    var nextStep = res.status === 'Pending Approval'
+      ? '<div class="notice info" style="text-align:left">Your submission will be reviewed. You’ll get an email with the decision.</div>' : '';
+    // Per round-2 audit P20: the Drive copy is private now (staff-side record only), so the
+    // submitter's copy comes back as bytes in the response and is offered as a real download
+    // (Blob -> createObjectURL -> a.download -> click, same mechanism Builder.html's CSV export
+    // uses) — never a new-tab link to a shared Drive file, and never a plain blob-URL open,
+    // which the googleusercontent sandbox can block.
+    var pdfCopies = res.pdfCopies || [];
+    var pdfLinks = pdfCopies.length
+      ? pdfCopies.map(function (d, i) {
+          return '<button type="button" class="btn ghost block" data-pdfcopy="' + i + '">' +
+            FormsUI.icon('download') + ' Download a copy (' + FormsUI.esc(d.name) + ')</button>';
+        }).join('')
+      : (res.pdfCopiesOverCap ? '<p class="help">Your copy is attached to the confirmation email.</p>' : '');
+    var doneTitle = IS_EDIT ? 'Changes saved' : 'Submitted';
+    shell('<div class="card flush-top card-pad center stack">' +
+      '<div style="color:var(--hcs-red)">' + FormsUI.icon('check', { cls: 'hcsi-lg' }) + '</div>' +
+      '<h1 class="form-title">' + doneTitle + '</h1>' +
+      '<p class="form-desc">' + FormsUI.esc(res.message) + '</p>' +
+      nextStep +
+      pdfLinks +
+      '<p class="help">Reference: ' + FormsUI.esc(res.displayLabel || res.submissionId) + '</p>' +
+      (canAddChild ? '<button class="btn block" id="addChildBtn" type="button">' + FormsUI.icon('plus') + ' Save &amp; add another child</button>' : '') +
+      (IS_PREVIEW || IS_EDIT ? '' : '<button class="btn ghost" id="anotherBtn" type="button">' + (canAddChild ? 'I’m done' : 'Submit another response') + '</button>') +
+      '</div>');
+    document.querySelectorAll('[data-pdfcopy]').forEach(function (b) {
+      b.onclick = function () {
+        var d = pdfCopies[Number(b.getAttribute('data-pdfcopy'))];
+        if (!d) return;
+        var bin = atob(d.b64), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        var blob = new Blob([bytes], { type: 'application/pdf' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href = url; a.download = d.name; a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      };
+    });
+    var acb = document.getElementById('addChildBtn'); if (acb) acb.onclick = addAnotherChild;
+    var anb = document.getElementById('anotherBtn'); if (anb) anb.onclick = restartForm_;
+    FormsUI.announce(doneTitle + '. ' + (res.message || '') + ' Reference ' + (res.displayLabel || res.submissionId || ''));
+    FormsUI.focusView(document.querySelector('#app .card'));
+  }
+
+  // Re-open the form for the parent's NEXT child: keep parent + common answers, reset the student
+  // (and student-derived + file/signature fields). Produces a separate response row per child.
+  function addAnotherChild() {
+    var keep = LAST_ANSWERS || {};
+    // What does NOT carry over: the student picker, student-derived fields, and every
+    // file/signature field. A toast saying "your info was kept" was actively misleading for a
+    // parent who had just signed and attached a physical form for child 1 — they'd submit child
+    // 2 believing the signature came along. Spell it out, once, before they start.
+    var resetFields = FIELDS.filter(function (f) { return f.type === 'file' || f.type === 'signature'; });
+    var resetNames = resetFields.map(function (f) { return f.label || (f.type === 'signature' ? 'Signature' : 'Attachment'); });
+
+    ATTACH = {}; SIG_DRAWN = {}; ATTACH_DRAFT_SKIPPED = false;
+    renderForm(FORM); // fresh render — applyPrefill re-fills parent fields and resets the picker
+    FIELDS.forEach(function (f) {
+      if (f.type === 'studentPicker' || f.type === 'file' || f.type === 'signature') return;
+      if (f.prefillFrom === 'studentGrade' || f.prefillFrom === 'studentName' || f.prefillFrom === 'studentGradeNextYear') return;
+      if (keep[f.id] != null) writeValue(f, keep[f.id]);
+    });
+    recomputeCalc(); applyVisibility(); renderAttachTotal_();
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+
+    var body = '<p style="margin:0 0 10px">Your contact details and shared answers were kept. ' +
+      'Choose your next child to continue.</p>';
+    if (resetNames.length) {
+      body += '<p style="margin:0 0 6px"><strong>You’ll need to redo these for this child:</strong></p><ul style="margin:0;padding-left:20px">' +
+        resetNames.map(function (n) { return '<li>' + FormsUI.esc(n) + '</li>'; }).join('') + '</ul>';
+    }
+    FormsUI.modal('Next child', body, 'Got it');
+  }
+})();
+</script>
+
+  
+</body>
+</html>

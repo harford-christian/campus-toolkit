@@ -1,22 +1,29 @@
 // Verifies the Dismissal Board demo by running its fabricated dataset through the REAL app — all of it:
 //   - the Roster fixture must be EXACTLY what the real nightly producer (FACTS/facts-api-sync/
 //     Transportation.gs) emits for the same inputs, so the fixture cannot drift from the shape the app consumes;
-//   - logic.js must be the source project's server layer, verbatim (build-logic.mjs), and index.html a fresh
+//   - logic.js must be the source project's server layer, verbatim (build-logic.mjs), and board.html a fresh
 //     build of build.json — a stale demo is the failure these two catch;
 //   - every google.script.run method the page calls is served, by the vendored endpoint, over the in-memory
 //     Google in mock.js: the board, the time-travel, the planned list, history, the writes (overrides, standing
 //     patterns, walk-up list, notes, pickup authorizations, views, roles), the mail, the persistence;
-//   - the built page passes the app's own two blank-page gates and carries no real names or ids.
+//   - the built page passes the app's own two blank-page gates and carries no real names or ids;
+//   - the RAMP KIOSK (kiosk.html, a separate Apps Script project) runs its own vendored server
+//     (kiosk-logic.js, build-kiosk-logic.mjs) over the SAME mock Drive: doGet and rampApi read the
+//     Dismissal_RAMP_BOARD.json the vendored publisher writes, the device-token gate is real, and a change
+//     saved on the board reaches the kiosk at its next poll;
+//   - index.html is the hand-written switcher that frames the two.
 //
 // Run from the repo root: node demos/transportation/verify.mjs
 // Requires the source projects checked out alongside this repo:
 //   Projects/apps-script-showcase/  ·  Projects/FACTS/transportation/  ·  Projects/FACTS/facts-api-sync/
+//   ·  Projects/FACTS/transportation-kiosk/
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
 import { buildLogic, SRC, nameAliases } from './build-logic.mjs';
+import { buildKioskLogic, KIOSK_SRC } from './build-kiosk-logic.mjs';
 import { findPhrases, findStaffNames } from '../../tools/staff-aliases.mjs';
 const require = createRequire(import.meta.url);
 
@@ -66,7 +73,7 @@ check('the fixture headers are the source\'s headers, column for column',
   eq(T.Overrides[0], L.OVERRIDES_HEADER) && eq(T.Standing[0], L.STANDING_HEADER) && eq(T.Walkers[0], L.WALKERS_HEADER) &&
   eq(T.PickupAuth[0], L.PICKUP_AUTH_HEADER) && eq(T.Notes[0], L.NOTES_HEADER) && eq(T.Specials[0], L.SPECIALS_HEADER) &&
   eq(T.Roles[0], L.ROLES_HEADER) && eq(T.Routes[0], L.ROUTES_HEADER));
-const html = readFileSync(HERE + 'index.html', 'utf8');
+const html = readFileSync(HERE + 'board.html', 'utf8');
 // Every google.script.run chain: walk forward from each call site at paren depth 0 — through the
 // .with*Handler(...) calls, whose bodies may nest anything — to the first method that is not a with*; the
 // gear's members table goes through cfgCall(btn, 'name', args).
@@ -82,7 +89,7 @@ function chainEndpoint(src, from) {
     else if (depth === 0 && ch === '[') return null;      // run[name].apply(...) — dynamic, covered by cfgCall
     else if (depth === 0 && ch === '.') {
       const m = /^\.([a-zA-Z]\w*)\s*\(/.exec(text.slice(i, i + 60));
-      if (m && !/^with/.test(m[1])) return m[1];
+      if (m && !/^with(SuccessHandler|FailureHandler|UserObject)$/.test(m[1])) return m[1];
     }
   }
   return null;
@@ -395,11 +402,161 @@ try {
   const tmpCfg = ROOT + '.tmp/verify-transportation.json', tmpOut = ROOT + '.tmp/verify-transportation.html';
   writeFileSync(tmpCfg, JSON.stringify({ ...cfg, dst: tmpOut }));
   execFileSync(process.execPath, [ROOT + 'tools/build-demo.mjs', tmpCfg], { cwd: ROOT, stdio: 'pipe' });
-  check('index.html is what build-demo.mjs produces from the current source (not stale)', readFileSync(tmpOut, 'utf8') === html,
+  check('board.html is what build-demo.mjs produces from the current source (not stale)', readFileSync(tmpOut, 'utf8') === html,
     'rebuild: node demos/transportation/build-logic.mjs && node tools/build-demo.mjs demos/transportation/build.json');
 } catch (e) {
-  check('index.html could be rebuilt from build.json', false, e.message);
+  check('board.html could be rebuilt from build.json', false, e.message);
 }
+
+/* ---------- the RAMP KIOSK (kiosk.html), on the SAME data ---------- */
+// A second Apps Script project. Its page loads kiosk-logic.js (the kiosk's Config.gs + Code.gs, plus the
+// publisher's pure logic as page globals), logic.js (the Dismissal server, whose publishBoardTick is the
+// minute trigger), then data.js and mock.js — so boot it the same way, with a clock we can move.
+if (!existsSync(KIOSK_SRC + '/Code.gs')) {
+  check('the Ramp Kiosk source project is checked out next to this repo (FACTS/transportation-kiosk)', false);
+} else {
+  const KP = require(KIOSK_SRC + '/Pure.gs');               // the kiosk's own pure logic (module.exports, as its tests use)
+  const kioskHtml = readFileSync(HERE + 'kiosk.html', 'utf8');
+  const kioskJs = readFileSync(HERE + 'kiosk-logic.js', 'utf8');
+  const RAMP = 'Dismissal_RAMP_BOARD.json';
+  const bootKiosk = (sess, search, clock) => {
+    const RealDate = Date;
+    const D2 = clock ? class extends RealDate {
+      constructor(...a) { if (a.length) super(...a); else super(RealDate.now() + clock.delta); }
+      static now() { return RealDate.now() + clock.delta; }
+    } : Date;
+    const ctx = { console, Date: D2, Math, JSON, Object, Array, String, Number, RegExp, Error, parseInt, parseFloat, isNaN, URLSearchParams, setTimeout };
+    ctx.window = ctx; ctx.globalThis = ctx; ctx.sessionStorage = sess || makeSession();
+    ctx.location = { search: search || '', href: 'http://demo/kiosk.html' + (search || ''), reload() {} };
+    vm.createContext(ctx);
+    for (const f of [HERE + 'kiosk-logic.js', HERE + 'logic.js', HERE + 'data.js', HERE + 'mock.js']) vm.runInContext(lf(readFileSync(f, 'utf8')), ctx, { filename: f });
+    return { S: ctx, M: ctx.MOCK_BACKEND, K: ctx.KIOSK_LOGIC, KD: ctx.KIOSK_DEMO };
+  };
+  const rampFile = (k) => { const f = Object.values(k.S.DISMISSAL_DEMO.files).filter((x) => x.name === RAMP); return f.length === 1 ? f[0] : null; };
+
+  // vendoring and the build
+  check('kiosk-logic.js is the kiosk\'s Config.gs + Code.gs WHOLE and the publisher\'s DismissalClient, verbatim after the scrubs (run build-kiosk-logic.mjs)',
+    buildKioskLogic() === kioskJs && /function rampApi\(token\)/.test(kioskJs) && /function doGet\(e\)/.test(kioskJs) && /function readRampBoard_\(\)/.test(kioskJs));
+  check('logic.js carries the Dismissal server\'s own minute publisher (publishBoardTick) and dsPublishBundle_',
+    typeof L.publishBoardTick === 'function' && typeof L.dsPublishBundle_ === 'function' && /function publishBoardTick\(\)/.test(logicJs));
+  const pureSrc = lf(readFileSync(KIOSK_SRC + '/Pure.gs', 'utf8'));
+  check('KioskClient (generated from Pure.gs) is current, and kiosk.html inlines Pure.gs verbatim — not a reimplementation',
+    lf(readFileSync(KIOSK_SRC + '/KioskClient.html', 'utf8')).indexOf(pureSrc) !== -1 && kioskHtml.indexOf(pureSrc) !== -1);
+  try {
+    const cfg = JSON.parse(readFileSync(HERE + 'build.kiosk.json', 'utf8'));
+    mkdirSync(ROOT + '.tmp', { recursive: true });
+    const tmpCfg = ROOT + '.tmp/verify-transportation-kiosk.json', tmpOut = ROOT + '.tmp/verify-transportation-kiosk.html';
+    writeFileSync(tmpCfg, JSON.stringify({ ...cfg, dst: tmpOut }));
+    execFileSync(process.execPath, [ROOT + 'tools/build-demo.mjs', tmpCfg], { cwd: ROOT, stdio: 'pipe' });
+    check('kiosk.html is what build-demo.mjs produces from the current source (not stale)', readFileSync(tmpOut, 'utf8') === kioskHtml,
+      'rebuild: node demos/transportation/build-kiosk-logic.mjs && node tools/build-demo.mjs demos/transportation/build.kiosk.json');
+  } catch (e) {
+    check('kiosk.html could be rebuilt from build.kiosk.json', false, e.message);
+  }
+
+  // the page itself
+  check('kiosk.html: no unreplaced template tokens; kiosk-logic.js and logic.js load in <head> before the shim, data and mock; titled HCS Ramp',
+    !/<\?[=!]?[\s\S]*?\?>/.test(kioskHtml) && (() => { const head = kioskHtml.slice(0, kioskHtml.indexOf('<body>')); const at = (x) => head.indexOf(x);
+      return at('<title>HCS Ramp</title>') !== -1 && at('src="kiosk-logic.js"') !== -1 && at('src="kiosk-logic.js"') < at('src="logic.js"') &&
+        at('src="logic.js"') < at('gsr-shim.js') && at('gsr-shim.js') < at('src="data.js"') && at('src="data.js"') < at('src="mock.js"'); })());
+  check('kiosk.html reads doGet\'s template values back from the mock (window.KIOSK_DEMO.page), it does not hard-code them',
+    /var TOKEN = KIOSK_DEMO\.page\.token;/.test(kioskHtml) && /var DATA = JSON\.parse\(KIOSK_DEMO\.page\.dataJson\);/.test(kioskHtml) &&
+    /var FULL_APP = KIOSK_DEMO\.page\.fullAppUrl;/.test(kioskHtml));
+  const kBlocks = [...kioskHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  let kSyn = true, kWhy = '';
+  for (const b of kBlocks) { try { new Function(b[1]); } catch (e) { kSyn = false; kWhy = e.message; } }
+  check('every kiosk.html script parses as JavaScript', kSyn && kBlocks.length >= 2, kWhy);
+  const kDefined = new Set([...kioskHtml.matchAll(/\bid="([A-Za-z_][\w-]*)"/g)].map((m) => m[1]));
+  const kMissing = [...kioskHtml.matchAll(/\$\(\s*'([A-Za-z_][\w-]*)'\s*\)/g)].map((m) => m[1]).filter((id, i, a) => !kDefined.has(id) && a.indexOf(id) === i);
+  check('every literal $(id) in kiosk.html resolves to an element', kMissing.length === 0, 'missing: ' + kMissing.join(', '));
+  const kCalls = [...new Set([...kioskHtml.matchAll(/google\.script\.run/g)].map((m) => chainEndpoint(kioskHtml, m.index + 17)).filter(Boolean))];
+
+  // first paint: the REAL doGet, token gate and all, over the same Drive
+  const ks = makeSession();
+  const k1 = bootKiosk(ks);
+  check('the kiosk page calls exactly one server method, rampApi, and the mock serves it',
+    eq(kCalls, ['rampApi']) && typeof k1.M.rampApi === 'function', JSON.stringify(kCalls));
+  const file1 = rampFile(k1);
+  check('on load the vendored minute publisher (publishBoardTick, inside its 07:45-15:50 window on the pinned clock) wrote ONE Dismissal_RAMP_BOARD.json',
+    !!file1 && JSON.parse(file1.content).builtAt.indexOf('2026-09-15 14:5') === 0 && JSON.parse(file1.content).dayName === 'Tue');
+  check('doGet passes the device-token gate for the enrolled demo token and inlines exactly the published file; Full app = the board demo',
+    k1.KD.page.message === undefined && k1.KD.page.token === k1.KD.token && k1.KD.page.dataJson === file1.content &&
+    k1.KD.page.title === 'HCS Ramp' && k1.KD.page.fullAppUrl === 'board.html' && JSON.parse(k1.KD.page.errJson) === '');
+  const r1 = k1.M.rampApi(k1.KD.token);
+  check('rampApi reads that same file and stamps the server clock (the page measures staleness on it): live, "just now"',
+    eq(Object.assign({}, r1, { serverMs: 0 }), Object.assign(JSON.parse(rampFile(k1).content), { serverMs: 0 })) &&
+    typeof r1.serverMs === 'number' && KP.ksStaleness(r1.builtMs, r1.serverMs).level === 'ok' && KP.ksFmtAge(KP.ksStaleness(r1.builtMs, r1.serverMs).ageSec) === 'just now');
+  // who is on it: the ramp population of the board the Dismissal server builds from the same sheets
+  const fresh = boot(makeSession());
+  const fBoard = fresh.M.dismissalApi('').board;
+  const rampPop = fresh.S.dsFlatList(fBoard).filter((r) => fresh.S.dsRampPopulation(r, { sixthAtEl: true }));
+  check('rampApi returns the elementary ramp: K4-5 (plus EL-pickup 6th), Bus / Car / Early Bird, never a Staff Kid — the board\'s own ramp population, name for name',
+    r1.students.length === rampPop.length && r1.students.length > 30 &&
+    eq(r1.students.map((s) => s.name).sort(), rampPop.map((r) => r.name).sort()) &&
+    r1.students.every((s) => ['Bus', 'Car', 'Early Bird'].indexOf(s.type) !== -1) &&
+    r1.students.every((s) => ['K4', 'K5', '1', '2', '3', '4', '5', '6'].indexOf(s.grade) !== -1),
+    JSON.stringify(r1.students.map((s) => s.grade + ' ' + s.type)));
+  const flaggedNames = (st) => KP.ksApplyFilters(st, { notRidingOnly: true }).map((s) => s.name).sort();
+  const boardNE = fBoard.notExpected.map((r) => r.name);
+  check('the not-to-wait-for flags: Pure.gs (ksCounts / ksApplyFilters) derives the same from rampApi as from the published file, and they are the board\'s notExpected on the ramp',
+    eq(KP.ksCounts(r1.students), KP.ksCounts(JSON.parse(file1.content).students)) &&
+    eq(flaggedNames(r1.students), flaggedNames(JSON.parse(file1.content).students)) &&
+    KP.ksCounts(r1.students).flagged === flaggedNames(r1.students).length && flaggedNames(r1.students).length >= 1 &&
+    eq(flaggedNames(r1.students), r1.students.map((s) => s.name).filter((n) => boardNE.indexOf(n) !== -1).sort()),
+    JSON.stringify(flaggedNames(r1.students)));
+  check('PII-minimised: a ramp row carries no student id, phone or email, and at most three name + relationship pickups',
+    r1.students.every((s) => !('id' in s) && s.pickups.every((p) => p.length === 2) && s.pickups.length <= 3) && !/@|\d{3}-\d{3}-\d{4}/.test(file1.content));
+
+  // the gate
+  const k2 = bootKiosk(makeSession(), '?k=not-a-device');
+  check('the token gate is real: an unknown ?k= gets doGet\'s "Not enrolled" page and rampApi refuses it',
+    /Not enrolled/.test(k2.KD.page.message || '') && k2.KD.page.dataJson === 'null' && throws(() => k1.M.rampApi('not-a-device'), /no longer enrolled/) &&
+    throws(() => k1.M.rampApi(''), /no longer enrolled/));
+  k1.KD.props.KIOSK_ENABLED = 'N';
+  check('the panic switch (KIOSK_ENABLED = N) turns every poll away', throws(() => k1.M.rampApi(k1.KD.token), /turned off/));
+  delete k1.KD.props.KIOSK_ENABLED;
+
+  // a change on the board reaches the kiosk
+  const beforeStore = JSON.stringify(ks.s);
+  k1.M.rampApi(k1.KD.token);
+  check('the kiosk writes nothing: polling leaves this tab\'s sessionStorage untouched', JSON.stringify(ks.s) === beforeStore);
+  const gw = (st) => st.find((s) => s.name === 'Gaskill Wyatt');
+  check('before: Gaskill Wyatt is on the ramp as Bus (Bel Air), no TODAY badge', gw(r1.students).type === 'Bus' && gw(r1.students).today === false);
+  const boardTab = boot(ks);                                 // the board, in the same tab (same sessionStorage)
+  boardTab.M.setOverrides('400140', 'Car', '', 'nan collecting', '', 'Gaskill, Tabitha (Mother)', null);
+  const r2 = k1.M.rampApi(k1.KD.token);
+  check('an override saved on the board (setOverrides -> Car) shows in the kiosk\'s NEXT rampApi: lane Car, TODAY, handed to the adult',
+    gw(r2.students).type === 'Car' && gw(r2.students).today === true && gw(r2.students).handedTo === 'Gaskill, Tabitha (Mother)' &&
+    eq(gw(r2.students).lanes.map((l) => l.label), ['Car']) && JSON.parse(rampFile(k1).content).students.some((s) => s.name === 'Gaskill Wyatt' && s.type === 'Car'));
+  const k3 = bootKiosk(ks);
+  check('and a kiosk opened afterwards (the switcher reloads the frame) paints it on first load, from doGet',
+    gw(JSON.parse(k3.KD.page.dataJson).students).type === 'Car');
+  check('a fresh session\'s kiosk starts from the dataset', gw(JSON.parse(bootKiosk(makeSession()).KD.page.dataJson).students).type === 'Bus');
+
+  // the pinned clock: past 15:50 the publisher stops, and the kiosk says so
+  const clock = { delta: 0 };
+  const k4 = bootKiosk(makeSession(), '', clock);
+  const built4 = JSON.parse(rampFile(k4).content).builtMs;
+  clock.delta = 70 * 60 * 1000;                             // 14:52 + 70 min = 16:02
+  const r4 = k4.M.rampApi(k4.KD.token);
+  check('past 15:50 on the pinned clock publishBoardTick stands down, the file stops moving, and Pure.gs\'s staleness gate turns the kiosk red',
+    r4.builtMs === built4 && KP.ksStaleness(r4.builtMs, r4.serverMs).level === 'stale' && JSON.parse(rampFile(k4).content).builtAt.indexOf('2026-09-15 14:5') === 0);
+
+  // privacy
+  const kAll = kioskHtml + kioskJs;
+  check('kiosk.html and kiosk-logic.js: no real Drive ids, deployment ids or urls, and not the real domain',
+    !/AKfycb|script\.google\.com\/macros|docs\.google\.com|1[A-Za-z0-9_-]{30,}/i.test(kAll) && !new RegExp('harford' + 'christian', 'i').test(kAll) &&
+    /var SHARED_FOLDER_ID = 'DEMO_DRIVE_ID';/.test(kioskJs) && /example\.invalid\/demo-deployment/.test(kioskJs));
+  check('kiosk.html and kiosk-logic.js: staff first names in the source comments are scrubbed by hash',
+    findPhrases(kAll, nameAliases()).length === 0 && findStaffNames(kAll).length === 0 && /the ramp lead \+ the office manager/.test(kioskJs));
+}
+
+/* ---------- the switcher ---------- */
+const sw2 = readFileSync(HERE + 'index.html', 'utf8');
+check('index.html is the hand-written switcher: Dismissal Board and Ramp Kiosk buttons framing board.html / kiosk.html, a Gallery link, and ?sim= forwarded to the board',
+  /data-src="board\.html"[^>]*>📋 Dismissal Board</.test(sw2) && /data-src="kiosk\.html"[^>]*>🧸 Ramp Kiosk \(iPad\)</.test(sw2) &&
+  /href="\.\.\/\.\.\/index\.html"/.test(sw2) && /location\.search/.test(sw2) && !/gsr-shim/.test(sw2) &&
+  JSON.parse(readFileSync(HERE + 'build.json', 'utf8')).dst === 'demos/transportation/board.html');
 
 console.log(fail ? `\n${fail} FAILURE(S)` : '\nall demo checks passed');
 process.exit(fail ? 1 : 0);

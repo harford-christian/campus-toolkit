@@ -1,211 +1,90 @@
-<!DOCTYPE html><html lang="en"><head>
-<meta name="theme-color" content="#8B1E1E">
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HCS Forms — Preview</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Custom Forms — Showcase demo</title>
 <style>
-  :root {
-    --hcs-red:#8B1E1E; --hcs-red-hover:#701818; --hcs-gold:#D4AF37; --hcs-gold-soft:#f6ecd0;
-    --bg:#f4f5f7; --card:#ffffff; --panel:#fbfafa;
-    --text:#2b2b2b; --muted:#6b7280; --line:#e2e4e8; --line-strong:#cfd3da;
-    --ok:#2e7d32; --ok-bg:#e8f5e9; --err:#b42318; --err-bg:#fdeceb; --warn:#b45309; --warn-bg:#fdf3e7;
-    --radius:12px; --radius-sm:9px;
-    --shadow:0 1px 2px rgba(16,24,40,.06), 0 6px 22px rgba(16,24,40,.06);
-    --ring:0 0 0 3px rgba(139,30,30,.16);
+  :root { --maroon:#8B1E1E; --gold:#D4AF37; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #f4f5f7; }
+  .bar {
+    flex: none; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    padding: 10px 16px; color: #fff;
+    background: linear-gradient(120deg, #5f1414 0%, #8B1E1E 55%, #a52a2a 100%);
+    box-shadow: 0 4px 14px rgba(0,0,0,.35); z-index: 2;
   }
-  * { box-sizing:border-box; }
-  html,body { margin:0; }
-  body { background:var(--bg); color:var(--text); line-height:1.5;
-    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
-
-  /* ---- layout ---- */
-  .page { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
-  .page.wide { max-width:1080px; }
-  .brandbar { display:flex; align-items:center; gap:12px; background:var(--hcs-red); color:#fff;
-    padding:12px 18px; border-radius:var(--radius) var(--radius) 0 0; }
-  /* full-bleed variant — Portal's site shell (matches Builder's always-full-width .topbar);
-     the default (unrounded-top removed) is still used by boxed contexts like the runner's
-     access-denied page, which keep the rounded-top-of-a-card look. */
-  .brandbar.flush { border-radius:0; }
-  .brandbar .logo { height:34px; width:auto; background:#fff; border-radius:6px; padding:3px 5px; }
-  .brandbar .name { font-weight:800; letter-spacing:-.01em; font-size:1rem; }
-  .brandbar .spacer { margin-left:auto; }
-  .goldrule { height:4px; background:var(--hcs-gold); }
-
-  /* ---- card / surfaces ---- */
-  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
-  .card.flush-top { border-top-left-radius:0; border-top-right-radius:0; }
-  .card-pad { padding:22px; }
-  .stack > * + * { margin-top:16px; }
-  .divider { height:1px; background:var(--line); border:0; margin:20px 0; }
-
-  /* ---- headings / text ---- */
-  .form-title { font-size:1.5rem; font-weight:800; margin:0 0 4px; letter-spacing:-.02em; }
-  .form-desc { color:var(--muted); margin:0; }
-  .section-head { font-size:1.05rem; font-weight:700; color:var(--hcs-red); margin:8px 0 2px;
-    padding-bottom:6px; border-bottom:2px solid var(--hcs-gold-soft); }
-  .help { font-size:.83rem; color:var(--muted); margin:3px 0 0; }
-  .muted { color:var(--muted); } .center { text-align:center; }
-
-  /* ---- fields ---- */
-  .field { margin:0; }
-  .field > label { display:block; font-weight:600; font-size:.92rem; margin-bottom:6px; }
-  .req { color:var(--err); margin-left:2px; }
-  .control, input.control, select.control, textarea.control {
-    width:100%; font:inherit; font-size:1rem; color:var(--text); background:var(--card);
-    border:1px solid var(--line-strong); border-radius:var(--radius-sm); padding:10px 12px; transition:border-color .12s, box-shadow .12s; }
-  textarea.control { min-height:96px; resize:vertical; }
-  .control:focus, .control:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
-  .control:disabled, .control[readonly] { background:#f3f4f6; color:#4b5563; cursor:not-allowed; }
-  .field.invalid .control { border-color:var(--err); }
-  .field .error { display:none; color:var(--err); font-size:.82rem; margin-top:5px; }
-  .field.invalid .error { display:block; }
-
-  /* choice groups (radio/checkbox) */
-  .choices { display:flex; flex-direction:column; gap:8px; }
-  .choice { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--line);
-    border-radius:var(--radius-sm); cursor:pointer; background:var(--card); }
-  .choice:hover { border-color:var(--line-strong); }
-  .choice:focus-within { border-color:var(--hcs-red); box-shadow:var(--ring); }
-  .choice input { margin-top:2px; accent-color:var(--hcs-red); width:18px; height:18px; }
-  .choice.selected { border-color:var(--hcs-red); background:#fbf4f4; }
-
-  /* ---- buttons ---- */
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
-    border:1px solid transparent; border-radius:var(--radius-sm); font-weight:700; font-size:.95rem;
-    padding:11px 18px; background:var(--hcs-red); color:#fff; transition:background .12s, box-shadow .12s; }
-  .btn:hover { background:var(--hcs-red-hover); }
-  .btn:focus-visible { outline:none; box-shadow:var(--ring); }
-  .btn:disabled { opacity:.55; cursor:not-allowed; }
-  .btn.block { width:100%; }
-  .btn.ghost { background:transparent; color:var(--hcs-red); border-color:var(--line-strong); }
-  .btn.ghost:hover { background:#fbf4f4; }
-  .btn.gold { background:var(--hcs-gold); color:#3a2e00; }
-  .btn.sm { padding:7px 12px; font-size:.85rem; }
-
-  /* ---- badges / pills (status system, reused from purchasing) ---- */
-  .pill { display:inline-block; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:999px; text-transform:capitalize; }
-  .pill.draft { background:#eef1f5; color:#475467; }
-  .pill.published, .pill.open, .pill.approved { background:var(--ok-bg); color:var(--ok); }
-  .pill.private { background:var(--hcs-gold-soft); color:#7a5b00; }
-  .pill.staff { background:#e7edfb; color:#2b4a9b; }
-  .pill.locked, .pill.closed, .pill.rejected { background:var(--err-bg); color:var(--err); }
-  .pill.pending { background:var(--warn-bg); color:var(--warn); }
-
-  /* ---- notices ---- */
-  .notice { border-radius:var(--radius-sm); padding:12px 14px; font-size:.9rem; }
-  .notice.info { background:var(--hcs-gold-soft); border:1px solid #ecd9a3; color:#6b5200; }
-  .notice.err { background:var(--err-bg); border:1px solid #f3c6c2; color:var(--err); }
-  .notice.ok { background:var(--ok-bg); border:1px solid #bfe0c1; color:var(--ok); }
-
-  /* ---- toast + spinner ---- */
-  .toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); background:#1f2430; color:#fff;
-    padding:11px 18px; border-radius:999px; font-size:.88rem; font-weight:600; box-shadow:var(--shadow); z-index:60; }
-  .spinner { width:18px; height:18px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%;
-    display:inline-block; animation:spin .7s linear infinite; }
-  .btn.ghost .spinner { border-color:rgba(139,30,30,.3); border-top-color:var(--hcs-red); }
-  @keyframes spin { to { transform:rotate(360deg); } }
-
-  .modal-overlay { position:fixed; inset:0; background:rgba(16,24,40,.5); display:flex; align-items:center; justify-content:center; z-index:70; padding:16px; overflow-y:auto; }
-  .modal { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); max-width:440px; width:100%; padding:22px; max-height:calc(100vh - 32px); overflow-y:auto; margin:auto; }
-  .modal h3 { margin:0 0 8px; font-size:1.15rem; color:var(--hcs-red); }
-  .modal .mbody { margin:0 0 16px; color:var(--text); font-size:.92rem; line-height:1.5; }
-  .sigpad { border:1px dashed var(--line-strong); border-radius:var(--radius-sm); width:100%; height:180px; background:#fff; touch-action:none; display:block; }
-  .sigbar { margin-top:6px; }
-  .filelist { margin-top:6px; }
-  .filelist .fitem { display:flex; align-items:center; gap:8px; font-size:.82rem; color:var(--text); }
-  .desc-block { font-size:.9rem; color:var(--text); white-space:pre-wrap; line-height:1.5; margin:0; }
-  .progress { height:6px; background:var(--line); border-radius:999px; overflow:hidden; margin-bottom:4px; }
-  .progress-bar { height:100%; background:var(--hcs-red); transition:width .2s ease; }
-  .calc-value { font-weight:800; color:var(--hcs-red); background:#f7f8fa; }
-  .footer { text-align:center; color:var(--muted); font-size:.75rem; padding:22px 0 0; }
-  @media (max-width:520px){ .card-pad{ padding:16px; } .page{ padding:14px 10px 48px; } }
-  /* ---- shared shell nav (cross-app link in the topbar/brandbar) ---- */
-  .shell-topbar-link { margin-left:auto; color:#fff; text-decoration:none; font-weight:700;
-    font-size:.85rem; background:rgba(255,255,255,.14); border-radius:999px; padding:7px 14px;
-    transition:background .12s; }
-  .shell-topbar-link:hover { background:rgba(255,255,255,.24); }
-
-  /* ---- tile grid (Portal's full-site home view — same visual language as Builder's
-     .chipgrid/.chip, generically named so Portal doesn't need Builder's CSS) ---- */
-  .tilegrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr)); gap:14px; }
-  .tile { background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
-    box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; padding:16px;
-    text-decoration:none; color:inherit; font:inherit; cursor:pointer; text-align:left;
-    transition:border-color .12s, transform .12s; }
-  .tile:hover { border-color:var(--hcs-gold); transform:translateY(-1px); }
-  .tile:focus-visible { outline:none; border-color:var(--hcs-red); box-shadow:var(--ring); }
-  .tile:disabled { opacity:.55; cursor:not-allowed; transform:none; }
-  .tile-icon { flex:0 0 auto; width:40px; height:40px; border-radius:10px; background:var(--hcs-gold-soft);
-    color:var(--hcs-red); display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
-  .tile-name { flex:1 1 auto; min-width:0; font-weight:700; color:var(--text); overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
-  .tile-chev { flex:0 0 auto; color:var(--muted); font-size:1.1rem; }
-  /* prefilled parent-identity fields hidden behind the "Submitting as…" banner */
-  .identity-collapsed { display:none !important; }
-  /* FAQ accordion (faq field type) */
-  .faq-block { margin:4px 0 8px; }
-  .faq-item { border:1px solid var(--line); border-radius:10px; margin:6px 0; overflow:hidden; background:var(--card); }
-  .faq-item > summary { cursor:pointer; padding:11px 14px; font-weight:600; font-size:.95rem; list-style:none; position:relative; padding-right:34px; }
-  .faq-item > summary::-webkit-details-marker { display:none; }
-  .faq-item > summary::after { content:'+'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--hcs-red); font-size:1.15rem; }
-  .faq-item[open] > summary::after { content:'\2013'; }
-  .faq-item > summary:hover { color:var(--hcs-red); }
-  .faq-a { padding:0 14px 12px; color:#444; font-size:.92rem; line-height:1.5; white-space:pre-wrap; }
-  /* inline SVG icons (FormsUI.icon) — inherit color/size from context */
-  .hcsi { display:inline-block; vertical-align:middle; flex:none; }
-  .hcsi-lg { width:44px; height:44px; }
-  .infoicon { color:var(--muted); cursor:help; }
-  .infoicon:hover { color:var(--hcs-red); }
-  .infotip { position:fixed; max-width:260px; background:var(--card); border:1px solid var(--line-strong);
-    border-radius:8px; box-shadow:0 10px 26px rgba(0,0,0,.18); padding:9px 12px; font-size:.8rem;
-    line-height:1.4; color:var(--text); z-index:200; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.05rem; }
+  .brand .logo { font-size: 1.5rem; }
+  .brand small { display: block; font-weight: 600; font-size: .72rem; opacity: .85; }
+  .seg { display: inline-flex; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 4px; gap: 2px; flex-wrap: wrap; }
+  .seg button {
+    border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: .86rem;
+    color: #fff; background: transparent; padding: 8px 13px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 6px; transition: background .12s;
+  }
+  .seg button:hover { background: rgba(255,255,255,.16); }
+  .seg button.active { background: var(--gold); color: #3a2b00; }
+  .seg .rule { width: 1px; align-self: stretch; margin: 2px 5px; background: rgba(255,255,255,.28); }
+  .spacer { flex: 1; }
+  .hint { font-size: .78rem; opacity: .85; max-width: 26rem; line-height: 1.35; }
+  .back { color: #fff; text-decoration: none; font-weight: 700; font-size: .86rem; opacity: .9; border: 1px solid rgba(255,255,255,.3); padding: 7px 12px; border-radius: 999px; white-space: nowrap; }
+  .back:hover { background: rgba(255,255,255,.12); }
+  .stage { flex: 1; position: relative; background: #f4f5f7; }
+  .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #f4f5f7; }
+  @media (max-width: 1480px) { .hint { display: none; } }
+  @media (max-width: 760px) { .brand small { display: none; } .seg button { padding: 7px 9px; font-size: .78rem; } }
 </style>
-<style>
-  #pvbar { position:sticky; top:0; z-index:80; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
-    background:#2b2b2b; color:#fff; padding:8px 14px; font-family:'Inter',sans-serif; }
-  #pvbar .pvtag { font-size:.66rem; font-weight:800; letter-spacing:.06em; background:var(--hcs-gold); color:#3a2e00; padding:3px 8px; border-radius:999px; }
-  #pvbar a, #pvbar .pvlink { color:#fff; font-size:.8rem; text-decoration:none; }
-  #pvbar select { font:inherit; padding:3px 6px; border-radius:6px; }
-  #pvbar .sp { margin-left:auto; }
-  .chooser { max-width:820px; margin:0 auto; padding:48px 16px; }
-  .chooser h1 { font-size:1.8rem; margin:0 0 6px; }
-  .chooser .cards { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:26px; }
-  @media (max-width:640px){ .chooser .cards { grid-template-columns:1fr; } }
-  .chooser a.choice-card { display:block; text-decoration:none; color:var(--text); background:var(--card);
-    border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:24px; transition:border-color .12s, transform .08s; }
-  .chooser a.choice-card:hover { border-color:var(--hcs-red); transform:translateY(-2px); }
-  .chooser .ic { font-size:2rem; }
-  .chooser h2 { margin:8px 0 4px; color:var(--hcs-red); font-size:1.2rem; }
-</style>
-
-<link rel="stylesheet" href="../../assets/demo-banner.css">
-<script>window.DEMO_META = { name: "Custom Forms" };</script>
-<script src="../../assets/demo-banner.js" defer></script>
 </head>
 <body>
-<div id="pvbar"><span class="pvtag">PREVIEW · fabricated data</span>
-  <span>HCS Forms</span>
-  <a class="sp" href="mailto:joshmay@example.edu" target="_blank">Leave a comment ↗</a>
-</div>
-<div class="chooser">
-  <div class="brandbar" style="border-radius:12px"><span class="name">HCS Forms — interactive preview</span></div>
-  <div style="height:4px;background:var(--hcs-gold)"></div>
-  <div class="card card-pad" style="border-top-left-radius:0;border-top-right-radius:0">
-    <h1>Two ways to explore</h1>
-    <p class="form-desc">Everything here is a demo with fabricated data — nothing is saved and no email is sent. Pick a view:</p>
-    <div class="cards">
-      <a class="choice-card" href="fill.html">
-        <div class="ic">📝</div><h2>Fill out a form</h2>
-        <p class="help">See what a parent or staff member experiences: branded forms, FACTS auto-prefill (sign in with any email + any 6-digit code), file upload, and e-signature.</p>
-      </a>
-      <a class="choice-card" href="admin.html">
-        <div class="ic">🛠️</div><h2>Admin / builder (backend)</h2>
-        <p class="help">The part that beats JotForm: a dashboard of your forms, a drag-free field builder, template library with locked/starter layouts, per-form access &amp; email controls, and responses — all owned by the school.</p>
-      </a>
+  <div class="bar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">📝</span>
+      <span>Custom Forms<small>Five Apps Script apps, one form system</small></span>
     </div>
+    <div class="seg" role="tablist" aria-label="Choose an app">
+      <button data-src="chooser.html" aria-selected="false">🚪 Front door</button>
+      <span class="rule" aria-hidden="true"></span>
+      <button data-src="builder.html" class="active" aria-selected="true">🛠️ Builder</button>
+      <button data-src="staff.html" aria-selected="false">🏫 Staff portal</button>
+      <span class="rule" aria-hidden="true"></span>
+      <button data-src="parent.html" aria-selected="false">👪 Parent portal</button>
+      <button data-src="macs.html" aria-selected="false">🎓 MACS forms</button>
+    </div>
+    <span class="spacer"></span>
+    <span class="hint">Build and publish a form in the Builder, fill it in as a parent (sign in with the
+      emailed one-time code), then find the response — and any approval — back in the Builder.</span>
+    <a class="back" href="../../index.html" target="_top">← Gallery</a>
   </div>
-  <div class="footer">Harford Christian School · demo</div>
-</div>
-</body></html>
+  <div class="stage">
+    <iframe id="screen" src="builder.html" title="Custom Forms screen"></iframe>
+  </div>
+<script>
+  // Five separately deployed apps, one shared form store — swap the framed app in place. Every app
+  // here reads and writes the same demo Drive and Sheets (sessionStorage, this tab), so whatever is
+  // done in one frame is there when the next one loads.
+  var frame = document.getElementById('screen');
+  var btns = [].slice.call(document.querySelectorAll('.seg button'));
+  var FAMILY = { 'parent-form.html': 'parent.html', 'staff-form.html': 'staff.html', 'macs-portal.html': 'macs.html', 'macs-form.html': 'macs.html' };
+
+  function activate(btn) {
+    btns.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-selected', 'false'); });
+    if (!btn) return;
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+  }
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () { activate(b); frame.src = b.getAttribute('data-src'); });
+  });
+  // Links inside the apps (a portal tile, the chooser's buttons, the Builder's preview) move the frame
+  // without these buttons; re-sync the highlight when the browser lets us read the frame's address.
+  frame.addEventListener('load', function () {
+    var here = '';
+    try { here = frame.contentWindow.location.pathname.split('/').pop(); } catch (e) { return; }
+    here = FAMILY[here] || here;
+    activate(btns.filter(function (b) { return b.getAttribute('data-src') === here; })[0]);
+  });
+</script>
+</body>
+</html>
