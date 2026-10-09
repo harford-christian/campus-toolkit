@@ -52,7 +52,7 @@ console.log('\n  source sync');
 if (!existsSync(SRC)) {
   skip('source project not found at ' + SRC + ' — logic drift and fresh-build checks skipped');
 } else {
-  ok(buildLogic() === logicJs, 'logic.js is the source project\'s nine files, verbatim (run build-logic.mjs)');
+  ok(buildLogic() === logicJs, 'logic.js is the source project\'s ten files, verbatim (run build-logic.mjs)');
   const tmp = mkdtempSync(path.join(tmpdir(), 'portal-verify-'));
   try {
     const c = JSON.parse(read('build.json'));
@@ -117,6 +117,17 @@ ok(eq(Object.keys(M).sort(), calls), 'MOCK_BACKEND implements exactly the method
 const b = P.boot();
 ok(b.ok && b.fullName === 'Nora Alderman' && /Wed Sep 23, 2026 10:30 AM/.test(b.sim), 'the demo opens as Nora on Wednesday 2026-09-23 at 10:30, labelled as a demo clock');
 const d = P.bootData();
+// News & Info: the memo-check sheet's Chapel and MemoNotes tabs, the calendar's closed days, through the app's own News.build
+const news = d.news || {};
+const nk = (k) => (news.items || []).filter((i) => i.kind === k);
+ok(news.enabled === true && (news.items || []).length >= 4, 'News & Info is on, with this week\'s items', JSON.stringify(news).slice(0, 300));
+ok(nk('chapel').length === 1 && nk('chapel')[0].date === '2026-09-23' && nk('chapel')[0].isToday === true && /junior class/.test(JSON.stringify(nk('chapel')[0])),
+   'today\'s chapel is the live memo\'s row (the newest memo wins; last week\'s and next week\'s are not shown)');
+ok(nk('exam').length === 1 && nk('exam')[0].date === '2026-09-24' && nk('spirit').length === 1 && nk('closed').some((i) => i.date === '2026-09-25'),
+   'the exam and spirit day come from MemoNotes, Friday\'s no-school day from the school calendar');
+ok(nk('picture').length === 1 && nk('picture')[0].date === '2026-09-29' && !(news.items || []).some((i) => i.date > '2026-09-30'),
+   'picture retakes on Tuesday the 29th are inside the 7-day window; the following week (the 30th) and later are not');
+ok(eq((news.items || []).map((i) => i.date), (news.items || []).map((i) => i.date).slice().sort()), 'items are in date order');
 const sc = d.schedule;
 ok(sc.date === '2026-09-23' && sc.dayCol === '3' && sc.nowMin === 630 && sc.quarter === 1 && sc.schoolDay === true, 'schedule context: Wednesday, third period, Q1, a school day');
 ok(sc.now && sc.now.description === 'Physics' && sc.now.periodShort === 'P3' && sc.now.beginShort === '10:12', 'NOW is Physics (pattern 3 -> the P3 slot, 10:12-10:57)');

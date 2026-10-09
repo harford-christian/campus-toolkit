@@ -245,6 +245,17 @@ window.PORTAL_DATA = (function () {
     { uid: 'macs', allDay: true, start: '20261113', end: '20261114', summary: 'MACS Fine Arts Festival — no school for non-participants' }
   ]);
 
+  // The memo-check sheet (campus-control/memo-check reads the weekly office memo and files chapel and notes rows).
+  // The portal reads two of its tabs, read-only. One memo per week; the newest live memo wins. No speakers named.
+  var CHAPEL = [['CreatedAt', 'EmailDate', 'WeekOf', 'Day', 'Date', 'Display', 'Time', 'NoChapel'],
+    ['2026-09-13 18:40', '2026-09-13', '2026-09-14', 'Wednesday', '2026-09-16', 'Opening chapel — the senior class leads worship', '08:35:00', 'false'],
+    ['2026-09-20 18:02', '2026-09-20', '2026-09-21', 'Wednesday', '2026-09-23', 'The junior class leads worship · Missions Week kickoff', '08:35:00', 'false'],
+    ['2026-09-27 17:55', '2026-09-27', '2026-09-28', 'Wednesday', '2026-09-30', 'Missions Week guest — the summer team shares', '08:35:00', 'false']];
+  var MEMO_NOTES = [['CreatedAt', 'EmailDate', 'WeekOf', 'Kind', 'Day', 'Date', 'Title'],
+    ['2026-09-20 18:02', '2026-09-20', '2026-09-21', 'exam', 'Thursday', '2026-09-24', 'Algebra II unit 1 test (all sections)'],
+    ['2026-09-20 18:02', '2026-09-20', '2026-09-21', 'spirit', 'Thursday', '2026-09-24', 'Spirit Day — wear your class colour'],
+    ['2026-09-20 18:02', '2026-09-20', '2026-09-21', 'picture', 'Tuesday', '2026-09-29', 'Picture retakes, 9:00 in the gym']];
+
   // The team table the app joins against. Same ids and shape as production; the calendar ids are demo keys.
   var TEAMS = [
     ['baseball-jv-boys', 'Baseball', 'Boys', 'JV'], ['baseball-ms-boys', 'Baseball', 'Boys', 'MS'], ['baseball-v-boys', 'Baseball', 'Boys', 'Varsity'],
@@ -272,6 +283,7 @@ window.PORTAL_DATA = (function () {
       'Meta': META, 'UserState': [['Email', 'Item Key', 'State', 'Updated']], 'SyncLog': [['When', 'Note']],
       'AdminViews': [['When', 'Admin', 'Student ID', 'Student', 'Note']], 'Prefs': PREFS, 'Notices': NOTICES
     },
+    memo: { 'Chapel': CHAPEL, 'MemoNotes': MEMO_NOTES },
     bellFor: bellFor,
     ics: ICS, schoolIcs: SCHOOL_ICS, teams: TEAMS, failingCalendars: FAILING_CALENDARS,
     quarterDates: DIR.quarterDates

@@ -97,7 +97,7 @@
         "leave-sub-automation/public-interface/PublicSubs.html",
         "leave-sub-automation/public-interface/PublicSummary.html"
       ],
-      "buildMethod": "build-demo.mjs + hand data/mock"
+      "buildMethod": "build-demo.mjs (includeDir=public-interface, inlines the five Public* panels; the ?ui= breakpoint token replaced — config committed at demos/leave-sub/build.json) + hand data/mock; demos/leave-sub/verify.mjs checks the mock contract (7 methods), the Charged vs Used arithmetic and a fresh build"
     },
     "concessions": {
       "title": "Concessions Ordering System",
@@ -271,7 +271,7 @@
         "FACTS/student-interface/Index.html",
         "FACTS/student-interface/Client.html"
       ],
-      "buildMethod": "build-logic.mjs vendors the project's pure engines (Schedule/Due/Athletics/SchoolCal.js) and endpoint + data files (Code/Sports/Notify/Data/Bells.gs) verbatim into logic.js; mock.js supplies the config (not vendored: real calendar/Drive ids), in-memory Google services and a pinned clock, and feeds the Directory Search demo's SIS tabs as the staging workbook. Then build-demo.mjs (demos/student-portal/build.json: includeDir inlines Client.html; _self base + shared dataset + logic.js via the <base> replacement; boot object and inline payload from the mock; admin/deny branches and the personal credit removed). verify.mjs re-checks privacy, vendored-logic drift, the fresh build, the mock contract and the schedule / due engine / game card / closures / grades / attendance / prefs through the real code.",
+      "buildMethod": "build-logic.mjs vendors the project's pure engines (Schedule/Due/Athletics/SchoolCal/News.js) and endpoint + data files (Code/Sports/Notify/Data/Bells.gs) verbatim into logic.js; mock.js supplies the config (not vendored: real calendar/Drive ids), in-memory Google services (including the memo-check sheet's Chapel and MemoNotes tabs) and a pinned clock, and feeds the Directory Search demo's SIS tabs as the staging workbook. Then build-demo.mjs (demos/student-portal/build.json: includeDir inlines Client.html; _self base + shared dataset + logic.js via the <base> replacement; boot object and inline payload from the mock; admin/deny branches and the personal credit removed). verify.mjs re-checks privacy, vendored-logic drift, the fresh build, the mock contract and the schedule / due engine / game card / closures / grades / attendance / prefs through the real code.",
       "_sourceNote": "The source Config.gs holds 21 real team calendar ids, a Drive folder id and the deployment id — never vendor it; tools/.probe-cache/ holds real FACTS dumps — never copy it."
     },
     "conferences": {

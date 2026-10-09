@@ -59,49 +59,50 @@ window.LEAVESUB_DATA = (function () {
   // (submitted < 14 days before start) trips the late-warning flag; one Pending
   // record is anchored to now+21d so it shows as Upcoming.
   var NOW = Date.now();
+  // Alex's own records sit on fixed dates of the CURRENT school year (Sep..Feb), so the My Leave tab and
+  // the Charged vs Used card always have the year's rows whenever the demo is opened; the later ones are
+  // leave approved in advance. `hours` is what payroll CHARGED (half-day increments upstream);
+  // `actualHours` is the time actually away where the two differ — the card's whole point.
+  var SY = new Date(NOW).getMonth() >= 8 ? new Date(NOW).getFullYear() : new Date(NOW).getFullYear() - 1;   // the school year the app calls current
+  function idFor(t) { var d = new Date(t); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + pad(d.getDate()); }
   function rec(o) {
     o.start = mdy(o.startRaw);
     o.end = o.endRaw ? mdy(o.endRaw) : '';
+    if (o.status === 'Approved' && !o.approvalId) { o.approvalId = 'LSA-' + idFor(o.startRaw); o.uidLink = 'https://uid.demo.example.edu/r/AR-' + idFor(o.startRaw); }
     return o;
   }
   var personalRecords = [
-    rec({ approvalId: 'LSA-2025-0916', type: 'Sick Leave', status: 'Approved',
-      uidLink: 'https://uid.demo.example.edu/r/AR-2025-0916',
-      startRaw: ms(2025, 9, 16), endRaw: null, hours: 8,
+    rec({ type: 'Sick Leave', status: 'Approved',
+      startRaw: ms(SY, 9, 16), endRaw: null, hours: 8, actualHours: 8,
       subRequired: 'Yes', subNames: 'Jordan Blake',
       discussion: 'Out with a bad cold; coverage arranged the day before.',
-      submittedRaw: ms(2025, 8, 28) }),
-    rec({ approvalId: 'LSA-2025-1021', type: 'HCS-Related', status: 'Approved',
-      uidLink: 'https://uid.demo.example.edu/r/AR-2025-1021',
-      startRaw: ms(2025, 10, 21), endRaw: null, hours: 8,
+      submittedRaw: ms(SY, 8, 28) }),
+    rec({ type: 'HCS-Related', status: 'Approved',
+      startRaw: ms(SY, 10, 21), endRaw: null, hours: 8, actualHours: 8,
       subRequired: 'No', subNames: '',
       discussion: 'Chaperoned the regional HCS academic tournament.',
-      submittedRaw: ms(2025, 9, 30) }),
-    rec({ approvalId: 'LSA-2025-1113', type: 'Other Paid Leave', status: 'Approved',
-      uidLink: 'https://uid.demo.example.edu/r/AR-2025-1113',
-      startRaw: ms(2025, 11, 13), endRaw: null, hours: 8,
+      submittedRaw: ms(SY, 9, 30) }),
+    rec({ type: 'Other Paid Leave', status: 'Approved',
+      startRaw: ms(SY, 11, 13), endRaw: null, hours: 8, actualHours: 6.5,
       subRequired: 'Yes', subNames: 'Jordan Blake',
-      discussion: 'Jury duty — county summons.',
-      submittedRaw: ms(2025, 10, 20) }),
-    rec({ approvalId: 'LSA-2025-1203', type: 'Late Arrival/Early Departure', status: 'Approved',
-      uidLink: 'https://uid.demo.example.edu/r/AR-2025-1203',
-      startRaw: ms(2025, 12, 3), endRaw: null, hours: 2,
+      discussion: 'Jury duty — county summons; released at 2:30.',
+      submittedRaw: ms(SY, 10, 20) }),
+    rec({ type: 'Late Arrival/Early Departure', status: 'Approved',
+      startRaw: ms(SY, 12, 3), endRaw: null, hours: 4, actualHours: 1.75,
       subRequired: 'No', subNames: '',
       discussion: 'Early departure at 2:15 PM for a medical appointment.',
-      submittedRaw: ms(2025, 11, 24) }),
-    rec({ approvalId: 'LSA-2026-0127', type: 'Personal Leave', status: 'Approved',
-      uidLink: 'https://uid.demo.example.edu/r/AR-2026-0127',
-      startRaw: ms(2026, 1, 27), endRaw: null, hours: 8,
+      submittedRaw: ms(SY, 11, 24) }),
+    rec({ type: 'Personal Leave', status: 'Approved',
+      startRaw: ms(SY + 1, 1, 27), endRaw: null, hours: 8, actualHours: 8,
       subRequired: 'Yes', subNames: 'Sam Ortiz & Priya Nair',
       discussion: 'Personal day — requested well in advance.',
-      submittedRaw: ms(2025, 12, 20) }),
-    // Late Personal Leave: submitted 2026-02-05, starts 2026-02-10 → < 14 days.
-    rec({ approvalId: 'LSA-2026-0210', type: 'Personal Leave', status: 'Approved',
-      uidLink: 'https://uid.demo.example.edu/r/AR-2026-0210',
-      startRaw: ms(2026, 2, 10), endRaw: null, hours: 8,
+      submittedRaw: ms(SY, 12, 20) }),
+    // Late Personal Leave: submitted Feb 5, starts Feb 10 → < 14 days.
+    rec({ type: 'Personal Leave', status: 'Approved',
+      startRaw: ms(SY + 1, 2, 10), endRaw: null, hours: 8, actualHours: 8,
       subRequired: 'Yes', subNames: 'Marcus Webb',
       discussion: 'Short-notice family matter; approved at admin discretion.',
-      submittedRaw: ms(2026, 2, 5) }),
+      submittedRaw: ms(SY + 1, 2, 5) }),
     // Pending + future: anchored to now+21d so it appears under "Upcoming Leave".
     rec({ approvalId: '', type: 'Personal Leave', status: 'Pending',
       uidLink: 'https://uid.demo.example.edu/r/AR-PENDING',

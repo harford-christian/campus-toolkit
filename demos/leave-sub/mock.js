@@ -83,6 +83,42 @@ window.MOCK_BACKEND = (function () {
     // Sub utilization → Subs tab (myLeave / mySubWork / schoolWide).
     getSubData: function () {
       return JSON.parse(JSON.stringify(D.subData));
+    },
+
+    // Charged vs Used card → Summary tab (mirrors getMyChargeVsActual in public-interface/Code.js):
+    // approved records only, HCS-Related and Jury Duty excluded, filtered by the range's start-date
+    // bounds; chargeable is what payroll charged, actual the time away; roundedUp counts the rows where
+    // the charge exceeds the time. null is "no user", which the card renders as "could not load".
+    getMyChargeVsActual: function (range) {
+      var now = new Date();
+      function monthBounds(off) { var m = now.getMonth() + (off || 0); return { start: new Date(now.getFullYear(), m, 1), end: new Date(now.getFullYear(), m + 1, 0) }; }
+      function schoolYearBounds() { var y = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1; return { start: new Date(y, 8, 1), end: new Date(y + 1, 7, 31) }; }
+      var bounds = range === 'ThisMonth' ? monthBounds(0) : range === 'LastMonth' ? monthBounds(-1) : range === 'SchoolYear' ? schoolYearBounds() : null;
+      var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      var fmt = function (d) { return MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); };
+      var excluded = ['hcs-related', 'jury duty'];
+      var byType = {}, chargeable = 0, actual = 0, requests = 0, roundedUp = 0;
+      D.personal.records.forEach(function (r) {
+        if (r.status !== 'Approved') return;
+        var t = String(r.type || '').toLowerCase();
+        if (excluded.some(function (ex) { return t.indexOf(ex) === 0; })) return;
+        if (bounds && (r.startRaw < bounds.start.getTime() || r.startRaw > bounds.end.getTime() + 86399999)) return;
+        var charged = r.hours, used = typeof r.actualHours === 'number' ? r.actualHours : r.hours;
+        if (charged === 0 && used === 0) return;
+        byType[r.type] = byType[r.type] || { type: r.type, chargeable: 0, actual: 0, count: 0 };
+        byType[r.type].chargeable += charged; byType[r.type].actual += used; byType[r.type].count++;
+        chargeable += charged; actual += used; requests++;
+        if (charged > used + 0.005) roundedUp++;
+      });
+      var round = function (n) { return Math.round(n * 100) / 100; };
+      return {
+        requests: requests, roundedUp: roundedUp,
+        period: { key: range || 'All', label: bounds ? fmt(bounds.start) + ' – ' + fmt(bounds.end) : 'All time' },
+        chargeable: round(chargeable), actual: round(actual), difference: round(chargeable - actual),
+        byType: Object.keys(byType).sort().map(function (k) {
+          return { type: byType[k].type, count: byType[k].count, chargeable: round(byType[k].chargeable), actual: round(byType[k].actual) };
+        })
+      };
     }
   };
 })();

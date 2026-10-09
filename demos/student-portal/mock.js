@@ -76,7 +76,8 @@
   var data = new Workbook(D.data);
   var savedPrefs = readStore(PREFS_KEY);
   if (savedPrefs) data.sheets.Prefs = new Sheet(savedPrefs);
-  var WORKBOOKS = { 'staging-demo': staging, 'data-demo': data };
+  var memo = new Workbook(D.memo);   // the memo-check sheet's Chapel + MemoNotes tabs, read-only
+  var WORKBOOKS = { 'staging-demo': staging, 'data-demo': data, 'memo-demo': memo };
 
   /* ---------- the other services ---------- */
   var cacheStore = {};
@@ -88,7 +89,8 @@
     putAll: function (obj) { Object.keys(obj).forEach(function (k) { cacheStore[k] = String(obj[k]); }); },
     removeAll: function (keys) { (keys || []).forEach(function (k) { delete cacheStore[k]; }); }
   };
-  var propStore = { ATHLETICS_ENABLED: '1', ATTENDANCE_ENABLED: '1', AVERAGES_ENABLED: '1', STAGING_SHEET_ID: 'staging-demo', DATA_SHEET_ID: 'data-demo',
+  var propStore = { ATHLETICS_ENABLED: '1', ATTENDANCE_ENABLED: '1', AVERAGES_ENABLED: '1', NEWS_ENABLED: '1', STAGING_SHEET_ID: 'staging-demo', DATA_SHEET_ID: 'data-demo',
+    MEMO_CHECK_SHEET_ID: 'memo-demo',
     ADMIN_EMAILS: '', DATA_VERSION: 'demo', GRADES_VERSION: 'demo', NO_SCHOOL_DATES: '' };
   var props = {
     getProperty: function (k) { return Object.prototype.hasOwnProperty.call(propStore, k) ? propStore[k] : null; },
@@ -154,6 +156,11 @@
   G.DATA_TABS = { homework: 'Homework', assignments: 'Assignments', grades: 'Grades', averages: 'Averages', attendance: 'Attendance', meta: 'Meta', userState: 'UserState', log: 'SyncLog', adminViews: 'AdminViews' };
   G.ADMIN_VIEWS_KEEP = 5000; G.ATHLETICS_TEAMS = D.teams; G.SCHOOL_CALENDAR_ID = 'school-events-demo';
   G.PROP_ATHLETICS_ENABLED = 'ATHLETICS_ENABLED'; G.PROP_ATTENDANCE_ENABLED = 'ATTENDANCE_ENABLED'; G.PROP_AVERAGES_ENABLED = 'AVERAGES_ENABLED';
+  // News & Info (phase 2/3 upstream): the memo-check sheet's tabs and the flag, as Config.gs declares them.
+  G.PROP_MEMO_SHEET_ID = 'MEMO_CHECK_SHEET_ID'; G.CHAPEL_TAB = 'Chapel';
+  G.CHAPEL_KEEP = ['CreatedAt', 'EmailDate', 'WeekOf', 'Day', 'Date', 'Display', 'Time', 'NoChapel']; G.CHAPEL_TTL_SECS = 3600;
+  G.MEMO_NOTES_TAB = 'MemoNotes'; G.MEMO_NOTES_KEEP = ['CreatedAt', 'EmailDate', 'WeekOf', 'Kind', 'Day', 'Date', 'Title'];
+  G.PROP_NEWS_ENABLED = 'NEWS_ENABLED';
   G.PROP_ADMIN_EMAILS = 'ADMIN_EMAILS'; G.PROP_STAGING_SHEET_ID = 'STAGING_SHEET_ID'; G.PROP_DATA_SHEET_ID = 'DATA_SHEET_ID';
   G.PROP_QUARTER_DATES = 'QUARTER_DATES'; G.PROP_TERM_ID = 'TERM_ID'; G.PROP_ROLLOVER_TIME = 'ROLLOVER_TIME'; G.DEFAULT_ROLLOVER_TIME = '16:00';
   G.PROP_DATA_VERSION = 'DATA_VERSION'; G.PROP_STAGING_CONTENT_VERSION = 'STAGING_CONTENT_VERSION'; G.PROP_GRADES_VERSION = 'GRADES_VERSION'; G.PROP_BOOT_SALT = 'BOOT_SALT';
@@ -167,6 +174,7 @@
   G.averagesEnabled_ = function () { return props.getProperty('AVERAGES_ENABLED') === '1'; };
   G.athleticsEnabled_ = function () { return props.getProperty('ATHLETICS_ENABLED') === '1'; };
   G.attendanceEnabled_ = function () { return props.getProperty('ATTENDANCE_ENABLED') === '1'; };
+  G.newsEnabled_ = function () { return props.getProperty('NEWS_ENABLED') === '1'; };
   G.getStagingSheetId_ = function () { return 'staging-demo'; };
   G.getDataSheetId_ = function () { return 'data-demo'; };
   G.appUrl_ = function () { return '#'; };

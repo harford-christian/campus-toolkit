@@ -1,0 +1,10 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/leave-sub/build.json. Public.html is a template whose five tab panels arrive through <?!= include('Public…') ?> (inlined by includeDir); the one output token is the responsive breakpoint doGet derives from ?ui=, replaced with its default. Everything else is the app's own markup and JavaScript, untouched; data.js and mock.js supply what the seven google.script.run methods return.",
+  "src": "../leave-sub-automation/public-interface/Public.html",
+  "dst": "demos/leave-sub/index.html",
+  "includeDir": "../leave-sub-automation/public-interface",
+  "demoName": "Leave & Substitute Analytics",
+  "replace": [
+    ["<?= (ui === 'mobile') ? '99999px' : (ui === 'desktop' ? '1px' : '768px') ?>", "768px"]
+  ]
+}

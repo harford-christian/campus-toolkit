@@ -11,8 +11,8 @@
       "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<title>Talon Hub · Staff</title>\n</head>\n<body>\n<!-- GENERATED SOURCE: edit ui/Theme.html"
     ],
     [
-      "    boot();\r\n  })();\r\n</script>\r\n",
-      "    boot();\r\n  })();\r\n</script>\r\n</body>\r\n</html>\r\n"
+      "    boot();\n  })();\n</script>\n",
+      "    boot();\n  })();\n</script>\n</body>\n</html>\n"
     ],
     [
       "<?= BUILD_ID ?>",

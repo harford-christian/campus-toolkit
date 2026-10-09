@@ -524,6 +524,9 @@ function _initFilters() {
     years[sy] = true;
   });
 
+  var curSY = _currentSYYear();
+  years[curSY] = true; // always offer the current school year, even with no records in it yet
+
   var sortedYears = Object.keys(years).map(Number).sort(function(a,b){ return b - a; });
   var sel = document.getElementById('mlSchoolYear');
   while (sel.options.length > 1) sel.remove(1);
@@ -535,14 +538,9 @@ function _initFilters() {
     sel.add(opt);
   });
 
-  var curSY = _currentSYYear();
-  if (years[curSY]) {
-    sel.value = String(curSY);
-    var b = _syBounds(curSY);
-    _F.sy = curSY; _F.syStart = b.start; _F.syEnd = b.end;
-  } else {
-    sel.value = 'all'; _F.sy = 'all'; _F.syStart = 0; _F.syEnd = 0;
-  }
+  sel.value = String(curSY);
+  var b = _syBounds(curSY);
+  _F.sy = curSY; _F.syStart = b.start; _F.syEnd = b.end;
   _updateRangeNote();
 }
 
@@ -1108,7 +1106,7 @@ function _esc(s) {
   .heatmap-container { background: #fff; border-radius: 12px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
   .month-row { display: flex; align-items: center; margin-bottom: 5px; }
   .month-label { width: 40px; font-size: 0.7rem; font-weight: 800; color: #666; }
-  .day-cell { width: 18px; height: 18px; margin: 2px; border-radius: 2px; position: relative; cursor: pointer; border: 1px solid rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; line-height: 1; }
+  .day-cell { width: 18px; height: 18px; margin: 2px; border-radius: 2px; position: relative; cursor: pointer; border: 1px solid rgba(0,0,0,0.03); }
   .day-cell:hover::after {
     content: attr(data-info);
     position: absolute; bottom: 100%; left: 50%;
@@ -1119,10 +1117,10 @@ function _esc(s) {
   }
 
   /* Heatmap Color Scale */
-  .level-0 { background-color: #ebedf0; color: transparent; } /* 0 absences   */
-  .level-1 { background-color: #ff9999; color: #7a0000; }     /* 1–2 absences */
-  .level-2 { background-color: #ff4d4d; color: #fff; }        /* 3–4 absences */
-  .level-3 { background-color: #cc0000; color: #fff; }        /* 5+ absences  */
+  .level-0 { background-color: #ebedf0; } /* 0 absences   */
+  .level-1 { background-color: #ff9999; } /* 1–2 absences */
+  .level-2 { background-color: #ff4d4d; } /* 3–4 absences */
+  .level-3 { background-color: #cc0000; } /* 5+ absences  */
 
   .legend { display: flex; align-items: center; gap: 10px; margin-top: 20px; font-size: 0.7rem; font-weight: bold; color: #666; }
 </style>
@@ -1208,7 +1206,6 @@ function _esc(s) {
             else if (count <= 4)  cell.classList.add('level-2');
             else                  cell.classList.add('level-3');
 
-            if (count > 0) cell.textContent = count;   // show the count right in the cell
             cell.setAttribute('data-info', MONTH_NAMES[i] + ' ' + d + ': ' + count + ' absence(s)');
           }
         } else {
@@ -1630,7 +1627,232 @@ function _esc(s) {
       }
     });
   }
-</script></div>
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     CHARGED vs USED — the signed-in user's own record, all time.
+     Leave bills in half-day increments (4 hours inside one half, 8 across the
+     11:45 line) while "used" is real elapsed time, so the two diverge on any
+     short absence. HCS-Related and Jury Duty are excluded.
+     ══════════════════════════════════════════════════════════════════════ -->
+<style>
+  .cva-personal-banner {
+    background: linear-gradient(135deg, #B22222 0%, #8c1b1b 100%);
+    border-radius: 12px; padding: 16px 22px; margin: 26px 0 18px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .cva-personal-banner h5 { color:#fff; margin:0; font-weight:800; font-size:1.05rem; }
+  .cva-personal-banner p  { color:rgba(255,255,255,.75); margin:0; font-size:.78rem; }
+  .cva-swatch { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; }
+  .cva-note { font-size:.76rem; color:#6b7280; line-height:1.5; }
+  .cva-table { width:100%; font-size:.8rem; border-collapse:collapse; }
+  .cva-table th, .cva-table td { padding:7px 10px; border-bottom:1px solid #eef0f2; text-align:right; }
+  .cva-table th:first-child, .cva-table td:first-child { text-align:left; }
+  .cva-table th { color:#6b7280; font-weight:700; font-size:.72rem; text-transform:uppercase; }
+  .cva-scroll { overflow-x:auto; }
+  .cva-bar { background:#fff; border:1px solid #e6e8eb; border-radius:10px; padding:9px 13px; }
+</style>
+
+<div class="cva-personal-banner">
+  <span style="font-size:1.8rem;">⏱️</span>
+  <div>
+    <h5>Your Leave — Charged vs. Used</h5>
+    <p>Your own records only. Excludes HCS-Related and Jury Duty.</p>
+  </div>
+</div>
+
+<div class="cva-bar d-flex gap-2 align-items-center flex-wrap mb-3">
+  <label class="fw-bold small mb-0 text-muted">RANGE:</label>
+  <select id="cvaRange" class="form-select form-select-sm w-auto" onchange="cvaReload()">
+    <option value="ThisMonth">This Month</option>
+    <option value="LastMonth">Last Month</option>
+    <option value="SchoolYear" selected>This School Year</option>
+    <option value="All">All Time</option>
+  </select>
+  <span id="cvaPeriodLabel" class="small text-muted fw-bold"></span>
+</div>
+
+<div id="cvaCard">
+  <div id="cvaEmpty" style="display:none;" class="metric-card text-center">
+    <div class="text-muted">No approved leave on record yet.</div>
+  </div>
+
+  <div id="cvaBody" style="display:none;">
+    <div class="row g-4 mb-4">
+      <div class="col-md-4"><div class="metric-card text-center">
+        <div class="text-muted small fw-bold">HOURS CHARGED</div>
+        <div id="cvaCharged" class="big-num">0</div></div></div>
+      <div class="col-md-4"><div class="metric-card text-center">
+        <div class="text-muted small fw-bold">USED</div>
+        <div id="cvaActual" class="big-num" style="color:#2980b9;">0</div></div></div>
+      <div class="col-md-4"><div class="metric-card text-center">
+        <div class="text-muted small fw-bold">DIFFERENCE</div>
+        <div id="cvaDiff" class="big-num">0</div>
+        <div id="cvaDiffNote" class="cva-note mt-1"></div></div></div>
+    </div>
+
+    <div class="metric-card mb-4">
+      <h6 class="fw-bold mb-3">By Leave Category</h6>
+      <div style="position:relative; height:340px;"><canvas id="cvaChart"></canvas></div>
+      <p class="cva-note mt-3 mb-0">
+        The school day runs 7:45&nbsp;AM–3:45&nbsp;PM with a midday line at 11:45&nbsp;AM.
+        Leave is charged in half-day blocks: any absence inside the morning or inside
+        the afternoon is charged as <b>4 hours</b>, and leave crossing 11:45 is charged
+        as a full <b>8-hour</b> day. <b>Used</b> is the time you were actually away.
+      </p>
+    </div>
+
+    <div class="metric-card">
+      <h6 class="fw-bold mb-3">Detail</h6>
+      <div class="cva-scroll">
+        <table class="cva-table">
+          <thead><tr>
+            <th>Category</th><th>Requests</th>
+            <th><span class="cva-swatch" style="background:#B22222;"></span>Charged</th>
+            <th><span class="cva-swatch" style="background:#2980b9;"></span>Used</th>
+            <th>Difference</th>
+          </tr></thead>
+          <tbody id="cvaTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var cvaData = null, cvaChart = null;
+
+  function n1(v) { return (Math.round(v * 10) / 10).toFixed(1); }
+
+  // Charged can now fall BELOW used: early departures inside the four free
+  // instances charge nothing, so the difference is not always positive.
+  function signed(v) { return (v > 0 ? '+' : '') + n1(v); }
+
+  function cvaVisible() {
+    var el = document.getElementById('cvaCard');
+    return !!(el && el.offsetParent !== null);
+  }
+
+  function cvaFill() {
+    if (!cvaData) return;
+
+    if (!cvaData.requests) {
+      document.getElementById('cvaEmpty').style.display = '';
+      document.getElementById('cvaBody').style.display  = 'none';
+      return;
+    }
+    document.getElementById('cvaEmpty').style.display = 'none';
+    document.getElementById('cvaBody').style.display  = '';
+
+    document.getElementById('cvaCharged').innerText = n1(cvaData.chargeable);
+    document.getElementById('cvaActual').innerText  = n1(cvaData.actual);
+    document.getElementById('cvaDiff').innerText    = signed(cvaData.difference);
+    document.getElementById('cvaDiffNote').innerText =
+      cvaData.roundedUp > 0
+        ? cvaData.roundedUp + ' request' + (cvaData.roundedUp === 1 ? '' : 's') +
+          ' rounded up to a half or full day'
+        : 'Nothing rounded up';
+
+    var body = document.getElementById('cvaTableBody');
+    body.innerHTML = '';
+    cvaData.byType.forEach(function (r) {
+      var d = Math.round((r.chargeable - r.actual) * 10) / 10;
+      body.innerHTML += '<tr><td>' + r.type + '</td><td>' + r.count + '</td><td>' +
+        n1(r.chargeable) + '</td><td>' + n1(r.actual) + '</td><td>' +
+        (Math.abs(d) < 0.05 ? '—' : signed(d)) + '</td></tr>';
+    });
+    body.innerHTML += '<tr style="font-weight:800;"><td>Total</td><td>' + cvaData.requests +
+      '</td><td>' + n1(cvaData.chargeable) + '</td><td>' + n1(cvaData.actual) +
+      '</td><td>' + signed(cvaData.difference) + '</td></tr>';
+
+    cvaPaint();
+  }
+
+  function cvaPaint() {
+    if (!cvaData || !cvaData.requests || !cvaVisible()) return;
+    var el = document.getElementById('cvaChart');
+    if (!el) return;
+
+    if (cvaChart) { cvaChart.resize(); return; }
+
+    cvaChart = new Chart(el.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: cvaData.byType.map(function (r) { return r.type; }),
+        datasets: [
+          { label: 'Charged',       data: cvaData.byType.map(function (r) { return r.chargeable; }),
+            backgroundColor: '#B22222', borderRadius: 4, borderSkipped: false },
+          { label: 'Used', data: cvaData.byType.map(function (r) { return r.actual; }),
+            backgroundColor: '#2980b9', borderRadius: 4, borderSkipped: false }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        categoryPercentage: 0.7,
+        barPercentage: 0.85,
+        plugins: {
+          legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
+          datalabels: {
+            anchor: 'end', align: 'top', offset: 2,
+            color: '#6b7280', font: { size: 10, weight: '700' },
+            formatter: function (v) { return v > 0 ? n1(v) : ''; }
+          },
+          tooltip: {
+            callbacks: {
+              afterBody: function (items) {
+                var r = cvaData.byType[items[0].dataIndex];
+                var d = Math.round((r.chargeable - r.actual) * 10) / 10;
+                return d > 0 ? 'Charged ' + n1(d) + ' hrs more than used'
+                             : 'Charged exactly as used';
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Hours' },
+               grid: { color: '#eef0f2' }, ticks: { color: '#6b7280' } },
+          x: { grid: { display: false }, ticks: { color: '#6b7280', autoSkip: false,
+               maxRotation: 30, minRotation: 0 } }
+        }
+      }
+    });
+  }
+
+  function cvaLoad() {
+    var sel = document.getElementById('cvaRange');
+    document.getElementById('cvaPeriodLabel').innerText = 'Loading…';
+
+    // A range change means new data, so the old chart cannot be reused.
+    if (cvaChart) { cvaChart.destroy(); cvaChart = null; }
+
+    google.script.run
+      .withSuccessHandler(function (d) {
+        cvaData = d;
+        document.getElementById('cvaPeriodLabel').innerText =
+          d && d.period ? d.period.label : '';
+        if (d) cvaFill();
+      })
+      .withFailureHandler(function (e) {
+        document.getElementById('cvaPeriodLabel').innerText = 'Could not load';
+        console.error('Charged vs Used: ' + e);
+      })
+      .getMyChargeVsActual(sel ? sel.value : 'SchoolYear');
+  }
+
+  window.cvaReload = cvaLoad;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof switchTab === 'function') {
+      var _prev = switchTab;
+      switchTab = function (i) { _prev(i); if (i === 5) setTimeout(cvaPaint, 60); };
+    }
+    cvaLoad();
+  });
+})();
+</script>
+</div>
 
     </div>
 

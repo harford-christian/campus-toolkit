@@ -206,6 +206,14 @@
   .score { text-align: right; white-space: nowrap; }
   .score .s { font-weight: 800; font-size: 1rem; color: var(--dd); }
   .score .of { color: var(--dt); font-size: .78rem; font-weight: 600; }
+  /* News & Info card (2026-10-08) — existing tokens only, so light and dark both hold. */
+  .newshead { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--label); padding: 10px 14px 4px; }
+  .newsrow { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; min-height: 44px; }
+  .newsrow + .newsrow { border-top: 1px solid var(--line); }
+  .newsrow .ttl { font-weight: 700; font-size: .92rem; color: var(--dd); }
+  .newsrow .meta { font-size: .78rem; color: var(--dt); margin-top: 2px; }
+  .newsrow.today { background: var(--now-bg); box-shadow: inset 3px 0 0 var(--gold); }
+  .newsrow.today .meta { color: var(--now-t); }
   .pill { font-size: .64rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
   .pill.miss { background: var(--miss-bg); color: var(--miss); }
   .pill.late { background: var(--late-bg); color: var(--late); }
@@ -624,6 +632,21 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     return '<span class="due est">' + esc(when) + '</span><span class="src">· no date given, next class day</span>';
   }
 
+  function newsCard() {
+    var n = S.d.news;
+    if (!n || !n.enabled || !n.items || !n.items.length) return '';
+    return '<div class="card news"><div class="newshead">News &amp; Info</div>' + n.items.map(function (it) {
+      return '<div class="newsrow' + (it.isToday ? ' today' : '') + '"><div class="txt"><div class="ttl">' + esc(it.title) + (it.isToday ? ' <span class="nowtag">TODAY</span>' : '') + '</div>' +
+        (it.body ? '<div class="meta">' + esc(it.body) + '</div>' : '') + '</div></div>';
+    }).join('') + '</div>';
+  }
+  /** The chapel item if it falls on this date — used to annotate the Chapel row in Schedule (Josh, 2026-10-08). */
+  function chapelOn(dateIso) {
+    var n = S.d.news;
+    if (!n || !n.enabled || !n.items) return null;
+    for (var i = 0; i < n.items.length; i++) { var it = n.items[i]; if (it.kind === 'chapel' && !it.noChapel && it.date === dateIso && it.display) return it; }
+    return null;
+  }
   function renderHomework() {
     var d = S.d, hw = d.homework, box = $('#view-homework');
     if (!hw.connected) {
@@ -667,7 +690,11 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
       : '';
     var showNudge = false;
     try { showNudge = !S.hasPrefs && !localStorage.getItem('hcsp-nudge'); } catch (e) { showNudge = false; }
-    var html = sportsHtml + (showNudge && !d.who.viewingAs ? '<div class="card"><div class="nudge"><div class="txt"><b>Want a reminder email each evening?</b> You can turn on daily, weekly, test, and change alerts.</div>' +
+    /* News & Info (Josh, 2026-10-08): school-wide notes for this student, today. Sits BELOW the games card
+       (a 2:00 dismissal still outranks everything) and above the homework. Hidden when there is nothing to say.
+       First item: the HS chapel speaker, parsed from the staff Weekly Memo by memo-check. Grades 7-12 only. */
+    var newsHtml = newsCard();
+    var html = sportsHtml + newsHtml + (showNudge && !d.who.viewingAs ? '<div class="card"><div class="nudge"><div class="txt"><b>Want a reminder email each evening?</b> You can turn on daily, weekly, test, and change alerts.</div>' +
       '<button type="button" class="chip plain on" data-nudge-go>Set up</button><button type="button" class="chip plain" data-nudge-dismiss>No thanks</button></div></div>' : '') +
       '<div class="seg" role="tablist" style="grid-template-columns:repeat(' + subs.length + ',minmax(0,1fr))">' +
       subs.map(function (k) {
@@ -773,13 +800,21 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     if (next) return '<div class="card"><div class="today quiet"><div><div class="cls">Next · ' + esc(next.periodShort ? next.periodShort + ' · ' : '') + esc(next.description) + '</div><div class="t">' + esc((next.room ? 'Rm ' + next.room + ' · ' : '') + 'starts ' + next.beginShort) + '</div></div></div></div>';
     return '<div class="card"><div class="today quiet"><div><div class="cls">School day is over</div><div class="t">' + esc(longDate(sc.date)) + '</div></div></div></div>';
   }
-  function scheduleRows(rows, isToday) {
+  /* BellHub says "Normal (rings as Thu)" on a chapel-swap day (real, 2026-10-07). Students read it as a weekday name. */
+  function modeNote(mode) {
+    var m = /rings?\s+as\s+([a-z]+)/i.exec(String(mode || ''));
+    if (m) { var k = m[1].slice(0, 3).toLowerCase(), names = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday' }; return 'Bells on the ' + (names[k] || m[1]) + ' schedule'; }
+    return mode + ' schedule';
+  }
+  function scheduleRows(rows, isToday, dateIso) {
     if (!rows.length) return '<div class="empty">No classes scheduled.</div>';
+    var chapel = chapelOn(dateIso);   // only when the memo's chapel day is THIS day; a moved chapel never lands on the wrong row
     return rows.map(function (o) {
+      var isChapel = chapel && /chapel/i.test(String(o.description || ''));
       return '<div class="cls' + (isToday && o.current ? ' now' : '') + (o.meetsToday ? '' : ' off') + '">' +
         '<span class="p">' + esc(o.periodShort) + '</span><span class="dot" style="background:' + esc(o.color) + '"></span>' +
         '<div class="nm">' + esc(o.description) + (isToday && o.current ? ' <span class="nowtag">NOW</span>' : '') + (o.sharedSlot ? ' <span class="pill up">NOW?</span>' : '') +
-        '<div class="t">' + esc([o.teacher, o.room ? 'Rm ' + o.room : ''].filter(Boolean).join(' · ')) + (o.meetsToday ? '' : (o.offQuarter ? ' · not this quarter' : ' · not today')) + '</div></div>' +
+        '<div class="t">' + esc([isChapel ? chapel.display : '', o.teacher, o.room ? 'Rm ' + o.room : ''].filter(Boolean).join(' · ')) + (o.meetsToday ? '' : (o.offQuarter ? ' · not this quarter' : ' · not today')) + '</div></div>' +
         '<div class="clstime">' + (o.beginShort ? esc(o.beginShort) + '<br>' + esc(o.endShort) : '') + '</div></div>';
     }).join('');
   }
@@ -799,13 +834,13 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     html += '</div>';
     var wk = sc.week[S.day];
     var isToday = S.day === sc.dayCol;
-    var dayNote = wk.closed ? 'No school' : (wk.bellMode && !/^(normal|regular|standard)$/i.test(wk.bellMode) ? esc(wk.bellMode) + ' schedule' : (isToday ? 'Today' : ''));
+    var dayNote = wk.closed ? 'No school' : (wk.bellMode && !/^(normal|regular|standard)$/i.test(wk.bellMode) ? esc(modeNote(wk.bellMode)) : (isToday ? 'Today' : ''));
     /* A closed day must not also list ten classes. FACTS still holds a full timetable for a no-school day, so
        the rows exist — printing them under a "No school" heading told a student both things at once.
        Found 2026-09-27 on Friday 25 Sep, a Professional Development Day. */
     var dayBody = wk.closed
       ? '<div class="empty"><b>No school</b><br>' + (wk.bellMode ? esc(wk.bellMode) : 'Nothing scheduled for this day.') + '</div>'
-      : scheduleRows(wk.rows, isToday);
+      : scheduleRows(wk.rows, isToday, wk.date);
     html += '<div class="card"><div class="daybar"><span><b>' + esc(DOWL[Number(S.day)]) + '</b> · ' + esc(MON[Number(wk.date.slice(5, 7)) - 1] + ' ' + Number(wk.date.slice(8, 10))) + '</span><span>' + dayNote + (sc.quarter ? ' · Q' + sc.quarter : '') + '</span></div>' + dayBody + '</div>';
     if (S.day === '5' && !wk.closed) html += '<div class="note">Friday runs in reverse order — Period 8 meets first.</div>';
     html += '<div class="note">Times come from FACTS; delay and exam days use the bell schedule.</div>';
