@@ -1,0 +1,84 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST (it vendors the server into logic.js and reads the name scrubs from THIS file), then: node tools/build-demo.mjs demos/elc-assessments/build.json. The source Index.html is a whole document with no template tokens; the first replacement loads logic.js early in <head>, ahead of the shim/data/mock block build-demo.mjs injects before </head>. The \"today\" reads (request age, the New Assessment form defaults, print timestamps) go through window.ELC_DEMO_NOW, the demo's pinned clock (Tue 2026-10-13), so the form agrees with the server about the school year and season. The school is swapped for a fictional one (name, street address, the HCS abbreviation in two help sentences) and the 400 KB embedded crest for a generated badge (replaceRegex: the one value too large to quote). People named in the source comments are replaced by nameAliases: keys are sha256 hashes of the lowercased word or phrase (up to three words), values a fabricated student from data.js, so this public file never names anyone. build-logic.mjs applies the same table to the vendored server.",
+  "src": "../elc/elc-student-assessments/Index.html",
+  "dst": "demos/elc-assessments/app.html",
+  "demoName": "ELC Student Assessments",
+  "replace": [
+    [
+      "  <meta charset=\"UTF-8\" />\n",
+      "  <meta charset=\"UTF-8\" />\n  <script src=\"logic.js\"></script>\n"
+    ],
+    [
+      "var ms = new Date().getTime() - new Date(requestedAt).getTime();",
+      "var ms = (window.ELC_DEMO_NOW ? window.ELC_DEMO_NOW() : new Date()).getTime() - new Date(requestedAt).getTime();"
+    ],
+    [
+      "function todayIso_() { var d = new Date();",
+      "function todayIso_() { var d = (window.ELC_DEMO_NOW ? window.ELC_DEMO_NOW() : new Date());"
+    ],
+    [
+      "function schoolYearGuess_() { var d = new Date();",
+      "function schoolYearGuess_() { var d = (window.ELC_DEMO_NOW ? window.ELC_DEMO_NOW() : new Date());"
+    ],
+    [
+      "  var m = new Date().getMonth(); // 0-11",
+      "  var m = (window.ELC_DEMO_NOW ? window.ELC_DEMO_NOW() : new Date()).getMonth(); // 0-11"
+    ],
+    [
+      "new Date().toLocaleString()",
+      "(window.ELC_DEMO_NOW ? window.ELC_DEMO_NOW() : new Date()).toLocaleString()"
+    ],
+    [
+      "HARFORD CHRISTIAN SCHOOL",
+      "EXAMPLE CHRISTIAN SCHOOL"
+    ],
+    [
+      "Harford Christian School",
+      "Example Christian School"
+    ],
+    [
+      "Harford Christian/",
+      "the school/"
+    ],
+    [
+      "1736 Whiteford Road &middot; Darlington, MD 21034",
+      "100 Schoolhouse Lane &middot; Springfield, MD 21000"
+    ],
+    [
+      "at HCS",
+      "at this school"
+    ]
+  ],
+  "replaceRegex": [
+    [
+      "var HCS_LOGO_BASE64_ = 'data:image/png;base64,[A-Za-z0-9+/=]+';",
+      "",
+      "var HCS_LOGO_BASE64_ = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20120%20120%22%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2256%22%20fill%3D%22%23234C6A%22%2F%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2248%22%20fill%3D%22none%22%20stroke%3D%22%23D4AF37%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M60%2026%20L60%2058%20M44%2040%20L76%2040%22%20stroke%3D%22%23fff%22%20stroke-width%3D%226%22%20stroke-linecap%3D%22round%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2288%22%20font-family%3D%22Georgia%2C%20serif%22%20font-size%3D%2222%22%20font-weight%3D%22700%22%20fill%3D%22%23fff%22%20text-anchor%3D%22middle%22%3EECS%3C%2Ftext%3E%3C%2Fsvg%3E';"
+    ]
+  ],
+  "nameAliases": {
+    "8ad32d28a0ee7948": "Rowan Calloway",
+    "fb1714b0e7ab569d": "Calloway Rowan",
+    "f9f64fb1ad31fa20": "Wren Marchetti",
+    "736a4e2151ee799d": "Marchetti Wren",
+    "bfb6351b3fa822d2": "Brody Fenwick",
+    "68145e6acb504e0f": "Fenwick Brody",
+    "7c42afdeb6958ed7": "Silas Ingram",
+    "fbd548593fe7b14f": "Ingram Silas",
+    "5c736391f547c5a1": "Clara Holloway",
+    "67c1af8fbea2e4da": "Holloway Clara",
+    "288aa2a8991efe00": "Rowan",
+    "b43fa7d68f5ff632": "Calloway",
+    "54db7aa2038e72ea": "Wren",
+    "feac526abc84686b": "Marchetti",
+    "1a35e7005c22ed32": "Brody",
+    "fe28f9515ffd3705": "Fenwick",
+    "d2653ff7cbb2d8ff": "Silas",
+    "0aead8727b6b1a5f": "Clara",
+    "df4b1086ed85d4c9": "Holloway",
+    "f5c53d2d4c813e11": "Maisie",
+    "aa32008410845d16": "Tessa",
+    "de7ee76e7373c19b": "Jonah",
+    "0b9b56ac8b85447f": "removeWrenStrayOrfAccuracy"
+  }
+}

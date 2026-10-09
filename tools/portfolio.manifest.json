@@ -78,9 +78,10 @@
       ],
       "builtFrom": [
         "hcs-purchasing-system/Index.html",
-        "hcs-purchasing-system/JavaScript.html"
+        "hcs-purchasing-system/JavaScript.html",
+        "hcs-purchasing-system/Code.js"
       ],
-      "buildMethod": "custom node assembly (inline JavaScript.html) + hand data/mock"
+      "buildMethod": "build-demo.mjs (demos/purchasing/build.json) + hand data/mock, checked by demos/purchasing/verify.mjs"
     },
     "leave-sub": {
       "title": "Leave & Substitute Tracker",
@@ -286,6 +287,18 @@
         "parent-teacher-conference-scheduling/Teacher.html"
       ],
       "buildMethod": "build-logic.mjs vendors the source project's SERVER files (Settings, BookingService, ParentView, TeacherView, FactsData, RosterSync) verbatim into logic.js; mock.js supplies an in-memory SpreadsheetApp/LockService/Session so that code runs unchanged in the browser, and feeds the Directory Search demo's SIS tabs to the real syncRoster/syncTeachers at boot. Then build-demo.mjs x2 (demos/conferences/build.parent.json, build.teacher.json: _self base, shared dataset + logic.js via the <base> replacement, the SSO ticket token replaced). verify.mjs re-checks privacy, vendored-logic drift, fresh builds, the mock contract and a parent->teacher booking round trip through the real code."
+    },
+    "elc-assessments": {
+      "title": "ELC Student Assessments",
+      "demoFolder": "demos/elc-assessments",
+      "launch": "demos/elc-assessments/index.html",
+      "sourceProject": [
+        "elc/elc-student-assessments"
+      ],
+      "builtFrom": [
+        "elc/elc-student-assessments/Index.html"
+      ],
+      "buildMethod": "build-logic.mjs vendors every server .gs file verbatim (Assessments/*.gs, Registry, Code, Data, Growth, Dashboard, Compliance, Coverage, Summary, Requests, Roster, IepGoals, AccommodationsChecklist, Section504, Notifications, GradeAudit; never EasyCbmHistoricalImport.gs) into logic.js inside one IIFE with Google services, Date and console bindable; mock.js supplies an in-memory spreadsheet (every SHEET_SCHEMAS tab plus the three reference tabs), Session personas (?as=elc|admin|teacher|teacher4), Properties/Cache/Lock/Mail/ScriptApp stubs and a pinned server clock (Tue 2026-10-13), and replays data.js history through the real submitSession at boot. Then build-demo.mjs (demos/elc-assessments/build.json -> app.html: logic.js in <head>, the page's today reads routed to the pinned clock, school name/address/crest swapped, hashed nameAliases). index.html is a hand-written persona switcher. verify.mjs re-checks vendoring, fresh build, the mock contract, access scopes, the concern -> score -> fulfil round trip and privacy."
     }
   },
   "coveredProjects": [
@@ -319,7 +332,8 @@
     "lobby-tv-project",
     "macs-scheduling/secondary",
     "hcs-lunch-inventory-management",
-    "parent-teacher-conference-scheduling"
+    "parent-teacher-conference-scheduling",
+    "elc/elc-student-assessments"
   ],
   "excludeDirs": [
     "apps-script-showcase",

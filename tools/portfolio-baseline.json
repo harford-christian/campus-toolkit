@@ -83,6 +83,7 @@
   },
   "purchasing": {
     "files": [
+      "hcs-purchasing-system/Code.js",
       "hcs-purchasing-system/Index.html",
       "hcs-purchasing-system/JavaScript.html"
     ],
@@ -101,6 +102,8 @@
       "bryanRejectOrder",
       "bryanVerifyAndSign",
       "cancelOrder",
+      "const",
+      "deleteOrderDocument",
       "deleteSavedView",
       "denyCancellation",
       "editOrder",
@@ -158,7 +161,7 @@
       "verifyApproverPin"
     ],
     "ops": [],
-    "hash": "3c8f7c2a1ec79f39"
+    "hash": "4e107be2df249b00"
   },
   "leave-sub": {
     "files": [
@@ -476,5 +479,14 @@
     ],
     "ops": [],
     "hash": "76c262ab251eff2a"
+  },
+  "elc-assessments": {
+    "files": [
+      "elc/elc-student-assessments/Index.html"
+    ],
+    "missing": [],
+    "gsr": [],
+    "ops": [],
+    "hash": "a41e4fa09b4ae9a8"
   }
 }

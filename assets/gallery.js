@@ -219,6 +219,19 @@
         '<p>The demo runs the app&rsquo;s own server code in the browser against an in-memory copy of the spreadsheet, on the same fictional school as the Directory Search demo &mdash; each child&rsquo;s conference list is produced by the real grade-tier sync, not typed in. Book a time on the Parent screen, switch to the Teacher screen, and it is there.</p>'
     },
 
+    'elc-assessments': {
+      icon: '📚', title: 'ELC Student Assessments', launch: 'demos/elc-assessments/index.html',
+      summary: 'The ELC team&rsquo;s K&ndash;6 screening record: teachers flag a concern, ELC staff score DIBELS, CORE Phonics, easyCBM, DRA or Lexile against the published benchmark tables, and every student&rsquo;s growth, tier and risk bucket follows from the scores &mdash; scoped so a grade-level teacher sees only their own grade.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>Reading and math screening results lived on paper score sheets and in scattered spreadsheets. Composite scores were worked out by hand from a weighting table, so a missing measure or a slip in the arithmetic changed a child&rsquo;s tier without anyone noticing. A classroom teacher worried about a student sent an email, with no way to see whether anyone had picked it up, and nobody could say at a glance which children were at risk or had not been tested this window.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>A teacher <b>flags a concern</b> on a student (reading, phonics, math, spelling) and it lands in ELC&rsquo;s queue, where the app suggests the right instrument for the grade. ELC staff score the session on one form: the app looks every measure up in the <b>published benchmark tables</b> (DIBELS 8th Edition, CORE Phonics cut scores, easyCBM percentiles, DRA/Guided Reading levels, Lexile norms), derives ORF accuracy and the adjusted Maze score from the raw counts, and calculates the DIBELS composite itself &mdash; with a live preview before saving and a warning if a measure it needs is missing. Saving closes the teacher&rsquo;s concern. It also warns before a duplicate entry for the same window or a grade that does not fit the school year.</p>' +
+        '<p>Each student&rsquo;s profile shows growth over time per measure, strengths and areas of concern, what is due for retesting, IEP goals, the accommodations checklist and any 504 plan. The dashboard sorts every student into <b>at risk, some risk, on track or not yet assessed</b> by grade, lists who moved between windows, and tracks benchmarking compliance. Access follows the staff list: ELC staff and administrators see everyone, a grade-level teacher only their own grade, and every edit or deletion of a saved score is written to an audit log.</p>' +
+        '<h4>In the demo</h4>' +
+        '<p>The demo runs the app&rsquo;s own server code in the browser over an in-memory spreadsheet, on a fabricated 40-student elementary with the clock pinned to Tuesday 13 October 2026. Every score in the history was entered through the app&rsquo;s real save path, so the tiers and buckets are its own output. Switch to the 2nd-grade teacher, flag a concern on a student, then switch to ELC Staff, score it from Flagged Concerns and watch the dashboard move that child out of &ldquo;not assessed&rdquo;. Changes last for the visit; Reset replays the sample history.</p>'
+    },
+
     'campus-presence': {
       icon: '🪪', title: 'Campus Presence', launch: 'demos/campus-presence/index.html',
       summary: 'Sign-in and sign-out on two iPad kiosks at the visitor entrances, and the live answer to &ldquo;who is on campus right now?&rdquo; Visitors badge themselves in, students sign in late or out early, and a hard authorised-pickup check turns a stranger&rsquo;s attempt into an office flag rather than a sign-out. Presence is never stored &mdash; it is derived from an append-only event log, which is the one input the lockdown system never had.',

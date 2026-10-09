@@ -1,0 +1,74 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/purchasing/build.json, then node demos/purchasing/verify.mjs. Index.html is the app template; JavaScript.html arrives through the HtmlService include form (inlined by includeDir). The output tokens doGet fills become the demo persona (Owner Jordan Rivera, jrivera@example.edu). Three control-scriptlet blocks are removed outright before the builder strips the remaining wrappers: the classroom-teacher notice (it names a real person), the Approver-only status options in the Management filter (an Owner sees the full list) and the Approver-only PIN Settings button. The success image (a Drive file) becomes an inline SVG, and Switch Account shows a notice instead of opening Google's account chooser. People named in source comments are swapped for roles by the hashed tables (tools/staff-aliases.mjs plus nameAliases below: keys are sha256 of the lowercased word, so this public file names no one). data.js and mock.js answer every google.script.run method the page calls.",
+  "src": "../hcs-purchasing-system/Index.html",
+  "dst": "demos/purchasing/index.html",
+  "includeDir": "../hcs-purchasing-system",
+  "demoName": "Purchasing & Procurement",
+  "replace": [
+    [
+      "<?= (userData.firstName || ' ').charAt(0) ?><?= (userData.lastName || ' ').charAt(0) ?>",
+      "JR"
+    ],
+    [
+      "<?= userData.email ?>",
+      "jrivera@example.edu"
+    ],
+    [
+      "<?= userData.role ?>",
+      "Owner"
+    ],
+    [
+      "<?= userData.firstName ?>",
+      "Jordan"
+    ],
+    [
+      "<?= userData.lastName ?>",
+      "Rivera"
+    ],
+    [
+      "<?= targetPO ?>",
+      ""
+    ],
+    [
+      "<?= forceUI ?>",
+      ""
+    ],
+    [
+      "<?= isDelegate ?>",
+      "false"
+    ],
+    [
+      "<?= wizardSeen ?>",
+      "true"
+    ],
+    [
+      "      function switchAccount() {\n        try {",
+      "      function switchAccount() {\n        // Demo build: no Google sign-in here; the page always runs as the sample Owner.\n        appAlert('This demo runs on sample data as Jordan Rivera (Owner), so there is no account to switch.'); return;\n        try {"
+    ]
+  ],
+  "replaceRegex": [
+    [
+      "<\\? if \\(isTeacher\\) \\{ \\?>[\\s\\S]*?<\\? \\} \\?>\\n?",
+      "",
+      ""
+    ],
+    [
+      "<\\? if \\(userData\\.role === 'Approver'\\) \\{ \\?>\\s*<button id=\"btn-pinsettings\"[\\s\\S]*?<\\? \\} \\?>\\n?",
+      "",
+      ""
+    ],
+    [
+      "<\\? if \\(userData\\.role === 'Approver'\\) \\{ \\?>\\s*<option value=\"Pending Signature\">[\\s\\S]*?<\\? \\} else \\{ \\?>",
+      "",
+      ""
+    ],
+    [
+      "<img src=\"https://lh3\\.googleusercontent\\.com/u/0/d/[A-Za-z0-9_-]+\" alt=\"Success\">",
+      "",
+      "<img src=\"data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20400%20260%27%3E%3Crect%20width%3D%27400%27%20height%3D%27260%27%20rx%3D%2718%27%20fill%3D%27%23ffffff%27%2F%3E%3Ccircle%20cx%3D%27200%27%20cy%3D%27100%27%20r%3D%2758%27%20fill%3D%27%232e7d32%27%2F%3E%3Cpath%20d%3D%27M170%20102l20%2020%2042-46%27%20fill%3D%27none%27%20stroke%3D%27%23ffffff%27%20stroke-width%3D%2712%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3Ctext%20x%3D%27200%27%20y%3D%27205%27%20text-anchor%3D%27middle%27%20font-family%3D%27Inter%2CArial%2Csans-serif%27%20font-size%3D%2728%27%20font-weight%3D%27700%27%20fill%3D%27%232e7d32%27%3EOrder%20submitted%3C%2Ftext%3E%3Ctext%20x%3D%27200%27%20y%3D%27238%27%20text-anchor%3D%27middle%27%20font-family%3D%27Inter%2CArial%2Csans-serif%27%20font-size%3D%2716%27%20fill%3D%27%23555555%27%3EPurchasing%20will%20review%20and%20price%20it.%3C%2Ftext%3E%3C%2Fsvg%3E\" alt=\"Order submitted\">"
+    ]
+  ],
+  "nameAliases": {
+    "2c249473aa501c43": "a stand-in coordinator"
+  }
+}

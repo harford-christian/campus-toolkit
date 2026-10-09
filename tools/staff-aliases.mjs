@@ -23,7 +23,8 @@ export const STAFF_ALIASES = {
 export const EMAIL_LOCAL_ALIASES = {
   '12daafc5496c40f9': 'facilities',
   '8ec71017742872f6': 'it',
-  '85ade4b71517707c': 'admin'
+  '85ade4b71517707c': 'admin',
+  '18913dffa034e973': 'backup.approver'
 };
 const LOCAL = /\b([a-z][a-z0-9._-]{1,30})@/g;
 
