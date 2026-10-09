@@ -429,41 +429,6 @@
     ],
     "hash": "e8aecf4c21bc107d"
   },
-  "conferences": {
-    "files": [
-      "parent-teacher-conference-scheduling/Parent.html",
-      "parent-teacher-conference-scheduling/Teacher.html"
-    ],
-    "missing": [],
-    "gsr": [
-      "cancelBooking",
-      "getCurrentTeacherGrid",
-      "getStudentAvailabilityGrid",
-      "loadStudentsFromSession",
-      "saveTeacherBlockChanges",
-      "ssoLogin",
-      "submitBookings"
-    ],
-    "ops": [],
-    "hash": "973ff6125df1364d"
-  },
-  "student-portal": {
-    "files": [
-      "FACTS/student-interface/Client.html",
-      "FACTS/student-interface/Index.html"
-    ],
-    "missing": [],
-    "gsr": [
-      "athleticsApi",
-      "attendanceApi",
-      "bootApi",
-      "gradesApi",
-      "inboxApi",
-      "savePrefsApi"
-    ],
-    "ops": [],
-    "hash": "24c652a8559d789e"
-  },
   "macs": {
     "files": [
       "macs-scheduling/creative_writing/Code.js",
@@ -510,6 +475,41 @@
     ],
     "ops": [],
     "hash": "3c23d98bb45aca28"
+  },
+  "student-portal": {
+    "files": [
+      "FACTS/student-interface/Client.html",
+      "FACTS/student-interface/Index.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "athleticsApi",
+      "attendanceApi",
+      "bootApi",
+      "gradesApi",
+      "inboxApi",
+      "savePrefsApi"
+    ],
+    "ops": [],
+    "hash": "9ff92a2812defde6"
+  },
+  "conferences": {
+    "files": [
+      "parent-teacher-conference-scheduling/Parent.html",
+      "parent-teacher-conference-scheduling/Teacher.html"
+    ],
+    "missing": [],
+    "gsr": [
+      "cancelBooking",
+      "getCurrentTeacherGrid",
+      "getStudentAvailabilityGrid",
+      "loadStudentsFromSession",
+      "saveTeacherBlockChanges",
+      "ssoLogin",
+      "submitBookings"
+    ],
+    "ops": [],
+    "hash": "973ff6125df1364d"
   },
   "elc-assessments": {
     "files": [
