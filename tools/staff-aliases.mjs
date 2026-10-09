@@ -15,6 +15,27 @@ export const STAFF_ALIASES = {
   '50aeda2d707b10d8': 'Transportation Director 2'
 };
 
+// Email LOCAL PARTS the same way: a few staff mailboxes appear in source pages (a change-notice list, say).
+// The domain is scrubbed by build-demo.mjs; the local part is matched here by hash and swapped for a role mailbox.
+export const EMAIL_LOCAL_ALIASES = {
+  '12daafc5496c40f9': 'facilities',
+  '8ec71017742872f6': 'it',
+  '85ade4b71517707c': 'admin'
+};
+const LOCAL = /\b([a-z][a-z0-9._-]{1,30})@/g;
+
+/** Returns { text, count }: real staff mailboxes become role mailboxes (facilities@, it@ ...). */
+export function aliasEmailLocals(text) {
+  let count = 0;
+  const out = text.replace(LOCAL, (m, local) => {
+    const alias = EMAIL_LOCAL_ALIASES[h(local)];
+    if (!alias) return m;
+    count++;
+    return alias + '@';
+  });
+  return { text: out, count };
+}
+
 // A capitalised word NOT followed by another capitalised word — so a full name that merely shares
 // a first name (an author in the library catalogue, say) is left alone. Fabricated children in
 // data.js are never passed through here; only built pages and vendored logic are.

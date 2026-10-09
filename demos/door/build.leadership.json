@@ -1,0 +1,11 @@
+{
+  "_note": "Config for tools/build-demo.mjs: the Leadership page (?page=leadership upstream). Run from the repo root: node tools/build-demo.mjs demos/door/build.leadership.json",
+  "src": "../campus-control/door-automation/Leadership.html",
+  "dst": "demos/door/leadership.html",
+  "demoName": "Door Automation — Leadership",
+  "replace": [
+    ["<?!= baseUrl ?>", "index.html"],
+    ["<?= baseUrl ?>", "index.html"],
+    ["<?= csrfToken ?>", "demo-csrf-0"]
+  ]
+}

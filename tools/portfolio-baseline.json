@@ -61,9 +61,10 @@
       "addSchedule",
       "cancelScheduleOverride",
       "tempScheduleChange",
-      "updateSchedule"
+      "updateSchedule",
+      "updateScheduleBulk"
     ],
-    "hash": "bb31f5b1239c8455"
+    "hash": "edff51a43ea3f4d2"
   },
   "athletics": {
     "files": [

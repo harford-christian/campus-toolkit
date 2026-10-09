@@ -1,8 +1,12 @@
 /* mock.js — Door Automation demo backend. Shared by index.html (tabs), dashboard.html,
    and leadership.html. Implements processPost (all read + write actions) and the
-   dedicated getLeadershipStatus(mode). Read-only actions return real fabricated data;
-   write actions return {success:true, csrfToken}. serverTimezone is reported as the
-   viewer's own zone so clock conversions are a no-op. */
+   dedicated getLeadershipStatus(mode). Read-only actions return real fabricated data.
+   The Schedules writes (addSchedule, updateSchedule, updateScheduleBulk, tempScheduleChange,
+   cancelScheduleOverride) mutate the in-memory rows with the server's own validation rules, so
+   the tab re-reads what was saved; Quick Control runs as the server does now — quickControlStart
+   hands back a token and quickControlProgress is polled until the run is done (three polls here:
+   pending, half-way, done — then the record is gone). Other writes return {success:true, csrfToken}.
+   serverTimezone is reported as the viewer's own zone so clock conversions are a no-op. */
 window.MOCK_BACKEND = (function () {
   var D = window.DOOR_DATA;
   var csrfSeq = 1;
@@ -108,6 +112,114 @@ window.MOCK_BACKEND = (function () {
     return [c];
   }
 
+  /* ---- Schedules: the server's validation (ScheduleAdminData.js _validateSchedule_), verbatim rules ---- */
+  var HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  function validateSchedule(r) {
+    if (!String(r.type || '').trim()) return 'Type is required (e.g. Normal, 2HR Delay, Summer, Church).';
+    if (!String(r.days || '').trim()) return 'Days is required (e.g. DAILY, WEEKDAYS, WEEKENDS, or 1-5).';
+    if (!HHMM.test(String(r.unlockTime || '')) || !HHMM.test(String(r.lockTime || ''))) return 'Unlock and Lock must be valid HH:MM times.';
+    if (String(r.lockTime) <= String(r.unlockTime)) return 'Lock time must be after Unlock time.';
+    return '';
+  }
+  function scheduleRow(rowIndex) { for (var i = 0; i < D.schedules.length; i++) if (D.schedules[i].rowIndex === Number(rowIndex)) return D.schedules[i]; return null; }
+  function uuid() { return 'demo-' + Math.random().toString(16).slice(2, 10) + '-' + Math.random().toString(16).slice(2, 6); }
+  function addSchedule(p) {
+    var row = { type: String(p.type || '').trim(), name: String(p.name || '').trim() || String(p.type || '').trim(), days: String(p.days || '').trim(),
+      unlockTime: String(p.unlockTime || '').trim(), lockTime: String(p.lockTime || '').trim(), groups: String(p.groups || '').trim() || 'ALL',
+      category: String(p.category || '').trim() || 'School', enabled: (p.enabled === true || p.enabled === 'true'), override: null, id: uuid() };
+    var err = validateSchedule(row);
+    if (err) return { error: err };
+    row.rowIndex = D.schedules.reduce(function (m, s) { return Math.max(m, s.rowIndex); }, 1) + 1;
+    D.schedules.push(row);
+    return { success: true, rebuildOk: true, csrfToken: token() };
+  }
+  function updateSchedule(p) {
+    var row = scheduleRow(p.rowIndex);
+    if (!row) return { error: 'Invalid rowIndex: ' + p.rowIndex };
+    var next = { type: String(p.type || row.type).trim(), name: String(p.name || '').trim() || row.name, days: String(p.days || '').trim(),
+      unlockTime: String(p.unlockTime || '').trim(), lockTime: String(p.lockTime || '').trim(), groups: String(p.groups || '').trim() || 'ALL',
+      category: String(p.category || '').trim() || row.category, enabled: (p.enabled === true || p.enabled === 'true') };
+    var err = validateSchedule(next);
+    if (err) return { error: err };
+    Object.keys(next).forEach(function (k) { row[k] = next[k]; });
+    return { success: true, rebuildOk: true, csrfToken: token() };
+  }
+  function updateScheduleBulk(p) {
+    var idx = (p.rowIndexes || []).map(Number), fields = p.fields || {};
+    if (!idx.length) return { error: 'No rows selected.' };
+    var rows = [];
+    for (var i = 0; i < idx.length; i++) { var r = scheduleRow(idx[i]); if (!r) return { error: 'Invalid rowIndex: ' + idx[i] }; rows.push(r); }
+    var merged = rows.map(function (r) {
+      var m = {}; Object.keys(r).forEach(function (k) { m[k] = r[k]; });
+      Object.keys(fields).forEach(function (k) {
+        if (k === 'enabled') { m.enabled = (fields[k] === true || fields[k] === 'true'); return; }
+        var v = String(fields[k] == null ? '' : fields[k]).trim();
+        if (v) m[k] = v;                              // a blank value keeps the old one
+      });
+      return m;
+    });
+    for (var j = 0; j < merged.length; j++) {
+      var e = validateSchedule(merged[j]);
+      if (e) return { error: 'Row ' + rows[j].rowIndex + ' (' + rows[j].type + ' / ' + rows[j].name + '): ' + e };
+    }
+    merged.forEach(function (m, k) { ['name', 'days', 'unlockTime', 'lockTime', 'groups', 'category', 'enabled'].forEach(function (f) { rows[k][f] = m[f]; }); });
+    return { success: true, rebuildOk: true, count: rows.length, csrfToken: token() };
+  }
+  function tempScheduleChange(p) {
+    var row = scheduleRow(p.rowIndex);
+    if (!row) return { error: 'Invalid rowIndex: ' + p.rowIndex };
+    row.override = { soRow: row.rowIndex, until: String(p.until || fmtDate(7)), startDate: p.startDate ? String(p.startDate) : undefined,
+      days: String(p.days || row.days), unlockTime: String(p.unlockTime || row.unlockTime), lockTime: String(p.lockTime || row.lockTime),
+      groups: String(p.groups || row.groups), enabled: (p.enabled === true || p.enabled === 'true') };
+    return { success: true, rebuildOk: true, csrfToken: token() };
+  }
+  function cancelScheduleOverride(p) {
+    var hit = false;
+    D.schedules.forEach(function (s) { if (s.override && Number(s.override.soRow) === Number(p.soRow)) { s.override = null; hit = true; } });
+    return hit ? { success: true, rebuildOk: true, csrfToken: token() } : { error: 'No temporary change on row ' + p.soRow + '.' };
+  }
+
+  /* ---- Quick Control: start a run, then be polled (QuickControl.js shape) ---- */
+  var QC_RUNS = {};
+  function hhmmNow(plusMin) { var d = new Date(); d.setMinutes(d.getMinutes() + (plusMin || 0)); var h = d.getHours(), m = d.getMinutes();
+    if (plusMin && (d.getDate() !== new Date().getDate())) { h = 23; m = 59; } return pad(h) + ':' + pad(m); }
+  function quickControlStart(p) {
+    var action = String(p.qcAction || '');
+    if (action !== 'Unlock' && action !== 'Lock') return { error: 'action must be "Unlock" or "Lock"' };
+    var doors = resolveTargets(p.qcTargets);
+    if (!doors.length) return { error: 'No active doors match targets: "' + (p.qcTargets || '') + '"' };
+    var immediate = !(p.qcImmediate === false || p.qcImmediate === 'false');
+    if (!immediate) {
+      if (!HHMM.test(String(p.qcStart || ''))) return { error: 'invalid start time' };
+      if (!HHMM.test(String(p.qcEnd || ''))) return { error: 'invalid end time (give endTime or durationMins)' };
+      if (String(p.qcEnd) <= String(p.qcStart)) return { error: 'end time must be after start time' };
+      return { success: true, immediate: false, action: action, targets: p.qcTargets || '', doors: doors, date: p.qcDate || fmtDate(0),
+               startTime: p.qcStart, endTime: p.qcEnd, csrfToken: token() };
+    }
+    var start = hhmmNow(0), end;
+    if (p.qcEnd) { if (!HHMM.test(String(p.qcEnd))) return { error: 'invalid end time (give endTime or durationMins)' }; end = String(p.qcEnd); }
+    else { var mins = parseInt(p.qcDuration, 10); if (!(mins > 0)) return { error: 'invalid end time (give endTime or durationMins)' }; end = hhmmNow(mins); }
+    if (end <= start) return { error: 'end time must be after start time' };
+    var tok = 'qc-' + Math.random().toString(16).slice(2, 10);
+    QC_RUNS[tok] = { polls: 0, action: action, targets: p.qcTargets || '', doors: doors, startTime: start, endTime: end, startedAt: nowStamp() };
+    return { success: true, immediate: true, token: tok, action: action, targets: p.qcTargets || '', doors: doors, total: doors.length,
+             date: fmtDate(0), startTime: start, endTime: end, csrfToken: token() };
+  }
+  function quickControlProgress(p) {
+    if (!p || !p.token) return { error: 'no token' };
+    var run = QC_RUNS[p.token];
+    if (!run) return { status: 'unknown' };
+    run.polls++;
+    var n = run.polls === 1 ? 0 : run.polls === 2 ? Math.ceil(run.doors.length / 2) : run.doors.length;
+    var status = run.polls === 1 ? 'pending' : run.polls === 2 ? 'running' : 'done';
+    var done = run.doors.slice(0, n);
+    done.forEach(function (name) { D.liveStates.forEach(function (d) { if (d.name === name && d.ison !== null) d.ison = (run.action === 'Unlock'); }); });
+    var out = { token: p.token, status: status, action: run.action, targets: run.targets, total: run.doors.length, done: done, failed: [],
+                startTime: run.startTime, endTime: run.endTime, startedAt: run.startedAt };
+    if (status === 'done') delete QC_RUNS[p.token];       // the server forgets a run once its 'done' has been read
+    return out;
+  }
+
   var WRITE = { restoreNormal: 1, createEvent: 1, updateEvent: 1, cancelEvent: 1, syncTodaySchedule: 1, cancelTodayRow: 1, skipTodayRow: 1, updateSchedule: 1, tempScheduleChange: 1, cancelScheduleOverride: 1, scanEventCalendar: 1, syncSportsCalendar: 1 };
 
   function processPost(payload) {
@@ -119,9 +231,16 @@ window.MOCK_BACKEND = (function () {
         break;
       case 'getDoorStates': res = { success: true, doors: D.liveStates }; break;
       case 'getEditData': res = { success: true, scheduleTypes: D.scheduleTypes, doorGroups: D.doorGroups, doors: D.doors, events: editEvents() }; break;
-      case 'getSchedulesData': res = { success: true, doorGroups: D.doorGroups, schedules: schedules() }; break;
+      case 'getSchedulesData': res = { success: true, doorGroups: D.doorGroups, doors: D.doors, schedules: schedules() }; break;
       case 'getEventConflicts': res = { success: true, hasConflict: false, conflicts: [] }; break;
       case 'getDashboardData': res = dashboard(parseInt(payload.days, 10) || 30); break;
+      case 'quickControlStart': res = quickControlStart(payload); break;
+      case 'quickControlProgress': res = quickControlProgress(payload); break;
+      case 'addSchedule': res = addSchedule(payload); break;
+      case 'updateSchedule': res = updateSchedule(payload); break;
+      case 'updateScheduleBulk': res = updateScheduleBulk(payload); break;
+      case 'tempScheduleChange': res = tempScheduleChange(payload); break;
+      case 'cancelScheduleOverride': res = cancelScheduleOverride(payload); break;
       case 'quickControl': {
         var resolved = resolveTargets(payload.qcTargets);
         res = { success: true, action: payload.qcAction || 'Unlock', targets: payload.qcTargets || '', doors: resolved, date: payload.qcDate || fmtDate(0), startTime: payload.qcStart || '', endTime: payload.qcEnd || '', immediate: !!payload.qcImmediate, acted: resolved, failed: [], csrfToken: token() };

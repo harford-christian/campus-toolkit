@@ -2278,6 +2278,15 @@ body.hcs-app *{box-sizing:border-box;}
   .sch-gchk { display: inline-flex; align-items: center; gap: 5px; font-size: 0.82rem; font-weight: 600; border: 1px solid var(--line,#e7e9ee);
     border-radius: 999px; padding: 4px 11px; cursor: pointer; }
   .sch-gchk input { margin: 0; }
+  .sch-grp-section { border: 1px solid var(--line, #e7e9ee); border-radius: 8px; margin-bottom: 6px; overflow: hidden; width: 100%; }
+  .sch-grp-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; user-select: none; background: #fafafa; }
+  .sch-grp-head:hover { background: #f3f4f6; }
+  .sch-grp-head input { margin: 0; }
+  .sch-grp-head-label { font-size: 0.82rem; font-weight: 600; flex: 1; }
+  .sch-grp-caret { color: #6b7280; font-size: 0.75rem; transition: transform 0.15s; }
+  .sch-grp-section.open .sch-grp-caret { transform: rotate(90deg); }
+  .sch-grp-body { display: none; flex-direction: column; gap: 5px; padding: 6px 10px 8px 30px; }
+  .sch-grp-section.open .sch-grp-body { display: flex; }
   .sch-body { padding: 15px 18px; font-size: 0.9rem; line-height: 1.5; }
   .sch-body p { margin: 0 0 10px; }
   .sch-summary { background: #f7f8fa; border: 1px solid var(--line,#e7e9ee); border-radius: 8px; padding: 12px; font-size: 0.82rem;
@@ -2313,8 +2322,18 @@ body.hcs-app *{box-sizing:border-box;}
 <div class="sch-wrap">
   <div class="sch-head">
     <h2>Standard Schedules</h2>
+    <button class="sch-btn sch-btn-primary" id="sch-add-btn" style="display:none" onclick="schOpenAdd()">+ Add schedule</button>
     <p class="sch-note">The recurring door schedules that run automatically based on the day type (Normal, delays, Summer, Church&hellip;).
       <span id="sch-admin-hint"></span></p>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+    <input id="sch-search" type="text" placeholder="Search by name to select & bulk-edit across types (e.g. &quot;KG Afternoon Dismissal&quot;)&hellip;"
+      oninput="schSearch()" style="flex:1;min-width:240px;font-family:inherit;font-size:0.9rem;padding:8px 10px;border:1px solid var(--line,#e7e9ee);border-radius:8px;">
+    <span id="sch-bulk-bar" style="display:none;align-items:center;gap:8px;">
+      <span id="sch-bulk-count" class="sch-pill sch-pill-on"></span>
+      <button class="sch-btn sch-btn-sm sch-btn-primary" onclick="schOpenBulk()">Edit selected</button>
+      <button class="sch-btn sch-btn-sm sch-btn-ghost" onclick="schClearSelection()">Clear</button>
+    </span>
   </div>
   <div id="sch-loading" class="sch-muted">Loading schedules&hellip;</div>
   <div id="sch-list"></div>
@@ -2326,7 +2345,7 @@ body.hcs-app *{box-sizing:border-box;}
     <div class="sch-card-head"><span id="sch-modal-title">Edit schedule</span><button class="sch-x" onclick="schCloseModal()" aria-label="Close">&times;</button></div>
     <div class="sch-form">
       <label>Schedule type
-        <input id="sch-f-type" class="sch-ro" readonly tabindex="-1">
+        <input id="sch-f-type" placeholder="e.g. Normal, 2HR Delay, Summer, Church" autocomplete="off">
       </label>
       <label>Name / label
         <input id="sch-f-name" placeholder="e.g. Morning unlock" autocomplete="off">
@@ -2349,6 +2368,9 @@ body.hcs-app *{box-sizing:border-box;}
         <label class="sch-chk"><input type="checkbox" id="sch-f-enabled" checked> Enabled</label>
       </div>
       <div id="sch-until-row" style="display:none;">
+        <label>Starts on this date (blank = immediately)
+          <input type="date" id="sch-f-start-date">
+        </label>
         <label>Temporary — revert on this date
           <input type="date" id="sch-f-until">
         </label>
@@ -2358,6 +2380,41 @@ body.hcs-app *{box-sizing:border-box;}
     <div class="sch-card-foot">
       <button class="sch-btn" onclick="schCloseModal()">Cancel</button>
       <button class="sch-btn sch-btn-primary" onclick="schReview()">Review change&hellip;</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk edit form — applied to every schedule checked in the search results (Type is never touched) -->
+<div id="sch-bulk-modal" class="sch-overlay" style="display:none">
+  <div class="sch-card">
+    <div class="sch-card-head"><span id="sch-bulk-modal-title">Edit selected schedules</span><button class="sch-x" onclick="schBulkClose()" aria-label="Close">&times;</button></div>
+    <div class="sch-form">
+      <p class="sch-muted">Fields greyed out differ across the selected schedules and are locked — clear the search and edit those rows individually instead.
+        <b>Schedule type is never changed here.</b></p>
+      <label>Name / label
+        <input id="sch-bulk-f-name" autocomplete="off">
+      </label>
+      <label>Days
+        <input id="sch-bulk-f-days" placeholder="DAILY, WEEKDAYS, WEEKENDS, or 1-5" autocomplete="off">
+      </label>
+      <div class="sch-row2">
+        <label>Unlock<input type="time" id="sch-bulk-f-start"></label>
+        <label>Lock<input type="time" id="sch-bulk-f-end"></label>
+      </div>
+      <label>Target doors</label>
+      <div id="sch-bulk-f-groups" class="sch-groups"></div>
+      <div class="sch-row2">
+        <label>Category
+          <select id="sch-bulk-f-category">
+            <option>School</option><option>Church</option><option>Event</option><option>Both</option>
+          </select>
+        </label>
+        <label class="sch-chk"><input type="checkbox" id="sch-bulk-f-enabled"> Enabled</label>
+      </div>
+    </div>
+    <div class="sch-card-foot">
+      <button class="sch-btn" onclick="schBulkClose()">Cancel</button>
+      <button class="sch-btn sch-btn-primary" onclick="schBulkReview()">Review change&hellip;</button>
     </div>
   </div>
 </div>
@@ -2431,7 +2488,7 @@ body.hcs-app *{box-sizing:border-box;}
     _pendingEmergency = null;
   }
 
-  var _sch = { list: [], groups: [], doors: [], editRow: null, pending: null, mode: 'edit' };
+  var _sch = { list: [], groups: [], doors: [], editRow: null, pending: null, mode: 'edit', selected: {}, search: '', bulkRows: [] };
 
   function schEsc(s) {
     return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -2453,13 +2510,57 @@ body.hcs-app *{box-sizing:border-box;}
       document.getElementById('sch-admin-hint').innerHTML = CAN_ADMIN
         ? 'Tap a type to expand. <b>Edit</b> = permanent change; <b>Temp</b> = change until a date, then it auto-reverts. Both take a two-step confirm.'
         : 'Tap a type to expand. View only — editing requires DoorAdmin access.';
+      document.getElementById('sch-add-btn').style.display = CAN_ADMIN ? 'inline-block' : 'none';
       schRender();
     });
   }
 
+  function schSearch() {
+    _sch.search = document.getElementById('sch-search').value.trim().toLowerCase();
+    schRender();
+  }
+  function schToggleSelect(rowIndex, checked) {
+    if (checked) _sch.selected[rowIndex] = true; else delete _sch.selected[rowIndex];
+    schUpdateBulkBar();
+  }
+  function schClearSelection() { _sch.selected = {}; schRender(); }
+  function schUpdateBulkBar() {
+    var bar = document.getElementById('sch-bulk-bar');
+    var n = Object.keys(_sch.selected).length;
+    if (!CAN_ADMIN || n < 1) { bar.style.display = 'none'; return; }
+    bar.style.display = 'inline-flex';
+    document.getElementById('sch-bulk-count').textContent = n + ' selected';
+  }
+
   function schRender() {
     var el = document.getElementById('sch-list');
-    if (!_sch.list.length) { el.innerHTML = '<div class="sch-muted">No standing schedules found.</div>'; return; }
+    if (!_sch.list.length) { el.innerHTML = '<div class="sch-muted">No standing schedules found.</div>'; schUpdateBulkBar(); return; }
+    if (_sch.search) {
+      var q = _sch.search;
+      var matches = _sch.list.filter(function(s) { return (s.name || '').toLowerCase().indexOf(q) >= 0; });
+      if (!matches.length) {
+        el.innerHTML = '<div class="sch-muted">No schedules match &quot;' + schEsc(_sch.search) + '&quot;.</div>';
+        schUpdateBulkBar();
+        return;
+      }
+      el.innerHTML = '<div class="sch-type open"><div class="sch-type-body">' + matches.map(function(s) {
+        var checked = !!_sch.selected[s.rowIndex];
+        var cb = CAN_ADMIN
+          ? '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="schToggleSelect(' + s.rowIndex + ', this.checked)" style="margin-right:2px">'
+          : '';
+        return '<div class="sch-row' + (s.enabled ? '' : ' sch-off') + '">' + cb +
+          '<div class="sch-row-main">' +
+            '<div class="sch-row-name">' + schEsc(s.name || '') +
+              ' <span class="sch-muted" style="font-weight:400">(' + schEsc(s.type || '') + ')</span></div>' +
+            '<div class="sch-row-meta"><span class="sch-time">' + schTo12h(s.unlockTime) + ' &ndash; ' + schTo12h(s.lockTime) + '</span>' +
+              ' &middot; ' + schEsc(s.days || '') + ' &middot; ' + schEsc(s.groups || 'ALL') + ' &middot; ' + schEsc(s.category || 'School') + '</div>' +
+          '</div>' +
+          '<span class="sch-pill ' + (s.enabled ? 'sch-pill-on' : 'sch-pill-off') + '">' + (s.enabled ? 'On' : 'Off') + '</span>' +
+        '</div>';
+      }).join('') + '</div></div>';
+      schUpdateBulkBar();
+      return;
+    }
     // group by type, preserving first-seen order
     var order = [], byType = {};
     _sch.list.forEach(function(s) {
@@ -2470,8 +2571,12 @@ body.hcs-app *{box-sizing:border-box;}
     el.innerHTML = order.map(function(t) {
       var rows = byType[t].map(function(s) {
         var ov = s.override;
+        var todayStr = new Date().toISOString().slice(0, 10);
+        var notYetActive = ov && ov.startDate && ov.startDate > todayStr;
         var badge = ov
-          ? '<div class="sch-tempbadge">&#9203; Temp until ' + schEsc(ov.until) + ': ' +
+          ? '<div class="sch-tempbadge">&#9203; ' +
+              (notYetActive ? 'Temp starts ' + schEsc(ov.startDate) + ', until ' + schEsc(ov.until) + ': '
+                            : 'Temp until ' + schEsc(ov.until) + ': ') +
               (ov.enabled ? schTo12h(ov.unlockTime) + '&ndash;' + schTo12h(ov.lockTime) +
                             (ov.groups ? ' [' + schEsc(ov.groups) + ']' : '') : 'disabled') + '</div>'
           : '';
@@ -2500,6 +2605,7 @@ body.hcs-app *{box-sizing:border-box;}
           '<span class="sch-caret">&#9654;</span></div>' +
         '<div class="sch-type-body">' + rows + '</div></div>';
     }).join('');
+    schUpdateBulkBar();
   }
   function schToggleType(headEl) { headEl.parentNode.classList.toggle('open'); }
 
@@ -2509,10 +2615,11 @@ body.hcs-app *{box-sizing:border-box;}
   // (e.g. "EL Ramp") instead of only a whole group (e.g. "EL"). resolveDoorTargets (Doors.js) already
   // accepts a comma-separated mix of group + individual door names — this UI was the only thing
   // restricting input to groups only. See docs/2026-07-12-override-fix-plan.md item 5.
-  function schRenderGroups(selected) {
+  function schRenderGroups(selected, hostId) {
+    hostId = hostId || 'sch-f-groups';
     var sel = String(selected || 'ALL').toUpperCase().split(',').map(function(x){ return x.trim(); });
     var isAll = sel.indexOf('ALL') >= 0;
-    var host = document.getElementById('sch-f-groups');
+    var host = document.getElementById(hostId);
     var pureGroups = _sch.groups.filter(function(g){ return g && g.toUpperCase() !== 'ALL'; });
     var doorsByGroup = {};
     (_sch.doors || []).forEach(function(d) {
@@ -2524,19 +2631,38 @@ body.hcs-app *{box-sizing:border-box;}
     pureGroups.forEach(function(g) {
       var gUp = g.toUpperCase();
       var gChecked = !isAll && sel.indexOf(gUp) >= 0;
-      html += '<label class="sch-gchk"><input type="checkbox" value="' + schEsc(g) + '" data-group="' + schEsc(g) +
-        '" class="sch-group-cb" ' + (gChecked ? 'checked' : '') + ' onchange="schGroupToggle(this)"> ' + schEsc(g) + ' (all)</label>';
-      (doorsByGroup[g] || []).forEach(function(dName) {
+      var groupDoors = doorsByGroup[g] || [];
+      var doorRows = groupDoors.map(function(dName) {
         var dChecked = !isAll && !gChecked && sel.indexOf(dName.toUpperCase()) >= 0;
-        html += '<label class="sch-gchk" style="padding-left:20px"><input type="checkbox" value="' + schEsc(dName) +
+        return '<label class="sch-gchk"><input type="checkbox" value="' + schEsc(dName) +
           '" data-door-group="' + schEsc(g) + '" class="sch-door-cb" ' + (dChecked ? 'checked' : '') +
           ' onchange="schGroupToggle(this)"> ' + schEsc(dName) + '</label>';
       });
+      // Auto-expand a group with a PARTIAL selection (some but not all doors checked) so the current
+      // state is visible without an extra click. Fully-checked-via-group-checkbox or empty stays collapsed.
+      var partialSelected = !isAll && !gChecked && groupDoors.some(function(dName) {
+        return sel.indexOf(dName.toUpperCase()) >= 0;
+      });
+      html += '<div class="sch-grp-section' + (partialSelected ? ' open' : '') + '">' +
+        '<div class="sch-grp-head" onclick="schToggleGroupSection(event, this)">' +
+          '<input type="checkbox" value="' + schEsc(g) + '" data-group="' + schEsc(g) +
+            '" class="sch-group-cb" ' + (gChecked ? 'checked' : '') +
+            ' onchange="schGroupToggle(this)" onclick="event.stopPropagation()">' +
+          '<span class="sch-grp-head-label">' + schEsc(g) + ' (' + groupDoors.length +
+            (groupDoors.length === 1 ? ' door)' : ' doors)') + '</span>' +
+          '<span class="sch-grp-caret">&#9654;</span>' +
+        '</div>' +
+        '<div class="sch-grp-body">' + (doorRows.join('') || '<span class="sch-muted">No individual doors in this group.</span>') + '</div>' +
+      '</div>';
     });
     host.innerHTML = html;
   }
+  function schToggleGroupSection(evt, headEl) {
+    if (evt.target && evt.target.tagName === 'INPUT') return;   // checkbox clicks handled by schGroupToggle
+    headEl.parentNode.classList.toggle('open');
+  }
   function schGroupToggle(cb) {
-    var host = document.getElementById('sch-f-groups');
+    var host = cb.closest('.sch-groups');
     var allCb = host.querySelector('input[value="ALL"]');
     if (cb.value === 'ALL') {
       if (!cb.checked) cb.checked = true;   // ALL can't be unchecked directly — pick a group/door instead
@@ -2556,8 +2682,8 @@ body.hcs-app *{box-sizing:border-box;}
     var anyChecked = Array.from(host.querySelectorAll('.sch-group-cb, .sch-door-cb')).some(function(c){ return c.checked; });
     if (!anyChecked && allCb) allCb.checked = true;
   }
-  function schGatherGroups() {
-    var host = document.getElementById('sch-f-groups');
+  function schGatherGroups(hostId) {
+    var host = document.getElementById(hostId || 'sch-f-groups');
     var allCb = host.querySelector('input[value="ALL"]');
     if (allCb && allCb.checked) return 'ALL';
     var groupsChecked = [];
@@ -2571,13 +2697,32 @@ body.hcs-app *{box-sizing:border-box;}
     return out.length ? out.join(',') : 'ALL';
   }
 
-  // ── open edit (existing rows only — no add) ──
+  // ── open add (new row) ──
+  function schOpenAdd() {
+    if (!CAN_ADMIN) return;
+    _sch.editRow = null; _sch.mode = 'add';
+    document.getElementById('sch-modal-title').textContent = 'Add schedule';
+    var typeEl = document.getElementById('sch-f-type');
+    typeEl.value = ''; typeEl.readOnly = false; typeEl.classList.remove('sch-ro');
+    document.getElementById('sch-f-name').value = '';
+    document.getElementById('sch-f-days').value = '';
+    document.getElementById('sch-f-start').value = '';
+    document.getElementById('sch-f-end').value = '';
+    document.getElementById('sch-f-category').value = 'School';
+    document.getElementById('sch-f-enabled').checked = true;
+    document.getElementById('sch-until-row').style.display = 'none';
+    schRenderGroups('ALL');
+    document.getElementById('sch-modal').style.display = 'flex';
+  }
+  // ── open edit (existing rows) ──
   function schOpenEdit(rowIndex) {
     if (!CAN_ADMIN) return;
     var s = _sch.list.filter(function(x){ return x.rowIndex === rowIndex; })[0];
     if (!s) return;
     _sch.editRow = s; _sch.mode = 'edit';
     document.getElementById('sch-modal-title').textContent = 'Edit schedule (permanent)';
+    var typeEl = document.getElementById('sch-f-type');
+    typeEl.readOnly = true; typeEl.classList.add('sch-ro');
     document.getElementById('sch-f-type').value = s.type || '';   // read-only — you edit within a type
     document.getElementById('sch-f-name').value = s.name || '';
     document.getElementById('sch-f-days').value = s.days || '';
@@ -2597,6 +2742,8 @@ body.hcs-app *{box-sizing:border-box;}
     var ov = s.override;
     _sch.editRow = s; _sch.mode = 'temp';
     document.getElementById('sch-modal-title').textContent = 'Temporary change';
+    var typeEl = document.getElementById('sch-f-type');
+    typeEl.readOnly = true; typeEl.classList.add('sch-ro');
     document.getElementById('sch-f-type').value = s.type || '';
     document.getElementById('sch-f-name').value = s.name || '';
     document.getElementById('sch-f-days').value = (ov ? ov.days : s.days) || '';
@@ -2605,6 +2752,7 @@ body.hcs-app *{box-sizing:border-box;}
     document.getElementById('sch-f-category').value = s.category || 'School';
     document.getElementById('sch-f-enabled').checked = ov ? !!ov.enabled : !!s.enabled;
     document.getElementById('sch-f-until').value = ov ? ov.until : '';
+    document.getElementById('sch-f-start-date').value = (ov && ov.startDate) || '';
     document.getElementById('sch-until-row').style.display = 'block';
     schRenderGroups((ov ? ov.groups : s.groups) || 'ALL');
     document.getElementById('sch-modal').style.display = 'flex';
@@ -2628,6 +2776,12 @@ body.hcs-app *{box-sizing:border-box;}
     } else if (mode === 'cancel') {
       head.innerHTML = '&#9888;&#65039;&nbsp; Cancel temporary change';
       text.innerHTML = "This ends the temporary change now and <b>reverts</b> to the standing schedule.";
+    } else if (mode === 'add') {
+      head.innerHTML = '&#9888;&#65039;&nbsp; New standing schedule';
+      text.innerHTML = "You're about to create a <b>new</b> standing door schedule. It will apply on <b>every future matching day</b> across campus &mdash; it moves real doors on a recurring basis.";
+    } else if (mode === 'bulk') {
+      head.innerHTML = '&#9888;&#65039;&nbsp; Bulk schedule change';
+      text.innerHTML = "You're about to change <b>multiple</b> standing door schedules at once. This affects every future day of <b>each</b> edited type across campus.";
     } else {
       head.innerHTML = '&#9888;&#65039;&nbsp; Standing schedule change';
       text.innerHTML = "You're about to change a <b>standing</b> door schedule. This affects <b>every future day</b> of this type across campus &mdash; it moves real doors on a recurring basis.";
@@ -2635,9 +2789,105 @@ body.hcs-app *{box-sizing:border-box;}
   }
   function schCloseModal()  { document.getElementById('sch-modal').style.display = 'none'; }
   function schCloseAll() {
-    ['sch-modal','sch-warn','sch-confirm'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+    ['sch-modal','sch-warn','sch-confirm','sch-bulk-modal'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
     document.getElementById('sch-until-row').style.display = 'none';
     _sch.pending = null;
+  }
+
+  // ── bulk edit (search-selected rows, same field(s) applied to all; Type is never touched) ──
+  function schBulkField(id, val) {
+    var el = document.getElementById(id);
+    el.disabled = (val === null);
+    el.value = (val === null) ? '' : val;
+  }
+  function schOpenBulk() {
+    if (!CAN_ADMIN) return;
+    var sel = _sch.list.filter(function(s) { return _sch.selected[s.rowIndex]; });
+    if (!sel.length) return;
+    _sch.bulkRows = sel;
+    document.getElementById('sch-bulk-modal-title').textContent = 'Edit ' + sel.length + ' selected schedule' + (sel.length === 1 ? '' : 's');
+
+    function allSame(getter) {
+      var v0 = getter(sel[0]);
+      return sel.every(function(s) { return getter(s) === v0; }) ? v0 : null;
+    }
+    schBulkField('sch-bulk-f-name',  allSame(function(s){ return s.name; }));
+    schBulkField('sch-bulk-f-days',  allSame(function(s){ return s.days; }));
+    schBulkField('sch-bulk-f-start', allSame(function(s){ return (s.unlockTime || '').substring(0, 5); }));
+    schBulkField('sch-bulk-f-end',   allSame(function(s){ return (s.lockTime   || '').substring(0, 5); }));
+    schBulkField('sch-bulk-f-category', allSame(function(s){ return s.category; }));
+
+    var mEnabled = allSame(function(s){ return !!s.enabled; });
+    var enEl = document.getElementById('sch-bulk-f-enabled');
+    enEl.disabled = (mEnabled === null);
+    enEl.checked = (mEnabled === null) ? false : mEnabled;
+    enEl.indeterminate = (mEnabled === null);
+
+    var mGroups = allSame(function(s){ return s.groups; });
+    var groupsHost = document.getElementById('sch-bulk-f-groups');
+    if (mGroups === null) {
+      groupsHost.innerHTML = '<span class="sch-muted">Target doors differ across the selected schedules &mdash; locked.</span>';
+      groupsHost.dataset.mixed = '1';
+    } else {
+      groupsHost.dataset.mixed = '';
+      schRenderGroups(mGroups, 'sch-bulk-f-groups');
+    }
+    document.getElementById('sch-bulk-modal').style.display = 'flex';
+  }
+  function schBulkClose() { document.getElementById('sch-bulk-modal').style.display = 'none'; }
+  function schBulkReview() {
+    var sel = _sch.bulkRows || [];
+    if (!sel.length) { toast('No schedules selected', true); return; }
+    var fields = {}, lines = [];
+
+    var nameEl = document.getElementById('sch-bulk-f-name');
+    if (!nameEl.disabled && nameEl.value.trim()) { fields.name = nameEl.value.trim(); lines.push('Name/label → ' + fields.name); }
+
+    var daysEl = document.getElementById('sch-bulk-f-days');
+    if (!daysEl.disabled) {
+      var d = daysEl.value.trim();
+      if (!d) { toast('Days is required', true); return; }
+      fields.days = d; lines.push('Days → ' + d);
+    }
+
+    var startEl = document.getElementById('sch-bulk-f-start');
+    var endEl   = document.getElementById('sch-bulk-f-end');
+    if (startEl.disabled !== endEl.disabled) {
+      toast('Unlock/Lock times differ across the selection and are locked together', true); return;
+    }
+    if (!startEl.disabled) {
+      var st = startEl.value.trim(), en = endEl.value.trim();
+      if (!st || !en) { toast('Unlock and Lock times are required', true); return; }
+      if (en <= st) { toast('Lock must be after Unlock', true); return; }
+      fields.unlockTime = st; fields.lockTime = en;
+      lines.push('Window → ' + st + '–' + en);
+    }
+
+    var groupsHost = document.getElementById('sch-bulk-f-groups');
+    if (groupsHost.dataset.mixed !== '1') {
+      fields.groups = schGatherGroups('sch-bulk-f-groups');
+      lines.push('Target doors → ' + fields.groups);
+    }
+
+    var catEl = document.getElementById('sch-bulk-f-category');
+    if (!catEl.disabled) { fields.category = catEl.value; lines.push('Category → ' + fields.category); }
+
+    var enEl = document.getElementById('sch-bulk-f-enabled');
+    if (!enEl.disabled) { fields.enabled = enEl.checked; lines.push('Enabled → ' + (enEl.checked ? 'Yes' : 'No')); }
+
+    if (!lines.length) { toast('No fields to change — everything is locked (mixed) or unchanged', true); return; }
+
+    var names = sel.map(function(s) { return s.type + ' / ' + s.name; }).join('\n  ');
+    var summary = 'BULK UPDATE — ' + sel.length + ' schedule' + (sel.length === 1 ? '' : 's') +
+      '\n\nApplying to:\n  ' + names + '\n\nChanges:\n  ' + lines.join('\n  ');
+
+    _sch.pending = { op: 'updateScheduleBulk',
+      params: { rowIndexes: sel.map(function(s){ return s.rowIndex; }), fields: fields },
+      summary: summary, toast: sel.length + ' schedule(s) updated — change notice emailed.' };
+    _sch.mode = 'bulk';
+    _schSetWarn('bulk');
+    document.getElementById('sch-bulk-modal').style.display = 'none';
+    document.getElementById('sch-warn').style.display = 'flex';
   }
 
   // ── two-step confirm ──
@@ -2646,15 +2896,18 @@ body.hcs-app *{box-sizing:border-box;}
       '\n  Target: ' + o.groups + '   Category: ' + o.category + (o.enabled ? '' : '   (DISABLED)');
   }
   function schReview() {
-    if (!_sch.editRow) { toast('No schedule selected', true); return; }
+    if (_sch.mode !== 'add' && !_sch.editRow) { toast('No schedule selected', true); return; }
     var isTemp  = (_sch.mode === 'temp');
+    var isAdd   = (_sch.mode === 'add');
     var enabled = document.getElementById('sch-f-enabled').checked;
     var days    = document.getElementById('sch-f-days').value.trim();
     var unlock  = document.getElementById('sch-f-start').value.trim();
     var lock    = document.getElementById('sch-f-end').value.trim();
     var groups  = schGatherGroups();
-    var type    = _sch.editRow.type;                                            // locked
+    var type    = isAdd ? document.getElementById('sch-f-type').value.trim() : _sch.editRow.type;   // locked unless add
     var name    = document.getElementById('sch-f-name').value.trim() || type;
+
+    if (isAdd && !type) { toast('Schedule type is required', true); return; }
 
     // A disabled TEMP window needs no window/times; every other case needs a valid window.
     var needTimes = enabled || !isTemp;
@@ -2666,16 +2919,29 @@ body.hcs-app *{box-sizing:border-box;}
 
     if (isTemp) {
       var until = document.getElementById('sch-f-until').value;
+      var startDate = document.getElementById('sch-f-start-date').value;
+      var todayStr = new Date().toISOString().slice(0, 10);
       if (!until) { toast('Set the "revert on" date', true); return; }
-      if (until < new Date().toISOString().slice(0, 10)) { toast('The revert date must be today or later', true); return; }
+      if (until < todayStr) { toast('The revert date must be today or later', true); return; }
+      if (startDate && startDate > until) { toast('The start date must be on or before the revert date', true); return; }
       var whileActive = enabled ? (days + '   ' + unlock + '–' + lock + '   [' + groups + ']') : 'window DISABLED';
-      var summary = 'TEMPORARY change — reverts on ' + until + '\n\n' + type + ' / ' + name +
+      var whenActive = startDate ? ('from ' + startDate + ' through ' + until) : ('reverts on ' + until);
+      var summary = 'TEMPORARY change — ' + whenActive + '\n\n' + type + ' / ' + name +
         '\n\nWhile active:\n  ' + whileActive + '\n\nAfter ' + until + ': back to the standing schedule.';
       _sch.pending = { op: 'tempScheduleChange',
         params: { rowIndex: _sch.editRow.rowIndex, enabled: enabled, days: days,
-                  unlockTime: unlock, lockTime: lock, groups: groups, until: until },
-        summary: summary, toast: 'Temporary change set — reverts on ' + until + '. Notice emailed.' };
+                  unlockTime: unlock, lockTime: lock, groups: groups, until: until, startDate: startDate },
+        summary: summary, toast: 'Temporary change set — ' + whenActive + '. Notice emailed.' };
       _schSetWarn('temp');
+    } else if (isAdd) {
+      var addObj = { type: type, name: name, days: days, unlockTime: unlock, lockTime: lock,
+                     groups: groups, category: document.getElementById('sch-f-category').value, enabled: enabled };
+      var addSumm = 'ADD (new standing schedule)\n\n' + schFmtRow(addObj);
+      _sch.pending = { op: 'addSchedule',
+        params: { type: type, name: name, days: days, unlockTime: unlock, lockTime: lock,
+                  groups: groups, category: addObj.category, enabled: enabled },
+        summary: addSumm, toast: 'Schedule added — change notice emailed.' };
+      _schSetWarn('add');
     } else {
       var newObj = { type: type, name: name, days: days, unlockTime: unlock, lockTime: lock,
                      groups: groups, category: document.getElementById('sch-f-category').value, enabled: enabled };
@@ -2697,8 +2963,14 @@ body.hcs-app *{box-sizing:border-box;}
   function schApply(btn) {
     if (!_sch.pending) return;
     var p = _sch.pending;
-    postBtn(btn, 'Applying…', p.op, p.params, function() {
-      toast(p.toast || 'Done.');
+    postBtn(btn, 'Applying…', p.op, p.params, function(r) {
+      if (r && r.rebuildOk === false) {
+        toast('Saved, but Today didn\'t rebuild — run "Restore to CMS Schedule" above.', true);
+      } else {
+        toast(p.toast || 'Done.');
+      }
+      invalidateTab('today');
+      _sch.selected = {};
       schCloseAll();
       loadSchedules();
     });
@@ -2731,6 +3003,20 @@ body.hcs-app *{box-sizing:border-box;}
   .qc-num{width:64px;} .qc-time,.qc-date{padding:3px;}
   #qc-submit{background:var(--hcs-red);color:#fff;border:0;border-radius:9px;padding:11px 26px;font-weight:700;cursor:pointer;font-size:1rem;}
   #qc-submit:hover{background:var(--hcs-red-dark);}
+  /* Progress modal — big "don't close" overlay with a live N-of-M count. */
+  #qc-modal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;}
+  #qc-modal.show{display:flex;}
+  .qc-modal-card{background:var(--hcs-surface,#fff);border-radius:14px;max-width:440px;width:100%;padding:26px 24px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.4);}
+  .qc-modal-card h3{margin:0 0 6px;font-weight:800;font-size:1.25rem;}
+  #qc-modal-sub{color:var(--hcs-muted);font-size:.9rem;margin:0 0 18px;}
+  .qc-modal-count{font-size:2.4rem;font-weight:800;color:var(--hcs-red);line-height:1.1;}
+  .qc-modal-count small{display:block;font-size:.72rem;font-weight:700;color:var(--hcs-muted);margin-top:6px;text-transform:uppercase;letter-spacing:.05em;}
+  .qc-bar{height:10px;border-radius:6px;background:var(--hcs-line,#e5e7eb);overflow:hidden;margin:16px 0 6px;}
+  .qc-bar > span{display:block;height:100%;width:0;background:var(--hcs-red);transition:width .3s;}
+  .qc-modal-note{font-size:.82rem;color:var(--hcs-muted);margin:14px 0 0;line-height:1.4;}
+  .qc-modal-note b{color:var(--hcs-ink);}
+  #qc-modal-fail{color:#b91c1c;font-size:.84rem;margin-top:10px;}
+  #qc-modal-close{margin-top:16px;background:var(--hcs-red);color:#fff;border:0;border-radius:9px;padding:9px 24px;font-weight:700;cursor:pointer;display:none;}
 </style>
 
 <div class="qc-wrap">
@@ -2771,6 +3057,18 @@ body.hcs-app *{box-sizing:border-box;}
 
   <button type="button" id="qc-submit" onclick="qcSubmit(this)">Apply</button>
   <div id="qc-result" class="qc-result"></div>
+</div>
+
+<div id="qc-modal">
+  <div class="qc-modal-card">
+    <h3 id="qc-modal-title">&#128275; Unlocking doors…</h3>
+    <p id="qc-modal-sub">Sending commands to the doors.</p>
+    <div class="qc-modal-count"><span id="qc-modal-done">0</span> / <span id="qc-modal-total">0</span><small>doors done</small></div>
+    <div class="qc-bar"><span id="qc-modal-barfill"></span></div>
+    <p class="qc-modal-note">&#9888;&#65039; <b>You can leave this screen &mdash; it will finish on its own.</b> The doors keep going even if your phone locks or you close the app.</p>
+    <div id="qc-modal-fail"></div>
+    <button type="button" id="qc-modal-close" onclick="qcCloseModal()">Done</button>
+  </div>
 </div>
 
 <script>
@@ -2874,15 +3172,84 @@ body.hcs-app *{box-sizing:border-box;}
       if (!confirm(QC.action.toUpperCase() + ' doors across ' + scope + '\nWindow: ' + windowDesc + '\n\nProceed?')) return;
     }
 
-    var res = document.getElementById('qc-result'); res.className = 'qc-result';
-    postBtn(btn, 'Applying…', 'quickControl', params, function(r){
+    var res = document.getElementById('qc-result'); res.className = 'qc-result'; res.textContent = '';
+    var immediate = (when === 'now');
+    postBtn(btn, immediate ? 'Starting…' : 'Scheduling…', 'quickControlStart', params, function(r){
       if (!r || !r.success) { res.className = 'qc-result bad'; res.textContent = (r && r.error) || 'Failed.'; return; }
-      res.className = 'qc-result ok';
-      res.innerHTML = '<b>' + r.action + '</b> &mdash; ' + (r.doors||[]).length + ' door(s): ' + (r.doors||[]).join(', ') +
-        '<br>Window: ' + r.date + ' ' + r.startTime + '–' + r.endTime + (r.immediate ? ' (actuated now)' : ' (scheduled)') +
-        ((r.failed && r.failed.length) ? '<br><span style="color:#b91c1c">Failed to actuate: ' + r.failed.join(', ') + '</span>' : '');
-      toast(r.action + ' applied to ' + (r.doors||[]).length + ' door(s).');
+      if (!immediate || !r.token) {                              // scheduled → simple confirmation, no modal
+        res.className = 'qc-result ok';
+        res.innerHTML = '<b>' + r.action + '</b> scheduled &mdash; ' + (r.doors||[]).length + ' door(s): ' +
+          (r.doors||[]).join(', ') + '<br>Window: ' + r.date + ' ' + r.startTime + '–' + r.endTime;
+        toast(r.action + ' scheduled for ' + (r.doors||[]).length + ' door(s).');
+        return;
+      }
+      qcOpenModal(r);                                            // immediate → progress modal + poll
     });
+  }
+
+  // ── Progress modal + polling (immediate actions run server-side; the client just watches) ──
+  var QC_POLL = { timer: null, token: null, wakeLock: null };
+
+  function qcOpenModal(r){
+    QC_POLL.token = r.token;
+    QC_POLL.finished = false;
+    document.getElementById('qc-modal-title').innerHTML = (r.action === 'Lock' ? '&#128274; Locking doors…' : '&#128275; Unlocking doors…');
+    document.getElementById('qc-modal-sub').textContent = r.targets + '  ·  ' + r.startTime + '–' + r.endTime;
+    document.getElementById('qc-modal-done').textContent = '0';
+    document.getElementById('qc-modal-total').textContent = r.total || (r.doors||[]).length || '?';
+    document.getElementById('qc-modal-barfill').style.width = '0%';
+    document.getElementById('qc-modal-fail').textContent = '';
+    document.getElementById('qc-modal-close').style.display = 'none';
+    document.getElementById('qc-modal').classList.add('show');
+    qcRequestWakeLock();
+    qcPoll();
+    QC_POLL.timer = setInterval(qcPoll, 2000);
+  }
+
+  function qcPoll(){
+    if (!QC_POLL.token) return;
+    post('quickControlProgress', { token: QC_POLL.token }, function(p){
+      if (!p) return;
+      var total = p.total || parseInt(document.getElementById('qc-modal-total').textContent, 10) || 0;
+      var done  = (p.done||[]).length, fail = (p.failed||[]).length;
+      document.getElementById('qc-modal-total').textContent = total || '?';
+      document.getElementById('qc-modal-done').textContent  = done;
+      document.getElementById('qc-modal-barfill').style.width = (total ? Math.round((done+fail)/total*100) : 0) + '%';
+      document.getElementById('qc-modal-fail').innerHTML = fail ? (fail + ' will retry automatically (within ~10 min).') : '';
+      if (p.status === 'done' || p.status === 'unknown') qcFinishModal(p, total, done, fail);
+    });
+  }
+
+  function qcFinishModal(p, total, done, fail){
+    if (QC_POLL.finished) return;   // run-once: a slow 'unknown' poll (record already cleared) must not re-render 0/N
+    QC_POLL.finished = true;
+    QC_POLL.token = null;
+    if (QC_POLL.timer) { clearInterval(QC_POLL.timer); QC_POLL.timer = null; }
+    var action = p.action || QC.action;
+    document.getElementById('qc-modal-title').innerHTML = fail ? '&#9989; Done (with retries)' : '&#9989; ' + action + ' complete';
+    document.getElementById('qc-modal-sub').textContent = done + ' of ' + (total||done) + ' door(s) ' + (action==='Lock'?'locked':'unlocked') + '.';
+    document.getElementById('qc-modal-barfill').style.width = '100%';
+    document.getElementById('qc-modal-close').style.display = 'inline-block';
+    qcReleaseWakeLock();
+    var res = document.getElementById('qc-result'); res.className = 'qc-result ok';
+    res.innerHTML = '<b>' + action + '</b> &mdash; ' + done + '/' + (total||done) + ' door(s)' +
+      (fail ? '<br><span style="color:#b91c1c">' + fail + ' will retry automatically.</span>' : '');
+  }
+
+  function qcCloseModal(){
+    document.getElementById('qc-modal').classList.remove('show');
+    if (QC_POLL.timer) { clearInterval(QC_POLL.timer); QC_POLL.timer = null; }
+    QC_POLL.token = null;
+    qcReleaseWakeLock();
+  }
+
+  function qcRequestWakeLock(){
+    try {
+      if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(function(w){ QC_POLL.wakeLock = w; }).catch(function(){});
+    } catch(e){}
+  }
+  function qcReleaseWakeLock(){
+    try { if (QC_POLL.wakeLock) { QC_POLL.wakeLock.release(); QC_POLL.wakeLock = null; } } catch(e){}
   }
 </script>
 </div>

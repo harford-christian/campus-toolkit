@@ -1,0 +1,11 @@
+{
+  "_note": "Config for tools/build-demo.mjs: the Dashboard page (?page=dashboard upstream). Run from the repo root: node tools/build-demo.mjs demos/door/build.dashboard.json",
+  "src": "../campus-control/door-automation/Dashboard.html",
+  "dst": "demos/door/dashboard.html",
+  "demoName": "Door Automation — Dashboard",
+  "replace": [
+    ["<?!= baseUrl ?>", "index.html"],
+    ["<?= baseUrl ?>", "index.html"],
+    ["<?= csrfToken ?>", "demo-csrf-0"]
+  ]
+}

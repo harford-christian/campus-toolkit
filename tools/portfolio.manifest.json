@@ -51,7 +51,7 @@
         "campus-control/bell-schedule/Index.html",
         "campus-control/monitoring/Dashboard.html"
       ],
-      "buildMethod": "build-demo.mjs (per sub-page) + hand wrapper/data/mock"
+      "buildMethod": "demos/campus-control/index.html is a hand wrapper framing door, lockdown, bell-schedule, event-requests and monitoring. The door pages rebuild with build-demo.mjs from committed configs (demos/door/build.index.json, build.dashboard.json, build.leadership.json); the three staff mailboxes in the change-notice text are swapped for role mailboxes by the hash-matched alias step in tools/staff-aliases.mjs. demos/door/mock.js answers every action the pages post, including the Schedules writes (with the server's validation) and the polled Quick Control run; demos/door/verify.mjs checks the contract, the writes, the run and fresh builds. Other sub-demos: hand data/mock."
     },
     "athletics": {
       "title": "Athletics Logistics (Talon Hub)",

@@ -1,0 +1,14 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run from the repo root: node tools/build-demo.mjs demos/door/build.index.json (and build.dashboard.json, build.leadership.json). Index.html is the tabbed app (Today / Edit / Schedules / Quick Control, inlined via includeDir); the doGet tokens become demo values, the Dashboard link becomes a relative one plus a Leadership link, and the `if (canDoorControl)` scriptlets are stripped by the builder so every tab shows. The three staff mailboxes in the change-notice text are swapped for role mailboxes by the builder's hash-matched alias step (tools/staff-aliases.mjs), never listed here.",
+  "src": "../campus-control/door-automation/Index.html",
+  "dst": "demos/door/index.html",
+  "includeDir": "../campus-control/door-automation",
+  "demoName": "Door Automation",
+  "replace": [
+    ["<?= baseUrl ?>?page=dashboard", "dashboard.html"],
+    [">to Dashboard</a>", ">Dashboard →</a> <a class=\"nav-btn\" style=\"text-decoration:none;\" href=\"leadership.html\" target=\"_blank\">Leadership →</a>"],
+    ["<?= baseUrl ?>", "#"],
+    ["<?= csrfToken ?>", "demo-csrf-0"],
+    ["<?= canDoorAdmin ?>", "true"]
+  ]
+}
