@@ -111,6 +111,10 @@
   .seg .n { font-size: .7rem; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--up-bg); color: var(--up); }
   .seg button.on .n { background: var(--gold); color: var(--gold-ink); }
   .seg button.warn .n { background: var(--overdue-bg); color: var(--overdue); }
+  /* Four tabs (Past · Today · Upcoming · Ungraded) on a ~360px phone: smaller type, and the count may wrap UNDER the
+     label instead of pushing "Upcoming 7" past its cell. Height stays >= 44px. */
+  .seg.four button { font-size: .8rem; gap: 2px 4px; padding: 2px; flex-wrap: wrap; line-height: 1.1; }
+  .seg.four .n { padding: 1px 5px; font-size: .64rem; }
 
   /* ---- filters ---- */
   .chips { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
@@ -207,6 +211,8 @@
   .score { text-align: right; white-space: nowrap; }
   .score .s { font-weight: 800; font-size: 1rem; color: var(--dd); }
   .score .of { color: var(--dt); font-size: .78rem; font-weight: 600; }
+  /* Date-conflict note on a homework item (2026-10-08) — existing tokens only. */
+  .conflict { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--late-bg); color: var(--dd); font-size: .82rem; line-height: 1.35; box-shadow: inset 3px 0 0 var(--late); overflow-wrap: anywhere; }
   /* News & Info card (2026-10-08) — existing tokens only, so light and dark both hold. */
   .newshead { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--label); padding: 10px 14px 4px; }
   .newsrow { display: flex; align-items: center; gap: 10px; padding: 8px 14px 12px; min-height: 44px; }
@@ -543,11 +549,15 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     try {
       var copy = JSON.parse(JSON.stringify(d));
       copy.grades = { connected: !!(d.grades && d.grades.connected), classes: [], pending: true };
-      if (copy.homework && copy.homework.items) copy.homework.items.forEach(function (it) { delete it.grade; });
+      /* No SCORE is ever stored on the device — but a yes/no "has been scored" flag is kept. Stripping the grade with
+         nothing in its place made every past-due assignment look unscored, so the instant-open view filled the
+         Ungraded tab with work that was already graded until the real data landed (Josh, 2026-10-08). */
+      if (copy.homework && copy.homework.items) copy.homework.items.forEach(function (it) { it.scored = hasScore(it); delete it.grade; });
       localStorage.setItem(CACHE_KEY, JSON.stringify({ email: BOOT.email, d: copy }));
     } catch (e) { /* private mode, or quota — the app just loads the normal way */ }
   }
 
+  function hasScore(it) { return !!(it.scored || (it.grade && (it.grade.earned !== '' || it.grade.display))); }
   function defaultPrefs() { return { daily: { on: false, time: '18:00', schoolDaysOnly: true }, weekly: { on: false, day: 0, time: '18:00' }, changes: { on: false, classes: [] }, tests: { on: false, daysBefore: 2 } }; }
   function onBoot(d, fromCache) {
     if (fromCache && S.gotFresh) return;
@@ -632,6 +642,18 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
   var TEST_RE = /\b(test|quiz|quizzes|exam|midterm|final|assessment)\b|\bT\s?chp|\bQ\d|\bQ\s?chp/i;
   function isTest(it) { return TEST_RE.test(it.title || ''); }
 
+  /* Josh, 2026-10-08: when the homework note and the gradebook disagree, say so plainly instead of silently picking one.
+     The gradebook date is still the one the list uses (SPEC precedence); this tells the student to check. */
+  function conflictNote(it) {
+    var c = it.dateConflict;
+    if (!c) return '';
+    var note = '“' + (c.noteWords || dayMd(c.noteDue)) + '” (' + dayMd(c.noteDue) + ')';
+    var body = c.kind === 'merged'
+      ? 'The homework note says ' + note + ', but the FACTS gradebook says ' + dayMd(c.gradebookDue) + '. This list goes by the gradebook date.'
+      : 'This looks like the same task as “' + (it.source === 'homework' ? c.gradebookTitle : c.noteText) + '”, which is listed for ' +
+        dayMd(it.source === 'homework' ? c.gradebookDue : c.noteDue) + '. The homework note says ' + note + '; the gradebook says ' + dayMd(c.gradebookDue) + '.';
+    return '<div class="conflict"><b>Dates differ.</b> ' + esc(body) + ' If you are not sure which is right, ask ' + esc(it.teacher || 'your teacher') + '.</div>';
+  }
   function dueMeta(it, today) {
     var late = it.dueOn < today || (it.dueOn === today && isRolled());
     var when = (late ? 'Was due ' : 'Due ') + dayMd(it.dueOn);
@@ -643,7 +665,12 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
   function newsCard() {
     var n = S.d.news;
     if (!n || !n.enabled || !n.items || !n.items.length) return '';
-    return '<div class="card news"><div class="newshead">News &amp; Info</div>' + n.items.map(function (it) {
+    /* After the student's last class, a line about TODAY ("Bells on the Wednesday schedule · TODAY") is history —
+       seen at 10:42 PM on a real phone, 2026-10-08. Same rollover rule the Homework tab uses. */
+    var tday = S.d.schedule && S.d.schedule.date, over = isRolled();
+    var live = n.items.filter(function (it) { return !(over && it.date === tday); });
+    if (!live.length) return '';
+    return '<div class="card news"><div class="newshead">News &amp; Info</div>' + live.map(function (it) {
       return '<div class="newsrow' + (it.isToday ? ' today' : '') + '"><div class="txt"><div class="ttl">' + esc(it.title) + (it.isToday ? ' <span class="nowtag">TODAY</span>' : '') + '</div>' +
         (it.body ? '<div class="meta">' + esc(it.body) + '</div>' : '') + '</div></div>';
     }).join('') + '</div>';
@@ -677,13 +704,16 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     var firstLabel = rolled ? (weekend ? 'Weekend' : 'Tonight') : 'Today';
     var firstSub = 'Due ' + dayMd(focus);
     var twoWeeksAgo = addDays(today, -14);
-    var scored = function (it) { return !!(it.grade && (it.grade.earned !== '' || it.grade.display)); };
+    var scored = hasScore;
     var buckets = {
       today: all.filter(function (it) { return it.dueOn === focus; }),
       upcoming: all.filter(function (it) { return it.dueOn > focus; }),
-      ungraded: all.filter(function (it) { return it.source === 'assignment' && it.dueOn < focus && it.dueOn >= twoWeeksAgo && !scored(it); })
+      ungraded: all.filter(function (it) { return it.source === 'assignment' && it.dueOn < focus && it.dueOn >= twoWeeksAgo && !scored(it); }),
+      /* PAST WEEK (Josh, 2026-10-08): everything that was due in the 7 days before the current focus day — graded work
+         with its score, unscored work flagged. The payload already carries 10 days back, so this is display only. */
+      past: all.filter(function (it) { return it.dueOn < focus && it.dueOn >= addDays(focus, -7); })
     };
-    var subs = ['today', 'upcoming'].concat(buckets.ungraded.length ? ['ungraded'] : []);
+    var subs = ['past', 'today', 'upcoming'].concat(buckets.ungraded.length ? ['ungraded'] : []);
     if (subs.indexOf(S.sub) === -1) S.sub = 'today';
     /* A game that takes you out of class at 2:00 outranks anything else on the screen — so it sits at the top.
        That is also why it must not ARRIVE at the top: the games come from 21 calendars fetched after first
@@ -704,9 +734,9 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     var newsHtml = newsCard();
     var html = sportsHtml + newsHtml + (showNudge && !d.who.viewingAs ? '<div class="card"><div class="nudge"><div class="txt"><b>Want a reminder email each evening?</b> You can turn on daily, weekly, test, and change alerts.</div>' +
       '<button type="button" class="chip plain on" data-nudge-go>Set up</button><button type="button" class="chip plain" data-nudge-dismiss>No thanks</button></div></div>' : '') +
-      '<div class="seg" role="tablist" style="grid-template-columns:repeat(' + subs.length + ',minmax(0,1fr))">' +
+      '<div class="seg' + (subs.length >= 4 ? ' four' : '') + '" role="tablist" style="grid-template-columns:repeat(' + subs.length + ',minmax(0,1fr))">' +
       subs.map(function (k) {
-        var label = k === 'today' ? firstLabel : k === 'upcoming' ? 'Upcoming' : 'Ungraded';
+        var label = k === 'today' ? firstLabel : k === 'upcoming' ? 'Upcoming' : k === 'past' ? 'Past' : 'Ungraded';
         return '<button type="button" data-sub="' + k + '" class="' + (S.sub === k ? 'on' : '') + (k === 'ungraded' ? ' warn' : '') + '">' + label + '<span class="n">' + buckets[k].length + '</span></button>';
       }).join('') + '</div>';
     if (S.sub === 'today') html += '<div class="note" style="margin-top:-4px">' + esc(firstSub) + (rolled && !weekend ? ' · school day is over' : '') + '</div>';
@@ -743,12 +773,21 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
         group((x === nextSchoolDay(focus) && !rolled ? 'Tomorrow · ' : '') + dayMd(x), function (i) { return i.dueOn === x; });
       });
       group('Later', function (i) { return i.dueOn > horizon; });
+    } else if (S.sub === 'past') {
+      items.sort(function (a, b) { return a.dueOn < b.dueOn ? 1 : a.dueOn > b.dueOn ? -1 : a.className < b.className ? -1 : 1; });
+      var seenP = {};
+      items.forEach(function (it) {
+        if (seenP[it.dueOn]) return;
+        seenP[it.dueOn] = true;
+        var y = it.dueOn;
+        group((y === today ? 'Today · ' : '') + 'Was due ' + dayMd(y), function (i) { return i.dueOn === y; });
+      });
     } else {
       items.sort(function (a, b) { return a.dueOn < b.dueOn ? 1 : a.dueOn > b.dueOn ? -1 : 0; });
       group('Past due, no score yet in FACTS', function () { return true; }, true);
     }
     if (!groups.length) {
-      var why = S.sub === 'today' ? ('Nothing due ' + (rolled ? dayMd(focus) : 'today') + '.') : S.sub === 'upcoming' ? 'Nothing coming up yet.' : 'Nothing ungraded.';
+      var why = S.sub === 'today' ? ('Nothing due ' + (rolled ? dayMd(focus) : 'today') + '.') : S.sub === 'upcoming' ? 'Nothing coming up yet.' : S.sub === 'past' ? 'Nothing was due in the last week.' : 'Nothing ungraded.';
       html += '<div class="card"><div class="empty"><b>' + why + '</b>' + (S.filter !== 'all' || S.types.tests || S.types.graded ? '<br>Try clearing a filter.' : '') + '</div></div>';
     }
     groups.forEach(function (g) {
@@ -756,6 +795,8 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
       g.items.forEach(function (it) {
         var late = it.dueOn < today;
         var meta = dueMeta(it, today);
+        if (it.dateConflict) meta += ' <span class="pill late">Dates differ</span>';
+        if (S.sub === 'past' && it.source === 'assignment' && !hasScore(it)) meta += ' <span class="pill up">No score yet</span>';
         if (it.grade && (it.grade.earned !== '' || it.grade.display)) meta += '<span class="src">· score <b>' + esc(it.grade.display || it.grade.earned) + (it.grade.max ? '/' + esc(it.grade.max) : '') + '</b></span>';
         html += '<div class="item' + (late ? ' late' : '') + '">' +
           '<span class="kchip" style="--c:' + esc(it.color) + '">' + esc(it.short) + '</span>' +
@@ -764,7 +805,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
         if (S.openItem[it.key]) {
           html += '<div class="detail">' + esc(it.detail || it.title) + '<small>' + esc(it.className) + (it.teacher ? ' · ' + esc(it.teacher) : '') + ' · assigned ' + esc(dayMd(it.assignedOn)) +
             (it.timesTyped > 1 ? ' · posted ' + it.timesTyped + ' days (' + md(it.assignedOn) + '–' + md(it.lastSeenOn) + ')' : '') + '</small>' +
-            teacherMailto(it) + '</div>';
+            conflictNote(it) + teacherMailto(it) + '</div>';
         }
       });
       html += '</div>';

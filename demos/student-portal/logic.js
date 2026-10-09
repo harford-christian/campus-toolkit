@@ -205,6 +205,50 @@ var Sched = (function () {
     return out;
   }
 
+  /**
+   * A FACTS Teacher cell → every person in it, each with their Staff email ('' when it cannot be resolved).
+   * Co-taught classes put two people in one cell — "Ward, Melanie / Schmidt, Teresa" (real, 3rd Grade Reading) — and
+   * teacherEmails matched that whole string as ONE name, so it matched nobody. Split on / & + ;
+   * Each name is tried strictly first (teacherEmails); if that fails, "Last, First Middle" matches a Staff row whose
+   * surname is Last and whose first name is First ("Cronin, Marie Anna" ↔ Marie Cronin), but only when exactly one
+   * active person qualifies. Never a guess between two people. (Added 2026-10-08 for the teacher digest.)
+   */
+  function splitTeacherNames(field) {
+    return String(field || '').split(/\s*(?:\/|&|\+|;|\band\b)\s*/i).map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function staffPeople(tabs) {
+    var staff = tabByName(tabs, ['Staff']);
+    if (!staff || (staff.values || []).length < 2) return [];
+    var h = headerMap(staff.values[0]), out = [];
+    for (var r = 1; r < staff.values.length; r++) {
+      var cell = cellGetter(h, staff.values[r]);
+      out.push({ first: cell('First Name'), last: cell('Last Name'), email: cell('Email'), active: cell('Active') });
+    }
+    return out;
+  }
+  function lc(s) { return String(s || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function teacherEmailList(tabs, field) {
+    var names = splitTeacherNames(field);
+    var strict = teacherEmails(tabs, names);
+    var people = null;
+    return names.map(function (n) {
+      if (strict[n]) return { name: n, email: strict[n] };
+      var parts = n.split(',');
+      if (parts.length < 2) return { name: n, email: '' };
+      var last = lc(parts[0]), first = lc(parts[1]).split(' ')[0];
+      people = people || staffPeople(tabs);
+      var hits = people.filter(function (p) { return p.email && lc(p.last) === last && lc(p.first).split(' ')[0] === first; });
+      if (hits.length > 1) { var act = hits.filter(function (p) { return /^(y|yes|true|active)$/i.test(p.active); }); if (act.length === 1) hits = act; }
+      return { name: n, email: hits.length === 1 ? hits[0].email : '' };
+    });
+  }
+  /** Diagnostics: Staff rows sharing a surname — "Marie Cronin <mcronin@…> (Active)". */
+  function staffBySurname(tabs, name) {
+    var last = lc(String(name || '').split(',')[0]).split(' ').pop();
+    return staffPeople(tabs).filter(function (p) { return lc(p.last).split(' ').pop() === last; })
+      .map(function (p) { return p.first + ' ' + p.last + ' <' + (p.email || 'no email') + '>' + (p.active ? ' (' + p.active + ')' : ''); });
+  }
+
   /** "Q1,2" / "Q1,2,3,4" -> {1:true,2:true}. Blank = meets every quarter. */
   function parseQuartersField(s) {
     var out = {};
@@ -335,6 +379,7 @@ var Sched = (function () {
     timeToMin: timeToMin, timeLabel: timeLabel, timeShort: timeShort,
     buildPeriodTimes: buildPeriodTimes, isHomeroomClass: isHomeroomClass,
     studentClasses: studentClasses, studentProfile: studentProfile, teacherEmails: teacherEmails,
+    teacherEmailList: teacherEmailList, splitTeacherNames: splitTeacherNames, staffBySurname: staffBySurname,
     parseQuartersField: parseQuartersField, parseQuarterRanges: parseQuarterRanges, quarterForDate: quarterForDate,
     annotateSchedule: annotateSchedule, nowAndNext: nowAndNext, assignColors: assignColors, shortName: shortName,
     PALETTE: PALETTE
@@ -516,7 +561,14 @@ var Due = (function () {
     var out = [];
     anchors.forEach(function (a) {
       var last = out[out.length - 1];
-      if (last && a.start < last.end + 2) { if (a.kind === 'monthname') out[out.length - 1] = a; return; }
+      if (last && a.start < last.end + 2) {
+        if (a.kind === 'monthname') out[out.length - 1] = a;
+        /* "Thurs 10/8" / "due Fri 10/9": the WRITTEN date wins over the weekday, and the anchor covers both words.
+           Keeping the weekday resolved "CH 3 TEST on Thurs 10/8" typed before 10/1 to 10/1 (RUN_dateConflicts,
+           2026-10-08). When both name the same day nothing changes but the span. */
+        else if (a.kind === 'numeric' && last.kind === 'weekday') out[out.length - 1] = Object.assign({}, a, { start: last.start, raw: text.slice(last.start, a.end) });
+        return;
+      }
       out.push(a);
     });
     // ranges "from A to B", "A - B", "A -B", "A to B", "up to B", "through B": the LAST date is the due date;
@@ -597,6 +649,13 @@ var Due = (function () {
         break;
       }
       var prev = out[out.length - 1];
+      /* "CH 3 TEST on Thurs 10/8" typed before 10/1: "Thurs" alone resolves to 10/1, but the teacher WROTE 10/8. A weekday
+         directly followed by an explicit date is one anchor, and the written date wins (RUN_dateConflicts, 2026-10-08). */
+      if (prev && prev.dueOn !== a.dueOn && !/\d/.test(prev.raw) && /\d\s*[\/\-]\s*\d/.test(a.raw) &&
+          /^[\s,.;:\-–—(]*$/.test(line.slice(prev.end, a.start))) {
+        out[out.length - 1] = Object.assign({}, a, { start: prev.start, raw: line.slice(prev.start, a.end) });
+        return;
+      }
       if (prev && prev.dueOn === a.dueOn && /^[\s,.;:\-–—(]*$/.test(line.slice(prev.end, a.start))) {
         out[out.length - 1] = Object.assign({}, prev, { end: a.end, raw: line.slice(prev.start, a.end) });
         return;
@@ -755,14 +814,25 @@ var Due = (function () {
       var title = clean(a.title) || clean(a.description) || 'Assignment';
       var key = 'as|' + a.classId + '|' + a.id;
       // merge a homework segment that names the same thing (same class, due within a day, similar words)
-      var merged = null;
+      // The BEST match wins, not the first over the bar, and never across a label clash ("Unit 3" vs "Unit 2").
+      var merged = null, mergedScore = 0;
       order.forEach(function (k) {
         var it = byKey[k];
-        if (merged || it.source !== 'homework' || String(it.classId) !== String(a.classId)) return;
+        if (it.source !== 'homework' || String(it.classId) !== String(a.classId)) return;
         if (Math.abs(daysBetween(it.dueOn, due)) > 1) return;
-        if (matchScore(it.title, a) >= 0.6) merged = it;
+        if (labelClash(it.title, it.anchor, title + ' ' + clean(a.description))) return;
+        var sc = matchScore(it.title, a);
+        if (sc >= 0.6 && sc > mergedScore) { merged = it; mergedScore = sc; }
       });
       if (merged) {
+        /* DATE CONFLICT (Josh, 2026-10-08): the teacher TYPED a date in the homework box and the gradebook says a
+           different day — real: English 9, "Choose the Right Word (Tues.)" vs gradebook due Wed 10/7. The gradebook
+           still wins (SPEC precedence); this only records the disagreement so student and teacher can both see it.
+           A guessed next-school-day date is NOT a conflict: the teacher never stated one. */
+        if (merged.dueSource === 'text' && merged.dueOn !== due) {
+          merged.dateConflict = { kind: 'merged', noteDue: merged.dueOn, noteWords: merged.anchor || '', noteText: merged.title,
+                                  gradebookDue: due, gradebookTitle: title };
+        }
         merged.source = 'assignment'; merged.assignmentId = String(a.id); merged.points = a.maxPoints == null ? null : a.maxPoints;
         merged.title = title; merged.dueOn = due; merged.dueSource = 'gradebook';
         if (assigned && assigned < merged.assignedOn) merged.assignedOn = assigned;
@@ -778,8 +848,75 @@ var Due = (function () {
     });
 
     var items = order.map(function (k) { return byKey[k]; }).filter(Boolean);
+    markTwins(items);
     items.sort(function (a, b) { return a.dueOn < b.dueOn ? -1 : a.dueOn > b.dueOn ? 1 : String(a.classId).localeCompare(String(b.classId)); });
     return items;
+  }
+
+  /**
+   * LIKELY TWINS: a homework task with a TYPED date and a gradebook assignment in the same class that name the same
+   * thing but sit 2-7 days apart. They are too far apart to merge (the merge allows one day), so the student sees two
+   * items and cannot tell which date is right. Both get a `dateConflict` of kind 'twin'; neither date is changed.
+   * Stricter than the merge on purpose: score >= 0.8 AND the gradebook title has at least two meaningful words, so a
+   * one-word title like "Quiz" (which every quiz line contains) can never pair up.
+   */
+  /* LABELLED NUMBERS — "List 4", "Unit 3", "pg. 15-16", "Acts 1", "Ephesians 2". Two texts that use the SAME label
+     with DIFFERENT numbers are different tasks, however similar the words. Found by RUN_dateConflicts on the whole
+     school 2026-10-08: about half its 58 hits were pairs like "List 5 Quiz" ~ "Quiz List 4", and the live merge had
+     folded English 9's "Vocab Unit 3 - Choose the Right Word" into the gradebook's "Vocab Unit 2 Quiz".
+     Dates are removed first (the task's own anchor, M/D, years, "October 6"), so a due date is never a label number. */
+  var LABEL_SKIP = /^(due|on|by|at|for|and|or|the|of|to|in|is|a|an|grade|period|th|st|nd|rd|x|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)$/;
+  function normLabel(w) {
+    w = String(w).toLowerCase();
+    if (/^(p|pg|pgs|pp|page|pages)$/.test(w)) return 'page';
+    if (/^(ch|chp|chap|chapter|chapters)$/.test(w)) return 'chapter';
+    return w.replace(/s$/, '');
+  }
+  function labelNumbers(text, anchorRaw) {
+    var t = String(text || '');
+    if (anchorRaw) t = t.split(anchorRaw).join(' ');
+    t = t.replace(/\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b/g, ' ')
+         .replace(/\b(19|20)\d{2}\b/g, ' ')
+         .replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(st|nd|rd|th)?\b/gi, ' ');
+    var out = {}, m, re = /([A-Za-z]+)\.?\s*#?\s*(\d+(?:\.\d+)?(?:\s*[-–:,&]\s*\d+(?:\.\d+)?)*)/g;
+    while ((m = re.exec(t))) {
+      var lab = normLabel(m[1]);
+      if (LABEL_SKIP.test(lab) || lab.length < 2) continue;
+      var nums = m[2].match(/\d+(?:\.\d+)?/g).map(function (n) { return String(Number(n)); });
+      out[lab] = (out[lab] || []).concat(nums);
+    }
+    return out;
+  }
+  /** true when a shared label carries different numbers — "List 4" vs "List 3". */
+  function labelClash(hwText, hwAnchor, otherText) {
+    var a = labelNumbers(hwText, hwAnchor), b = labelNumbers(otherText, '');
+    return Object.keys(a).some(function (k) {
+      if (!b[k]) return false;
+      var uniq = function (v) { return v.filter(function (n, i) { return v.indexOf(n) === i; }).sort().join(','); };
+      var x = uniq(a[k]), y = uniq(b[k]);
+      return x !== y;
+    });
+  }
+
+  var TWIN_MIN_SCORE = 0.8, TWIN_MIN_DAYS = 2, TWIN_MAX_DAYS = 7;
+  function markTwins(items) {
+    var hw = items.filter(function (it) { return it.source === 'homework' && it.dueSource === 'text' && !it.dateConflict; });
+    var gb = items.filter(function (it) { return it.source === 'assignment' && it.dueSource === 'gradebook'; });
+    hw.forEach(function (h) {
+      var best = null, bestScore = 0;
+      gb.forEach(function (g) {
+        if (String(g.classId) !== String(h.classId) || g.dateConflict) return;
+        var gap = Math.abs(daysBetween(h.dueOn, g.dueOn));
+        if (gap < TWIN_MIN_DAYS || gap > TWIN_MAX_DAYS || tokens(g.title).length < 2) return;
+        if (labelClash(h.title, h.anchor, g.title)) return;
+        var sc = matchScore(h.title, { title: g.title, description: '' });
+        if (sc >= TWIN_MIN_SCORE && sc > bestScore) { best = g; bestScore = sc; }
+      });
+      if (!best) return;
+      var c = { kind: 'twin', noteDue: h.dueOn, noteWords: h.anchor || '', noteText: h.title, gradebookDue: best.dueOn, gradebookTitle: best.title };
+      h.dateConflict = c;
+      best.dateConflict = c;
+    });
   }
 
   /**
@@ -825,7 +962,7 @@ var Due = (function () {
     addDays: addDays,
     normKey: normKey,
     similarity: similarity,
-    matchScore: matchScore,
+    matchScore: matchScore, markTwins: markTwins, labelNumbers: labelNumbers, labelClash: labelClash,
     MAX_LEAD_DAYS: MAX_LEAD_DAYS
   };
 })();
@@ -1744,6 +1881,7 @@ function bootApi(asId, sim) {
   payload.attendance.enabled = attendanceEnabled_();
   payload.news = newsFor_(payload, ctx);   // per request, not in the cached payload: the Chapel tab changes on its own clock
   restampClock_(payload.schedule, ctx);
+  restampGrades_(payload.homework, who.studentId);
   payload.perf = { ms: Date.now() - t0, cached: hit };
   perfNote_(hit ? 'boot-cached' : 'boot-built', Date.now() - t0);
   return payload;
@@ -1801,6 +1939,24 @@ function RUN_newsCheck() {
   News.build(Object.assign({ grade: '9', elementary: false }, base)).forEach(function (it) { Logger.log('   [%s] %s — %s%s', it.kind, it.title, it.body, it.isToday ? '  (TODAY)' : ''); });
   Logger.log('Today %s → grade 4 student would see:', today);
   News.build(Object.assign({ grade: '4', elementary: true }, base)).forEach(function (it) { Logger.log('   [%s] %s — %s%s', it.kind, it.title, it.body, it.isToday ? '  (TODAY)' : ''); });
+}
+
+/**
+ * Re-attach this student's scores to a (possibly cached) homework list, every request.
+ * The boot payload is cached up to 6 h against the homework/assignment fingerprint, which does NOT move when a
+ * teacher enters a score into an existing gradebook row — so a graded assignment kept showing under Ungraded for
+ * hours (Josh, 2026-10-08). The per-student grade slice has its own fingerprint (GRADES_VERSION) and is a cache
+ * hit, so this costs a few ms.
+ */
+function restampGrades_(hw, studentId) {
+  if (!hw || !hw.items || !hw.items.length) return;
+  var mine = {};
+  try { gradesForStudent_(studentId).forEach(function (g) { mine[g['Assignment ID']] = g; }); } catch (e) { return; }   // keep what we had
+  hw.items.forEach(function (it) {
+    if (!it.assignmentId) return;
+    var g = mine[it.assignmentId];
+    it.grade = g ? { display: g['Display Grade'], status: g['Status'], earned: g['Earned'], max: g['Max'] } : null;
+  });
 }
 
 /** Re-apply the current time to a (possibly cached) schedule: which class is on now, and what is next. */
@@ -1999,8 +2155,8 @@ function homeworkPayload_(who, classList, todayIso, data) {
     var c = byId[it.classId] || {};
     var g = it.assignmentId ? myGrades[it.assignmentId] : null;
     return { key: it.key, classId: it.classId, className: c.name || '', short: c.short || '', color: c.color || '#4b5563', teacher: c.teacher || '',
-      source: it.source, title: it.title, detail: it.detail, assignedOn: it.assignedOn, lastSeenOn: it.lastSeenOn, dueOn: it.dueOn,
-      dueSource: it.dueSource, anchor: it.anchor, points: it.points, timesTyped: it.timesTyped,
+      source: it.source, assignmentId: it.assignmentId || '', title: it.title, detail: it.detail, assignedOn: it.assignedOn, lastSeenOn: it.lastSeenOn, dueOn: it.dueOn,
+      dueSource: it.dueSource, anchor: it.anchor, points: it.points, timesTyped: it.timesTyped, dateConflict: it.dateConflict || null,
       grade: g ? { display: g['Display Grade'], status: g['Status'], earned: g['Earned'], max: g['Max'] } : null };
   });
   // NOTE: `data` is deliberately NOT returned. It is the whole school's gradebook; returning it once shipped
