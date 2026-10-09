@@ -228,8 +228,9 @@
   };
 
   // The simulated-clock bar the template renders for admins: here it is the honest label for every visitor.
+  // No ?sim= hint — the page runs in the frame, so visitors move the clock with the frame's Clock picker.
   document.addEventListener('DOMContentLoaded', function () {
     var bar = document.getElementById('demoSimbar');
-    if (bar) { bar.textContent = 'DEMO CLOCK · ' + pinnedLabel() + ' — add ?sim=YYYY-MM-DD HH:MM to time-travel'; bar.hidden = false; }
+    if (bar) { bar.textContent = 'Demo clock · ' + pinnedLabel(); bar.hidden = false; }
   });
 })();
