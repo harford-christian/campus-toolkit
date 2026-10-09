@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
+import { aliasStaffNames, aliasPhrases, PHRASE_ALIASES } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, '../../../FACTS/transpo-department/logic');
@@ -45,7 +45,7 @@ const parts = FILES.map((f) => {
 
   // Real staff first names in the comments become role aliases — the one deliberate departure
   // from verbatim (verify.mjs applies the same transform before comparing).
-  body = aliasStaffNames(body).text;
+  body = aliasStaffNames(aliasPhrases(body, PHRASE_ALIASES).text).text;
 
   return `/* ===== ${f} ===== */\n` + body;
 });

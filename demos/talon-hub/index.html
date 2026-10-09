@@ -7626,7 +7626,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       }).catch(function () { if (w) w.close(); TalonUI.toast('Network error.'); });
     }
     // Owner-only "view as Parent/Player": pick a real athlete → mint a view-only
-    // token (server, itscripts@-gated) → open that app in a new tab with ?imp=.
+    // token (server, it@-gated) → open that app in a new tab with ?imp=.
     var IMP_PARENT_EXEC = 'https://example.invalid/demo-deployment/exec';
     var IMP_STUDENT_EXEC = 'https://script.google.com/a/macros/example.edu/s/DEMO_DEPLOYMENT_ID/exec';
     function openImpersonatePicker(kind) {
@@ -8492,7 +8492,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     // ---------- Events: team list + drill-in ----------
     var DEPT_TOGGLE_KEY = 'talonStaffDeptEvs';
     // Owner-only test lab (create/clear the fake timing meet from the app).
-    function isLabOwner_() { return !!(state.bundle && ['joshmay@example.edu', 'itscripts@example.edu'].indexOf(String(state.bundle.email || '').toLowerCase()) !== -1); }
+    function isLabOwner_() { return !!(state.bundle && ['joshmay@example.edu', 'it@example.edu'].indexOf(String(state.bundle.email || '').toLowerCase()) !== -1); }
     function labRefresh_() { call('getStaffBundle').then(function (res) { if (res && res.ok) { writeBundleCache(res); applyBundle(res, true); } }).catch(function () {}); }
     function teamEvents() {
       var t = ctxTeam(); if (!t) return placeholder('No team', 'Tap the team name up top to pick a team.');

@@ -118,7 +118,7 @@ var BOARDING_HONESTY = 'An unchecked child is NOT RECORDED — never "not on the
  * somebody's private business: the FACTS attendance reason ("fever, dad emailed" is the example in
  * the producer's own documentation), the name of the adult who collected a child, the reason and
  * guardian on a planned pickup, or an office note plus a hand-over destination that legitimately
- * names ANOTHER CHILD ("to her brother Charlie Huber").
+ * names ANOTHER CHILD ("to her brother an older sibling").
  *
  * FORBIDDEN_RIDER_FIELDS named those note fields all along and the test checked them by KEY, so the
  * content sailed through inside this allowlisted one. 'reason' carries the label — ABSENT, CAR
@@ -393,7 +393,7 @@ var SEQ_GAP = 10;
  * Blank means EVERY school day — the overwhelmingly common case, and the safe default: a stop that
  * silently applies to no days would strand a child. Mirrors dsDaysInclude in
  * ../transportation/Dismissal.gs:208, which the office already understands from the Standing tab
- * ("the Siverds ride SE Mon-Thu and are Car on Friday").
+ * ("the Halvorsens ride SE Mon-Thu and are Car on Friday").
  *
  * @param {string} days   '' | 'Fri' | 'Mon,Wed,Thu,Fri'
  * @param {string} dayName 'Mon'..'Sun'
@@ -595,7 +595,7 @@ function _deps() {
  *   flags  = 'added today — <note>', 'standing — <note>', 'PICKUP PLANNED — <reason> (<guardian>)'
  *
  * So the test passed on names while the office's words went to eight personal phones, and
- * overrideDestination legitimately holds ANOTHER CHILD'S NAME ("to her brother Charlie Huber").
+ * overrideDestination legitimately holds ANOTHER CHILD'S NAME ("to her brother an older sibling").
  *
  * ../transportation/Dismissal.gs dsDriverScrub_ now strips this at the publishing boundary, so the
  * file on Drive is clean. This is the second line, and it exists for the same reason projectRider

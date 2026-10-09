@@ -280,7 +280,7 @@ var SETTINGS_DEFAULTS = {
   // question from the front desk's early-dismissal picklist (Josh, 2026-09-16).
   'nurse.reasons': 'Illness|Fever|Vomiting|Injury|Headache|Other',
   'dismissal.reasons': 'Medical appointment|Family|Sports dismissal|Illness|Homeschool|Other',
-  // Between-buildings moves. Per Coreen Forloine 2026-09-08: a student moving
+  // Between-buildings moves. Per the office manager 2026-09-08: a student moving
   // UNESCORTED (lessons, ELC, TA duties) signs out and back in; a class moving
   // together or escorted by a teacher does not. This is NOT leaving campus, so
   // it never runs the pickup check and never raises a flag.
@@ -623,8 +623,8 @@ var Directory = (function () {
    * The (surname, forename) pairs a teacher name could mean.
    *
    * FACTS writes teacher names TWO different ways and neither field announces
-   * which: the 7-12 'Homeroom' cell holds 'Burge, Angela L.' while the Student
-   * Schedules HR rows hold 'Burge Angela' with no comma at all. A resolver that
+   * which: the 7-12 'Homeroom' cell holds 'Sowell, Gina L.' while the Student
+   * Schedules HR rows hold 'Sowell Gina' with no comma at all. A resolver that
    * understands only the comma form silently matches nobody — which is exactly
    * how all 25 elementary homerooms came back unreachable on 2026-09-15, after
    * the mail had already been switched live.
@@ -642,8 +642,8 @@ var Directory = (function () {
     }
     var t = foldName(raw).split(' ');
     if (t.length >= 2) {
-      out.push([t[0], t[1]]);                        // 'Burge Angela' — FACTS HR rows
-      out.push([t[t.length - 1], t[0]]);             // 'Angela Burge' — typed the other way
+      out.push([t[0], t[1]]);                        // 'Sowell Gina' — FACTS HR rows
+      out.push([t[t.length - 1], t[0]]);             // 'Gina Sowell' — typed the other way
     }
     return out.filter(function (pr) { return pr[0] && pr[1]; });
   }
@@ -722,8 +722,8 @@ var Directory = (function () {
       var email = cellToString(row[h['Email']]).trim();
       if (!name || !email) continue;
       // Register EVERY form the caller might arrive with, for the same reason
-      // staffEmailResolver does: this tab is hand-kept, so 'Burge Angela',
-      // 'Burge, Angela' and 'Angela Burge' are all plausible spellings of one
+      // staffEmailResolver does: this tab is hand-kept, so 'Sowell Gina',
+      // 'Sowell, Gina' and 'Gina Sowell' are all plausible spellings of one
       // teacher and none of them should decide whether she is told.
       out[name.toLowerCase().replace(/\s+/g, '')] = out[name.toLowerCase().replace(/\s+/g, '')] || email;
       teacherNameParts(name).forEach(function (pr) {
@@ -2330,7 +2330,7 @@ var Notify = (function () {
    * @param {Object} student  from Directory.buildStudents
    * @param {Object} ctx { staffEmailFor:fn(name), hrByStudent:{}, elcEmails:{},
    *                        elcEmailFor?:fn(elcEmails, name) — Directory.elcEmailFor, which
-   *                        understands 'Burge Angela' as well as 'Burge, Angela' }
+   *                        understands 'Sowell Gina' as well as 'Sowell, Gina' }
    * @return {{teacherName, email, via:'staff'|'elc'|'none'}}
    */
   function resolveTeacherEmail(student, ctx) {

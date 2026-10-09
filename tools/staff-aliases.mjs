@@ -57,6 +57,61 @@ export function aliasStaffNames(text) {
   return { text: out, count };
 }
 
+/** Shared phrase aliases, applied by every build (build-demo and each build-logic): people whose
+ *  replacement reads the same in every app — full names a first-name alias cannot catch (a first name
+ *  followed by a surname is deliberately skipped by aliasStaffNames), and a few family names. */
+export const PHRASE_ALIASES = {
+  '49a725bccb71d604': 'the office manager',
+  '76a981126144db8b': 'Sowell Gina',
+  '25adea4cb817ea12': 'Gina Sowell',
+  'cbf8b8d229fa7fac': 'an older sibling',
+  '1318b84a35151999': 'Halvorsens',
+  '38797be92acdf726': 'Halvorsen',
+  '4a77d58e0b501a64': 'Sowell',
+  '79a6a933dfc9b197': 'Gina'
+};
+
+/** Per-build phrase aliases: { sha256(lowercased phrase).slice(0,16): replacement }. A phrase is one to
+ *  three letter-words joined by single spaces, matched case-insensitively, longest first — so a surname
+ *  shared by a family ("the X boys") and a staff full name ("X Y") can map differently, and the config
+ *  that carries the table never spells the names. Returns { text, count }. */
+export function aliasPhrases(text, table) {
+  if (!table || !Object.keys(table).length) return { text, count: 0 };
+  const words = [...text.matchAll(WORDS)];
+  let out = '', last = 0, count = 0;
+  for (let i = 0; i < words.length;) {
+    let hit = null;
+    for (let n = 3; n >= 1 && !hit; n--) {
+      if (i + n > words.length) continue;
+      let joined = true;
+      for (let k = i; k < i + n - 1; k++) if (text.slice(words[k].index + words[k][0].length, words[k + 1].index) !== ' ') { joined = false; break; }
+      if (!joined) continue;
+      const alias = table[h(words.slice(i, i + n).map((w) => w[0]).join(' '))];
+      if (alias !== undefined) hit = { n, alias };
+    }
+    if (!hit) { i++; continue; }
+    const end = words[i + hit.n - 1];
+    out += text.slice(last, words[i].index) + hit.alias;
+    last = end.index + end[0].length;
+    count++;
+    i += hit.n;
+  }
+  return { text: out + text.slice(last), count };
+}
+
+/** Every phrase from `table` still present in text (for verifiers and the scanner). */
+export function findPhrases(text, table, capitalOnly) {
+  if (!table) return [];
+  const words = [...text.matchAll(WORDS)].map((m) => m[0]);
+  const found = [];
+  for (let i = 0; i < words.length; i++) {
+    if (capitalOnly && !/^[A-Z]/.test(words[i])) continue;
+    for (let n = 1; n <= 3 && i + n <= words.length; n++) if (table[h(words.slice(i, i + n).join(' '))] !== undefined) found.push(i);
+  }
+  return found;
+}
+const WORDS = /(?<![A-Za-z0-9])[A-Za-z]+(?![A-Za-z0-9])/g;
+
 /** True if any aliased name still appears (for scanners). */
 export function findStaffNames(text) {
   return [...text.matchAll(/\b[A-Z][a-z]+\b/g)].map((m) => m[0]).filter((w) => STAFF_ALIASES[h(w)]);

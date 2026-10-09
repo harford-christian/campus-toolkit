@@ -362,7 +362,7 @@
             <button id="printKgBtn" role="menuitem"
                     title="One page for the Kindergarten building: ONLY what is different today for K4 and K5, grouped by bus (in route order) then the ramp.">K4/K5 Dismissal Changes</button>
             <button id="printWalkBtn" role="menuitem"
-                    title="For the walk-up chaperone and the walk-up lead: the staff kids walked up to the High School today — who is walking and who is handed where, who is not walking and why.">Staff Kids</button>
+                    title="For the walk-up chaperones: the staff kids walked up to the High School today — who is walking and who is handed where, who is not walking and why.">Staff Kids</button>
           </div>
         </div>
       </div>
@@ -485,7 +485,7 @@
   </div>
 </div></dialog>
 
-<!-- THE APPROVED WALK-UP LIST (the walk-up chaperone and the walk-up lead, 2026-09-22). Permanent settings, not today's
+<!-- THE APPROVED WALK-UP LIST (the walk-up chaperones, 2026-09-22). Permanent settings, not today's
      change: who is on the list, Daily or Occasional, where they are handed over, and the days that
      differ. Until now this tab could only be edited in the Sheet by hand. -->
 <dialog id="wlk"><div class="dlg">
@@ -2643,7 +2643,7 @@ function dsDriverSlice(board, routes, dayName, pickups) {
     if (r.routes && r.routes.length) return r.routes.join(' or ');
     if (r.routeName || r.routeCode) return r.routeName || r.routeCode;
     // The approved walk-up list outranks whatever the roster derived: a child on it is walked up,
-    // whether FACTS calls them Car (Evelyn, walking to her brother) or Staff Kid.
+    // whether FACTS calls them Car (a child, walking to her brother) or Staff Kid.
     if (r.walkUp) {
       if (r.walkUpWalking) return 'walks up' + (r.walkUpTo ? ' → ' + r.walkUpTo : ' to the HS');
       // NOT walking today: the LANE first, then why the walk-up is off. "walk-up · occasional" alone
@@ -3183,7 +3183,7 @@ function dsDriverSlice(board, routes, dayName, pickups) {
     var patBtn = myPerm.canEditStanding
       ? '<button class="cancel" id="cardPat" title="What this child does every week when FACTS is not the whole answer — e.g. bus Mon–Thu, car on Friday">Every week</button>'
       : '';
-    // The approved staff-kids list. Office, Admin and Walk-Up — the walk-up chaperone and the walk-up lead maintain it, and
+    // The approved staff-kids list. Office, Admin and Walk-Up — the walk-up chaperones maintain it, and
     // setWalker re-checks. The label says which it is, because a child ALREADY on the list and one
     // being added are the same form and the difference matters to the person tapping it.
     var wlkBtn = myPerm.canEditWalkUp
@@ -3445,7 +3445,7 @@ function dsDriverSlice(board, routes, dayName, pickups) {
       '<input class="patfrom" type="date" title="A date this row DOES apply on — it sets which week is which" value="' + esc(p.from || '') + '"></div>' +
       '</div>';
   }
-  /* ---------------- the approved walk-up list (the walk-up chaperone and the walk-up lead, 2026-09-22) ----------------
+  /* ---------------- the approved walk-up list (the walk-up chaperones, 2026-09-22) ----------------
    * Their permanent settings, which until now lived only in the Sheet. The dialog is deliberately
    * the CHILD'S NORMAL and says so: "for a one-off use Change instead", because the single most
    * likely mistake here is recording today's arrangement as a permanent one.

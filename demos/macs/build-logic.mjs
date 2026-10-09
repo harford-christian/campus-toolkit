@@ -25,7 +25,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
+import { aliasStaffNames, aliasPhrases, PHRASE_ALIASES } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SRC = path.resolve(HERE, '../../../macs-scheduling/secondary');
@@ -60,7 +60,7 @@ export function buildLogic() {
     body = body.replace(/\b[a-z]+@example\.edu\b/g, 'admin@example.edu');                     // the one real admin address
     body = body.replace(/https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec/g, 'https://example.invalid/macs-forms/exec');
     body = body.replace(/\b1[A-Za-z0-9_-]{30,}\b/g, 'DEMO_DRIVE_ID');                           // two Drive ids in strings
-    body = aliasStaffNames(body).text;
+    body = aliasStaffNames(aliasPhrases(body, PHRASE_ALIASES).text).text;
     return `/* ===== ${f} ===== */\n` + body;
   });
   return [

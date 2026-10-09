@@ -1,5 +1,5 @@
 {
-  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST (it vendors the server layer into logic.js and reads the name scrubs from THIS file), then: node tools/build-demo.mjs demos/transportation/build.json. The source Index.html is an Apps Script template FRAGMENT (no <head>): HtmlService wraps it in a document and doGet sets the title + viewport, so the first two replacements reproduce that wrapper — which is also where build-demo.mjs injects the demo shim (before </head>) and where logic.js is loaded. The SIM scriptlet is replaced with the same URL-parameter read and sanitiser doGet applies, so ?sim= still time-travels the board; presenceUrl points at the sibling Campus Presence demo. Staff first names and three family names in code comments are scrubbed to their roles or to the demo's fabricated people; the app's own JavaScript is otherwise untouched.",
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST (it vendors the server layer into logic.js and reads the name scrubs from THIS file), then: node tools/build-demo.mjs demos/transportation/build.json. The source Index.html is an Apps Script template FRAGMENT (no <head>): HtmlService wraps it in a document and doGet sets the title + viewport, so the first two replacements reproduce that wrapper — which is also where build-demo.mjs injects the demo shim (before </head>) and where logic.js is loaded. The SIM scriptlet is replaced with the same URL-parameter read and sanitiser doGet applies, so ?sim= still time-travels the board; presenceUrl points at the sibling Campus Presence demo. People named in the source comments (staff first names, a few family names) are replaced by nameAliases: keys are sha256 hashes of the lowercased word or phrase (up to three words), values the role or fabricated name that replaces it — so this public file never names anyone. build-logic.mjs applies the same table to the vendored server bundle.",
   "src": "../FACTS/transportation/Index.html",
   "dst": "demos/transportation/index.html",
   "includeDir": "../FACTS/transportation",
@@ -28,94 +28,30 @@
     [
       "var PRESENCE_URL = <?!= JSON.stringify(presenceUrl || '') ?>;",
       "var PRESENCE_URL = '../campus-presence/index.html';"
-    ],
-    [
-      "\"angela\", \"burge ang\" and \"Angela Burge\" all find \"Burge Angela\"",
-      "\"gina\", \"sowell gi\" and \"Gina Sowell\" all find \"Sowell Gina\""
-    ],
-    [
-      "Burge Angela",
-      "Sowell Gina"
-    ],
-    [
-      "Angela's",
-      "the ramp lead's"
-    ],
-    [
-      "Angela",
-      "the ramp lead"
-    ],
-    [
-      "Becky",
-      "the walk-up chaperone"
-    ],
-    [
-      "Charlie Huber",
-      "an older sibling"
-    ],
-    [
-      "Becky and Heather",
-      "the walk-up chaperones"
-    ],
-    [
-      "Heather and I",
-      "we"
-    ],
-    [
-      "Heather",
-      "the walk-up lead"
-    ],
-    [
-      "Coreen's",
-      "the office manager's"
-    ],
-    [
-      "Coreen",
-      "the office manager"
-    ],
-    [
-      "Jenni",
-      "the office"
-    ],
-    [
-      "Jen printed",
-      "the office printed"
-    ],
-    [
-      "the Boehm boys",
-      "the Marlowe children"
-    ],
-    [
-      "Boehm",
-      "Marlowe"
-    ],
-    [
-      "the Siverds",
-      "the Halvorsens"
-    ],
-    [
-      "Siverd",
-      "Halvorsen"
-    ],
-    [
-      "Kline Sarah",
-      "Sowell Gina"
-    ],
-    [
-      "\"Kline\"",
-      "\"Sowell\""
-    ],
-    [
-      "Renwick",
-      "Farrow"
-    ],
-    [
-      "Manogue",
-      "Marlowe"
-    ],
-    [
-      "Evelyn Hodgson's",
-      "one child's"
     ]
-  ]
+  ],
+  "nameAliases": {
+    "76a981126144db8b": "Sowell Gina",
+    "25adea4cb817ea12": "Gina Sowell",
+    "79a6a933dfc9b197": "the ramp lead",
+    "4a77d58e0b501a64": "Sowell",
+    "48c993f518e3e209": "the walk-up chaperones",
+    "7c4595aab3038012": "we",
+    "a0b7c245fab33446": "the walk-up lead",
+    "7904841598a49a87": "the walk-up chaperone",
+    "cbf8b8d229fa7fac": "an older sibling",
+    "29c935ee7ec55b55": "the office manager",
+    "d094a997ef61e6b0": "the office",
+    "c24762dad798ed1a": "the office",
+    "500936e647e5d179": "Marlowe",
+    "1318b84a35151999": "Halvorsens",
+    "38797be92acdf726": "Halvorsen",
+    "3b770466b86f0c54": "Sowell Gina",
+    "a70a16a8bc2d53c9": "Sowell",
+    "af6bc8e1f9324172": "Farrow",
+    "2088ce62d31b7678": "Marlowe",
+    "8778cb7673141054": "one child",
+    "ee685114ca255c47": "a child",
+    "44e5bf55761da563": "a child"
+  }
 }

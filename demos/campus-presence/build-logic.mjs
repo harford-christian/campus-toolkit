@@ -12,6 +12,7 @@
 // checked-in bundle can never quietly fall behind the source modules.
 import fs from 'node:fs';
 import path from 'node:path';
+import { aliasStaffNames, aliasPhrases, PHRASE_ALIASES } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
 const SRC = path.resolve(HERE, '../../../campus-sign-in-out-system/logic');
@@ -56,6 +57,7 @@ export function assemble(srcDir) {
       fs.readFileSync(path.join(srcDir, f), 'utf8').replace(/\r\n?/g, '\n');
   }
   for (const [find, repl] of SCRUB) out = out.replace(find, repl);
+  out = aliasStaffNames(aliasPhrases(out, PHRASE_ALIASES).text).text;   // people named in comments (hash-matched)
   return out;
 }
 

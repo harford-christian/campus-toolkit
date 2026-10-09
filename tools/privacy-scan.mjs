@@ -13,7 +13,7 @@
 // is there anything real in here?
 import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
-import { findStaffNames } from './staff-aliases.mjs';
+import { findStaffNames, findPhrases, PHRASE_ALIASES } from './staff-aliases.mjs';
 
 const ROOT = new URL('../demos/', import.meta.url).pathname.replace(/^\//, '');
 const SCANNABLE = /\.(js|mjs|html|json|css|md)$/;
@@ -73,6 +73,22 @@ for (const file of walk(ROOT)) {
     findings++;
     console.log(`LEAK  ${path.relative(ROOT, file)}:${i + 1}  real staff first name`);
     console.log('      -> rebuild; tools/staff-aliases.mjs replaces it with a role alias');
+  });
+}
+
+// Names a build scrubs through its own hashed table (build*.json nameAliases): none may remain anywhere.
+const PHRASES = Object.assign({}, PHRASE_ALIASES);
+for (const file of walk(ROOT)) {
+  if (!/build[^/\\]*\.json$/.test(file)) continue;
+  try { Object.assign(PHRASES, JSON.parse(readFileSync(file, 'utf8')).nameAliases || {}); } catch (e) { /* not a build config */ }
+}
+for (const file of walk(ROOT)) {
+  if (/data\.js$/.test(file)) continue;
+  readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+    if (!findPhrases(line, PHRASES, true).length) return;
+    findings++;
+    console.log(`LEAK  ${path.relative(ROOT, file)}:${i + 1}  a name from a build's nameAliases table`);
+    console.log('      -> rebuild; the build replaces it from its hashed table');
   });
 }
 

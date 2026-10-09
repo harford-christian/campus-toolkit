@@ -17,7 +17,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
+import { aliasStaffNames, aliasPhrases, PHRASE_ALIASES } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SRC = path.resolve(HERE, '../../../parent-teacher-conference-scheduling');
@@ -40,7 +40,7 @@ export function buildLogic() {
     let body = readFileSync(path.join(SRC, f), 'utf8').replace(/\r\n?/g, '\n');
     // Real staff first names in source comments become role aliases — the one deliberate
     // departure from verbatim (verify.mjs applies the same transform before comparing).
-    body = aliasStaffNames(body).text;
+    body = aliasStaffNames(aliasPhrases(body, PHRASE_ALIASES).text).text;
     return `/* ===== ${f} ===== */\n` + body;
   });
   return [

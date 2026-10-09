@@ -782,7 +782,7 @@ function dsComputeBoardBundle_(sim) {
   var attVals = dsReadTab_(stagingId, 'Attendance Today');
   var realToday = dsTodayKey_('');
   var attendance = dsBuildAttendance(attVals, realToday);
-  // Today's call-ins sit on top of the office's STANDING answers (the Marlowe children are car pickups
+  // Today's call-ins sit on top of the office's STANDING answers (the Marlowe boys are car pickups
   // whatever their mother's placement code says). Today wins for its student.
   var todayOverrides = dsBuildOverrides(dsReadTab_(dismissalId, OVERRIDES_TAB), dayKey);
   var dayName = dsDayName_(sim);
@@ -1446,7 +1446,7 @@ function dsWalkersSheet_(id) {
 /**
  * Rewrite ONE child's row on the approved walk-up list. Adds them if they are not on it.
  *
- * the walk-up chaperone and the walk-up lead, 2026-09-22: "Is this something that we can update (for a permanent
+ * the walk-up chaperones, 2026-09-22: "Is this something that we can update (for a permanent
  * change)?" It was not — every reference to this tab in the codebase was a read, so a frequency
  * change meant someone editing the Sheet by hand, and Lindsay Lindner's request to move Josie onto
  * the occasional list had nowhere to go.
@@ -2269,7 +2269,7 @@ var WALKERS_TAB = 'Walkers';
 // 'Only Days' is APPENDED at the end so dsEnsureColumns_ can add it to the live tab without
 // touching a single existing cell. Parsing is by header NAME, so a tab that has not been upgraded
 // yet simply reads it as blank — which means "every day", the behaviour it already had.
-// 'By', 'At' and 'Status' are APPENDED for the same reason (the walk-up chaperone and the walk-up lead, 2026-09-22): the
+// 'By', 'At' and 'Status' are APPENDED for the same reason (the walk-up chaperones, 2026-09-22): the
 // list is now editable from the card, so who changed it and when has to be answerable. Status is a
 // SOFT delete — BLANK MEANS ACTIVE, so all 30 seeded rows are untouched and a child taken off the
 // list can be put back. A hard delete of a row from an approved, signed list is not something a tap

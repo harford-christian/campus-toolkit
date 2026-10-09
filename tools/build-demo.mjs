@@ -5,7 +5,7 @@
 //        · strip control scriptlets <? ... ?> (keep inner content) · inject demo <head> block.
 import fs from 'node:fs';
 import path from 'node:path';
-import { aliasStaffNames, aliasEmailLocals } from './staff-aliases.mjs';
+import { aliasStaffNames, aliasEmailLocals, aliasPhrases, PHRASE_ALIASES } from './staff-aliases.mjs';
 
 const cfg = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 // Sources are read as LF whatever the checkout's line endings (a CRLF checkout must not change a build).
@@ -49,7 +49,10 @@ for (const [re, repl] of PRIVACY) {
 }
 if (scrubbed) console.log('  privacy scrub: replaced ' + scrubbed + ' real-world identifier(s)');
 
-// 2c. Real staff first names in source comments -> role aliases (hash-matched; see staff-aliases.mjs).
+// 2c. People named in source comments: the build's own hashed phrase table first (cfg.nameAliases), then the
+//     shared staff first-name aliases (hash-matched; see staff-aliases.mjs).
+{ const r = aliasPhrases(html, Object.assign({}, PHRASE_ALIASES, cfg.nameAliases || {})); html = r.text;
+  if (r.count) console.log('  name aliases: replaced ' + r.count + ' name(s) from this build\'s hashed table'); }
 { const r = aliasStaffNames(html); html = r.text;
   if (r.count) console.log('  staff aliases: replaced ' + r.count + ' staff name(s) with role aliases'); }
 { const r = aliasEmailLocals(html); html = r.text; if (r.count) console.log('  email aliases: replaced ' + r.count + ' staff mailbox(es) with role mailboxes'); }

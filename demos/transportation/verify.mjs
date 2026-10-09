@@ -16,7 +16,8 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
-import { buildLogic, SRC } from './build-logic.mjs';
+import { buildLogic, SRC, nameAliases } from './build-logic.mjs';
+import { findPhrases, findStaffNames } from '../../tools/staff-aliases.mjs';
 const require = createRequire(import.meta.url);
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -382,7 +383,8 @@ check('every literal $(id) in the page resolves to an element', missing.length =
 const all = html + logicJs + readFileSync(HERE + 'data.js', 'utf8') + readFileSync(HERE + 'mock.js', 'utf8');
 check('no real spreadsheet ids, deployment ids, urls or the real domain leaked', !/AKfycb|docs\.google\.com\/spreadsheets|1[A-Za-z0-9_-]{30,}|harfordchristian\.org/i.test(all));
 check('staff first names and real families in the source comments were scrubbed to their roles — page AND bundle',
-  !/Angela|Becky|Charlie Huber|Coreen|Jenni\b|Heather|Siverd|Boehm|Hodgson|Corrado|Manogue|Renwick|Kline/.test(all) &&
+  findPhrases(html + logicJs, nameAliases()).length === 0 && findStaffNames(html + logicJs).length === 0 &&   // built output only: data.js is fabricated
+  Object.keys(nameAliases()).length >= 20 &&
   /the ramp lead/.test(html) && /the walk-up chaperone/.test(html) && /the office manager/.test(logicJs) && !/NAME RESOLUTION, done once/.test(logicJs));
 check('every phone number in the dataset is a fictional 555 number', [...all.matchAll(/\b\d{3}-\d{3}-\d{4}\b/g)].every((m) => /^\d{3}-555-/.test(m[0])));
 

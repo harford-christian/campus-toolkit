@@ -16,7 +16,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { aliasStaffNames } from '../../tools/staff-aliases.mjs';
+import { aliasStaffNames, aliasPhrases, PHRASE_ALIASES } from '../../tools/staff-aliases.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(HERE, '../../../FACTS/transpo-department');
@@ -79,7 +79,7 @@ if (!existsSync(SRC)) {
     body = body.replace(
       /\(typeof module !== 'undefined' && module\.exports\)\s*\r?\n?\s*\? require\([^)]*\) : null/g,
       'null');
-    body = aliasStaffNames(body).text;              // build-logic.mjs applies the same transform
+    body = aliasStaffNames(aliasPhrases(body, PHRASE_ALIASES).text).text;              // build-logic.mjs applies the same transform
     // Compare on a whitespace-normalised basis so a line-ending flip is not reported as drift.
     const norm = (s) => s.replace(/\r\n/g, '\n').trim();
     if (!norm(logicJs).includes(norm(body))) drift.push(f);
