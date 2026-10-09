@@ -375,7 +375,11 @@
     "custom-forms/apps/chooser",
     "custom-forms/apps/runner-public",
     "custom-forms/apps/runner-staff",
-    "custom-forms/apps/runner-macs"
+    "custom-forms/apps/runner-macs",
+    "FACTS/transportation-kiosk",
+    "athletics/talon-hub/apps/fan",
+    "macs-scheduling/spelling_bee",
+    "macs-scheduling/creative_writing"
   ],
   "excludeDirs": [
     "apps-script-showcase",
