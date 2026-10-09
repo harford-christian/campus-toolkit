@@ -69,7 +69,7 @@
   .icbtn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; color: #fff; background: rgba(255,255,255,.1); }
   .who { color: var(--who); font-size: .8rem; display: flex; justify-content: space-between; align-items: center; min-height: 32px; gap: 8px; flex-wrap: wrap; }
   .who b { color: #fff; }
-  .who a { color: var(--gold); font-weight: 600; text-decoration: none; font-size: .78rem; min-height: 32px; display: inline-flex; align-items: center; }
+  .who a { color: var(--gold); font-weight: 600; text-decoration: none; font-size: .78rem; min-height: 44px; display: inline-flex; align-items: center; }
   .who .adm { background: var(--gold); color: var(--gold-ink); font-weight: 700; font-size: .68rem; padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
   nav.top { display: none; gap: 4px; margin-left: 18px; }
   nav.top button { color: #fff; font-weight: 600; font-size: .95rem; min-height: 44px; padding: 0 16px; border-radius: 10px; opacity: .8; }
@@ -96,7 +96,8 @@
 
   /* Long unbroken strings — a Quizlet URL in homework text, a full street address on a game — otherwise push
      the page wider than the screen, and Android then zooms the whole page out to fit. This is that bug. */
-  .ttl, .detail, .meta, .what, .where, .notice .b, .gname .n, .row .ttl { overflow-wrap: anywhere; word-break: break-word; }
+  .ttl, .detail, .meta, .what, .where, .notice .b, .gname .n, .row .ttl, .today .cls, .nm, .empty, .note { overflow-wrap: anywhere; word-break: break-word; }
+  .item > .txt { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }   /* whole row height is the tap target */
 
   .empty { padding: 22px 14px; color: var(--dt); font-size: .92rem; text-align: center; }
   .empty b { color: var(--dd); }
@@ -114,7 +115,7 @@
   /* ---- filters ---- */
   .chips { display: flex; gap: 6px; align-items: center; overflow-x: auto; padding: 2px 0; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
-  .chip { --c: #6b7280; font-size: .78rem; font-weight: 700; padding: 0 12px; border-radius: 999px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px;
+  .chip { --c: #6b7280; font-size: .78rem; font-weight: 700; padding: 0 12px; border-radius: 999px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
     background: color-mix(in srgb, var(--c) var(--chip-mix), var(--card)); color: color-mix(in srgb, var(--c) var(--chip-text-mix), white); border: 1px solid transparent; opacity: .7; }
   .chip.on { opacity: 1; border-color: color-mix(in srgb, var(--c) 60%, transparent); }
   .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
@@ -153,7 +154,7 @@
   /* "Email Mr Smith" on an opened item. 44px min-height is the house tap-target rule — this sits directly
      under body text on a phone and is easy to miss otherwise. */
   .mailto { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; margin-top: 8px; padding: 0 14px;
-    border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--dd);
     font-size: .82rem; font-weight: 600; text-decoration: none; }
   .mailto svg { flex: none; opacity: .75; }
   .detail small.addr { margin-top: 4px; font-size: .7rem; opacity: .8; user-select: all; }
@@ -264,7 +265,7 @@
   /* HOME / AWAY. Shown only when the coach stated it — an absent badge means "not stated", not "home". */
   .ha { display: inline-block; margin-top: 4px; font-size: .62rem; font-weight: 800; letter-spacing: .04em;
     padding: .15em .5em; border-radius: .6em; border: 1px solid var(--line); color: var(--dt); }
-  .ha.away { background: var(--seg); color: var(--ink); }
+  .ha.away { background: var(--seg); color: var(--dd); }
   .ha.home { background: var(--nowtag-bg); color: var(--nowtag-fg); border-color: transparent; }
   .game.off .team, .game.off .what { text-decoration: line-through; color: var(--done); }
   .game.off .where, .game.off .when { color: var(--done); }
@@ -276,12 +277,12 @@
   .pref .head .txt { flex: 1; min-width: 0; }
   .pref .head .ttl { font-size: .95rem; font-weight: 700; color: var(--dd); }
   .pref .head .meta { font-size: .76rem; color: var(--dt); margin-top: 1px; }
-  .toggle { min-width: 64px; min-height: 40px; border-radius: 999px; font-size: .78rem; font-weight: 800; padding: 0 14px; background: var(--up-bg); color: var(--up); border: 1px solid var(--card-border); flex: none; }
+  .toggle { min-width: 64px; min-height: 44px; border-radius: 999px; font-size: .78rem; font-weight: 800; padding: 0 14px; background: var(--up-bg); color: var(--up); border: 1px solid var(--card-border); flex: none; }
   .toggle.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
   .opt { display: flex; flex-direction: column; gap: 6px; }
   .optlabel { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--dt); }
   .pref .classes { display: flex; gap: 6px; flex-wrap: wrap; }
-  .pref .classes .chip { min-height: 40px; padding: 0 12px; font-size: .8rem; }
+  .pref .classes .chip { min-height: 44px; padding: 0 12px; font-size: .8rem; }
   .card.open > .mrow { border-bottom: 1px solid var(--line); }
   .savebar { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
   .savebar .status { flex: 1; }
@@ -487,6 +488,13 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     var so = e.target.closest('[data-sports-open]'); if (so) { S.sportsOpen = !S.sportsOpen; renderMore(); return; }
     var io = e.target.closest('[data-inbox-open]'); if (io) { S.inboxOpen = !S.inboxOpen; if (S.inboxOpen && !S.inbox) loadInbox(); renderMore(); return; }
     var ao = e.target.closest('[data-att-open]'); if (ao) { S.attendanceOpen = !S.attendanceOpen; if (S.attendanceOpen) loadAttendance(); renderMore(); return; }
+    var rt = e.target.closest('[data-retry]'); if (rt) {
+      var w = rt.getAttribute('data-retry');
+      if (w === 'grades') { S.d.grades = { pending: true }; S.gradesAsked = false; renderGrades(); }
+      else if (w === 'attendance') { S.attendance = null; S.attendanceAsked = false; loadAttendance(); renderMore(); }
+      else if (w === 'inbox') { S.inbox = null; loadInbox(); renderMore(); }
+      return;
+    }
     var nx = e.target.closest('[data-notice]'); if (nx) { var k = nx.getAttribute('data-notice'); S.openNotice[k] = !S.openNotice[k]; renderMore(); return; }
     var nd = e.target.closest('[data-nudge-dismiss]'); if (nd) { try { localStorage.setItem('hcsp-nudge', '1'); } catch (er) {} renderHomework(); return; }
     var ng = e.target.closest('[data-nudge-go]'); if (ng) { try { localStorage.setItem('hcsp-nudge', '1'); } catch (er2) {} S.notifOpen = true; renderMore(); show('more'); return; }
@@ -863,7 +871,8 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
       box.innerHTML = skeleton(4);
       return;
     }
-    if (g && g.failed) { box.innerHTML = '<div class="card"><div class="empty"><b>Could not load your grades.</b><br>Pull down to try again.</div></div>'; return; }
+    // "Pull down" never worked: overscroll-behavior-y:contain turns pull-to-refresh off, and the app sits in Google's iframe.
+    if (g && g.failed) { box.innerHTML = '<div class="card"><div class="empty"><b>Could not load your grades.</b><br>' + retryBtn('grades') + '</div></div>'; return; }
     if (!g.connected) { box.innerHTML = '<div class="card"><div class="empty"><b>Grades are not connected yet.</b><br>They arrive with the FACTS sync.</div></div>'; return; }
     var html = '';
     if (!g.classes.length) html += '<div class="card"><div class="empty">No classes found.</div></div>';
@@ -978,10 +987,13 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
   }
   function loadInbox() {
     google.script.run.withSuccessHandler(function (r) { S.inbox = r.notices || []; renderMore(); })
-      .withFailureHandler(function () { S.inbox = []; renderMore(); }).inboxApi(BOOT.asId || '');
+      .withFailureHandler(function () { S.inbox = { failed: true }; renderMore(); }).inboxApi(BOOT.asId || '');
   }
+  function retryBtn(what) { return '<button type="button" class="chip plain on" data-retry="' + what + '" style="margin-top:8px">Try again</button>'; }
   function inboxPanel() {
     if (!S.inbox) return '<div class="notice"><div class="m">Loading…</div></div>';
+    // A failed load must never read as an empty inbox.
+    if (S.inbox.failed) return '<div class="notice"><div class="m">Could not load your inbox. This is <b>not</b> "nothing sent".</div>' + retryBtn('inbox') + '</div>';
     if (!S.inbox.length) return '<div class="notice"><div class="m">Nothing sent yet. Emails you turn on under Notifications show up here too.</div></div>';
     return S.inbox.map(function (n, i) {
       var t = n.type === 'daily' ? 'Daily' : n.type === 'weekly' ? 'Weekly' : n.type === 'changes' ? 'Change' : n.type === 'tests' ? 'Test reminder' : n.type;
@@ -1012,7 +1024,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
   function attendancePanel() {
     var a = S.attendance;
     if (!a) return '<div class="notice"><div class="m">Loading…</div></div>';
-    if (a.failed || !a.connected) return '<div class="notice"><div class="m">Could not load your attendance. Pull down to try again.</div></div>';
+    if (a.failed || !a.connected) return '<div class="notice"><div class="m">Could not load your attendance.</div>' + retryBtn('attendance') + '</div>';
 
     /* "No record" means present — attendance at HCS is exception-only. But that is only true on a day the tab
        actually loaded, so a failed check says so instead of quietly reporting a clean day. */

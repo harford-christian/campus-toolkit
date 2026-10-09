@@ -199,6 +199,16 @@ input{-webkit-user-select:text;user-select:text;}
 }
 .plan-note .plan-sub{display:block;font-weight:600;color:var(--hcs-muted);font-size:.95rem;margin-top:5px;}
 
+/* THE 200-MINUTE LINE (Josh, 2026-10-08): the time the handbook requires a student to stay
+   until, shown only in the last 15 minutes before it. Warm, not red — it is information the
+   parent can act on, never a refusal, and it never blocks the sign-out. */
+.min-note{
+  background:var(--hcs-warn-bg);border:1px solid var(--hcs-warn-line);border-left:6px solid var(--hcs-warn);
+  border-radius:var(--hcs-radius,12px);padding:14px 16px;margin:0 0 10px;
+  font-size:1.05rem;font-weight:600;color:var(--hcs-ink);line-height:1.45;
+}
+.min-note b{font-weight:800;}
+
 .kp-error{color:var(--hcs-red);font-weight:700;text-align:center;min-height:26px;margin-top:10px;font-size:1rem;}
 .kp-error.warn{color:var(--hcs-warn);}
 
@@ -415,6 +425,8 @@ input{-webkit-user-select:text;user-select:text;}
   <section class="kiosk-screen" id="scr-student-menu">
     <h1 class="kiosk-h1">What do you need?</h1>
     <p class="kiosk-sub">Signing in as <b id="stuMenuWho">&hellip;</b> &mdash; tap Back if that isn&rsquo;t you.</p>
+    <!-- The 200-minute line, when the self sign-out button is offered inside its window. -->
+    <div class="min-note hidden" id="stuMenuNote" aria-live="polite"></div>
     <div class="role-grid" id="stuMenuBtns"></div>
     <div class="kp-error warn" id="stuMenuHint"></div>
     <div class="nav-row">
@@ -575,9 +587,14 @@ input{-webkit-user-select:text;user-select:text;}
            name is never shown: it is the exact string that passes the pickup
            check, so the adult still types their own and the check still runs. -->
       <div class="plan-note hidden" id="soutPlanned"></div>
+      <!-- THE 200-MINUTE LINE (Josh, 2026-10-08): in the last 15 minutes before the time the
+           handbook requires this student to stay until, say so. Information only — it never
+           blocks or delays the sign-out, and it names no one but the student already on screen. -->
+      <div class="min-note hidden" id="soutMinBanner" aria-live="polite"></div>
       <div class="hidden" id="soutSibsWrap">
         <div class="section-label">Also collecting — tap a name to leave them out</div>
         <div class="choice-grid" id="soutSibs"></div>
+        <div class="min-note hidden" id="soutSibsMin"></div>
       </div>
       <p class="kiosk-sub">Type <b>your own</b> first and last name. For student safety the authorized pickup list is never shown.</p>
       <label class="section-label" for="soutName">Your name</label>
@@ -1147,6 +1164,11 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     $('soutPlanned').innerHTML = '';
     $('soutSibsWrap').classList.add('hidden');
     $('soutSibs').innerHTML = '';
+    hideMinBanner('soutMinBanner');
+    hideMinBanner('soutSibsMin');
+    hideMinBanner('stuMenuNote');
+    stopMinTick();
+    if (flow) flow.minBanner = null;
   }
   function clearMoveInputs() {
     $('mvDestErr').textContent = ''; $('mvReasonErr').textContent = '';
@@ -1413,6 +1435,10 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     s.parentDriven = !!o.parentDriven;
 
     $('stuMenuWho').textContent = displayStudent(s.name, s.grade);
+    // The 200-minute line, only when the self sign-out button below is offered (the
+    // server computed it for exactly that case; it is null otherwise).
+    hideMinBanner('stuMenuNote');
+    if (o.banner && o.selfSignOut && !o.offCampus) showMinBanner('stuMenuNote', o.banner);
     $('stuMenuHint').textContent = o.parentDriven
       ? 'A grown-up has to sign you in or out — but you can still sign yourself between buildings.'
       : '';
@@ -1732,10 +1758,20 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
    * never lands at all, this screen behaves exactly as it always has.
    */
   function fetchPlanned(studentId) {
-    rawCall({ op: 'plannedFor', studentId: studentId }, function (res) {
-      if (!res || !res.ok || !res.planned) return;
+    var st = flow.student;
+    rawCall({ op: 'plannedFor', studentId: studentId, grade: st ? st.grade : '' }, function (res) {
+      if (!res || !res.ok) return;
       if (!flow.student || flow.student.id !== studentId) return;   // they moved on
       if (current !== 'sout-form') return;                          // …or left the screen
+      // The 200-minute line rides this answer. Shown now; hidden again if the reason
+      // tapped turns out to be a scheduled departure; gone the minute the line passes.
+      if (res.banner) {
+        flow.minBanner = res.banner;
+        showMinBanner('soutMinBanner', res.banner);
+        startMinTick('soutMinBanner', res.banner);
+        applyMinBannerReason();
+      }
+      if (!res.planned) return;
       flow.plan = res;
       var note = $('soutPlanned');
       note.innerHTML = 'Called ahead this morning' +
@@ -1784,6 +1820,73 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
       box.appendChild(b);
     });
     $('soutSibsWrap').classList.remove('hidden');
+    // Each child has their own line (a late sign-in, or the other bell); say the ones that are close.
+    var lines = list.map(minLineFor).filter(function (x) { return x; });
+    if (lines.length) {
+      $('soutSibsMin').innerHTML = lines.map(esc).join('<br>');
+      $('soutSibsMin').classList.remove('hidden');
+    }
+  }
+
+  // ====================================================================
+  // THE 200-MINUTE BANNER (Josh, 2026-10-08). The SERVER decides whether one
+  // shows and the time it names — the same rule, clock and schedule read the
+  // FACTS push uses (gas-shared/MinPresence.js) — so a parent is never told a
+  // time FACTS would then contradict. This page only renders it, keeps "It is
+  // h:mm" honest while the parent types (from the server's minute plus the
+  // seconds elapsed here, so a wrong iPad clock cannot move it), and hides it
+  // the minute the line passes. It never blocks anything.
+  // ====================================================================
+  var minTick = null, minLive = null;   // {elId, b, renderedAt}
+  function h12FromMin(m) {
+    var h = Math.floor(m / 60) % 24, mi = m % 60, hour = h % 12 || 12;
+    return hour + ':' + (mi < 10 ? '0' : '') + mi + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  function minNoteHtml(b, nowMin) {
+    return '<b>It is ' + esc(h12FromMin(nowMin)) + '.</b> ' + esc(b.body);
+  }
+  function showMinBanner(elId, b) {
+    var el = $(elId);
+    if (!el || !b) return;
+    el.innerHTML = minNoteHtml(b, b.nowMin);
+    el.classList.remove('hidden');
+  }
+  function hideMinBanner(elId) {
+    var el = $(elId);
+    if (!el) return;
+    el.classList.add('hidden');
+    el.innerHTML = '';
+  }
+  function stopMinTick() { clearInterval(minTick); minTick = null; minLive = null; }
+  function startMinTick(elId, b) {
+    stopMinTick();
+    minLive = { elId: elId, b: b, renderedAt: Date.now() };
+    minTick = setInterval(tickMinBanner, 30000);
+  }
+  function tickMinBanner() {
+    if (!minLive) return;
+    var nowMin = minLive.b.nowMin + Math.floor((Date.now() - minLive.renderedAt) / 60000);
+    if (nowMin >= minLive.b.thresholdMin) { hideMinBanner(minLive.elId); stopMinTick(); return; }
+    var el = $(minLive.elId);
+    if (el && !el.classList.contains('hidden')) el.innerHTML = minNoteHtml(minLive.b, nowMin);
+  }
+  // Work Release and Homeschool departures are the student's timetable and are
+  // never coded by the clock, so the line does not apply once such a reason is tapped.
+  function isScheduledReason(v) {
+    var r = String(v || '').split('—')[0].split(' - ')[0].trim().toLowerCase();
+    return r === 'work release' || r === 'homeschool';
+  }
+  function applyMinBannerReason() {
+    if (!flow || !flow.minBanner) return;
+    var el = $('soutMinBanner');
+    if (isScheduledReason(flow.sout && flow.sout.reason)) el.classList.add('hidden');
+    else if (!el.innerHTML) showMinBanner('soutMinBanner', flow.minBanner);
+    else el.classList.remove('hidden');
+  }
+  /** One short line for a sibling whose own line is close, or ''. */
+  function minLineFor(k) {
+    if (!k || !k.banner) return '';
+    return firstNameOf(k.name) + ' must stay until ' + k.banner.threshold + ' to be marked Early Departure.';
   }
 
   /** "A", "A and B", "A, B and C" — reads the way a person would say it. */
@@ -1831,9 +1934,10 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
         autoMs: 3500
       });
     } });
+    var minLines = sibs.map(minLineFor).filter(function (x) { return x; });
     showSplash({
       title: firstNameOf(leadName) + ' is signed out',
-      sub: 'Are you collecting anyone else today?',
+      sub: 'Are you collecting anyone else today?' + (minLines.length ? ' ' + minLines.join(' ') : ''),
       actions: acts,
       // Never leave a question on the screen for the next family: if nobody answers, the trip ends
       // with the one child already signed out, which is the safe outcome.
@@ -2373,7 +2477,10 @@ var URL_KEY = 'demo-device-key'; // production: the per-device key from Script P
     buildChoices('sinRelGrid', RELATIONSHIPS, function (v) { flow.guardian.relationship = v; });
     buildChoices('sinReasons', BOOT.reasons.late || [], function (v) { submitLateIn(v); });
     buildChoices('soutRelGrid', RELATIONSHIPS, function (v) { flow.sout.relationship = v; });
-    buildChoices('soutReasons', BOOT.reasons.dismissal || [], function (v) { flow.sout.reason = v; });
+    buildChoices('soutReasons', BOOT.reasons.dismissal || [], function (v) {
+      flow.sout.reason = v;
+      applyMinBannerReason();
+    });
     // Between buildings: every building is offered (the server rejects a move to
     // the student's own building, and the reason grid comes from settings).
     buildChoices('mvBuildings', BOOT.buildings || [], function (v) {

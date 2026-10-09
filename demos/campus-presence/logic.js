@@ -307,6 +307,11 @@ var SETTINGS_DEFAULTS = {
   // shape as factsfinder.url: Dismissal applies its OWN staff gate, we only point at
   // it. Blank hides the button; set it from Settings → Board (Josh, 2026-09-15).
   'dismissal.url': '',
+  // The 200-minute banner on student sign-out (Josh, 2026-10-08): in the last 15 minutes before
+  // the line the FACTS push uses (8:17 + any delay + 200 min, or a late sign-in + 200), the iPad,
+  // the self sign-out menu and the nurse's page say the time the policy requires. 'false' hides it
+  // everywhere — the switch to flip if the rule is ever in doubt (logic/schoolday.js).
+  'signout.banner.enabled': 'true',
   'kiosk.flows.enabled': JSON.stringify(['visitor', 'student_in', 'student_out']) // volunteer bolts on here later
 };
 

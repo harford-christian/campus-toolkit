@@ -12,7 +12,10 @@ import { createHash } from 'node:crypto';
 
 export const STAFF_ALIASES = {
   '2fa9eb130ea98eb6': 'Transportation Director 1',
-  '50aeda2d707b10d8': 'Transportation Director 2'
+  '50aeda2d707b10d8': 'Transportation Director 2',
+  '0bcf62b62f026b79': 'the Approver',
+  '29c935ee7ec55b55': 'the Office Manager',
+  '7904841598a49a87': 'Purchasing'
 };
 
 // Email LOCAL PARTS the same way: a few staff mailboxes appear in source pages (a change-notice list, say).

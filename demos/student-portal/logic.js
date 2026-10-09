@@ -1265,7 +1265,8 @@ var SchoolCal = (function () {
   // `non-?participa` covers "no school for non-participants" (2026 title) AND "no school for non-participating
   // students" (the 2027-03-12 title as it read live on 2026-10-08 — the office reworded it, and the narrower
   // pattern was listing that day CLOSED for everyone).
-  var PARTIAL = /non-?participa|except\b|participants only|grades? only/i;
+  // `non[-\s]?participa` also covers "Non participating students - no school" (space, not hyphen).
+  var PARTIAL = /non[-\s]?participa|except\b|participants only|grades? only/i;
   var CLOSED = /(school|offices?)[^.]*clos|clos[^.]*(school|offices?)|no school/i;
   var REVIEW = /holiday|break|vacation|closed|no class|recess/i;
 
@@ -1349,8 +1350,19 @@ var News = (function () {
     return name + ', ' + MON[d.getUTCMonth()] + ' ' + d.getUTCDate();
   }
 
-  /** The portal's HS band: FACTS grade levels 7-12 as text. */
-  function isHighSchool(grade) { return /^(7|8|9|10|11|12)$/.test(String(grade || '').trim()); }
+  /** The portal's HS band, 7-12. Tolerates "09" and "Grade 9"; anything with a K, PK or no number is not HS. */
+  function isHighSchool(grade) {
+    var s = String(grade || '').trim();
+    if (!s || /k/i.test(s)) return false;
+    var m = /(\d{1,2})/.exec(s);
+    var n = m ? Number(m[1]) : 0;
+    return n >= 7 && n <= 12;
+  }
+  /** Sort key for "which memo is newer": the send stamp when it is a real date, else the memo's week; then CreatedAt. */
+  function sentRank(r, weekOf) {
+    var sent = isoOf(r.EmailDate) ? String(r.EmailDate).trim() : (weekOf || '');
+    return sent + '|' + String(r.CreatedAt || '');
+  }
 
   /** Sheets turns a typed "8:35 AM" into a time value that reads back as "08:35:00" (seen live 2026-10-08).
    *  Accept that, bare 24h "13:20", or an already-labelled "8:35 AM"; always show "h:mm AM/PM". */
@@ -1406,8 +1418,10 @@ var News = (function () {
       if (todayIso < start || todayIso > end) return;
       var display = String(r.Display || '').trim();
       if (!no && !display) return;
-      var rank = String(r.EmailDate || '') + '|' + String(r.CreatedAt || '');
-      if (!best || rank > best.rank) best = { rank: rank, row: r, weekOf: weekOf, date: date, no: no, display: display };
+      /* EARLIEST week wins, latest-sent breaks a tie within that week (release review 2026-10-08). "Latest sent"
+         alone let next week's memo, sent on a Wednesday, hide this Thursday's chapel. */
+      var rank = sentRank(r, weekOf);
+      if (!best || weekOf < best.weekOf || (weekOf === best.weekOf && rank > best.rank)) best = { rank: rank, row: r, weekOf: weekOf, date: date, no: no, display: display };
     });
     if (!best) return null;
     if (best.no) return { kind: 'chapel', noChapel: true, title: 'No high school chapel this week', body: '', day: '', date: best.weekOf, display: '', time: '', isToday: false };
@@ -1436,9 +1450,15 @@ var News = (function () {
   /** MemoNotes rows → items live today. Kind decides the wording; a row with no Date or Title is skipped. */
   function memoItems(rows, todayIso) {
     var out = [];
+    /* A later memo for the same week REPLACES the earlier one's lines (release review 2026-10-08): a rescheduled
+       picture day must not show on both dates. */
+    var latest = {};
+    (rows || []).forEach(function (r) { var w = isoOf(r.WeekOf) || 'none', k = sentRank(r, isoOf(r.WeekOf)); if (!latest[w] || k > latest[w]) latest[w] = k; });
     (rows || []).forEach(function (r) {
+      var w0 = isoOf(r.WeekOf) || 'none';
+      if (sentRank(r, isoOf(r.WeekOf)).split('|')[0] !== latest[w0].split('|')[0]) return;
       var date = isoOf(r.Date), kind = String(r.Kind || '').trim().toLowerCase(), title = String(r.Title || '').trim();
-      if (!date || !title || !kind) return;
+      if (!date || !title || !kind || !isWeekday(date)) return;
       var sent = isoOf(r.EmailDate) || isoOf(r.WeekOf) || date;
       if (todayIso < sent || todayIso > date) return;
       var body = kind === 'exam' ? 'Exam schedule — check Schedule' : kind === 'spirit' ? 'Students may wear HCS spirit wear' : '';
@@ -1457,7 +1477,9 @@ var News = (function () {
     var o = opts || {};
     var today = isoOf(o.today);
     if (!today) return [];
-    var hs = !o.elementary && isHighSchool(o.grade);
+    /* The GRADE decides, not the page's `elementary` flag: that flag is also true for a 7-12 student with no period
+       patterns, who still goes to HS chapel (release review 2026-10-08). */
+    var hs = isHighSchool(o.grade);
     var horizon = addDays(today, o.horizonDays || 7);
     var closedDays = o.closedDays || {};
     var earlyDays = o.earlyDays || {};
@@ -1496,7 +1518,8 @@ var News = (function () {
       });
     }
     // Chapel — HS only.
-    if (hs) { var ch = pickChapel(o.chapelRows, today); if (ch) add(ch); }
+    // Chapel — HS only. A closed day beats it, like every other line.
+    if (hs) { var ch = pickChapel(o.chapelRows, today); if (ch && !(ch.date && byDate[ch.date] && byDate[ch.date].closed)) add(ch); }
     // Quarter ending within 14 days.
     if (o.quarter && o.quarter.q && isoOf(o.quarter.end)) {
       var last = isoOf(o.quarter.end), guard = 0;
@@ -1551,7 +1574,10 @@ function doGet(e) {
     serverTime: Utilities.formatDate(new Date(), TIMEZONE, 'EEE MMM d, yyyy h:mm a z')
   };
   t.boot = boot;
-  t.bootJson = JSON.stringify(boot).replace(/<\//g, '<\\/');
+  // Every '<' escaped (not just '</'): teacher text containing '<!--<script' would otherwise end the inline
+  // script block early and blank the page for that student (release review 2026-10-08). '<' only occurs inside
+  // JSON strings, where \u003c is the same character.
+  t.bootJson = JSON.stringify(boot).replace(/</g, '\\u003c');
 
   /* THE PAYLOAD RIDES WITH THE PAGE.
      The page used to load and then make a SECOND call to bootApi over google.script.run. That second call
@@ -1566,7 +1592,7 @@ function doGet(e) {
   t.dataJson = 'null';
   if (boot.ok) {
     try {
-      t.dataJson = JSON.stringify(bootApi(boot.asId, sim)).replace(/<\//g, '<\\/');
+      t.dataJson = JSON.stringify(bootApi(boot.asId, sim)).replace(/</g, '\\u003c');
     } catch (e) {
       Logger.log('inline boot payload failed for %s (page will fetch it instead): %s', boot.email, e);
     }
@@ -1686,18 +1712,33 @@ function newsFor_(payload, ctx) {
   if (!newsEnabled_()) return { enabled: false, items: [] };
   var items = [];
   try {
+    /* NOTHING here may fetch a calendar or call BellHub (release review 2026-10-08: a cold bundle walked ~10 BellHub
+       dates at 4.4 s each inside a student's page load). schoolNotes_ is a cache READ of the bundle the sync builds;
+       the closed days the due engine already uses (homework.noSchool, from Meta) cover a cache miss. */
     var notes = schoolNotes_(ctx.date);
+    var closed = {};
+    Object.keys((payload.homework && payload.homework.noSchool) || {}).forEach(function (d) { closed[d] = 'known'; });
+    Object.keys(notes.calClosed || {}).forEach(function (d) { closed[d] = notes.calClosed[d]; });
     items = News.build({
-      today: ctx.date, grade: payload.profile && payload.profile.grade, elementary: !!payload.elementary,
-      chapelRows: loadChapelRows_() || [], memoNotes: loadMemoNotes_() || [], closedDays: notes.closed, earlyDays: notes.early,
-      week: payload.schedule && payload.schedule.week, quarter: notes.quarter
+      today: ctx.date, grade: payload.profile && payload.profile.grade,
+      chapelRows: loadChapelRows_() || [], memoNotes: loadMemoNotes_() || [], closedDays: closed, earlyDays: notes.early || {},
+      week: payload.schedule && payload.schedule.week, quarter: quarterInfo_(ctx.date)
     });
   } catch (e) { Logger.log('news failed: %s', e); items = []; }
   return { enabled: true, items: items };
 }
 
+/** {q, end} for a date from QUARTER_DATES — pure arithmetic, no I/O. */
+function quarterInfo_(iso) {
+  var ranges = Sched.parseQuarterRanges(getQuarterDatesRaw_());
+  var q = Sched.quarterForDate(ranges, iso), end = '';
+  ranges.forEach(function (r) { if (r.q === q) end = r.end; });
+  return { q: q, end: end };
+}
+
 /** Editor check (Code.gs, Run menu): the Chapel rows the portal can see, and what the test student gets today. */
 function RUN_newsCheck() {
+  requireOperator_();
   var rows = loadChapelRows_();
   Logger.log('NEWS flag: %s · MEMO_CHECK_SHEET_ID set: %s · Chapel rows readable: %s', newsEnabled_() ? 'ON' : 'OFF',
              props_().getProperty(PROP_MEMO_SHEET_ID) ? 'yes' : 'NO', rows ? rows.length : 'NO (null)');
@@ -1706,12 +1747,14 @@ function RUN_newsCheck() {
   var memoNotes = loadMemoNotes_();
   Logger.log('MemoNotes rows readable: %s', memoNotes ? memoNotes.length : 'NO (null)');
   (memoNotes || []).forEach(function (r) { Logger.log('  %s | %s | %s %s | %s | sent %s', r.WeekOf, r.Kind, r.Day, r.Date, r.Title, r.EmailDate); });
-  var notes = schoolNotes_(today);
-  Logger.log('School notes (complete=%s): closed=%s early=%s quarter=%s', notes.complete, JSON.stringify(notes.closed), JSON.stringify(notes.early), JSON.stringify(notes.quarter));
+  var notes = schoolNotesBuild_(today);   // builds + caches the bundle, exactly as the sync does
+  var known = {}; String(((loadDataTabs_([]) || {}).meta || {}).noSchoolDays || '').split(',').forEach(function (d) { if (d) known[d] = 'known'; });
+  var closedAll = {}; Object.keys(known).forEach(function (d) { closedAll[d] = 'known'; }); Object.keys(notes.calClosed).forEach(function (d) { closedAll[d] = notes.calClosed[d]; });
+  Logger.log('School notes (complete=%s): calendar closed=%s early=%s quarter=%s · due-engine closed days=%s', notes.complete, JSON.stringify(notes.calClosed), JSON.stringify(notes.early), JSON.stringify(quarterInfo_(today)), Object.keys(known).length);
   var ctx = schedCtx_('');
   var week = {}; weekDates_(ctx.date, ctx.dow).forEach(function (d, i) { var b = bellsForDay_(d); week[String(i + 1)] = { date: d, bellMode: b.ok ? b.mode : '', closed: b.ok && b.closed && !!(b.source || b.mode) }; });
   Logger.log('This week bells: %s', JSON.stringify(week));
-  var base = { today: today, chapelRows: rows || [], memoNotes: memoNotes || [], closedDays: notes.closed, earlyDays: notes.early, week: week, quarter: notes.quarter };
+  var base = { today: today, chapelRows: rows || [], memoNotes: memoNotes || [], closedDays: closedAll, earlyDays: notes.early, week: week, quarter: quarterInfo_(today) };
   Logger.log('Today %s → grade 9 student would see:', today);
   News.build(Object.assign({ grade: '9', elementary: false }, base)).forEach(function (it) { Logger.log('   [%s] %s — %s%s', it.kind, it.title, it.body, it.isToday ? '  (TODAY)' : ''); });
   Logger.log('Today %s → grade 4 student would see:', today);
@@ -1920,7 +1963,10 @@ function homeworkPayload_(who, classList, todayIso, data) {
   });
   // NOTE: `data` is deliberately NOT returned. It is the whole school's gradebook; returning it once shipped
   // every student's scores to every student's browser. Callers that need it pass it in.
-  return { connected: true, items: out, today: today, meta: data.meta, noSchool: noSchoolMap };
+  // Only the two Meta fields the page shows. The whole tab carried lastError (up to 200 chars of a FACTS error
+  // body), request counts and ids to every student (release review 2026-10-08).
+  var m = data.meta || {};
+  return { connected: true, items: out, today: today, meta: { lastSyncAt: m.lastSyncAt || '', lastSyncOk: m.lastSyncOk || '' }, noSchool: noSchoolMap };
 }
 
 /**
@@ -2774,7 +2820,10 @@ function projectTab_(values, keep, dedupeBy) {
   if (!keep || !values.length) return values;
   var header = values[0].map(function (h) { return Sched.cellToString(h).trim(); });
   var cols = keep.map(function (name) { return header.indexOf(name); }).filter(function (i) { return i !== -1; });
-  if (!cols.length) return values;
+  /* None of the wanted headers exists: return the header row only, never every column (release review
+     2026-10-08). The old fallback cached whole tabs — guardian contacts, or memo text — whenever a source
+     renamed its headers. An empty result is loud on screen; a silent over-share is not. */
+  if (!cols.length) { Logger.log('projectTab_: none of %s found — returning no rows', JSON.stringify(keep)); return [values[0]]; }
   var dedupeCol = dedupeBy ? header.indexOf(dedupeBy) : -1;
   var out = [cols.map(function (i) { return header[i]; })];
   var seen = {};
@@ -2865,19 +2914,26 @@ function loadMemoTab_(tabName, keep) {
   var id = props_().getProperty(PROP_MEMO_SHEET_ID) || '';
   if (!id) return null;
   var cache = CacheService.getScriptCache();
-  var key = 'memotab_' + APP_VERSION + '_' + tabName;
+  // Keyed on the sheet id too, so pointing MEMO_CHECK_SHEET_ID elsewhere takes effect at once.
+  var key = 'memotab_' + APP_VERSION + '_' + id.slice(-10) + '_' + tabName;
   var hit = cacheGetChunked_(cache, key);
-  if (hit) return JSON.parse(hit);
-  var rows;
+  if (hit) return JSON.parse(hit);   // may be the cached 'null' below
+  var rows = null;
   try {
     var sh = SpreadsheetApp.openById(id).getSheetByName(tabName);
-    if (!sh) return null;
-    rows = objectsFromValues_(projectTab_(sh.getDataRange().getValues(), keep, ''));
+    var values = sh ? sh.getDataRange().getValues() : [];
+    var header = values.length ? values[0].map(function (h) { return String(h).trim(); }) : [];
+    var missing = keep.filter(function (k) { return header.indexOf(k) === -1; });
+    // Every expected column must be there; otherwise refuse the tab rather than guess at a changed layout.
+    if (!sh) Logger.log('%s tab not found in the memo-check sheet', tabName);
+    else if (missing.length) Logger.log('%s tab is missing columns %s — not loaded', tabName, missing.join(', '));
+    else rows = objectsFromValues_(projectTab_(values, keep, ''));
   } catch (e) {
     Logger.log('%s tab unavailable: %s', tabName, e);
-    return null;
   }
-  cachePutChunked_(cache, key, JSON.stringify(rows), CHAPEL_TTL_SECS);
+  /* A failure is cached for 10 minutes. Uncached, every page load re-opened the sheet (0.5-1.5 s) for as long as
+     the tab was missing or access was lost (release review 2026-10-08). The card shows nothing meanwhile. */
+  cachePutChunked_(cache, key, JSON.stringify(rows), rows === null ? 600 : CHAPEL_TTL_SECS);
   return rows;
 }
 
@@ -3360,23 +3416,32 @@ function calendarEarlyDays_(fromIso, toIso) {
  * when a source could not be read the bundle is cached for 10 minutes only and that source is simply empty —
  * the card then omits those lines rather than asserting a quiet week.
  */
+/* REQUEST PATH: a cache read only, never a fetch (release review 2026-10-08). The first version built the bundle on a
+   page load and walked ~10 cold BellHub dates (4.4 s each) whenever its 6-hour entry expired mid-day. */
 function schoolNotes_(todayIso) {
-  var cache = CacheService.getScriptCache();
-  var key = 'notes_' + APP_VERSION + '_' + todayIso;
-  var hit = cache.get(key);
+  var hit = null;
+  try { hit = CacheService.getScriptCache().get(schoolNotesKey_(todayIso)); } catch (e) { hit = null; }
   if (hit) return JSON.parse(hit);
-  var to = Due.addDays(todayIso, 21);
-  var closed = {}, complete = true;
-  try { var ns = noSchoolDaysCached_(todayIso, to); closed = ns.days || {}; complete = !!ns.complete; }
-  catch (e) { Logger.log('notes: no-school union failed: %s', e); complete = false; }
-  var early = null;
+  return { calClosed: {}, early: {}, complete: false, missing: true };   // the caller still has the due engine's closed days
+}
+function schoolNotesKey_(todayIso) { return 'notes_' + APP_VERSION + '_' + todayIso; }
+
+/* SYNC PATH (warmCaches_, every 30 min): the school calendar's closed and early-dismissal days for the next 14 days.
+   One .ics read, cached 1 h by schoolCalendarIcs_, so a snow day the office posts reaches the card within ~90 min.
+   BellHub closures are not re-walked here: the due engine's Meta list (daily) and this week's bells already have them.
+   Cached 45 min, so a stopped sync lets it lapse instead of serving a stale week. */
+function schoolNotesBuild_(todayIso) {
+  var to = Due.addDays(todayIso, 14);
+  var calClosed = {}, early = null, complete = true;
+  try {
+    var c = calendarClosedDays_(todayIso, to);
+    if (c === null) complete = false;
+    else Object.keys(c).forEach(function (d) { calClosed[d] = 'calendar:' + String(c[d]).split('  [')[0]; });
+  } catch (e) { Logger.log('notes: calendar closures failed: %s', e); complete = false; }
   try { early = calendarEarlyDays_(todayIso, to); } catch (e2) { Logger.log('notes: early-dismissal read failed: %s', e2); }
   if (early === null) complete = false;
-  var ranges = Sched.parseQuarterRanges(getQuarterDatesRaw_());
-  var q = Sched.quarterForDate(ranges, todayIso), end = '';
-  ranges.forEach(function (r) { if (r.q === q) end = r.end; });
-  var out = { closed: closed, early: early || {}, quarter: { q: q, end: end }, complete: complete };
-  try { cache.put(key, JSON.stringify(out), complete ? 21600 : 600); } catch (e3) { /* a failed cache write just means a re-read */ }
+  var out = { calClosed: calClosed, early: early || {}, complete: complete };
+  try { CacheService.getScriptCache().put(schoolNotesKey_(todayIso), JSON.stringify(out), complete ? 2700 : 600); } catch (e3) { /* next sync retries */ }
   return out;
 }
 

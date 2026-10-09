@@ -14,7 +14,9 @@ let html = lf(fs.readFileSync(cfg.src, 'utf8'));
 
 // 1. Inline includes (one pass; door's includes don't nest).
 if (cfg.includeDir) {
-  html = html.replace(/<\?!=\s*include\('([^']+)'\)\s*;?\s*\?>/g, (_m, name) => {
+  // Both spellings the projects use: include('X') and HtmlService.createHtmlOutputFromFile('X').getContent().
+  html = html.replace(/<\?!=\s*(?:include\('([^']+)'\)|HtmlService\.createHtmlOutputFromFile\('([^']+)'\)\.getContent\(\))\s*;?\s*\?>/g, (_m, a, c) => {
+    const name = a || c;
     const p = path.join(cfg.includeDir, name + '.html');
     return lf(fs.readFileSync(p, 'utf8'));
   });
