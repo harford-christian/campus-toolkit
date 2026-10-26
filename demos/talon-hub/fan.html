@@ -699,7 +699,11 @@ var Sports = (function () {
       drillCategories: ['Warm-up', 'Shooting', 'Ball-handling', 'Passing', 'Defense', 'Rebounding', 'Transition', 'Set plays', 'Conditioning'],
       practiceTimerMode: 'linear', eventShape: 'single-opponent', tryoutSeed: 'basketball',
       defaultTryouts: true, // runs formal cut-downs (all-sports rollout, Josh 2026-07-22)
-      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+      // gameLive OFF by default: HCS basketball keeps the official scorebook on
+      // paper (exchanged and signed with the other team), so the live pad is not
+      // their tool (Josh, 2026-10-24). A team can still turn the Game Day pack on
+      // in Team settings; this only sets the default for teams without one.
+      modules: { tryouts: true, practices: true, gameLive: false, scoreboard: true, travel: true }
     },
     volleyball: {
       key: 'volleyball', name: 'Volleyball', landingTab: 'stats',
@@ -788,6 +792,12 @@ var Sports = (function () {
 
   function keyFor(code) { return ALIAS[String(code || '').toUpperCase()] || 'generic'; }
 
+  // Sports whose coaches and families have moved to Talon Hub v2 (Josh, 2026-10-25:
+  // basketball first). The Beta's automatic family mail skips them, so no parent is
+  // sent back to the Beta; v2 sends its own. Spring sports join by adding a key here.
+  var MOVED_TO_V2 = { basketball: true };
+  function movedToV2(code) { return MOVED_TO_V2[keyFor(code)] === true; }
+
   /** Do two sport codes denote the SAME sport? Same canonical family (BSOC≡GSOC≡SOC
    *  all soccer), but the catch-all 'generic' family requires an EXACT code match so
    *  distinct un-blueprinted sports (e.g. FF vs FB) never conflate. */
@@ -834,7 +844,7 @@ var Sports = (function () {
   /** The alias map (code → family) — the wizard's sport dropdown source. */
   function codes() { return JSON.parse(JSON.stringify(ALIAS)); }
 
-  return { get: get, resolve: resolve, list: list, codes: codes, keyFor: keyFor, same: same };
+  return { get: get, resolve: resolve, list: list, codes: codes, keyFor: keyFor, same: same, movedToV2: movedToV2 };
 })();
 
 if (typeof module !== 'undefined') module.exports = Sports;

@@ -199,6 +199,10 @@
   .sp-sm { margin-left: auto; color: var(--hcs-muted); font-size: 0.8rem; text-align: right; padding-left: 10px; }
   .sp-checked { padding: 6px 18px 16px; color: var(--hcs-muted); font-size: 0.72rem; }
   .sp-empty { padding: 14px 0; color: var(--hcs-muted); }
+  .sp-linkrow { padding: 4px 18px 0; }
+  .sp-dash { display: inline-block; background: var(--hcs-red); color: #fff; text-decoration: none; font-weight: 700;
+    font-size: 0.84rem; padding: 8px 14px; border-radius: 9px; }
+  .sp-dash:hover { background: #8f1b1b; }
 
   @media (max-width: 720px) {
     .panel { grid-template-columns: 1fr; }
@@ -250,6 +254,7 @@
     </div>
     <div id="sp-status" class="sp-statusline"></div>
     <div id="sp-body" class="sp-list"></div>
+    <div id="sp-link" class="sp-linkrow"></div>
     <div id="sp-checked" class="sp-checked"></div>
   </div>
 </div>
@@ -293,6 +298,7 @@
     return '<div class="railcat">Sensors</div><div class="sum">' +
         monRow('&#128167;', 'Water Leak', _mon.leak, 'leak') +
         monRow('&#129482;', 'Fridge / Freezer', _mon.fridge, 'fridge') +
+        monWaterRow() +
       '</div>' +
       (_mon.checkedAt ? '<div class="mon-sub" style="margin-top:9px">Checked ' + esc(monAgo(_mon.checkedAt)) + '</div>' : '');
   }
@@ -309,11 +315,29 @@
       '<div class="val">' + val + '</div>' + sub + '</div></div>';
   }
 
+  // Water — month-to-date gallons across all meters (Campus Monitoring roll-up). Info only, never an alert.
+  // Hidden until the Campus Monitoring history log is running (roll-up has no `water` key before then).
+  function monWaterRow() {
+    var w = _mon && _mon.water;
+    if (!w || !w.meters) return '';
+    var sub = w.meters.map(function(m) { return esc(monShortMeter(m.name)) + ' ' + Number(m.mtdGal || 0).toLocaleString(); }).join(' &middot; ');
+    return '<div class="sumrow mon-click" role="button" tabindex="0" onclick="openSensor(\'water\')">' +
+      '<div class="ic">&#128688;</div>' +
+      '<div style="flex:1"><div class="lab">Water Use &middot; ' + esc(w.monthLabel || 'This month') + '<span class="mon-view">view</span></div>' +
+      '<div class="val">' + Number(w.totalGal || 0).toLocaleString() + ' gal</div>' +
+      (sub ? '<div class="mon-sub">' + sub + '</div>' : '') + '</div></div>';
+  }
+  function monShortMeter(n) { return String(n).replace(/\s*water\s*meter(\s*controller)?/i, '').trim() || n; }
+
   // Click-popup listing every device in the category (alerts first), fed by the roll-up's `devices` list.
   // Falls back to the alerting names if an older roll-up (no devices list) is still in the sheet.
   function openSensor(key) {
     if (!_mon || !_mon.available) return;
     var r = _mon[key]; if (!r) return;
+    var link = document.getElementById('sp-link');
+    link.innerHTML = _mon.dashboardUrl
+      ? '<a class="sp-dash" href="' + esc(_mon.dashboardUrl + '/' + key) + '" target="_blank" rel="noopener">Open full dashboard &rarr;</a>' : '';
+    if (key === 'water') return openWater(r);
     var meta = (key === 'leak')
       ? { icon: '&#128167;', title: 'Water Leak' }
       : { icon: '&#129482;', title: 'Fridge / Freezer' };
@@ -335,6 +359,19 @@
       : '<span class="sp-badge sp-badge-ok">All Normal</span>';
     document.getElementById('sp-body').innerHTML = rows;
     document.getElementById('sp-checked').textContent = _mon.checkedAt ? ('Checked ' + monAgo(_mon.checkedAt)) : '';
+    document.getElementById('sensor-popup').style.display = 'flex';
+  }
+  function openWater(w) {
+    var rows = (w.meters || []).map(function(m) {
+      return '<div class="sp-row sp-ok"><span class="sp-dot"></span><span class="sp-nm">' + esc(m.name) + '</span>' +
+        '<span class="sp-sm">' + Number(m.mtdGal || 0).toLocaleString() + ' gal this month<br>' +
+        Number(m.todayGal || 0).toLocaleString() + ' today' + (m.flowing ? ' &middot; flowing now' : '') + '</span></div>';
+    }).join('') || '<div class="sp-empty">No meters reported.</div>';
+    document.getElementById('sp-title').innerHTML = '&#128688; Water Use';
+    document.getElementById('sp-status').innerHTML = '<span class="sp-badge sp-badge-ok">' +
+      Number(w.totalGal || 0).toLocaleString() + ' gal &middot; ' + esc(w.monthLabel || 'this month') + '</span>';
+    document.getElementById('sp-body').innerHTML = rows;
+    document.getElementById('sp-checked').textContent = w.asOf ? ('Updated ' + monAgo(w.asOf)) : '';
     document.getElementById('sensor-popup').style.display = 'flex';
   }
   function closeSensor() { document.getElementById('sensor-popup').style.display = 'none'; }

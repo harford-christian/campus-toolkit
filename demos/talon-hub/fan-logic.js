@@ -64,7 +64,10 @@ var SCHEMA = {
       { name: 'GuardiansJson', tier: 'STAFF' }, // [{name,email,household}] merged across FACTS rows
       { name: 'SourceRows', tier: 'STAFF' },
       { name: 'ImportedAt', tier: 'SYSTEM' },
-      { name: 'Gender', tier: 'STAFF' } // from FACTS; gender-filters parent-recovered players onto gendered teams (append-at-end for the additive migration)
+      { name: 'Gender', tier: 'STAFF' }, // from FACTS; gender-filters parent-recovered players onto gendered teams (append-at-end for the additive migration)
+      // 'Y' when FACTS files the student as homeschool (facts-api-sync Homeschool column, 2026-10-09). STAFF only:
+      // enrollment status is never sent to parents/students/fans. Append-at-end; run RUN_addMissingColumns once.
+      { name: 'Homeschool', tier: 'STAFF' }
     ]
   },
 
@@ -1323,6 +1326,27 @@ var SCHEMA = {
       { name: 'CreatedAt', tier: 'SYSTEM' }
     ]
   },
+  // Redundant per-DEVICE copy of a live soccer game (2026-10-10). Every pad sync
+  // stores that phone's FULL play list + clock here, independent of GAME_EVENT, so
+  // (a) a second phone can take over a game mid-match with the right clock, and
+  // (b) finalize/recovery can rebuild from any phone's last copy even if single
+  // GAME_EVENT writes were lost. Single writer = staff. STAFF-only.
+  GAME_SNAPSHOT: {
+    key: ['EventID', 'DeviceID'],
+    rowScope: 'staff',
+    cols: [
+      { name: 'EventID', tier: 'STAFF' },
+      { name: 'DeviceID', tier: 'STAFF' },     // random per-phone id (localStorage)
+      { name: 'TeamID', tier: 'STAFF' },
+      { name: 'EventsJson', tier: 'STAFF' },   // SoccerLive.encodeEvents(...) — compact rows
+      { name: 'ClockJson', tier: 'STAFF' },    // LiveTimer state at the sync
+      { name: 'MetaJson', tier: 'STAFF' },     // {segments, otMin, keeper, halfMin, status}
+      { name: 'Count', tier: 'STAFF' },        // # plays in EventsJson
+      { name: 'UpdatedBy', tier: 'STAFF' },
+      { name: 'UpdatedAt', tier: 'SYSTEM' },
+      { name: 'UpdatedAtMs', tier: 'SYSTEM' }  // epoch ms — newest copy wins for the clock
+    ]
+  },
   // Depth chart / lineup (FS-C) — coach-built, but athlete-scoped so a student
   // sees ONLY their own position/role in the student app. One row per (team,
   // athlete). Coach sees the whole chart via staff read-scoping.
@@ -1667,7 +1691,8 @@ var Labels = (function () {
     BASE: 'Baseball', SOFT: 'Softball', VB: 'Volleyball', VOLL: 'Volleyball',
     XC: 'Cross-Country', GOLF: 'Golf', FF: 'Flag Football', FB: 'Football'
   };
-  var LEVEL = { V: 'Varsity', JV: 'JV', MS: 'Middle School' };
+  // MSD = a middle-school developmental (B) team beside the MS (A) team (Boys MS basketball, 2026-10-26).
+  var LEVEL = { V: 'Varsity', JV: 'JV', MS: 'Middle School', MSD: 'Middle School Developmental' };
 
   // Sport code → sprite symbol id (mirrors the GLYPH map in ui/Theme.html;
   // keep the two in sync — the labels.test.js lock guards this side).
@@ -1677,7 +1702,7 @@ var Labels = (function () {
     VB: 'sp-volleyball', VOLL: 'sp-volleyball', BASE: 'sp-baseball', SOFT: 'sp-softball',
     XC: 'sp-xc', GOLF: 'sp-golf', FF: 'sp-football', FB: 'sp-football'
   };
-  var LEVEL_LETTER = { V: 'V', JV: 'JV', MS: 'MS' };
+  var LEVEL_LETTER = { V: 'V', JV: 'JV', MS: 'MS', MSD: 'MSD' };
 
   function sportName(code) { return SPORT[String(code).toUpperCase()] || String(code || ''); }
   function levelName(l) { return LEVEL[String(l).toUpperCase()] || String(l || ''); }

@@ -474,7 +474,8 @@ var FactsLogic = (function () {
    */
   var COLS = {
     sheet1: { studentId: 0, name: 1, studentEmail: 2, status: 3, grade: 4,
-              guardianName: 5, guardianEmail1: 6, guardianEmail2: 7, homeroom: 8, homeroomTeacher: 9, gender: 10 },
+              guardianName: 5, guardianEmail1: 6, guardianEmail2: 7, homeroom: 8, homeroomTeacher: 9, gender: 10,
+              homeschool: 12 }, // 'Homeschool' (Y/blank) appended by facts-api-sync 2026-10-09 (after Locker)
     schedules: { studentId: 0, studentName: 1, grade: 2, classCode: 3,
                  classDescription: 4, category: 5, teacher: 6, quarters: 7 },
     teachers: { staffId: 0, teacherName: 1 },
@@ -490,7 +491,8 @@ var FactsLogic = (function () {
       grade: ['grade level', 'grade'],
       guardianName: ['lastname firstname 1', 'contact name', 'parent name', 'guardian name'],
       guardianEmail1: ['email 1', 'email1'], guardianEmail2: ['email2', 'email 2'],
-      homeroom: ['homeroom'], homeroomTeacher: ['homeroom teacher'], gender: ['gender']
+      homeroom: ['homeroom'], homeroomTeacher: ['homeroom teacher'], gender: ['gender'],
+      homeschool: ['homeschool']
     },
     schedules: {
       studentId: ['student id (system)', 'student id', 'studentid'],
@@ -549,6 +551,7 @@ var FactsLogic = (function () {
       studentEmail: String(cells[idx.studentEmail] || '').trim().toLowerCase(),
       homeroom: String(cells[idx.homeroom] || '').trim(),
       homeroomTeacher: String(cells[idx.homeroomTeacher] || '').trim(),
+      homeschool: String(cells[idx.homeschool] || '').trim().toUpperCase() === 'Y',
       guardians: guardians
     };
   }
@@ -574,7 +577,8 @@ var FactsLogic = (function () {
       var e = byId[rec.studentId];
       if (!e) e = byId[rec.studentId] = { studentId: rec.studentId, last: rec.last, first: rec.first,
         grade: rec.grade, studentEmail: rec.studentEmail, homeroom: rec.homeroom,
-        homeroomTeacher: rec.homeroomTeacher, guardians: [], _seen: {} };
+        homeroomTeacher: rec.homeroomTeacher, homeschool: !!rec.homeschool, guardians: [], _seen: {} };
+      if (rec.homeschool) e.homeschool = true;
       if (!e.studentEmail && rec.studentEmail) e.studentEmail = rec.studentEmail;
       if (!e.homeroom && rec.homeroom) e.homeroom = rec.homeroom;
       if (!e.homeroomTeacher && rec.homeroomTeacher) e.homeroomTeacher = rec.homeroomTeacher;
@@ -595,12 +599,12 @@ var FactsLogic = (function () {
     entries.forEach(function (e) {
       if (!e.guardians.length) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, '', '', 0]);
+          e.homeroom, e.homeroomTeacher, '', '', 0, e.homeschool ? 'Y' : '']);
         return;
       }
       e.guardians.forEach(function (g, i) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1]);
+          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1, e.homeschool ? 'Y' : '']);
       });
     });
     return rows;
@@ -714,7 +718,8 @@ var FactsLogic = (function () {
       if (String(r[9]).trim().toLowerCase() !== norm) return; // GuardianEmail col
       var id = r[0];
       if (!byId[id]) byId[id] = { studentId: r[0], last: r[1], first: r[2], displayName: r[3],
-        grade: r[4], studentEmail: r[5], homeroom: r[6], homeroomTeacher: r[7] };
+        grade: r[4], studentEmail: r[5], homeroom: r[6], homeroomTeacher: r[7],
+        homeschool: String(r[11] || '').trim().toUpperCase() === 'Y' }; // r[11] absent on an old 11-col sheet
     });
     return Object.keys(byId).map(function (id) { return byId[id]; });
   }
@@ -1292,7 +1297,7 @@ var SYS_HEADERS = {
     'IsTemplate', 'TemplateScope', 'LayoutLock', 'Category', 'IconUrl', 'Notes',
     'ClassCode', 'ClassTeacher', 'CloseDate'],
   FACTS_Directory: ['StudentId', 'Last', 'First', 'DisplayName', 'Grade', 'StudentEmail',
-    'Homeroom', 'HomeroomTeacher', 'GuardianName', 'GuardianEmail', 'GuardianSlot'],
+    'Homeroom', 'HomeroomTeacher', 'GuardianName', 'GuardianEmail', 'GuardianSlot', 'Homeschool'],
   FACTS_Classes: ['StudentId', 'ClassCode', 'ClassDescription', 'Category', 'Teacher'],
   FACTS_Staff: ['Email', 'TeacherName'],
   Approval_Groups: ['GroupName', 'MemberEmails', 'Notes'],
@@ -3121,7 +3126,8 @@ var FactsLogic = (function () {
    */
   var COLS = {
     sheet1: { studentId: 0, name: 1, studentEmail: 2, status: 3, grade: 4,
-              guardianName: 5, guardianEmail1: 6, guardianEmail2: 7, homeroom: 8, homeroomTeacher: 9, gender: 10 },
+              guardianName: 5, guardianEmail1: 6, guardianEmail2: 7, homeroom: 8, homeroomTeacher: 9, gender: 10,
+              homeschool: 12 }, // 'Homeschool' (Y/blank) appended by facts-api-sync 2026-10-09 (after Locker)
     schedules: { studentId: 0, studentName: 1, grade: 2, classCode: 3,
                  classDescription: 4, category: 5, teacher: 6, quarters: 7 },
     teachers: { staffId: 0, teacherName: 1 },
@@ -3137,7 +3143,8 @@ var FactsLogic = (function () {
       grade: ['grade level', 'grade'],
       guardianName: ['lastname firstname 1', 'contact name', 'parent name', 'guardian name'],
       guardianEmail1: ['email 1', 'email1'], guardianEmail2: ['email2', 'email 2'],
-      homeroom: ['homeroom'], homeroomTeacher: ['homeroom teacher'], gender: ['gender']
+      homeroom: ['homeroom'], homeroomTeacher: ['homeroom teacher'], gender: ['gender'],
+      homeschool: ['homeschool']
     },
     schedules: {
       studentId: ['student id (system)', 'student id', 'studentid'],
@@ -3196,6 +3203,7 @@ var FactsLogic = (function () {
       studentEmail: String(cells[idx.studentEmail] || '').trim().toLowerCase(),
       homeroom: String(cells[idx.homeroom] || '').trim(),
       homeroomTeacher: String(cells[idx.homeroomTeacher] || '').trim(),
+      homeschool: String(cells[idx.homeschool] || '').trim().toUpperCase() === 'Y',
       guardians: guardians
     };
   }
@@ -3221,7 +3229,8 @@ var FactsLogic = (function () {
       var e = byId[rec.studentId];
       if (!e) e = byId[rec.studentId] = { studentId: rec.studentId, last: rec.last, first: rec.first,
         grade: rec.grade, studentEmail: rec.studentEmail, homeroom: rec.homeroom,
-        homeroomTeacher: rec.homeroomTeacher, guardians: [], _seen: {} };
+        homeroomTeacher: rec.homeroomTeacher, homeschool: !!rec.homeschool, guardians: [], _seen: {} };
+      if (rec.homeschool) e.homeschool = true;
       if (!e.studentEmail && rec.studentEmail) e.studentEmail = rec.studentEmail;
       if (!e.homeroom && rec.homeroom) e.homeroom = rec.homeroom;
       if (!e.homeroomTeacher && rec.homeroomTeacher) e.homeroomTeacher = rec.homeroomTeacher;
@@ -3242,12 +3251,12 @@ var FactsLogic = (function () {
     entries.forEach(function (e) {
       if (!e.guardians.length) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, '', '', 0]);
+          e.homeroom, e.homeroomTeacher, '', '', 0, e.homeschool ? 'Y' : '']);
         return;
       }
       e.guardians.forEach(function (g, i) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1]);
+          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1, e.homeschool ? 'Y' : '']);
       });
     });
     return rows;
@@ -3361,7 +3370,8 @@ var FactsLogic = (function () {
       if (String(r[9]).trim().toLowerCase() !== norm) return; // GuardianEmail col
       var id = r[0];
       if (!byId[id]) byId[id] = { studentId: r[0], last: r[1], first: r[2], displayName: r[3],
-        grade: r[4], studentEmail: r[5], homeroom: r[6], homeroomTeacher: r[7] };
+        grade: r[4], studentEmail: r[5], homeroom: r[6], homeroomTeacher: r[7],
+        homeschool: String(r[11] || '').trim().toUpperCase() === 'Y' }; // r[11] absent on an old 11-col sheet
     });
     return Object.keys(byId).map(function (id) { return byId[id]; });
   }
@@ -4770,7 +4780,7 @@ function structureSig_(schema) {
         showIf: f.showIf || null, calc: f.calc || null, validation: f.validation || null,
         capacity: f.capacity || null, items: f.items || null, accept: f.accept || '',
         multiple: !!f.multiple, staffLevel: f.staffLevel || '', max: f.max || 0,
-        money: !!f.money, priorYear: !!f.priorYear };
+        money: !!f.money, priorYear: !!f.priorYear, homeschoolMode: f.homeschoolMode || '' };
     }) };
   }));
 }
@@ -8303,7 +8313,7 @@ function getFormPreview(formId) {
       parent: { first: 'Jordan', last: 'Sample', email: 'preview@example.com' },
       students: [
         { key: 's1', displayName: 'Alex Sample', first: 'Alex', last: 'Sample', grade: '9' },
-        { key: 's2', displayName: 'Bailey Sample', first: 'Bailey', last: 'Sample', grade: '11' }
+        { key: 's2', displayName: 'Bailey Sample', first: 'Bailey', last: 'Sample', grade: '11', homeschool: true }
       ]
     }
   };
@@ -8683,6 +8693,8 @@ function sanitizePages_(pages) {
           id: f.id, type: f.type, label: f.label || '', required: !!f.required,
           help: f.help || '', placeholder: f.placeholder || '',
           prefillFrom: f.prefillFrom || '', multiple: !!f.multiple, staffLevel: f.staffLevel || '',
+          // studentPicker only: '' (all, default) | 'first' | 'only' — FACTS Homeschool flag (2026-10-09)
+          homeschoolMode: (f.homeschoolMode === 'first' || f.homeschoolMode === 'only') ? f.homeschoolMode : '',
           accept: f.accept || '', showIf: f.showIf || null, calc: f.calc || null,
           validation: f.validation || null, max: f.max || 0, options: options,
           items: Array.isArray(f.items) ? f.items : undefined, money: !!f.money, priorYear: !!f.priorYear,
@@ -9015,7 +9027,8 @@ if (typeof module !== 'undefined') module.exports = {
   validateField_: validateField_, normalizeAnswer_: normalizeAnswer_, isMulti_: isMulti_,
   computeCalc: computeCalc, acceptOk_: acceptOk_, answerToCell_: answerToCell_,
   editToken_: editToken_, editTokenOk_: editTokenOk_, // GAS deps (authHmacBytes_/authSecret_/authEpoch_) stubbed by the test
-  editLinkFor_: editLinkFor_ // GAS deps (cfGetConfig_/ScriptApp/contextRunnerUrl_) stubbed by the test
+  editLinkFor_: editLinkFor_, // GAS deps (cfGetConfig_/ScriptApp/contextRunnerUrl_) stubbed by the test
+  sanitizePages_: sanitizePages_ // the Runner's field allowlist (tests/homeschool.test.js)
 };
 
 /* ===================== Seeds.js ===================== */

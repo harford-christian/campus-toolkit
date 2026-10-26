@@ -3585,6 +3585,7 @@ function schoolPrefillNotice(state) {
       })();
       var multEl = document.getElementById('mult_' + f.id); if (multEl) multEl.onchange = function () { f.multiple = this.checked; };
       var lvlEl = document.getElementById('lvl_' + f.id); if (lvlEl) lvlEl.onchange = function () { f.staffLevel = this.value; };
+      var hsEl = document.getElementById('hs_' + f.id); if (hsEl) hsEl.onchange = function () { f.homeschoolMode = this.value; };
       var accEl = document.getElementById('acc_' + f.id); if (accEl) accEl.oninput = function () { f.accept = this.value; };
       var subsEl = document.getElementById('subs_' + f.id);
       if (subsEl) subsEl.oninput = function () {
@@ -3920,6 +3921,14 @@ function schoolPrefillNotice(state) {
             return '<option value="' + o[0] + '"' + ((f.staffLevel || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
           '</select><p class="help">Names come from <strong>Admin → Staff directory</strong>.</p>';
       }
+      if (f.type === 'studentPicker') {
+        // FACTS Homeschool flag (facts-api-sync, 2026-10-09). Default '' = list every child, exactly as before.
+        body += '<label class="lbl">Homeschool students</label><select class="control" id="hs_' + f.id + '">' +
+          [['', 'List every student in the family (default)'], ['first', 'List homeschool students first'],
+           ['only', 'List only homeschool students']].map(function (o) {
+            return '<option value="' + o[0] + '"' + ((f.homeschoolMode || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') +
+          '</select><p class="help">Homeschool = what FACTS says. With “only”, a family with no student marked homeschool in FACTS still sees all of their students, so nobody is locked out.</p>';
+      }
       if (f.type === 'file') {
         body += '<label class="lbl">Accepted file types (optional)</label><input class="control" id="acc_' + f.id + '" value="' + esc(f.accept || '') + '" placeholder=".pdf,image/*"><p class="help">Blank = any. Max 10 MB per file.</p>';
       }
@@ -3938,7 +3947,7 @@ function schoolPrefillNotice(state) {
       }
       if (['studentPicker', 'staffPicker', 'file', 'signature', 'calculation'].indexOf(f.type) === -1) {
         body += '<details class="adv"><summary>Advanced</summary><label class="lbl">Auto-fill</label>' +
-          '<select class="control" id="pf_' + f.id + '">' + prefillOpts(f.prefillFrom, currentContextAuthMode_() === 'open-picker') + '</select>' +
+          '<select class="control" id="pf_' + f.id + '">' + prefillOpts(f.prefillFrom, currentContextAuthMode_() === 'open-picker', f.type) + '</select>' +
           fieldIdAdvancedHtml_(f) + '</details>';
       } else {
         body += '<details class="adv"><summary>Advanced</summary>' + fieldIdAdvancedHtml_(f) + '</details>';
@@ -4307,11 +4316,13 @@ function schoolPrefillNotice(state) {
     }));
     return rows.join('');
   }
-  function prefillOpts(sel, openPicker) {
+  function prefillOpts(sel, openPicker, type) {
     var opts = [['', '— none —'], ['parentFirst', 'Parent first name'], ['parentLast', 'Parent last name'],
       ['parentEmail', 'Parent email (locked)'], ['studentGrade', 'Student grade'],
       ['studentGradeNextYear', 'Next year’s grade (editable)'], ['studentName', 'Student name']];
     if (openPicker) opts.push(['schoolPicker', 'School (sign-in, locked)']);
+    // Yes/No only: pre-answers "Yes" when FACTS marks the family's student as homeschool (still editable).
+    if (type === 'yesno') opts.push(['studentHomeschool', 'Yes if the student is homeschool (FACTS)']);
     return opts.map(function (o) { return '<option value="' + o[0] + '"' + (sel === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('');
   }
   function bindInput(id, cb) { var el = document.getElementById(id); if (el) el.oninput = function () { cb(this.value); }; }

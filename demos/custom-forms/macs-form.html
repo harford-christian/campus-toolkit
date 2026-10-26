@@ -1478,7 +1478,12 @@ function schoolPrefillNotice(state) {
     w.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var c = w.querySelector('input:not([type=hidden]),select,textarea,canvas'); if (c) { try { c.focus({ preventScroll: true }); } catch (e) { try { c.focus(); } catch (x) {} } }
   }
-  function onFieldChange(e) { applyVisibility(); recomputeCalc(); saveDraft(); updateAnswerCount(); mirrorDuplicateQuestion(e); }
+  function onFieldChange(e) {
+    // A parent's own answer is final: the homeschool Yes/No suggestion never withdraws what they chose.
+    var tn = e && e.target && e.target.name;
+    if (tn && tn.indexOf('f_') === 0 && HS_AUTO[tn.slice(2)]) HS_AUTO[tn.slice(2)] = false;
+    applyVisibility(); recomputeCalc(); saveDraft(); updateAnswerCount(); mirrorDuplicateQuestion(e);
+  }
 
   // ---------- duplicate questions auto-fill each other ----------
   // Same label + type asked twice on one form (e.g. repeated in different sections) — answering
@@ -1708,7 +1713,8 @@ function schoolPrefillNotice(state) {
     var any = false;
     if (saved) {
       FIELDS.forEach(function (f) {
-        if (f.type === 'studentPicker' || f.prefillFrom) return; // verified/locked values always win
+        // verified/locked values always win — except the homeschool Yes/No, which is only a suggestion
+        if (f.type === 'studentPicker' || (f.prefillFrom && f.prefillFrom !== 'studentHomeschool')) return;
         if (!(f.id in saved)) return;
         var v = saved[f.id];
         if (v === '' || (Array.isArray(v) && !v.length)) return;
@@ -1805,7 +1811,7 @@ function schoolPrefillNotice(state) {
       case 'textarea':
         ctrl = '<textarea class="control" id="' + name + '" placeholder="' + FormsUI.esc(f.placeholder) + '"' + patternAttrs(f) + '></textarea>'; break;
       case 'studentPicker': {
-        var studs = (PREFILL && PREFILL.students) || [];
+        var studs = pickerStudents(f);
         var sOpts = studs.map(function (s) { return { v: s.displayName, label: s.displayName + (s.grade ? ' (Grade ' + s.grade + ')' : '') }; });
         ctrl = pickerControl(name, sOpts, f.multiple, '— Choose student —'); break;
       }
@@ -2097,6 +2103,45 @@ function schoolPrefillNotice(state) {
   }
 
   // ---------- prefill ----------
+  /* FACTS Homeschool flag (facts-api-sync, 2026-10-09). A studentPicker's homeschoolMode is '' (every
+     child, the default — unchanged behaviour), 'first' (homeschool children first) or 'only'. 'only'
+     falls back to every child when FACTS marks none of them, so a family is never left with an empty
+     list. The server still accepts any of the parent's own children (processAnswers_). */
+  function pickerStudents(f) {
+    var studs = ((PREFILL && PREFILL.students) || []).slice();
+    var mode = f && f.homeschoolMode;
+    if (mode !== 'first' && mode !== 'only') return studs;
+    var hs = studs.filter(function (s) { return s.homeschool; });
+    if (mode === 'only') return hs.length ? hs : studs;
+    return hs.concat(studs.filter(function (s) { return !s.homeschool; }));
+  }
+  /* Yes/No prefilled 'Yes' when the student is homeschool: any SELECTED child if the parent has picked,
+     otherwise any of their children. Only a suggestion — never writes 'No', never overrides an answer the
+     parent gave, and withdraws its own 'Yes' if the selection changes to non-homeschool children. */
+  var HS_AUTO = {};
+  function applyHomeschoolPrefill_() {
+    var targets = FIELDS.filter(function (f) { return f.type === 'yesno' && f.prefillFrom === 'studentHomeschool'; });
+    if (!targets.length || !PREFILL) return false;
+    var studs = PREFILL.students || [];
+    var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
+    var v = picker ? readValue(picker) : null;
+    var picked = Array.isArray(v) ? v : (v ? [v] : []);
+    var pool = picked.length ? studs.filter(function (s) { return picked.indexOf(s.displayName) > -1; }) : studs;
+    var want = pool.some(function (s) { return s.homeschool; });
+    var changed = false;
+    targets.forEach(function (f) {
+      var cur = readValue(f);
+      if (want && !cur) { writeValue(f, 'Yes'); HS_AUTO[f.id] = true; changed = true; }
+      else if (!want && HS_AUTO[f.id] && cur === 'Yes') {
+        document.querySelectorAll('input[name="f_' + f.id + '"]').forEach(function (inp) {
+          inp.checked = false; var box = inp.closest('.choice'); if (box) box.classList.remove('selected');
+        });
+        HS_AUTO[f.id] = false; changed = true;
+      }
+    });
+    return changed;
+  }
+
   function selectedStudent() {
     var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
     if (!picker || !PREFILL) return null;
@@ -2283,12 +2328,13 @@ function schoolPrefillNotice(state) {
     var p = PREFILL.parent || {};
     var picker = FIELDS.filter(function (f) { return f.type === 'studentPicker'; })[0];
 
-    // auto-select when the parent has exactly one student
-    if (picker && (PREFILL.students || []).length === 1) {
+    // auto-select when the picker lists exactly one student (after its homeschool filter, if any)
+    var listed = picker ? pickerStudents(picker) : [];
+    if (picker && listed.length === 1) {
       if (picker.multiple) {
         var cb = document.querySelector('input[name="f_' + picker.id + '"]');
         if (cb) { cb.checked = true; cb.closest('.choice').classList.add('selected'); }
-      } else { setVal(picker.id, PREFILL.students[0].displayName); }
+      } else { setVal(picker.id, listed[0].displayName); }
     }
 
     FIELDS.forEach(function (f) {
@@ -2367,6 +2413,7 @@ function schoolPrefillNotice(state) {
       // with 0 or >1 students selected can still complete a required field (no dead-end).
       if (v) lockField(f.id, true); else lockField(f.id, false);
     });
+    if (applyHomeschoolPrefill_()) { recomputeCalc(); applyVisibility(); }
     maybePriorYear();
   }
   // Pre-fill "remembered" fields (priorYear) from this student's most recent prior submission to

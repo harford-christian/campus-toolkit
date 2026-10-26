@@ -110,6 +110,12 @@
   .cls.missed { background: #FDECEA; box-shadow: inset 0 0 0 2px #C62828; }
   .cls.missed .t { color: #7f1d1d; }
   .cls.now.missed { box-shadow: inset 0 0 0 2px #C62828, inset 3px 0 0 var(--gold); }
+  /* a class the planned early pickup costs (cut short or missed): a blue dot, the plan's colour */
+  .pickdot { display: inline-block; width: .6em; height: .6em; border-radius: 50%; background: #1d4ed8;
+             margin-right: .4em; vertical-align: .05em; }
+  /* hollow = planned, still to come; solid = it happened (signed out) */
+  .pickdot.ring { background: transparent; box-shadow: inset 0 0 0 2px #1d4ed8; }
+  .pickkey { font-size: .8rem; color: #1e3a8a; }
   .nowtag { background: #8FE39B; color: #0d3a17; font-size: .62rem; font-weight: 700;
             padding: .1em .45em; border-radius: .6em; vertical-align: middle; margin-left: .35rem; }
   /* today's attendance — deliberately loud, it changes where a student physically is */
@@ -120,6 +126,11 @@
   .att.left { background: #6b7280; color: #fff; }
   .att.out { background: #6d28d9; color: #fff; }   /* signed out — not in the building */
   .att.back { background: #0e7490; color: #fff; }  /* signed out and came back */
+  .att.plan { background: #1d4ed8; color: #fff; }  /* early pickup planned by the office — still here */
+  /* homeschool — a standing fact, not today's news, so it stays quiet: outlined, never filled */
+  .hstag { font-size: .62rem; font-weight: 700; padding: .08em .45em; border-radius: .6em;
+           vertical-align: middle; margin-left: .35rem; white-space: nowrap;
+           border: 1px solid currentColor; opacity: .75; }
   .attbar.out { background: #F3EEFF; color: #4c1d95; }
   .attbar.back { background: #ECFEFF; color: #155e75; }
   .assumed { color: var(--dt); font-style: italic; }
@@ -140,6 +151,10 @@
   /* A game today (Josh's spec, 2026-09-14): red frame, light red fill — the SAME treatment the
      classes they'll miss get, so the bar and the affected rows read as one statement. */
   .attbar.game { background: #FDECEA; color: #7f1d1d; border: 2px solid #C62828;
+                 border-radius: .4rem; margin: .6rem .9rem; padding: .55rem .8rem; }
+  /* An early pickup the office has planned (Campus Presence): framed like the game bar because it
+     is the same kind of fact (a scheduled leave), blue so the two never read as one another. */
+  .attbar.plan { background: #EFF6FF; color: #1e3a8a; border: 2px solid #1d4ed8;
                  border-radius: .4rem; margin: .6rem .9rem; padding: .55rem .8rem; }
   .attbar b { font-weight: 700; }
   .clstime { float: right; color: var(--dt); font-size: .78rem; font-weight: 600; white-space: nowrap;
@@ -393,10 +408,13 @@ function searchHeaderMap_(headerRow) {
   return map;
 }
 
+/** A search token that means "homeschool students": homeschool, home-school, homeschooler(s)… */
+var SEARCH_HOMESCHOOL_TOKEN = /^home-?school/;
+
 /**
  * Group the LONG-format directory tab (one row per student+guardian) into people.
  * Parses columns by HEADER NAME (facts-api-sync's contract: columns are append-only).
- * @return {Array<{id,name,grade,homeroom,homeroomTeacher,status,email,gender,
+ * @return {Array<{id,name,grade,homeroom,homeroomTeacher,status,email,gender,locker,homeschool,
  *                 guardians:Array<{name:string,emails:Array<string>}>}>} sorted by name.
  */
 function buildPeople(tabs) {
@@ -422,6 +440,9 @@ function buildPeople(tabs) {
         email: cell('Email'),
         gender: cell('Gender'),
         locker: cell('Locker'), // appended to the directory contract 2026-09-06; '' on old exports
+        // appended 2026-10-09 (FACTS homeschool merge): 'Y' when FACTS files the student as
+        // homeschool. Grade Level stays a plain grade; false on old exports without the column.
+        homeschool: cell('Homeschool').toUpperCase() === 'Y',
         guardians: []
       };
       order.push(p);
@@ -628,6 +649,7 @@ function searchPeople(tabs, query, opts) {
     var ok = tokens.every(function (t, i) {
       if (own.indexOf(t) !== -1) { exactCount++; return true; }
       if (gradeKeys[i].indexOf(p.grade) !== -1) { exactCount++; return true; } // "seventh" → grade 07
+      if (p.homeschool && SEARCH_HOMESCHOOL_TOKEN.test(t)) { exactCount++; return true; } // "homeschool 7"
       for (var k = 0; k < p.guardians.length; k++) {
         var g = p.guardians[k];
         if ((g.name + ' ' + g.emails.join(' ')).toLowerCase().indexOf(t) !== -1) {
@@ -655,10 +677,12 @@ function searchPeople(tabs, query, opts) {
   out.truncated = matches.length > cap;
   out.people = matches.slice(0, cap).map(function (m) {
     return { id: m.p.id, name: m.p.name, grade: m.p.grade, homeroom: m.p.homeroom,
-             homeroomTeacher: m.p.homeroomTeacher, close: !m.allExact, via: m.via,
+             homeroomTeacher: m.p.homeroomTeacher, homeschool: m.p.homeschool,
+             close: !m.allExact, via: m.via,
              fuzzyWords: m.fuzzyWords,
              attendance: attendance[m.p.id] || null, // absent/late shows in the list itself
-             status: studentStatus(attendance[m.p.id], presence[m.p.id]) };
+             status: studentStatus(attendance[m.p.id], presence[m.p.id]),
+             planned: plannedPickupPending(presence[m.p.id]) ? plannedPickupLabel(presence[m.p.id]) : '' };
   });
 
   // teachers: same exact-or-fuzzy-name matching against the Teachers tab
@@ -851,7 +875,10 @@ function teacherDetail(tabs, id) {
  * so if the 15-minute job stops running, yesterday's absences are ignored rather than
  * reported as today's. Pass '' to accept whatever the tab holds (used by tests).
  *
- * @return {Object} studentId -> {status, detail, code, excused, reason, date}
+ * `On Campus` / `Arrived At` (appended by the producer 2026-10-12) are read by header NAME, so a
+ * tab written before them yields onCampus false / arrivedAt '' and nothing downstream changes.
+ *
+ * @return {Object} studentId -> {status, detail, code, excused, reason, date, onCampus, arrivedAt}
  */
 function buildAttendance(tabs, today) {
   var t = searchTabByName_(tabs, [ATTENDANCE_TAB_NAME]);
@@ -867,7 +894,8 @@ function buildAttendance(tabs, today) {
     if (today && date && date.slice(0, 10) !== String(today).slice(0, 10)) continue; // stale
     out[sid] = {
       status: cell('Status'), detail: cell('Detail'), code: cell('Code'),
-      excused: cell('Excused'), reason: cell('Reason'), date: date
+      excused: cell('Excused'), reason: cell('Reason'), date: date,
+      onCampus: /^y/i.test(cell('On Campus')), arrivedAt: cell('Arrived At')
     };
   }
   return out;
@@ -1033,6 +1061,10 @@ function buildPresence(values, todayKey) {
     var i = h[name];
     return i === undefined ? '' : searchCellToString_(row[i]).trim();
   };
+  var rec0 = function (sid) {
+    return out[sid] || (out[sid] = { out: '', back: '', late: '', planned: false, plannedAt: '' });
+  };
+  var plans = {};
   for (var r = 1; r < values.length; r++) {
     var row = values[r];
     if (todayKey && get(row, 'Date').slice(0, 10) !== String(todayKey).slice(0, 10)) continue;
@@ -1040,7 +1072,19 @@ function buildPresence(values, todayKey) {
     if (!sid) continue;
     var type = get(row, 'Type');
     var hhmm = get(row, 'Timestamp').slice(11, 16);
-    var rec = out[sid] || (out[sid] = { out: '', back: '', late: '' });
+    // A PLANNED early pickup (the office took a parent's call). Skipped once the office cancels
+    // it; the most recent plan wins (Campus Presence logic/planned.js forStudent). Unlike the
+    // board, a plan is KEPT after the child signs out (Josh, 2026-10-14): a teacher should see
+    // both what was planned and what happened. A plan is NOT a departure: `out` still comes only
+    // from a real sign-out. Time only: Reason is OFFICE tier and never leaves this fold.
+    if (type === 'dismissal_planned') {
+      if (get(row, 'FlagStatus').toLowerCase() === 'cancelled') continue;
+      var ts = get(row, 'Timestamp');
+      if (!plans[sid] || ts >= plans[sid].ts) plans[sid] = { ts: ts, at: get(row, 'ExpectedBack').slice(0, 5) };
+      continue;
+    }
+    if (type === 'pickup_flag') continue;
+    var rec = rec0(sid);
     if (type === 'student_early_out') {
       if (get(row, 'PickupMatch') === 'mismatch') continue; // an open flag, NOT a departure
       rec.out = hhmm;
@@ -1051,7 +1095,77 @@ function buildPresence(values, todayKey) {
       rec.late = hhmm;
     }
   }
+  Object.keys(plans).forEach(function (sid) {
+    var rec = rec0(sid);
+    rec.planned = true;
+    rec.plannedAt = /^\d{1,2}:\d{2}$/.test(plans[sid].at) ? plans[sid].at : '';
+  });
   return out;
+}
+
+/**
+ * Row offsets (0-based within `pairs`) of TODAY's planned pickups, from the EVENTS Date and Type
+ * columns read whole. A plan booked days ahead is written when it is TAKEN but dated for the day it
+ * applies (Campus Presence, 2026-09-28), so it can sit far above the recent tail this app reads.
+ * Same approach as the board's gwPlansAfter_: scan two narrow columns, fetch only the hits.
+ * @param {Array<Array>} pairs rows as read from the sheet; dateCol/typeCol index into each row
+ */
+function plannedRowOffsets(pairs, dateCol, typeCol, todayKey) {
+  var out = [];
+  for (var i = 0; i < (pairs || []).length; i++) {
+    if (searchCellToString_(pairs[i][typeCol]).trim() !== 'dismissal_planned') continue;
+    if (searchCellToString_(pairs[i][dateCol]).slice(0, 10) !== String(todayKey).slice(0, 10)) continue;
+    out.push(i);
+  }
+  return out;
+}
+
+/**
+ * The plan AND what has happened, in one line (Josh, 2026-10-14):
+ *   "Early pickup planned · 2:45 PM"                                   still to come
+ *   "Early pickup planned · 2:45 PM · signed out 2:41 PM"              gone
+ *   "Early pickup planned · 2:45 PM · signed out 2:41 PM, back 3:05 PM" gone and returned
+ * '' when nothing is planned.
+ */
+function plannedPickupLabel(presence) {
+  var p = presence || {};
+  if (!p.planned) return '';
+  var s = 'Early pickup planned · ' + (p.plannedAt ? searchTimeLabel_(p.plannedAt + ':00') : 'time not given');
+  if (p.out) {
+    s += ' · signed out ' + searchTimeLabel_(p.out + ':00') + (p.back ? ', back ' + searchTimeLabel_(p.back + ':00') : '');
+  }
+  return s;
+}
+
+/** The plan is still to come (planned, not yet signed out): what the list's PICKUP pill shows. */
+function plannedPickupPending(presence) {
+  var p = presence || {};
+  return !!p.planned && !p.out;
+}
+
+/**
+ * How today's early leaving touches ONE class (Josh, 2026-10-14):
+ *   'missed'  the child HAS signed out: the class runs past the sign-out (and, if they came
+ *             back, began before the return). Solid dot. Any sign-out, planned or not.
+ *   'planned' still to come: the class runs past the planned pickup. Hollow ring.
+ *   ''        untouched.
+ * Same END-of-class rule as isMissedForGame (still running = cut short, starts later =
+ * missed). Untimed classes (K4-6th have no FACTS period times) resolve no end, so they are
+ * never marked rather than guessed.
+ */
+function classPickupMark(c, presence) {
+  var p = presence || {};
+  if (!c || !c.meetsToday) return '';
+  var end = searchTimeToMin_(c.end);
+  if (end < 0) return '';
+  if (p.out) {
+    var o = searchTimeToMin_(p.out);
+    var back = p.back ? searchTimeToMin_(p.back) : Infinity;
+    var begin = searchTimeToMin_(c.begin);
+    return (o >= 0 && end > o && (begin < 0 || begin < back)) ? 'missed' : '';
+  }
+  if (p.planned && p.plannedAt) return end > searchTimeToMin_(p.plannedAt) ? 'planned' : '';
+  return '';
 }
 
 /**
@@ -1072,12 +1186,26 @@ function studentStatus(attendance, presence) {
   }
   if (attendance && attendance.status) {
     var d = [];
-    if (attendance.detail && attendance.detail !== attendance.status) d.push(attendance.detail);
+    // ON CAMPUS OUTRANKS AN ABSENT CODE (Josh, 2026-10-12): the kiosk saw this child sign in
+    // late and not leave, but FACTS holds an absent code (the 200-minute rule, or AE marked in
+    // homeroom before they walked in). The producer already writes Status 'Late' for these; an
+    // 'Absent' here too reads late, so a tab from an older producer can't contradict the kiosk.
+    // The FACTS code stays visible — it is the record, just not where the child is.
+    var hereDespiteAbsent = attendance.onCampus &&
+      /absent/i.test(attendance.status + ' ' + (attendance.detail || ''));
+    if (hereDespiteAbsent) {
+      var arrived = searchTimeLabel_(attendance.arrivedAt);
+      d.push((arrived ? 'signed in ' + arrived : 'on campus') +
+             ' (FACTS: ' + (attendance.detail || attendance.code || attendance.status) + ')');
+    } else if (attendance.detail && attendance.detail !== attendance.status) {
+      d.push(attendance.detail);
+    }
     if (attendance.reason) d.push(attendance.reason);
     if (p.out && p.back) {
       d.push('signed out ' + searchTimeLabel_(p.out + ':00') +
              ', returned ' + searchTimeLabel_(p.back + ':00'));
     }
+    if (hereDespiteAbsent) return { state: 'late', label: 'Late', detail: d.join(' · ') };
     return { state: /absent/i.test(attendance.status) ? 'absent'
                   : /late/i.test(attendance.status) ? 'late' : 'left',
              label: attendance.status, detail: d.join(' · ') };
@@ -1159,7 +1287,7 @@ function personDetail(tabs, id, today, presence) {
   return {
     profile: { id: p.id, name: p.name, grade: p.grade, homeroom: p.homeroom,
                homeroomTeacher: p.homeroomTeacher, status: p.status, email: p.email,
-               gender: p.gender, locker: p.locker },
+               gender: p.gender, locker: p.locker, homeschool: p.homeschool },
     guardians: p.guardians,
     emergency: buildEmergencyContacts(tabs)[p.id] || [],
     pickups: buildPickupContacts(tabs)[p.id] || [],
@@ -2134,7 +2262,9 @@ if (typeof module !== 'undefined' && module.exports) {
     buildTransportation: buildTransportation,
     buildSiblings: buildSiblings,
     buildPresence: buildPresence,
-    studentStatus: studentStatus,
+    studentStatus: studentStatus, plannedRowOffsets: plannedRowOffsets,
+    plannedPickupLabel: plannedPickupLabel, plannedPickupPending: plannedPickupPending,
+    classPickupMark: classPickupMark,
     bellSlotTimes: bellSlotTimes,
     annotateSchedule: annotateSchedule,
     ROOM_BUILDINGS: ROOM_BUILDINGS,
@@ -2275,9 +2405,20 @@ if (typeof module !== 'undefined' && module.exports) {
       .tabsExtrasApi();
   }
 
+  /* Attendance Today is NOT in the dataset (2026-10-14): it changes every 5-15 minutes, so it
+     comes with the 2-minute presence call and is joined into tabsData here. Every reader
+     (buildAttendance, personDetail, searchPeople) then finds it exactly where it always did,
+     and an open page picks up a new absence within 2 minutes instead of only on reload. */
+  function mergeAttendance_() {
+    var a = presenceData && presenceData.attendance;
+    if (!tabsData || !a) return;
+    tabsData = tabsData.filter(function (t) { return t.name !== a.name; }).concat([a]);
+  }
+
   google.script.run
     .withSuccessHandler(function (tabs) {
       tabsData = tabs;
+      mergeAttendance_();
       periodTimes = buildPeriodTimes(tabs);
       if (currentView.type === 'list') {  // never repaint over a record opened while loading
         if (q.value.trim()) run(); // rerun whatever's typed through the instant engine
@@ -2299,7 +2440,11 @@ if (typeof module !== 'undefined' && module.exports) {
   var presenceData = null;
   function loadPresence_(then) {
     google.script.run
-      .withSuccessHandler(function (p) { presenceData = p; if (then) then(); })
+      .withSuccessHandler(function (p) {
+        // a failed attendance read (null) keeps the attendance already joined in
+        if (p && !p.attendance && presenceData && presenceData.attendance) p.attendance = presenceData.attendance;
+        presenceData = p; mergeAttendance_(); if (then) then();
+      })
       .withFailureHandler(function () { presenceData = presenceData || { presence: {}, overrides: {} }; })
       .presenceApi();
   }
@@ -2430,6 +2575,17 @@ if (typeof module !== 'undefined' && module.exports) {
     return serverDate || '';
   }
 
+  /** HOMESCHOOL tag from facts-api-sync's Homeschool column (2026-10-09). '' for everyone else. */
+  /** Pill for an office-planned early pickup: "PICKUP 1:00 PM". Time only, never the reason. */
+  function planTag_(label) {
+    if (!label) return '';
+    var m = /·\s*(\d{1,2}:\d{2}\s*[AP]M)$/.exec(label);
+    return '<span class="att plan" title="' + esc(label) + '">PICKUP' + (m ? ' ' + esc(m[1]) : '') + '</span>';
+  }
+  function hsTag_(on) {
+    return on ? '<span class="hstag" title="FACTS lists this student as homeschool">HOMESCHOOL</span>' : '';
+  }
+
   /**
    * Status pill. Driven by studentStatus(), which resolves attendance + today's sign-in/out
    * into ONE verdict — a sign-out beats a late arrival, an absence is never suppressed, and
@@ -2497,7 +2653,8 @@ if (typeof module !== 'undefined' && module.exports) {
       var meta = ['Grade ' + dispGrade(p.grade), p.homeroom, p.homeroomTeacher]
         .filter(function (x) { return x && x !== 'Grade '; }).join(' · ');
       return '<button class="person" data-fav="' + i + '">' +
-        '<span class="pname">' + esc(p.name) + attTag_(a, st) + '</span>' +
+        '<span class="pname">' + esc(p.name) + hsTag_(p.homeschool) + attTag_(a, st) +
+        planTag_(plannedPickupPending(pres[p.id]) ? plannedPickupLabel(pres[p.id]) : '') + '</span>' +
         '<span class="pmeta">' + esc(meta) + '</span></button>';
     }).join('');
 
@@ -2586,7 +2743,7 @@ if (typeof module !== 'undefined' && module.exports) {
           if (p.close) meta = (meta ? meta + ' · ' : '') + 'similar spelling';
           return '<button class="person" data-i="' + i + '">' +
             '<span class="pname">' + nameHtml(p.name, res.tokens, p.fuzzyWords) +
-            attTag_(p.attendance, p.status) + '</span>' +
+            hsTag_(p.homeschool) + attTag_(p.attendance, p.status) + planTag_(p.planned) + '</span>' +
             '<span class="pmeta">' + esc(meta) + '</span></button>';
         }).join('') + '</div>';
     }
@@ -2709,6 +2866,11 @@ if (typeof module !== 'undefined' && module.exports) {
        one fact a teacher acts on. " PM" is dropped because every real dismissal is an
        afternoon one; a genuinely morning departure (Saturday tournaments do exist in the data)
        keeps its AM so "8:30 Dismissal" can never be misread. */
+    // An early pickup the office planned (a parent rang ahead). Time only — the reason is office-tier.
+    var planLabel = plannedPickupLabel(d.presence);
+    var planParts = planLabel ? planLabel.split(' · ') : [];
+    var planBar = planLabel ? '<div class="attbar plan"><b>' + esc(planParts[0]) + '</b> · ' +
+      esc(planParts.slice(1).join(' · ')) + '</div>' : '';
     var gameBar = leaving.map(function (g) {
       var when = g.dismiss || g.depart;
       return '<div class="attbar game"><b>' + esc(g.team) + '</b> · ' +
@@ -2729,10 +2891,11 @@ if (typeof module !== 'undefined' && module.exports) {
       (faved ? '<span class="assumed">shows on your home screen with today\'s status</span>' : '') +
       '</div>';
 
-    html += section_('student', esc(d.profile.name) + attTag_(att, st), '— Student',
-      attBar + gameBar + favRow + '<div class="hit"><dl>' +
+    html += section_('student', esc(d.profile.name) + hsTag_(d.profile.homeschool) + attTag_(att, st), '— Student',
+      attBar + planBar + gameBar + favRow + '<div class="hit"><dl>' +
       dlRow('Student ID', d.profile.id) +
       dlRow('Grade', dispGrade(d.profile.grade)) +
+      dlRow('Homeschool', d.profile.homeschool ? 'Yes' : '') +
       dlRow('Locker', d.profile.locker) +
       dlRow('Homeroom', d.profile.homeroom) +
       dlRow('Homeroom Teacher', d.profile.homeroomTeacher) +
@@ -2753,9 +2916,24 @@ if (typeof module !== 'undefined' && module.exports) {
     // fallback here would be a second code path that quietly ordered the schedule differently.
     var sched = annotateSchedule(d.classes, periodTimes, ctx);
     var anyTimes = sched.some(function (c) { return c.beginLabel; });
+    // Early leaving: ○ the classes a planned pickup will cost, ● the ones a sign-out has cost.
+    // Only on the day the presence is FOR, so a ?sim= day never borrows today's.
+    var viewDate = (SIM && SIM.date) || serverDate;
+    var pres = (presenceData && viewDate && viewDate === presenceData.date) ? d.presence : null;
+    var marks = sched.map(function (c) { return classPickupMark(c, pres); });
+    var keyBits = [];
+    if (marks.indexOf('planned') !== -1) {
+      keyBits.push('<span class="pickdot ring"></span>leaving at ' + esc(searchTimeLabel_(pres.plannedAt + ':00')) +
+        ' — will be missed or cut short');
+    }
+    if (marks.indexOf('missed') !== -1) {
+      keyBits.push('<span class="pickdot"></span>signed out at ' + esc(searchTimeLabel_(pres.out + ':00')) +
+        (pres.back ? ', back ' + esc(searchTimeLabel_(pres.back + ':00')) : '') + ' — missed or cut short');
+    }
+    var pickKey = keyBits.length ? '<div class="hit pickkey">' + keyBits.join('<br>') + '</div>' : '';
 
     html += section_('schedule', 'Schedule', '(' + d.classes.length + ')',
-      dayBarHtml_(sched, ctx, anyTimes, d.profile.grade) +
+      dayBarHtml_(sched, ctx, anyTimes, d.profile.grade) + pickKey +
       (sched.length ? sched.map(function (c, i) {
         var meta = [c.period, c.room ? 'Room ' + c.room : '', c.teacher, c.quarters, c.category]
           .filter(String).join(' · ');
@@ -2766,6 +2944,8 @@ if (typeof module !== 'undefined' && module.exports) {
           (isMissedForGame(c, dismissMin) ? ' missed' : '') +
           '" data-cl="' + i + '">' +
           (time ? '<span class="clstime">' + esc(time) + '</span>' : '') +
+          (marks[i] === 'planned' ? '<span class="pickdot ring" title="Will be missed or cut short by the planned early pickup"></span>'
+            : marks[i] === 'missed' ? '<span class="pickdot" title="Missed or cut short: signed out"></span>' : '') +
           esc(c.description || c.code) +
           (c.current ? '<span class="nowtag">' + (c.sharedSlot ? 'NOW?' : 'NOW') + '</span>' : '') +
           '<div class="t">' + esc(meta) + '</div></button>';

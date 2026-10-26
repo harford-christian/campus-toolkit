@@ -4105,7 +4105,7 @@
         order.items.forEach(item => {
           html += `
             <tr>
-              <td>${itemNameCellHtml(item)}</td><td>${item.qty}</td>
+              <td>${itemNameCellHtml(item)}${item.notes ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px; white-space:pre-wrap;">${escHtml(item.notes)}</div>` : ''}</td><td>${item.qty}</td>
               <td>${canBeckyEdit
                 ? `<input type="number" step="0.01" class="m-cost-input" data-lineid="${item.lineId}" value="${item.unitCost}" style="width:80px; margin:0;" onchange="recalculateModalTotal()">`
                 : `$${item.unitCost}`

@@ -1626,7 +1626,11 @@ var Sports = (function () {
       drillCategories: ['Warm-up', 'Shooting', 'Ball-handling', 'Passing', 'Defense', 'Rebounding', 'Transition', 'Set plays', 'Conditioning'],
       practiceTimerMode: 'linear', eventShape: 'single-opponent', tryoutSeed: 'basketball',
       defaultTryouts: true, // runs formal cut-downs (all-sports rollout, Josh 2026-07-22)
-      modules: { tryouts: true, practices: true, gameLive: true, scoreboard: true, travel: true }
+      // gameLive OFF by default: HCS basketball keeps the official scorebook on
+      // paper (exchanged and signed with the other team), so the live pad is not
+      // their tool (Josh, 2026-10-24). A team can still turn the Game Day pack on
+      // in Team settings; this only sets the default for teams without one.
+      modules: { tryouts: true, practices: true, gameLive: false, scoreboard: true, travel: true }
     },
     volleyball: {
       key: 'volleyball', name: 'Volleyball', landingTab: 'stats',
@@ -1715,6 +1719,12 @@ var Sports = (function () {
 
   function keyFor(code) { return ALIAS[String(code || '').toUpperCase()] || 'generic'; }
 
+  // Sports whose coaches and families have moved to Talon Hub v2 (Josh, 2026-10-25:
+  // basketball first). The Beta's automatic family mail skips them, so no parent is
+  // sent back to the Beta; v2 sends its own. Spring sports join by adding a key here.
+  var MOVED_TO_V2 = { basketball: true };
+  function movedToV2(code) { return MOVED_TO_V2[keyFor(code)] === true; }
+
   /** Do two sport codes denote the SAME sport? Same canonical family (BSOC≡GSOC≡SOC
    *  all soccer), but the catch-all 'generic' family requires an EXACT code match so
    *  distinct un-blueprinted sports (e.g. FF vs FB) never conflate. */
@@ -1761,7 +1771,7 @@ var Sports = (function () {
   /** The alias map (code → family) — the wizard's sport dropdown source. */
   function codes() { return JSON.parse(JSON.stringify(ALIAS)); }
 
-  return { get: get, resolve: resolve, list: list, codes: codes, keyFor: keyFor, same: same };
+  return { get: get, resolve: resolve, list: list, codes: codes, keyFor: keyFor, same: same, movedToV2: movedToV2 };
 })();
 
 if (typeof module !== 'undefined') module.exports = Sports;
@@ -2194,13 +2204,13 @@ if (typeof module !== 'undefined') module.exports = GameClock;
  *  - Dual meet (exactly 2 complete teams): scores clamp to the 15..50 range.
  *
  * Input: an ordered finish list (by crossing) — [{ teamId, timeMs?, athleteId? }],
- * place 1 = index 0. teamId '' / null / 'UNAT' = unattached individual.
+ * place 1 = index 0. teamId '' / null / 'UNAT' / 'Unattached' = unattached individual.
  */
 
 var XcScore = (function () {
   function n(v) { var x = Number(v); return isFinite(x) ? x : null; }
-  var UNAT = { '': true, 'UNAT': true, 'null': true, 'undefined': true };
-  function isUnattached(teamId) { return teamId == null || UNAT[String(teamId)]; }
+  var UNAT = { '': true, 'unat': true, 'unattached': true, 'null': true, 'undefined': true };
+  function isUnattached(teamId) { return teamId == null || UNAT[String(teamId).trim().toLowerCase()]; }
 
   /**
    * @param finishers ordered array [{teamId, timeMs?, athleteId?}], crossing order.
@@ -2228,10 +2238,16 @@ var XcScore = (function () {
       if (countByTeam[t] >= scoringN) complete[t] = true; else incompleteTeams.push(t);
     });
 
-    // Scoring universe = runners on complete teams, re-ranked densely in
-    // crossing order (this removes incompletes + unattached and closes the gap).
-    var scoringPlace = 1;
-    list.forEach(function (r) { r.scoringPlace = (r.teamId && complete[r.teamId]) ? scoringPlace++ : null; });
+    // Scoring universe = each complete team's first `displacersN` runners,
+    // re-ranked densely in crossing order. This removes incompletes and
+    // unattached runners and closes the gap, and a team's 8th+ runner takes no
+    // place at all (NFHS 8-2-2: "shall not displace any opposing runners").
+    // Fixed 2026-10-25: the 8th runner used to take a place and push others back.
+    var scoringPlace = 1, seen = {};
+    list.forEach(function (r) {
+      var keep = r.teamId && complete[r.teamId] && (seen[r.teamId] = (seen[r.teamId] || 0) + 1) <= displacersN;
+      r.scoringPlace = keep ? scoringPlace++ : null;
+    });
 
     // Per team: gather scoring places in order; first `scoringN` sum, next up to
     // displacersN are displacers (recorded for ties, not summed).
@@ -2676,7 +2692,12 @@ var SoccerLive = (function () {
   function reduceGame(events, roster, opts) {
     opts = opts || {};
     var live = (events || []).filter(function (e) { return e && !truthy_(e.Void); });
-    live.sort(function (a, b) { return numOr_(a.Seq, 0) - numOr_(b.Seq, 0); });
+    // Kickoff check-ins (US SUBIN at minute 0) always process FIRST, whatever their
+    // Seq: a starter added after the fact (the post-game Fix screen, a recovery)
+    // gets a late Seq, and in Seq order their 30' SUBOUT would come before the
+    // kickoff SUBIN — crediting 80 instead of 30 (review 2026-10-10).
+    var kick_ = function (e) { return String(e.StatType) === 'SUBIN' && String(e.Side || 'US') !== 'OPP' && e.MatchMin !== '' && e.MatchMin != null && Number(e.MatchMin) === 0 ? 0 : 1; };
+    live.sort(function (a, b) { return (kick_(a) - kick_(b)) || (numOr_(a.Seq, 0) - numOr_(b.Seq, 0)); });
     var byId = {}; (roster || []).forEach(function (p) { byId[String(p.athleteId)] = p; });
     var players = {};
     function P(aid) { aid = String(aid); if (!players[aid]) players[aid] = blank_(); return players[aid]; }
@@ -2685,6 +2706,7 @@ var SoccerLive = (function () {
     var shootout = { us: 0, opp: 0, taken: { us: 0, opp: 0 }, log: [] }; // penalty shootout (kicks made / taken per side, in order)
     var assistBySeq = {}; // goal Seq → assister aid
     var lastMin = 0;
+    var minFix = {};      // aid → corrected minutes (MINFIX rows, last one wins — rows are Seq-sorted)
 
     live.forEach(function (e) {
       if (e.StatType === STAT.ASSIST && e.LinkSeq !== '' && e.LinkSeq != null) assistBySeq[String(e.LinkSeq)] = String(e.AthleteID || '');
@@ -2694,6 +2716,9 @@ var SoccerLive = (function () {
      try {
       var side = String(e.Side || 'US'), type = String(e.StatType || ''), aid = String(e.AthleteID || '');
       if (type === 'GAMEMETA') return; // durable game-length marker, not a stat
+      // Coach's hand correction of a player's minutes (the post-game Fix screen):
+      // the highest-Seq live MINFIX per player REPLACES their computed minutes.
+      if (type === 'MINFIX') { if (aid) minFix[aid] = numOr_(e.MatchMin, 0); return; }
       // Penalty SHOOTOUT kicks — a full ordered log, tallied per side. Handled
       // before the OPP early-return (the opponent's kicks decide the winner too)
       // and NEVER added to goals or a player's box score.
@@ -2767,11 +2792,12 @@ var SoccerLive = (function () {
       P(aid).MIN = m;
       if (openNow) onField[aid] = true;
     });
+    Object.keys(minFix).forEach(function (aid) { P(aid).MIN = Math.max(0, minFix[aid]); });
 
     timeline.sort(function (a, b) { return (a.seq || 0) - (b.seq || 0); });
     return { us: { goals: usGoals, corners: team.us.corners, offsides: team.us.offsides, fouls: team.us.fouls },
              opp: { goals: oppGoals, corners: team.opp.corners, offsides: team.opp.offsides, fouls: team.opp.fouls },
-             players: players, onField: onField, timeline: timeline, shootout: shootout };
+             players: players, onField: onField, timeline: timeline, shootout: shootout, minFix: minFix };
   }
 
   /**
@@ -2934,7 +2960,7 @@ var SoccerLive = (function () {
       lineupStarters.forEach(function (a) { if (a) started[String(a)] = 1; });
     } else {
       us.forEach(function (e) {
-        if (String(e.StatType) === 'SUBIN') return;            // a SUBIN isn't evidence of starting
+        if (String(e.StatType) === 'SUBIN' || String(e.StatType) === 'MINFIX') return;  // a SUBIN / a hand minutes-fix isn't evidence of starting
         var a = String(e.AthleteID); if (!a) return;
         if (firstIn[a] == null || numOr_(e.Seq, 0) < firstIn[a]) started[a] = 1;  // activity before first SUBIN ⇒ on at kickoff
       });
@@ -2977,7 +3003,140 @@ var SoccerLive = (function () {
     return { add: add, voids: voids };
   }
 
-  return { STAT: STAT, matchMinute: matchMinute, reduceGame: reduceGame, gameResult: gameResult, toStatsJson: toStatsJson, parseGames: parseGames, plainText: plainText, reconstructKickoff: reconstructKickoff, recoverDiff: recoverDiff };
+  /**
+   * Outbox ack policy: should a pad write be KEPT (and retried) after this reply?
+   * Only a server ack or a rejection a resend can never fix drops it. Anything
+   * else — a transport failure (NETWORK), an expired sign-in, a SERVER_ERROR (a
+   * script-lock timeout at kickoff: 2026-10-09 lost the whole starting XI this
+   * way), an unknown code, or no reply at all — stays queued. Resending is safe:
+   * GAME_EVENT is idempotent on [EventID, Seq].
+   */
+  var OUTBOX_PERMANENT = { BAD_INPUT: 1, NO_TEAM: 1, MODULE_OFF: 1, PRACTICE: 1, NO_EVENT: 1, NO_SUCH_FN: 1, DENIED: 1, DEMO: 1 };
+  function outboxKeep(r) {
+    if (!r || typeof r !== 'object') return true;
+    if (r.ok === true) return false;
+    return !OUTBOX_PERMANENT[String(r.code || '')];
+  }
+
+  /**
+   * Next play number. Seqs are TIME-BASED (epoch ms, bumped past the last one
+   * used) so two phones on the same game can never hand out the same Seq — the
+   * old "server max + 1" scheme let a phone that died and came back later collide
+   * with the phone that took over. Still strictly increasing per device, and
+   * cross-device Seq order ≈ real time order (the reducer sorts by Seq).
+   */
+  function nextSeq(lastUsed, nowMs) {
+    var n = Math.floor(numOr_(nowMs, 0));
+    var l = numOr_(lastUsed, 0);
+    return n > l ? n : l + 1;
+  }
+
+  /** Compact wire/storage form of a play: [Seq,Side,AthleteID,StatType,LinkSeq,MatchMin,Period,Void(0|1)]. */
+  function encodeEvents(events) {
+    return (events || []).filter(function (e) { return e && isFinite(Number(e.Seq)) && e.StatType; }).map(function (e) {
+      return [Number(e.Seq), String(e.Side || 'US'), String(e.AthleteID || ''), String(e.StatType),
+        (e.LinkSeq === '' || e.LinkSeq == null) ? '' : Number(e.LinkSeq),
+        (e.MatchMin === '' || e.MatchMin == null) ? '' : Number(e.MatchMin),
+        (e.Period === '' || e.Period == null) ? '' : Number(e.Period), truthy_(e.Void) ? 1 : 0];
+    });
+  }
+  function decodeEvents(rows) {
+    return (Array.isArray(rows) ? rows : []).filter(function (r) { return Array.isArray(r) && isFinite(Number(r[0])) && r[3]; }).map(function (r) {
+      return { Seq: Number(r[0]), Side: String(r[1] || 'US'), AthleteID: String(r[2] == null ? '' : r[2]), StatType: String(r[3]),
+        LinkSeq: (r[4] === '' || r[4] == null) ? '' : Number(r[4]), MatchMin: (r[5] === '' || r[5] == null) ? '' : Number(r[5]),
+        Period: (r[6] === '' || r[6] == null) ? '' : Number(r[6]), Void: r[7] === 1 || r[7] === true };
+    });
+  }
+
+  /**
+   * Union two copies of a game (this phone + the server / another phone) by Seq.
+   * A Seq both hold keeps `base`'s content (the server's row wins), and is Void
+   * if EITHER side undid it (an undo on any device sticks). Returns the merged
+   * list sorted by Seq, plus how many rows `incoming` contributed.
+   */
+  function mergeEvents(base, incoming) {
+    var by = {}, out = [], added = 0;
+    (base || []).forEach(function (e) { if (!e || !isFinite(Number(e.Seq))) return; var c = {}; for (var k in e) c[k] = e[k]; c.Seq = Number(e.Seq); c.Void = truthy_(e.Void); if (!by[c.Seq]) { by[c.Seq] = c; out.push(c); } });
+    (incoming || []).forEach(function (e) {
+      if (!e || !isFinite(Number(e.Seq))) return;
+      var sq = Number(e.Seq), have = by[sq];
+      if (have) { if (truthy_(e.Void) && !have.Void && String(have.StatType) === String(e.StatType) && String(have.AthleteID || '') === String(e.AthleteID || '')) { have.Void = true; added++; } return; }
+      var c = {}; for (var k in e) c[k] = e[k]; c.Seq = sq; c.Void = truthy_(e.Void);
+      by[sq] = c; out.push(c); added++;
+    });
+    out.sort(function (a, b) { return a.Seq - b.Seq; });
+    return { events: out, added: added };
+  }
+
+  /** Signature of a game's live state (rows, voids, newest Seq) — changes whenever
+   *  any play is added or undone. Finalize stores it; a mismatch later means the
+   *  box score is stale and must be rebuilt (late phone, late tap, late undo). */
+  function eventSig(events) {
+    var n = 0, v = 0, mx = 0, sum = 0;
+    (events || []).forEach(function (e) {
+      if (!e || String(e.StatType) === 'GAMEMETA') return;
+      n++; var sq = numOr_(e.Seq, 0); if (sq > mx) mx = sq;
+      if (truthy_(e.Void)) { v++; sum = (sum + (sq % 1000003)) % 1000003; }
+    });
+    return n + ':' + v + ':' + mx + ':' + sum;
+  }
+
+  /** Players checked in at kickoff (a live minute-0 SUBIN) — the starting XI. */
+  function kickoffStarters(events) {
+    var xi = {};
+    (events || []).forEach(function (e) {
+      if (!e || truthy_(e.Void) || String(e.StatType) !== 'SUBIN' || String(e.Side || 'US') !== 'US') return;
+      if (e.MatchMin === '' || e.MatchMin == null || Number(e.MatchMin) !== 0) return;
+      xi[String(e.AthleteID)] = 1;
+    });
+    return Object.keys(xi);
+  }
+
+  /**
+   * The FINAL box score (what GAME_STATS + the MaxPreps email record): reduced to
+   * the true end minute (regMin + any OT from a GAMEMETA row), minutes capped at
+   * that end, and a sole keeper credited the full game — EXCEPT players whose
+   * minutes a coach hand-fixed (MINFIX), which are final as typed. Shared by the
+   * server (finalize + email) and the pad's Fix screen so they always agree.
+   */
+  function recordReduce(events, roster, regMin) {
+    regMin = numOr_(regMin, 80) || 80;
+    var otMin = 0;
+    (events || []).forEach(function (e) { if (e && String(e.StatType) === 'GAMEMETA' && !truthy_(e.Void)) { var p = numOr_(e.Period, 0); if (p > otMin) otMin = p; } });
+    var endMin = regMin + otMin;
+    var reduced = reduceGame(events, roster, { endMin: endMin });
+    var fixed = reduced.minFix || {};
+    Object.keys(reduced.players).forEach(function (aid) { if (!(aid in fixed) && Number(reduced.players[aid].MIN) > endMin) reduced.players[aid].MIN = endMin; });
+    var keeperIds = Object.keys(reduced.players).filter(function (aid) { var p = reduced.players[aid]; return (Number(p.SV) || 0) > 0 || (Number(p.GA) || 0) > 0; });
+    if (keeperIds.length === 1 && !(keeperIds[0] in fixed)) reduced.players[keeperIds[0]].MIN = endMin;
+    return { reduced: reduced, endMin: endMin, regMin: regMin, otMin: otMin };
+  }
+
+  /**
+   * The minutes conservation check (Josh 2026-10-11): an 11-a-side game of endMin
+   * minutes has exactly 10 × endMin FIELD minutes and endMin KEEPER minutes —
+   * every sub swaps one player for one. A shortfall = check-ins/subs the server
+   * never got. keeperId: the pad's keeper, else the sole player with saves/GA.
+   * Returns { field, fieldTarget, keeper, keeperTarget, keeperId, ok }.
+   */
+  function minuteCheck(reduced, keeperId, endMin, onField) {
+    endMin = numOr_(endMin, 80); onField = numOr_(onField, 11);
+    var players = (reduced && reduced.players) || {};
+    var kid = keeperId && players[keeperId] ? String(keeperId) : '';
+    if (!kid) {
+      var ks = Object.keys(players).filter(function (a) { return (players[a].SV || 0) > 0 || (players[a].GA || 0) > 0; });
+      if (ks.length === 1) kid = ks[0];
+    }
+    var field = 0;
+    Object.keys(players).forEach(function (a) { if (a !== kid) field += numOr_(players[a].MIN, 0); });
+    var keeper = kid ? numOr_(players[kid].MIN, 0) : 0;
+    var fieldTarget = (onField - 1) * endMin;
+    return { field: field, fieldTarget: fieldTarget, keeper: keeper, keeperTarget: endMin, keeperId: kid,
+             ok: field === fieldTarget && keeper === endMin };
+  }
+
+  return { STAT: STAT, outboxKeep: outboxKeep, recordReduce: recordReduce, minuteCheck: minuteCheck, nextSeq: nextSeq, encodeEvents: encodeEvents, decodeEvents: decodeEvents,
+           mergeEvents: mergeEvents, kickoffStarters: kickoffStarters, eventSig: eventSig, matchMinute: matchMinute, reduceGame: reduceGame, gameResult: gameResult, toStatsJson: toStatsJson, parseGames: parseGames, plainText: plainText, reconstructKickoff: reconstructKickoff, recoverDiff: recoverDiff };
 })();
 
 if (typeof module !== 'undefined') module.exports = SoccerLive;
@@ -6950,19 +7109,38 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     // (external-coach app) the next coach would otherwise instant-paint the
     // PREVIOUS coach's roster/schedule from localStorage before auth kicks in.
     function clearAuthToken() { authToken = null; try { localStorage.removeItem(STAFF_TOKEN_KEY); localStorage.removeItem('talonStaffBundle'); } catch (e) {} }
+    // A google.script.run call that stalls (weak signal, a lost response) never
+    // fails on its own, so every "Saving…" / "Loading…" it drove sat forever
+    // (audit 2026-10-24). Give up after 90 s — or 6 min (the GAS execution cap)
+    // for the known long jobs that email each family or move whole tabs — and
+    // resolve a non-ok envelope so the screen recovers; a late reply is ignored.
+    var CALL_TIMEOUT_MS = 90000, CALL_TIMEOUT_LONG_MS = 360000;
+    var CALL_LONG_ = {};
+    ['postAnnouncement', 'createPoll', 'remindPoll', 'publishPotluck', 'sendParentInvite', 'sendFormReminder', 'remindAllMissingForms',
+      'importDirectory', 'resyncGuardians', 'syncPhysicalsNow', 'importReturningFromGroup', 'importSignupsForTeam', 'syncMyTeams',
+      'finalizeSoccerGame', 'finalizeLivePadGame', 'finalizeRace', 'exportRaceResults', 'archivePreview', 'archiveSeason',
+      'seedTryoutPlan', 'seedUniformKit', 'importCandidates', 'importTryoutCandidates', 'importCandidateNotes', 'publishTryoutResults', 'notifyTryoutResults', 'finalizeKeepers']
+      .forEach(function (n) { CALL_LONG_[n] = true; });
     function call(fn, args) {
       args = args || {};
       if (DEMO) { args._demo = true; args._demoSport = DEMO; } // scope the demo to this sport
       if (authToken) args._t = authToken; // token identity for the anonymous deployment; ignored under SSO
       if (VOL.on && VOL.code) { args.mvEvent = VOL.event; args.mvCode = VOL.code; args.mvName = VOL.name; } // meet-volunteer code
       return new Promise(function (res, rej) {
+        var done = false;
+        var timer = setTimeout(function () {
+          if (done) return; done = true;
+          res({ ok: false, code: 'TIMEOUT', msg: 'No reply from the server after ' + (CALL_LONG_[fn] ? '6 minutes' : '90 seconds') + '. Check your connection — and if this was a post or a send, look before trying again.' });
+        }, CALL_LONG_[fn] ? CALL_TIMEOUT_LONG_MS : CALL_TIMEOUT_MS);
         google.script.run.withSuccessHandler(function (r) {
+          if (done) return; done = true; clearTimeout(timer);
           if (r && (r.code === 'AUTH_INVALID' || r.code === 'AUTH_EXPIRED') && !DEMO) {
             clearAuthToken();
             showLogin(r.code === 'AUTH_EXPIRED' ? 'Your session ended — please sign in again.' : '');
           }
           res(r);
         }).withFailureHandler(function (err) {
+          if (done) return; done = true; clearTimeout(timer);
           // A transport failure (dropped wifi, timeout) resolves to a non-ok
           // envelope instead of rejecting — so every `if (!r || !r.ok)` loader
           // renders its error state instead of spinning on "Loading…" forever.
@@ -7264,7 +7442,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       try { state.ctx = localStorage.getItem(CTX_KEY) || 'all'; var storedTab = localStorage.getItem(TAB_KEY); state._tabStored = !!storedTab; state.tab = storedTab || 'home'; } catch (e) {}
       if (DEMO) { state.ctx = 'all'; state._tabStored = false; state.tab = 'home'; } // demo starts clean, ignores this device's remembered state
       var cached = readBundleCache();
-      if (cached) { applyBundle(cached, true); liveResume(); } // instant paint + resume a running timer
+      if (cached) { state.bundleSrc = 'cache'; applyBundle(cached, true); liveResume(); } // instant paint + resume a running timer
       call('getStaffBundle').then(function (res) {
         if (!res || !res.ok) {
           if (!cached) {
@@ -7276,6 +7454,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           return;
         }
         writeBundleCache(res);
+        state.bundleSrc = 'live';
         // Re-render on fresh data only if nothing's been opened since paint (don't clobber a drill-in / running timer).
         applyBundle(res, !cached || (!state.currentEvent && !state.pp && !state.live));
         if (!cached) liveResume();
@@ -8480,7 +8659,9 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           var expD = $('an-exp').value, expT = ($('an-exp-time') && $('an-exp-time').value) || '';
           if (expT && !expD) { $('an-msg').textContent = ' Pick the expiry date too.'; return; }
           var expiresAt = expD ? (expD + (expT ? ' ' + expT.slice(0, 5) : '')) : '';
+          $('an-post').disabled = true; // one post per tap: a slow family-by-family send, tapped again, posted twice
           call('postAnnouncement', { audience: aud.value === 'Program' ? 'Program' : 'Team', teamIds: picked, teamId: picked[0] || '', title: $('an-title').value, body: $('an-body').value, severity: $('an-sev').value, expiresAt: expiresAt, attachments: anFiles, alsoEmail: $('an-email').checked, showPlayers: $('an-players').checked, showParents: $('an-parents').checked, showFans: $('an-fans').checked }).then(function (rr) {
+            if ($('an-post')) $('an-post').disabled = false;
             if (rr && rr.ok) { $('an-msg').textContent = ''; TalonUI.toast(annSentMsg(rr.emailed)); annApplied(rr); }
             else $('an-msg').textContent = ' ' + ((rr && (rr.msg || rr.code)) || 'Error');
           });
@@ -8522,6 +8703,12 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       // Planning context: an off-by-default toggle overlays the rest of the
       // department's schedule as read-only rows (facility/bus awareness).
       h += '<label class="s" style="display:block;margin-top:.8rem"><input type="checkbox" id="dept-evs"' + (deptOn ? ' checked' : '') + '/> Show other teams’ events (read-only)</label><div id="dept-evs-list"></div>';
+      // Diagnostic footer (2026-10-12, "Recent missing in UID / on Riley's phone"):
+      // which build, who, which data this device is actually rendering.
+      var allEvs = state.bundle.events || [];
+      h += '<div class="xs muted" style="margin-top:1rem;text-align:center;opacity:.7">' + esc(domBuild() || 'no build id') + ' · ' + esc(String(state.bundle.email || '?')) +
+        ' · ' + esc(t.Sport + '/' + t.Level + '/' + t.Season) + ': ' + eventsForTeam(t).length + ' ev, ' + eventsForTeam(t).filter(function (e) { return String(e.Date) < td; }).length + ' past' +
+        ' · all ' + allEvs.length + (allEvs.length ? ' (' + esc(String(allEvs[0].Date)) + '…)' : '') + ' · today ' + esc(td) + ' · ' + esc(state.bundleSrc || '?') + '</div>';
       // Test lab — only the app owner sees it, only on an XC team.
       if (isLabOwner_() && isRaceSport(t.Sport)) {
         h += '<div class="card tight" style="margin-top:.9rem;border-style:dashed"><div class="xs" style="font-weight:800;color:var(--muted)">🧪 TIMING TEST LAB <span style="font-weight:400">(only you see this)</span></div>' +
@@ -8579,6 +8766,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         if (!r || !r.ok) { setContent('<p class="placeholder">Could not load event.</p>'); return; }
         // Server state wins on a fresh open — drop any half-edited board.
         state.evLineup = { lineup: r.lineup || null, squad: r.squad || [] };
+        state.evSchool = r.school || null; // FACTS school attendance — today's team events only
         state.lu = null;
         renderEventDetail(r.event, r.manifest, r.missing || [], false, r.asks || null);
       }).catch(function () { setContent('<p class="placeholder">Network error.</p>'); });
@@ -8637,6 +8825,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
               reason = String(reason || '').trim();
               if (!reason) { TalonUI.toast('Add a reason so the record means something.'); return; }
             }
+            TalonUI.toast('Saving…'); // the sheet closes on tap; without this a slow save looks like nothing happened
             call('setAthleteAttendance', { eventId: state.currentEvent, athleteId: p.athleteId, outboundStatus: 'ABSENT', reason: reason })
               .then(function (rr) {
                 if (rr && rr.ok) { TalonUI.toast(p.name + ' marked out.'); openEvent(state.currentEvent); }
@@ -8666,6 +8855,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       ], { title: p.name + ' — getting there how?' });
     }
     function applyRider_(p, status, reason) {
+      TalonUI.toast('Saving…'); // same reason as markOutReason: immediate feedback on a slow field connection
       call('setAthleteAttendance', { eventId: state.currentEvent, athleteId: p.athleteId, outboundStatus: status, reason: reason })
         .then(function (rr) {
           if (rr && rr.ok) { TalonUI.toast(p.name + ' → ' + Attendance.label('OUT', status) + '.'); openEvent(state.currentEvent); }
@@ -8984,6 +9174,25 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       }).join('') + '</div>';
     }
 
+    /** FACTS SCHOOL attendance (not team attendance): who was absent from school or
+     *  left early today. Info only — the coach decides; nothing is marked out.
+     *  `school` is null for any event that isn't today (server decides). */
+    function schoolTodayHtml_(school) {
+      if (!school) return '';
+      var h = '<div class="sectlabel">🏫 School today <span class="muted">(FACTS)</span></div>';
+      if (school.state !== 'ok') return h + '<p class="s muted">School attendance isn’t available right now.</p>';
+      var ids = Object.keys(school.byAthlete || {});
+      if (!ids.length) return h + '<p class="s">No one is absent from school or left early.</p>';
+      ids.sort(function (a, b) { return String(school.byAthlete[a].name) < String(school.byAthlete[b].name) ? -1 : 1; });
+      return h + ids.map(function (id) {
+        var x = school.byAthlete[id];
+        return '<div class="row"><div><span class="who">' + esc(x.name || '') + '</span> ' + schoolPill_(x) + '</div></div>';
+      }).join('');
+    }
+    function schoolPill_(x) {
+      if (!x) return '';
+      return '<span class="pill ' + (x.status === 'ABSENT' ? 'err' : 'warn') + '" title="From FACTS school attendance">' + esc(x.label) + '</span>';
+    }
     function renderEventDetail(ev, manifest, missing, gameday, asks) {
       var bus = hasTransport(ev);
       var awayEv = String(ev.HomeAway) === 'Away';
@@ -9008,13 +9217,14 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       // and the one this app has never answered. Compact during the event itself.
       h += whereWhenHtml_(ev, isDuring);
       if (isDuring) h += gdChecklistHtml(ev);
-      // The stat pad opens from any soccer game's page — tomorrow's included.
-      // A PAST game reopens only on a phone that still holds its own copy of it —
-      // the recovery path for plays the server never got (2026-10-01 Mount Airy).
+      // The stat pad opens from any soccer game's page — tomorrow's included, and
+      // PAST games too (any phone): that's where the box score and the ✏️ Fix
+      // lineup & minutes screen live (2026-10-10). Opening a past game on the phone
+      // that kept it also pushes up anything the server never got.
       var padLocal = isAfter && padHasLocalCopy_(ev.EventID);
-      if ((!isAfter || padLocal) && ev.TeamID && String(ev.EventType) !== 'Practice' &&
+      if (ev.TeamID && String(ev.EventType) !== 'Practice' &&
           typeof Sports !== 'undefined' && Sports.keyFor(ev.Sport) === 'soccer' && canManageTeam(ev.TeamID)) {
-        h += '<button class="btn block" id="btn-trklive" style="margin:.4rem 0">' + (padLocal ? '⚽ Stats saved on this phone' : '⚽ Track live stats') + '</button>';
+        h += '<button class="btn block" id="btn-trklive" style="margin:.4rem 0">' + (!isAfter ? '⚽ Track live stats' : (padLocal ? '⚽ Box score · stats saved on this phone' : '⚽ Box score · fix lineup & minutes')) + '</button>';
       }
       // 🖨 Print roster — a quick paper team sheet (#/name/grade) for the bench or
       // the scorer's table. Opt-in per sport, default on for soccer (a coach can
@@ -9060,6 +9270,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           (m.coachAck ? '<span class="muted">✓ seen</span>' : '<button class="act btn-ack" data-a="' + esc(m.athleteId) + '">Mark seen</button>') +
           '<button class="act btn-unmark" data-a="' + esc(m.athleteId) + '" data-n="' + esc(m.name) + '" title="' + (bus ? 'Put them back on the team bus' : 'Mark them attending') + '">↩ back</button></div></div>';
       }).join('') : '<p class="s">Everyone is playing.</p>';
+      h += schoolTodayHtml_(state.evSchool);
       // Change any rider's plan in two taps — a late "I\'ll meet you there" email
       // becomes "Own way" so the bus never waits (Josh, 2026-09-18). The movable
       // set = current bus riders + own-way players. Home/non-bus games keep the
@@ -11462,7 +11673,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           .then(function (r) { if (r && r.ok) b.removeAttribute('data-busy'); else revert('Couldn\'t save — tap again.'); })
           .catch(function () { revert('Network error — tap again.'); });
       }); });
-      q('.btn-ack', function (b) { b.addEventListener('click', function () { call('ackAttendance', { eventId: state.currentEvent, athleteId: b.getAttribute('data-a') }).then(function (r) { if (r && r.ok) openEvent(state.currentEvent); }); }); });
+      q('.btn-ack', function (b) { b.addEventListener('click', function () { call('ackAttendance', { eventId: state.currentEvent, athleteId: b.getAttribute('data-a') }).then(function (r) { if (r && r.ok) openEvent(state.currentEvent); else TalonUI.toast((r && (r.msg || r.code)) || 'Error'); }); }); });
       // Put someone back on the bus (a plan changed again, or it was a mis-tap).
       q('.btn-unmark', function (b) {
         b.addEventListener('click', async function () {
@@ -11490,6 +11701,137 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     function padStopTimer() { if (state.spad && state.spad._timer) { clearInterval(state.spad._timer); state.spad._timer = null; } }
     function padSave() {
       try { var s = state.spad; if (s && !s.practice) localStorage.setItem(SPAD_LS, JSON.stringify({ eventId: s.eventId, baseEventId: s.baseEventId, gameNo: s.gameNo, halfMin: s.halfMin, notesGames: s.notesGames, teamId: s.teamId, opponent: s.opponent, clock: s.clock, segments: s.segments, seq: s.seq, events: s.events, status: s.status, broadcast: s.broadcast, keeper: s.keeper, otMin: s.otMin, lastOtLen: s.lastOtLen, shootout: s.shootout, oppNums: s.oppNums })); } catch (e) {} // practice mode is ephemeral + never persisted (isolated from real games)
+      padBakSave_();
+    }
+    // ---- Redundant game copies + full sync (2026-10-10) ---------------------
+    // The kickoff XI was lost 9/17, 10/1 and 10/9: a play only reached the sheet if
+    // ONE request carrying it got through, and the phone's copy lived in a single
+    // slot the next game overwrote. Now:
+    //   • every game has its OWN copy on this phone (talonSoccerPadBak:<eventId>),
+    //     written on every change, kept 45 days, never overwritten by another game;
+    //   • padSync_ sends the WHOLE game (every ~20s, ~2s after any tap, when the app
+    //     comes back to the foreground, when signal returns, and at app start for
+    //     any game whose copy was never confirmed). The server stores this phone's
+    //     full copy (GAME_SNAPSHOT), writes any play it lacks, and answers with
+    //     every play it has — other phones' included — so a SECOND phone can take
+    //     over (and a dead phone that comes back later merges in, no collisions:
+    //     play numbers are time-based, SoccerLive.nextSeq).
+    var SPAD_BAK = 'talonSoccerPadBak:';
+    var SPAD_DEV = 'talonDeviceId';
+    function padDeviceId_() {
+      try {
+        var d = localStorage.getItem(SPAD_DEV);
+        if (!d) { d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); localStorage.setItem(SPAD_DEV, d); }
+        return d;
+      } catch (e) { return _padDevFallback; }
+    }
+    var _padDevFallback = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);   // storage blocked: still unique per phone
+    function padBakRead_(eventId) { try { return JSON.parse(localStorage.getItem(SPAD_BAK + eventId) || 'null'); } catch (e) { return null; } }
+    function padSig_(events) { var n = 0, v = 0, mx = 0; (events || []).forEach(function (e) { n++; if (e.Void) v++; if (Number(e.Seq) > mx) mx = Number(e.Seq); }); return n + ':' + v + ':' + mx; }
+    /** This game's own copy on the phone. `synced` = the server confirmed this exact content. */
+    function padBakSave_() {
+      var s = state.spad; if (!s || s.practice || !s.eventId || !(s.events || []).length) return;
+      try {
+        var prev = padBakRead_(s.eventId) || {};
+        var sig = padSig_(s.events);
+        localStorage.setItem(SPAD_BAK + s.eventId, JSON.stringify({ eventId: s.eventId, teamId: s.teamId, opponent: s.opponent,
+          events: s.events, clock: s.clock, segments: s.segments, otMin: s.otMin || 0, keeper: s.keeper || '', halfMin: s.halfMin,
+          lastOwnSeq: s.lastOwnSeq || 0, mine: s.mine || {},
+          savedAt: Date.now(), sig: sig, syncedSig: prev.syncedSig || '', syncedAt: prev.syncedAt || 0 }));
+      } catch (e) {}
+    }
+    function padBakMarkSynced_(eventId, sig) {
+      try { var b = padBakRead_(eventId); if (!b) return; b.syncedSig = sig; b.syncedAt = Date.now(); localStorage.setItem(SPAD_BAK + eventId, JSON.stringify(b)); } catch (e) {}
+    }
+    function padMeta_() { var s = state.spad; return { segments: s.segments, otMin: s.otMin || 0, keeper: s.keeper || '', halfMin: s.halfMin, status: s.status, lastOtLen: s.lastOtLen || 0, lastOwnSeq: s.lastOwnSeq || 0 }; }
+    /** Is the pad itself on screen? (A sync must never paint over another tab or a Fix screen mid-typing.) */
+    function padOnScreen_() { return !!(state.spad && $('spad-exit') && !state.spad.fix && !state.spad.ask); }
+    var _padSyncBusy = {}, _padSyncTimer = null, _padSnapSig = {};
+    /** Send one game's FULL copy; merge back whatever the server has. Resolves true when confirmed. */
+    function padSyncGame_(eventId, teamId, events, clock, meta) {
+      if (_padSyncBusy[eventId] && Date.now() - _padSyncBusy[eventId] < 45000) return Promise.resolve(false);  // single-flight, with a 45s watchdog for a hung request
+      _padSyncBusy[eventId] = Date.now();
+      var sig = padSig_(events);
+      // Re-store this phone's full snapshot only when its copy (plays or clock) changed
+      // — the snapshot write takes the server's script lock.
+      var snapSig = sig + '|' + JSON.stringify(clock || null) + '|' + ((meta && meta.otMin) || 0);
+      var snap = _padSnapSig[eventId] !== snapSig;
+      return call('soccerSync', { teamId: teamId, eventId: eventId, deviceId: padDeviceId_(), ev: SoccerLive.encodeEvents(events), snap: snap, clock: clock || null, meta: meta || null, broadcast: !!(state.spad && state.spad.broadcast) })
+        .then(function (r) {
+          delete _padSyncBusy[eventId];
+          var s = state.spad, live = s && !s.practice && String(s.eventId) === String(eventId);
+          if (!r || !r.ok) {
+            var keep = SoccerLive.outboxKeep(r);   // a permanent refusal (module off, no access) is never retried
+            if (!keep && !live) padBakMarkSynced_(eventId, sig);
+            if (live) { s.syncState = { ok: false, okAt: (s.syncState && s.syncState.okAt) || 0, code: (r && r.code) || 'NETWORK' }; padSyncBadge_(); if (keep) padSyncSoon_(15000); }
+            return false;
+          }
+          if (snap) _padSnapSig[eventId] = snapSig;
+          if (live) {
+            // Pull in any play another phone recorded (or a heal restored).
+            var m = SoccerLive.mergeEvents(s.events, SoccerLive.decodeEvents(r.ev));
+            var repaint = false;
+            if (m.added) {
+              s.events = m.events;
+              s.seq = Math.max(s.seq || 1, Math.max.apply(null, s.events.map(function (e) { return Number(e.Seq) || 0; }).concat([0])) + 1);
+              padReduce(); padSave(); repaint = true;
+            }
+            // Someone finalized this game (maybe on another phone): stop running it live.
+            if (r.final && s.status === 'live') { s.status = 'final'; padStopTimer(); padSave(); repaint = true; }
+            if (repaint && padOnScreen_()) padRender();
+            var serverHasAll = SoccerLive.recoverDiff(SoccerLive.decodeEvents(r.ev), s.events, {});
+            var okAll = !serverHasAll.add.length && !serverHasAll.voids.length;
+            s.syncState = { ok: okAll, okAt: okAll ? Date.now() : ((s.syncState && s.syncState.okAt) || 0), n: r.serverCount, code: okAll ? '' : 'PARTIAL' };
+            if (okAll) padBakMarkSynced_(eventId, padSig_(s.events));
+            padSyncBadge_();
+            if (!okAll) padSyncSoon_(5000);
+          } else {
+            padBakMarkSynced_(eventId, sig);
+          }
+          return true;
+        });
+    }
+    function padSync_() {
+      var s = state.spad; if (!s || s.practice || !s.eventId || s.status === 'setup' || !(s.events || []).length) return Promise.resolve(false);
+      return padSyncGame_(s.eventId, s.teamId, s.events, s.clock, padMeta_());
+    }
+    function padSyncSoon_(ms) { if (_padSyncTimer) clearTimeout(_padSyncTimer); _padSyncTimer = setTimeout(function () { _padSyncTimer = null; padSync_(); }, ms || 2000); }
+    /** The always-visible save status on the live pad: green = server has every play. */
+    function padSyncBadge_() {
+      var el = $('spad-sync'); var s = state.spad; if (!el || !s || s.practice) { if (el) el.style.display = 'none'; return; }
+      var st = s.syncState || {}, n = (s.events || []).length;
+      var pend = padOutboxCountFor_(s.eventId);
+      el.style.display = 'block';
+      if (st.ok && !pend) {
+        el.className = 'pill ok'; el.textContent = '✓ Saved to server — all ' + n + ' plays';
+      } else {
+        var ago = st.okAt ? Math.max(0, Math.round((Date.now() - st.okAt) / 1000)) : -1;
+        el.className = 'pill warn';
+        el.textContent = '⏳ Saved on this phone — sending to server' + (ago >= 0 ? ' (last confirmed ' + (ago < 60 ? ago + 's' : Math.round(ago / 60) + 'm') + ' ago)' : '') + '. Keep going — nothing is lost.';
+      }
+    }
+    /** App start / back online: push every game copy on this phone the server never confirmed
+     *  (the phone died or lost signal mid-game), and prune old confirmed copies. */
+    function padSyncPendingCopies_() {
+      // Only once signed in (a call before login would bounce to the sign-in screen).
+      if (!state.bundle) { setTimeout(padSyncPendingCopies_, 15000); return; }
+      var keys = [];
+      try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i) || ''; if (k.indexOf(SPAD_BAK) === 0) keys.push(k); } } catch (e) { return; }
+      keys.forEach(function (k) {
+        var b = null; try { b = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) {}
+        if (!b || !b.eventId || !b.teamId) return;
+        var age = Date.now() - (Number(b.savedAt) || 0);
+        if (b.syncedSig && b.syncedSig === b.sig) { if (age > 45 * 86400000) { try { localStorage.removeItem(k); } catch (e) {} } return; }
+        if (state.spad && String(state.spad.eventId) === String(b.eventId)) return;   // the open pad syncs itself
+        padSyncGame_(b.eventId, b.teamId, b.events || [], b.clock || null, { segments: b.segments, otMin: b.otMin || 0, keeper: b.keeper || '', halfMin: b.halfMin, lastOwnSeq: b.lastOwnSeq || 0 });
+      });
+      padFlush_();
+    }
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener('online', function () { padSyncPendingCopies_(); padSync_(); });
+      document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { padFlush_(); padSync_(); padSyncPendingCopies_(); } });
+      window.addEventListener('pageshow', function () { padFlush_(); padSync_(); });
+      setTimeout(padSyncPendingCopies_, 6000);   // app start: anything left over from a dead/offline phone
     }
     function padLoad_() { try { return JSON.parse(localStorage.getItem(SPAD_LS) || 'null'); } catch (e) { return null; } }
     // ---- Durable send queue (outbox) ---------------------------------------
@@ -11516,8 +11858,13 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     /** Send the queue head; drop it once the server acknowledges (a resolved call
      *  means the idempotent write landed), keep everything on a network failure and
      *  retry on a timer. Single-flight + id-matched so it can't drop the wrong op. */
+    var _padFlushAt = 0;
     function padFlush_() {
-      if (_padFlushing) return;
+      // Watchdog: on a bad cell signal a request can hang with NO callback at all,
+      // which used to leave the queue "busy" forever. After 45s, let a resend go
+      // (safe: every pad write is idempotent / insert-only on [EventID, Seq]).
+      if (_padFlushing && Date.now() - _padFlushAt < 45000) return;
+      _padFlushAt = Date.now();
       var q = padOutboxLoad_();
       if (!q.length) { padOutboxBadge_(); return; }
       _padFlushing = true;
@@ -11527,10 +11874,13 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         // call() never rejects — a transport failure RESOLVES as {code:'NETWORK'}.
         // Treating that as an ack silently dropped the kickoff XI, a single tap,
         // and the halftime reset on 2026-10-01 (Mount Airy: starters read 0').
-        // KEEP the op and retry on NETWORK (and on an expired sign-in, which
-        // re-prompts login); drop only a server ack or a permanent rejection a
-        // resend can't fix, so the queue never wedges. Mirrors raceFlush_.
-        if (!r || r.code === 'NETWORK' || r.code === 'AUTH_INVALID' || r.code === 'AUTH_EXPIRED') { padOutboxBadge_(); padFlushSoon_(); return; }
+        // Then a SERVER_ERROR (script-lock timeout) on the kickoff batch was
+        // dropped the same way on 2026-10-09. KEEP every op the server didn't
+        // ack unless it's a permanent rejection a resend can't fix
+        // (SoccerLive.outboxKeep) — finalize also carries the full play list, so
+        // a stuck op can never wedge the game.
+        if (SoccerLive.outboxKeep(r)) { padOutboxBadge_(); padFlushSoon_(); return; }
+        if (!r.ok) TalonUI.toast('A play was rejected by the server (' + (r.code || 'error') + ') — it is still on this phone and will be included when you finalize.');
         var q2 = padOutboxLoad_();
         if (q2.length && q2[0] && q2[0].id === head.id) { q2.shift(); padOutboxSaveList_(q2); }
         padOutboxBadge_();
@@ -11635,7 +11985,8 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     }
     function padTap(type, aid, opts) {
       opts = opts || {}; var s = state.spad;
-      var seq = s.seq++;
+      var seq = SoccerLive.nextSeq(s.seq - 1, Date.now()); s.seq = seq + 1;   // time-based: no two phones ever share a Seq
+      s.lastOwnSeq = seq; (s.mine = s.mine || {})[seq] = 1;   // this phone's own plays (clock hand-off + Undo)
       var e = { Seq: seq, Side: opts.side || 'US', AthleteID: aid || '', StatType: type,
         LinkSeq: (opts.linkSeq == null ? '' : opts.linkSeq), MatchMin: (opts.min != null ? opts.min : padMatchMin()),
         Period: (s.clock ? s.clock.idx : ''), Void: false };
@@ -11643,6 +11994,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       // Practice mode never touches the server (no writes, no broadcast) — it runs
       // entirely in the browser off the real roster and is thrown away on reset.
       padQueue_('soccerTap', { teamId: s.teamId, eventId: s.eventId, seq: seq, side: e.Side, athleteId: e.AthleteID, statType: type, linkSeq: e.LinkSeq, matchMin: e.MatchMin, period: e.Period, broadcast: s.broadcast });
+      if (!s.practice) padSyncSoon_(2500);
       return seq;
     }
     /**
@@ -11656,7 +12008,8 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       var s = state.spad, payload = [];
       (list || []).forEach(function (it) {
         var opts = it.opts || {};
-        var seq = s.seq++;
+        var seq = SoccerLive.nextSeq(s.seq - 1, Date.now()); s.seq = seq + 1;
+        s.lastOwnSeq = seq; (s.mine = s.mine || {})[seq] = 1;
         var e = { Seq: seq, Side: opts.side || 'US', AthleteID: it.aid || '', StatType: it.type,
           LinkSeq: (opts.linkSeq == null ? '' : opts.linkSeq), MatchMin: (opts.min != null ? opts.min : padMatchMin()),
           Period: (s.clock ? s.clock.idx : ''), Void: false };
@@ -11665,6 +12018,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       });
       padReduce(); padSave();
       if (payload.length) padQueue_('soccerTapBatch', { teamId: s.teamId, eventId: s.eventId, broadcast: s.broadcast, matchMin: padMatchMin(), taps: payload });
+      if (payload.length && !s.practice) padSyncSoon_(1500);   // the kickoff XI is confirmed by a full sync within seconds
       return payload.map(function (p) { return p.seq; });
     }
     /**
@@ -11677,6 +12031,9 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     function padUndo() {
       var s = state.spad;
       var liveRows = s.events.filter(function (e) { return !e.Void; });
+      // Undo THIS phone's last play — never one another phone recorded and the sync merged in.
+      var own = liveRows.filter(function (e) { return s.mine && s.mine[e.Seq]; });
+      if (own.length) liveRows = own;
       if (!liveRows.length) { TalonUI.toast('Nothing to undo.'); return; }
       var n = padVoidActionBySeq(liveRows[liveRows.length - 1].Seq);
       TalonUI.toast(n > 1 ? 'Undid the whole action.' : 'Undone.');
@@ -11706,6 +12063,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         padQueue_('soccerUndo', { teamId: s.teamId, eventId: s.eventId, seq: e.Seq, broadcast: s.broadcast });
       });
       padReduce(); padSave(); padRender();
+      if (!s.practice) padSyncSoon_(2500);
       return kill.length;
     }
     function openSoccerPad(eventId, teamId, opponent, notes) {
@@ -11750,6 +12108,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       call('getSoccerGame', { teamId: teamId, eventId: state.spad.eventId }).then(function (r) {
         if (!r || !r.ok) { setContent('<p class="placeholder">Could not load. ' + esc((r && (r.msg || r.code)) || '') + '</p>'); return; }
         state.spad.roster = r.roster || [];
+        state.spad.regMin = Number(r.regMin) || 80;   // box-score length (CONFIG SoccerGameMinutes) — Fix screen matches MaxPreps
         state.spad.siblings = r.siblings || {};   // powers the game bar on every screen
         var ev = r.events || [];
         // The coach's team sheet pre-selects the starters and the keeper, so the
@@ -11757,6 +12116,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         // coach already chose. Only before kickoff — once events exist the game
         // itself is the truth.
         var lu = (r.lineup && r.lineup.formation) ? r.lineup : null;
+        try { state.spad.lineupXI = lu ? Formations.starters(lu) : []; } catch (eLu) { state.spad.lineupXI = []; }   // Fix screen pre-ticks from it
         if (lu && !ev.length) {
           var onRoster = {};
           state.spad.roster.forEach(function (p) { onRoster[String(p.athleteId)] = 1; });
@@ -11768,46 +12128,60 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           if (gk && onRoster[gk] && !state.spad.keeper) state.spad.keeper = gk;
         }
         var saved = padLoad_();
-        if (ev.length) {
-          state.spad.events = ev.map(function (e) { return { Seq: Number(e.Seq), Side: e.Side, AthleteID: String(e.AthleteID || ''), StatType: e.StatType, LinkSeq: e.LinkSeq, MatchMin: e.MatchMin, Period: e.Period, Void: e.Void === true || e.Void === 'TRUE' }; });
-          state.spad.seq = Math.max.apply(null, state.spad.events.map(function (e) { return e.Seq; })) + 1;
+        // EVERY copy of this game, unioned: the server's rows (already healed from
+        // every phone's snapshot), this phone's own per-game copy, and any plays
+        // still in the outbox. A game the server knows NOTHING about (no signal the
+        // whole match) still reopens live from the phone instead of the setup
+        // screen — and the sync below pushes it all up.
+        var serverEv = ev.map(function (e) { return { Seq: Number(e.Seq), Side: e.Side, AthleteID: String(e.AthleteID || ''), StatType: e.StatType, LinkSeq: e.LinkSeq, MatchMin: e.MatchMin, Period: e.Period, Void: e.Void === true || e.Void === 'TRUE' }; });
+        var pend = padOutboxEventsFor_(state.spad.eventId);
+        var mine = (localCopy ? localCopy.events : []).concat(pend.add);
+        var merged = SoccerLive.mergeEvents(serverEv, mine).events;
+        Object.keys(pend.voids).forEach(function (sq) { merged.forEach(function (e) { if (String(e.Seq) === sq) e.Void = true; }); });
+        if (merged.length) {
+          state.spad.events = merged;
+          state.spad.seq = Math.max.apply(null, merged.map(function (e) { return Number(e.Seq) || 0; }).concat([0])) + 1;
           state.spad.status = 'live';
-          if (saved && saved.eventId === state.spad.eventId && saved.clock) {
-            state.spad.clock = saved.clock; state.spad.broadcast = saved.broadcast !== false; state.spad.keeper = saved.keeper || '';
+          // Which clock? This phone's own (if it was the last to run this game),
+          // else the newest copy any OTHER phone synced — so a second phone takes
+          // over a game mid-match at the right minute instead of restarting at 0'.
+          var bak = padBakRead_(state.spad.eventId);
+          var mineClock = (saved && saved.eventId === state.spad.eventId && saved.clock) ? saved : (bak && bak.clock ? bak : null);
+          state.spad.mine = (bak && bak.mine) || {}; state.spad.lastOwnSeq = (bak && Number(bak.lastOwnSeq)) || 0;
+          // The clock comes from the phone that recorded the NEWEST play (Seqs are
+          // time-based) — the one actually keeping the game. A revived phone's stale
+          // copy, or a phone that only opened the pad, never wins.
+          var peerOwn = r.latest ? (Number((r.latest.meta || {}).lastOwnSeq) || 0) : 0;
+          var peer = r.latest && r.latest.clock && r.latest.deviceId !== padDeviceId_() &&
+            (peerOwn > (state.spad.lastOwnSeq || 0) || (!mineClock && peerOwn >= (state.spad.lastOwnSeq || 0))) ? r.latest : null;
+          if (peer) {
+            var pm = peer.meta || {};
+            state.spad.clock = peer.clock;
+            if (pm.segments && pm.segments.length) state.spad.segments = pm.segments;
+            state.spad.otMin = Number(pm.otMin) || 0; state.spad.lastOtLen = Number(pm.lastOtLen) || 0;
+            if (pm.keeper) state.spad.keeper = pm.keeper;
+            if (pm.halfMin) state.spad.halfMin = Number(pm.halfMin) || state.spad.halfMin;
+            TalonUI.toast('Picked up this game from another phone — clock and plays are in sync.');
+          } else if (mineClock) {
+            state.spad.clock = mineClock.clock; state.spad.keeper = mineClock.keeper || state.spad.keeper || '';
+            if (mineClock === saved) { state.spad.broadcast = saved.broadcast !== false; state.spad.shootout = saved.shootout === true; state.spad.lastOtLen = Number(saved.lastOtLen) || 0; }
             // Keep any OT periods added this game — otherwise the restored clock
             // index could point past the default (shorter) segment list.
-            if (saved.segments && saved.segments.length) state.spad.segments = saved.segments;
-            state.spad.otMin = Number(saved.otMin) || 0; state.spad.lastOtLen = Number(saved.lastOtLen) || 0;
-            state.spad.shootout = saved.shootout === true;
+            if (mineClock.segments && mineClock.segments.length) state.spad.segments = mineClock.segments;
+            state.spad.otMin = Number(mineClock.otMin) || 0;
           }
-          else { state.spad.clock = LiveTimer.start(state.spad.segments, Date.now()); } // fresh device: events safe, clock restarts
+          else { state.spad.clock = LiveTimer.start(state.spad.segments, Date.now()); } // no clock anywhere: events safe, clock restarts
         }
         // A game whose box score is already written reopens FINISHED, not live.
         // Coming back to a finalized game as a running live board invited taps
         // that appended to a closed match and restarted its clock. Server-side
         // state, so this holds on any device — not just the one that finalized.
+        // (Plays only this phone had still get pushed by the sync below, and the
+        // server re-finalizes + re-sends MaxPreps marked CORRECTED.)
         if ((state.spad.siblings[state.spad.eventId] || {}).final) state.spad.status = 'final';
-        // Merge any plays still sitting in the outbox (not yet acknowledged by the
-        // server) so a reopen is COMPLETE, then flush to push them up. This is what
-        // recovers a game if a tap/batch dropped at the field before it landed.
-        var pend = padOutboxEventsFor_(state.spad.eventId);
-        if (state.spad.status !== 'final' && (pend.add.length || Object.keys(pend.voids).length)) {
-          var haveSeq = {}; state.spad.events.forEach(function (e) { haveSeq[String(e.Seq)] = e; });
-          pend.add.forEach(function (e) { if (!haveSeq[String(e.Seq)]) { state.spad.events.push(e); haveSeq[String(e.Seq)] = e; } });
-          Object.keys(pend.voids).forEach(function (sq) { if (haveSeq[sq]) haveSeq[sq].Void = true; });
-          state.spad.events.sort(function (a, b) { return Number(a.Seq) - Number(b.Seq); });
-          state.spad.seq = Math.max.apply(null, state.spad.events.map(function (e) { return Number(e.Seq); }).concat([0])) + 1;
-          state.spad.status = 'live';
-        }
-        state.spad.recover = null;
-        if (localCopy) {
-          var pendSeq = {};
-          pend.add.forEach(function (e) { pendSeq[String(e.Seq)] = 1; });
-          Object.keys(pend.voids).forEach(function (sq) { pendSeq[sq] = 1; });
-          var rd = SoccerLive.recoverDiff(ev, localCopy.events, pendSeq);
-          if (rd.add.length || rd.voids.length) state.spad.recover = { add: rd.add, voids: rd.voids, otMin: Number(localCopy.otMin) || 0 };
-        }
-        padReduce(); padRender(); padFlush_();
+        padReduce(); padBakSave_(); padRender(); padFlush_();   // per-game copy only — opening a past game must not overwrite the live slot
+        if (state.spad.status === 'live') padServiceStart();
+        padSync_();
       }).catch(function () { setContent('<p class="placeholder">Network error.</p>'); });
     }
 
@@ -11899,16 +12273,13 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       Array.prototype.forEach.call($('content').querySelectorAll('.spad-game'), function (b) {
         b.addEventListener('click', function () { padGoToGame_(Number(b.getAttribute('data-i'))); });
       });
-      padRecoverMount_();
     }
     /**
-     * RECOVERY (2026-10-01 Mount Airy): the old outbox treated a dropped request
-     * as delivered, so the kickoff XI, a tap, and the halftime reset never reached
-     * the server — starters read 0'. The phone that kept stats still holds every
-     * play, so: snapshot this device's copy of the game per-event (a later game
-     * on the same phone reuses the single SPAD_LS slot and would erase it), and
-     * on open, offer to re-send whatever the server lacks.
-     * Returns { events, otMin } — the union (by Seq) of the live slot + backup.
+     * This phone's own copy of a game — the union (by Seq) of the live slot and the
+     * per-game copy (talonSoccerPadBak:<eventId>). openSoccerPad merges it with the
+     * server's rows and padSync_ pushes anything the server lacks — automatically,
+     * no button (2026-10-10; the 10/1 manual banner needed the right phone + a tap).
+     * Returns { events, otMin }.
      */
     /** Does THIS device hold its own copy of a game (live slot or backup)? */
     function padHasLocalCopy_(eventId) {
@@ -11935,51 +12306,8 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       var events = Object.keys(bySeq).map(function (k) { return bySeq[k]; });
       if (!events.length) return null;
       var copy = { events: events, otMin: otMin };
-      if (cur) { try { localStorage.setItem(key, JSON.stringify(copy)); } catch (e) {} }
+      // (padBakSave_ keeps the per-game copy current on every change — no write here.)
       return copy;
-    }
-    function padRecoverMount_() {
-      var s = state.spad, rc = s && s.recover;
-      if (!rc || s.practice || $('spad-recover-card')) return;
-      var ex = $('spad-exit'); if (!ex) return;
-      var n = rc.add.length + rc.voids.length, pl = n === 1 ? 'play' : 'plays';
-      var d = document.createElement('div');
-      d.id = 'spad-recover-card'; d.className = 'card tight';
-      d.style.cssText = 'border:2px solid #c0392b;margin:.4rem 0';
-      d.innerHTML = '<div class="s"><b>⚠ This phone has ' + n + ' ' + pl + ' the server never received.</b> ' +
-        'The box score and minutes are incomplete until they are sent.' +
-        (s.status === 'final' ? ' Sending also re-finalizes the game and re-sends the MaxPreps email.' : '') + '</div>' +
-        '<button class="btn block" id="spad-recover" style="margin-top:.4rem">⤴ Send ' + n + ' missing ' + pl + '</button>';
-      ex.insertAdjacentElement('afterend', d);
-      $('spad-recover').addEventListener('click', padRecoverRun_);
-    }
-    async function padRecoverRun_() {
-      var s = state.spad, rc = s && s.recover; if (!rc) return;
-      var wasFinal = s.status === 'final', n = rc.add.length + rc.voids.length;
-      if (!(await TalonUI.confirm('Send the ' + n + ' play' + (n === 1 ? '' : 's') + ' saved on this phone' +
-        (wasFinal ? ', then re-finalize the box score and re-send the MaxPreps email' : '') + '?', { title: 'Send missing plays?', okLabel: 'Send' }))) return;
-      var btn = $('spad-recover'); if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-      // Every write is idempotent on [EventID, Seq], so a stop part-way is safe to retry.
-      var fail = function (r, what) {
-        TalonUI.toast('Stopped while sending ' + what + ': ' + ((r && (r.msg || r.code)) || 'error') + '. Nothing is lost — tap again when you have signal.');
-        if (btn) { btn.disabled = false; btn.textContent = '⤴ Try again'; }
-      };
-      var r;
-      for (var i = 0; i < rc.add.length; i += 40) {
-        r = await call('soccerTapBatch', { teamId: s.teamId, eventId: s.eventId, broadcast: false, matchMin: '', taps: rc.add.slice(i, i + 40) });
-        if (!r || !r.ok) return fail(r, 'plays');
-      }
-      for (var j = 0; j < rc.voids.length; j++) {
-        r = await call('soccerUndo', { teamId: s.teamId, eventId: s.eventId, seq: rc.voids[j], broadcast: false });
-        if (!r || (!r.ok && r.code !== 'NO_EVENT')) return fail(r, 'undos');
-      }
-      if (wasFinal) {
-        r = await call('finalizeSoccerGame', { teamId: s.teamId, eventId: s.eventId, matchMin: padEndMin(), otMin: rc.otMin || s.otMin || 0 });
-        if (!r || !r.ok) return fail(r, 'the final box score');
-      }
-      s.recover = null;
-      TalonUI.toast(n + ' play' + (n === 1 ? '' : 's') + ' sent' + (wasFinal ? ' · box score re-finalized' + (r.maxprepsTo ? ' · MaxPreps re-sent' : '') : '') + '.');
-      openSoccerPad(s.baseEventId, s.teamId, s.opponent, null);
     }
     /** First game of the day nobody has touched — what "next" means after a final. */
     function padNextUntouched_() {
@@ -12017,10 +12345,12 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       // A render exception must never white-screen a live game — catch it and show
       // a recovery card. The plays are safe on the server (append-only stream).
       try {
-        if (s.status === 'setup') padRenderSetup();
+        if (s.fix) padRenderFix_();
+        else if (s.status === 'setup') padRenderSetup();
         else if (s.status === 'final') padRenderFinal();
         else padRenderLive();
         padOutboxBadge_();   // paint the "unsaved plays" warning (no-op off the live view)
+        padSyncBadge_();     // ✓ saved to server / ⏳ on this phone
       } catch (e) { padRenderError_(e); }
     }
     function padRenderError_(e) {
@@ -12123,7 +12453,17 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         if (!padEnforceEleven_()) padRender();   // keeper-add could make 12 → ask who sits
       });
     }
-    function padServiceStart() { if (!state.spad._timer) state.spad._timer = setInterval(function () { var c = $('spad-clock'); if (c && state.spad && state.spad.clock) c.textContent = padClockLabel(); }, 1000); }
+    function padServiceStart() {
+      if (state.spad._timer) return;
+      var tick = 0;
+      state.spad._timer = setInterval(function () {
+        var c = $('spad-clock'); if (c && state.spad && state.spad.clock) c.textContent = padClockLabel();
+        // Full sync every 20s while the pad is open (the guarantee that the server
+        // holds every play), + refresh the save-status pill's "last confirmed".
+        if (++tick % 20 === 0) { padSync_(); padFlush_(); }
+        if (tick % 5 === 0) padSyncBadge_();
+      }, 1000);
+    }
     function padClockLabel() {
       var s = state.spad; if (!s.clock) return '';
       var now = Date.now();
@@ -12170,6 +12510,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
 
       var h = '<button class="link" id="spad-exit">‹ Leave</button>' + (s.practice ? padPracticeBanner_() : '') + padGameBar_() +
         '<div id="spad-outbox" class="pill err" style="display:none;margin:.3rem 0;text-align:center"></div>' +
+        '<div id="spad-sync" class="pill warn" style="display:none;margin:.3rem 0;text-align:center;white-space:normal"></div>' +
         '<div class="card tight" style="text-align:center">' +
         '<div class="flex" style="justify-content:space-between;align-items:center">' +
         '<button class="act" id="spad-play">' + (running ? '⏸' : '▶') + '</button>' +
@@ -12533,21 +12874,36 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       }
       TalonUI.confirm('End the match and finalize the box score?', { title: 'Finalize?', okLabel: 'Finalize' }).then(function (ok) {
         if (!ok) return;
-        // Never finalize (and email MaxPreps) with plays still unsent — otherwise
-        // the box score + email would be missing them. Flush and ask to retry.
-        if (padOutboxCountFor_(s.eventId) > 0) {
-          padFlush_();
-          TalonUI.toast(padOutboxCountFor_(s.eventId) + ' play(s) still saving — check your signal, then tap Finalize again in a moment.');
-          return;
-        }
-        call('finalizeSoccerGame', { teamId: s.teamId, eventId: s.eventId, matchMin: padEndMin(), otMin: s.otMin || 0 }).then(function (r) {
-          if (r && r.ok) { s.status = 'final'; s.finalR = r; padStopTimer(); padSave(); padRender(); TalonUI.toast('Final: ' + SoccerLive.gameResult(padReduce()).label); }
-          else TalonUI.toast((r && (r.msg || r.code)) || 'Could not finalize.');
+        // Finalize carries this phone's FULL play list; the server writes any play
+        // it never received BEFORE building the box score + MaxPreps email (the
+        // kickoff XI was lost on 9/17, 10/1 and 10/9). So unsent outbox plays no
+        // longer block — they ride along, and are cleared once the server has them.
+        padFlush_();
+        call('finalizeSoccerGame', { teamId: s.teamId, eventId: s.eventId, matchMin: padEndMin(), otMin: s.otMin || 0, ev: SoccerLive.encodeEvents(s.events) }).then(function (r) {
+          if (r && r.ok) {
+            // Every play in the outbox for this game is now on the server (finalize carried them all).
+            padOutboxSaveList_(padOutboxLoad_().filter(function (o) { return !(o.args && String(o.args.eventId) === String(s.eventId)); }));
+            padOutboxBadge_();
+            s.status = 'final'; s.finalR = r; padStopTimer(); padSave(); padSync_();
+            var msg = 'Final: ' + SoccerLive.gameResult(padReduce()).label;
+            if (r.reconciled) msg += ' · recovered ' + r.reconciled + ' play' + (r.reconciled === 1 ? '' : 's') + ' the server had missed';
+            if (r.emailHeld) {
+              // Fewer than 11 starters checked in at kickoff — the 9/17, 10/1, 10/9
+              // failure. MaxPreps is NOT emailed until someone confirms the XI.
+              padOpenFix_('held');
+              msg += ' · MaxPreps email held: only ' + r.starters + ' starters were recorded — confirm who started';
+            } else padRender();
+            TalonUI.toast(msg);
+          }
+          else TalonUI.toast((r && (r.msg || r.code)) || 'Could not finalize — your plays are safe on this phone; try again when you have signal.');
         }).catch(function () { TalonUI.toast('Network error.'); });
       });
     }
     function padRenderFinal() {
-      var s = state.spad, r = s.reduced || padReduce();
+      var s = state.spad;
+      // The numbers MaxPreps gets (true end minute, caps, keeper, hand fixes) — not the live clock's.
+      var r = s.practice ? (s.reduced || padReduce()) : SoccerLive.recordReduce(s.events, s.roster, s.regMin || 80).reduced;
+      var xiN = SoccerLive.kickoffStarters(s.events).length;
       var rows = s.roster.map(function (p) { var st = r.players[p.athleteId]; return st ? { p: p, st: st } : null; }).filter(Boolean)
         .filter(function (x) { return x.st.G || x.st.A || x.st.SH || x.st.SV || x.st.GA || x.st.YC || x.st.RC || x.st.FC || x.st.OFF || x.st.MIN; });
       var nextI = padNextUntouched_();
@@ -12557,6 +12913,8 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         (s.practice ? 'Practice game — nothing was saved or emailed.' : 'Box score saved. Season stats + the final score are updated.') +
         (r.shootout && r.shootout.log && r.shootout.log.length ? ' Shootout: HCS ' + r.shootout.us + '–' + r.shootout.opp + ' ' + esc(s.opponent || 'OPP') + '.' : '') + '</div>' +
         (s.practice ? '<button class="btn block" id="spad-again" style="margin-bottom:.5rem">🔄 Practice again</button>' : '') +
+        (!s.practice && xiN < 11 ? '<div class="card tight" style="border:2px solid var(--err);margin-bottom:.5rem"><div class="s"><b>⚠ Only ' + xiN + ' starter' + (xiN === 1 ? ' was' : 's were') + ' recorded at kickoff.</b> Minutes are wrong for anyone missing' + (s.finalR && s.finalR.emailHeld ? ', so the MaxPreps email is on hold' : '') + '. Tap Fix and tick who started.</div></div>' : '') +
+        (!s.practice ? '<button class="btn block" id="spad-fix" style="margin-bottom:.5rem">✏️ Fix lineup &amp; minutes</button>' : '') +
         // The next game is the whole point of a tournament day, so it is a
         // button here rather than something to go and find.
         (nextI >= 0
@@ -12573,6 +12931,110 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       var ng = $('spad-nextgame');
       if (ng) ng.addEventListener('click', function () { padGoToGame_(padNextUntouched_()); });
       var again = $('spad-again'); if (again) again.addEventListener('click', padPracticeReset);
+      var fx = $('spad-fix'); if (fx) fx.addEventListener('click', function () { padOpenFix_('fix'); });
+    }
+
+    /**
+     * ✏️ FIX LINEUP & MINUTES (2026-10-10) — the human last resort on a finished
+     * game, on ANY phone. Tick who started (adds/voids the minute-0 check-in) and,
+     * if needed, type a player's real minutes (a MINFIX row that overrides the
+     * computed number). Every change is an ordinary pad play — synced, voidable,
+     * kept in the log — and Save re-finalizes + re-sends MaxPreps (CORRECTED).
+     * mode 'held' = finalize held the MaxPreps email (<11 starters recorded).
+     */
+    function padOpenFix_(mode) {
+      var s = state.spad; if (!s || s.practice) return;
+      var started = {}; SoccerLive.kickoffStarters(s.events).forEach(function (a) { started[a] = true; });
+      var startedWas = JSON.parse(JSON.stringify(started));
+      // Pre-tick everyone the data PROVES started (came off, or logged a stat,
+      // before ever being subbed on) plus the coach's saved lineup — so the coach
+      // only ticks the starters with no trace at all (Josh 2026-10-11).
+      var inferred = {};
+      var onRoster = {}; s.roster.forEach(function (p) { onRoster[String(p.athleteId)] = 1; });
+      SoccerLive.reconstructKickoff(s.events, []).concat((s.lineupXI || []).filter(function (a) { return onRoster[a]; }))
+        .forEach(function (a) { if (!started[a]) { started[a] = true; inferred[a] = true; } });
+      var fixedNow = (SoccerLive.recordReduce(s.events, s.roster, s.regMin || 80).reduced.minFix) || {};
+      var mins = {}; Object.keys(fixedNow).forEach(function (a) { mins[a] = String(fixedNow[a]); });
+      s.fix = { mode: mode || 'fix', started: started, startedWas: startedWas, inferred: inferred, mins: mins, minsWas: JSON.parse(JSON.stringify(mins)) };
+      padRender();
+    }
+    /** The events the Fix screen WOULD produce (for the live preview + save). */
+    function padFixPlan_() {
+      var s = state.spad, f = s.fix, add = [], voids = [];
+      s.roster.forEach(function (p) {
+        var a = String(p.athleteId);
+        if (f.started[a] && !f.startedWas[a]) add.push({ type: 'SUBIN', aid: a, opts: { min: 0 } });
+        if (!f.started[a] && f.startedWas[a]) s.events.forEach(function (e) { if (!e.Void && String(e.AthleteID) === a && String(e.StatType) === 'SUBIN' && e.MatchMin !== '' && Number(e.MatchMin) === 0) voids.push(e.Seq); });
+        var now = String(f.mins[a] == null ? '' : f.mins[a]).trim(), was = String(f.minsWas[a] == null ? '' : f.minsWas[a]).trim();
+        if (now !== was) {
+          if (now === '') s.events.forEach(function (e) { if (!e.Void && String(e.AthleteID) === a && String(e.StatType) === 'MINFIX') voids.push(e.Seq); });
+          else if (isFinite(Number(now)) && Number(now) >= 0) add.push({ type: 'MINFIX', aid: a, opts: { min: Math.round(Number(now)) } });
+        }
+      });
+      return { add: add, voids: voids };
+    }
+    function padRenderFix_() {
+      var s = state.spad, f = s.fix, plan = padFixPlan_();
+      // Preview = the box score as it will be after Save.
+      var vset = {}; plan.voids.forEach(function (q) { vset[String(q)] = 1; });
+      var t0 = Date.now(), prev = s.events.map(function (e) { var c = {}; for (var k in e) c[k] = e[k]; if (vset[String(e.Seq)]) c.Void = true; return c; })
+        .concat(plan.add.map(function (it, i) { return { Seq: t0 + i, Side: 'US', AthleteID: it.aid, StatType: it.type, LinkSeq: '', MatchMin: it.opts.min, Period: '', Void: false }; }));
+      var rr = SoccerLive.recordReduce(prev, s.roster, s.regMin || 80).reduced;
+      var nStart = Object.keys(f.started).filter(function (a) { return f.started[a]; }).length;
+      var roster = s.roster.slice().sort(function (a, b) { return (Number(a.jersey) || 999) - (Number(b.jersey) || 999); });
+      var h = '<button class="link" id="spad-fix-x">‹ Back to box score</button>' +
+        '<div class="sectlabel" style="margin-top:0">✏️ Fix lineup &amp; minutes</div>' +
+        (f.mode === 'held' ? '<div class="card tight" style="border:2px solid var(--err);margin-bottom:.5rem"><div class="s"><b>MaxPreps email is on hold.</b> Only ' + SoccerLive.kickoffStarters(s.events).length + ' starters were checked in at kickoff. Tick everyone who started, then Save — it sends the corrected file.</div></div>' : '') +
+        '<div class="s" style="margin-bottom:.4rem">Tick who <b>started</b> — every minute is then worked out from the subs that were recorded (no typing). ' +
+        (Object.keys(f.inferred || {}).length ? '<b>✓ ' + Object.keys(f.inferred).length + ' already ticked</b> because the subs show they started. ' : '') +
+        'Only type a number in <i>Fix min</i> if the check below still doesn\u2019t add up. <b>Starters: ' + nStart + ' / 11</b></div>' +
+        (function () {
+          var c = SoccerLive.minuteCheck(rr, s.keeper, (s.regMin || 80) + (s.otMin || 0));
+          var line = function (lbl, v, t) { var ok = v === t; return '<div style="color:' + (ok ? 'var(--ok)' : 'var(--err)') + ';font-weight:700">' + (ok ? '✓ ' : '⚠ ') + lbl + ' ' + v + ' / ' + t + (ok ? '' : ' (' + (v < t ? (t - v) + ' short' : (v - t) + ' over') + ')') + '</div>'; };
+          return '<div class="card tight s" style="margin-bottom:.5rem">' + line('Field minutes', c.field, c.fieldTarget) + line('Keeper minutes', c.keeper, c.keeperTarget) +
+            (c.ok ? '' : '<div class="xs muted" style="margin-top:.2rem">' + (nStart < 11 ? 'Tick the remaining starters first. ' : 'Still short after all 11 starters = a sub the server never got — type that player\u2019s real minutes in Fix min.') + '</div>') + '</div>';
+        })() +
+        '<div class="box-wrap"><table class="boxtbl"><tr><th>Started</th><th class="bx-name">Player</th><th>Min</th><th>Fix min</th></tr>' +
+        roster.map(function (p) {
+          var a = String(p.athleteId), st = rr.players[a], m = st ? st.MIN : 0;
+          return '<tr><td><input type="checkbox" class="fix-st" data-aid="' + esc(a) + '"' + (f.started[a] ? ' checked' : '') + ' style="width:1.3rem;height:1.3rem"></td>' +
+            '<td class="bx-name">' + esc((p.jersey ? '#' + p.jersey + ' ' : '') + (p.last || '') + (p.first ? ', ' + p.first : '')) + '</td>' +
+            '<td><b>' + m + '</b></td>' +
+            '<td><input type="number" inputmode="numeric" min="0" max="200" class="fix-min" data-aid="' + esc(a) + '" value="' + esc(f.mins[a] == null ? '' : f.mins[a]) + '" placeholder="—" style="width:3.6rem"></td></tr>';
+        }).join('') + '</table></div>' +
+        '<button class="btn block" id="spad-fix-save" style="margin-top:.6rem">💾 Save &amp; re-send MaxPreps</button>' +
+        '<div class="xs muted" style="margin-top:.4rem">Nothing is deleted: each fix is logged and can be changed again later.</div>';
+      setContent(h);
+      $('spad-fix-x').addEventListener('click', function () { s.fix = null; padRender(); });
+      Array.prototype.forEach.call($('content').querySelectorAll('.fix-st'), function (cb) {
+        cb.addEventListener('change', function () { f.started[cb.getAttribute('data-aid')] = cb.checked; padRenderFix_(); });
+      });
+      Array.prototype.forEach.call($('content').querySelectorAll('.fix-min'), function (inp) {
+        inp.addEventListener('change', function () { f.mins[inp.getAttribute('data-aid')] = inp.value; padRenderFix_(); });
+      });
+      $('spad-fix-save').addEventListener('click', padFixSave_);
+    }
+    async function padFixSave_() {
+      var s = state.spad, f = s.fix, plan = padFixPlan_();
+      var nStart = Object.keys(f.started).filter(function (a) { return f.started[a]; }).length;
+      if (nStart !== 11 && !(await TalonUI.confirm(nStart + ' starters are ticked (a full team is 11). Save and send MaxPreps anyway?', { title: 'Starters: ' + nStart, okLabel: 'Save & send' }))) return;
+      var btn = $('spad-fix-save'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+      // Ordinary pad plays (outbox + sync carry them) — but NEVER broadcast a
+      // "Live" score for a finished game while fixing it.
+      var bc = s.broadcast; s.broadcast = false;
+      var vset = {}; plan.voids.forEach(function (q) { vset[String(q)] = 1; });
+      s.events.forEach(function (e) { if (vset[String(e.Seq)] && !e.Void) { e.Void = true; padQueue_('soccerUndo', { teamId: s.teamId, eventId: s.eventId, seq: e.Seq, broadcast: false }); } });
+      if (plan.add.length) padTapMany(plan.add); else { padReduce(); padSave(); }
+      s.broadcast = bc;
+      if (_padSyncTimer) { clearTimeout(_padSyncTimer); _padSyncTimer = null; }   // finalize below carries every change; a racing sync would mail a 2nd CORRECTED copy
+      var r = await call('finalizeSoccerGame', { teamId: s.teamId, eventId: s.eventId, matchMin: '', otMin: s.otMin || 0, ev: SoccerLive.encodeEvents(s.events), corrected: true, allowShort: true });
+      if (!r || !r.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = '💾 Try again'; }
+        TalonUI.toast('Saved on this phone, but the server didn\u2019t answer (' + ((r && (r.code || r.msg)) || 'error') + '). Tap Save again when you have signal.');
+        return;
+      }
+      s.fix = null; s.status = 'final'; s.finalR = r; padSave(); padSync_(); padRender();
+      TalonUI.toast('Fixed · ' + r.starters + ' starters' + (r.maxprepsTo ? ' · corrected MaxPreps sent to ' + r.maxprepsTo : ''));
     }
 
     // ---------- Generalized live stat pad (basketball + volleyball) ----------
@@ -12882,6 +13344,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         if (!r || !r.ok) { setContent('<p class="placeholder">Could not load.</p>'); return; }
         state.currentEvent = ev.EventID;
         state.evLineup = { lineup: r.lineup || null, squad: r.squad || [] };
+        state.evSchool = r.school || null; // FACTS school attendance — today's team events only
         state.lu = null;
         renderEventDetail(r.event, r.manifest, r.missing || [], true, r.asks || null);
         // Live-tool launcher atop the game-day board — routed by sport:
@@ -14479,7 +14942,8 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         h += '<div class="sectlabel">Owner / IT backend</div>' +
           '<div class="card tight"><button class="act" id="btn-import">Import / refresh directory (FACTS)</button>' +
           traceBoxHtml() + '</div>' +
-          '<div class="card tight" id="archive-box"><button class="act" id="btn-archive-open">🗄 Archive a past season</button></div>';
+          '<div class="card tight" id="archive-box"><button class="act" id="btn-archive-open">🗄 Archive a past season</button></div>' +
+          '<div class="card tight" id="readiness-box"><button class="act" id="btn-readiness">🧭 Season readiness check</button></div>';
       } else {
         h += '<p class="xs" style="color:var(--muted);margin-top:.6rem">Backend tools (directory import, archive) are managed by IT.</p>';
       }
@@ -14487,6 +14951,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       var syn = $('btn-sync'); if (syn) syn.addEventListener('click', doSync);
       var imp = $('btn-import'); if (imp) imp.addEventListener('click', doImport);
       var arc = $('btn-archive-open'); if (arc) arc.addEventListener('click', openArchiveTool);
+      var rdy = $('btn-readiness'); if (rdy) rdy.addEventListener('click', openReadiness);
       bindTraceBox();
       function renderHandbook(r) {
         var el = $('hb-status'); if (!el) return;
@@ -14731,6 +15196,49 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     }
     function doSync() { $('admin-msg').textContent = 'Syncing…'; call('syncMyTeams').then(function (r) { $('admin-msg').textContent = r && r.ok ? r.created + ' new, ' + r.updated + ' updated, ' + r.skipped + ' skipped' : 'Error'; reload(); }); }
 
+    // ---------- Season readiness (Admin) ----------
+    // The winter checklist as one report (logic/readiness.js): per team — Game
+    // Day pack, coaches/managers on the roster, calendar shared + synced, roster,
+    // guardian emails, parent sign-ins; plus the season pointer, FACTS import
+    // age and the two trigger heartbeats. One button applies the Game Day fix.
+    function openReadiness() {
+      var box = $('readiness-box');
+      if (!box) return;
+      box.innerHTML = '<div class="s" style="font-weight:700;color:var(--maroon)">🧭 Season readiness</div><div class="s" id="rdy-body">Checking every team, calendar and trigger…</div>';
+      call('readinessReport').then(function (r) {
+        var body = $('rdy-body');
+        if (!body) return;
+        if (!r || !r.ok) { body.textContent = (r && (r.msg || r.code)) || 'Could not load.'; return; }
+        var rep = r.report;
+        var mark = function (c) {
+          return c.state === 'ok' ? '<span style="color:var(--ok,#2e7d32)">✓</span>'
+            : c.state === 'warn' ? '<span style="color:var(--gold,#b8860b)">⚠</span>' : '<span style="color:var(--err)">✗</span>';
+        };
+        var line = function (c) { return '<div class="xs">' + mark(c) + ' <b>' + esc(c.label) + '</b> — ' + esc(c.detail) + '</div>'; };
+        var h = '<div class="s" style="margin-top:.3rem"><b>' + esc(sLbl(rep.season)) + '</b> · ' + rep.summary.ok + ' ok · ' + rep.summary.warn + ' to look at · ' + rep.summary.fail + ' blocking' +
+          (rep.inactiveTeams ? ' · ' + rep.inactiveTeams + ' inactive team' + (rep.inactiveTeams === 1 ? '' : 's') + ' skipped' : '') + '</div>';
+        h += '<div class="subhead" style="margin-top:.4rem">Program</div>' + rep.global.map(line).join('');
+        if (!rep.teams.length) h += '<div class="s" style="color:var(--muted)">No active teams in ' + esc(sLbl(rep.season)) + '.</div>';
+        rep.teams.forEach(function (t) {
+          h += '<div class="subhead" style="margin-top:.4rem">' + esc(t.teamId) + ' <span style="color:var(--muted);font-weight:400">' + esc(t.label) + '</span></div>' + t.checks.map(line).join('');
+        });
+        var fix = (rep.fixes && rep.fixes.gamedayOff) || [];
+        if (fix.length) h += '<button class="act" id="rdy-gameday-off" style="margin-top:.5rem">Turn Game Day off for ' + fix.length + ' basketball team' + (fix.length === 1 ? '' : 's') + '</button>';
+        h += '<button class="act" id="rdy-rerun" style="margin-top:.5rem;margin-left:.4rem">Re-check</button>';
+        body.innerHTML = h;
+        var go = $('rdy-gameday-off');
+        if (go) go.addEventListener('click', async function () {
+          if (!(await TalonUI.confirm('Turn the Game Day pack off for ' + fix.join(', ') + '? A coach can turn it back on in Team settings.', { title: 'Game Day off', okLabel: 'Turn off' }))) return;
+          go.disabled = true;
+          call('winterGameDayOff', { season: rep.season }).then(function (rr) {
+            if (rr && rr.ok) { TalonUI.toast(rr.changed.length ? 'Game Day off for ' + rr.changed.join(', ') + '.' : 'Nothing to change.'); openReadiness(); }
+            else { go.disabled = false; TalonUI.toast((rr && (rr.msg || rr.code)) || 'Error'); }
+          });
+        });
+        $('rdy-rerun').addEventListener('click', openReadiness);
+      });
+    }
+
     // ---------- Archive a past season (Admin) ----------
     function openArchiveTool() {
       var box = $('archive-box');
@@ -14738,12 +15246,30 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       call('archivableSeasons').then(function (r) {
         var body = $('arc-body');
         if (!r || !r.ok) { body.textContent = 'Could not load.'; return; }
-        if (!r.seasons.length) { body.textContent = 'No past seasons to archive (current: ' + esc(sLbl(r.current) || '?') + ').'; return; }
+        var selStyle = 'padding:.3rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)';
+        // The CurrentSeason pointer (F26 → W27 the week winter starts). Lost &
+        // Found, poll/sign-up stamps and the list below follow it. Until
+        // 2026-10-24 moving it meant editing the CONFIG tab in the spreadsheet.
+        var curRow = '<div class="flex" style="gap:.4rem;align-items:center;margin-top:.3rem">Current season <select id="arc-current" style="' + selStyle + '">' + seasonOptionList(r.current) + '</select>' +
+          '<button class="act" id="arc-setcur">Set</button></div>' +
+          '<div class="xs" style="color:var(--muted);margin-top:.15rem">Move it the week a new season starts; the old season then shows below once its last event has passed.</div>';
         var opts = r.seasons.map(function (s) { return '<option value="' + esc(s) + '">' + esc(sLbl(s)) + '</option>'; }).join('');
         var warn = r.archiveConfigured ? '' : '<div class="s" style="color:var(--err);margin-top:.3rem">No archive spreadsheet yet — run RUN_createArchiveSpreadsheet in the editor first.</div>';
-        body.innerHTML = '<div class="flex" style="gap:.4rem;align-items:center;margin-top:.3rem">Season <select id="arc-season" style="padding:.3rem;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text)">' + opts + '</select>' +
-          '<button class="act" id="arc-preview">Preview</button></div>' + warn + '<div class="s" id="arc-result" style="margin-top:.4rem"></div>';
-        $('arc-preview').addEventListener('click', archivePreview);
+        var pick = r.seasons.length
+          ? '<div class="flex" style="gap:.4rem;align-items:center;margin-top:.5rem">Archive <select id="arc-season" style="' + selStyle + '">' + opts + '</select><button class="act" id="arc-preview">Preview</button></div>'
+          : '<div class="s" style="margin-top:.5rem;color:var(--muted)">No past seasons to archive yet.</div>';
+        body.innerHTML = curRow + pick + warn + '<div class="s" id="arc-result" style="margin-top:.4rem"></div>';
+        if ($('arc-preview')) $('arc-preview').addEventListener('click', archivePreview);
+        $('arc-setcur').addEventListener('click', async function () {
+          var s = $('arc-current').value;
+          if (s === String(r.current || '')) { TalonUI.toast(sLbl(s) + ' is already the current season.'); return; }
+          if (!(await TalonUI.confirm('Make ' + sLbl(s) + ' the current season?' + (r.current ? ' ' + sLbl(r.current) + ' becomes archivable once its last event has passed.' : ''), { title: 'Current season', okLabel: 'Set' }))) return;
+          $('arc-setcur').disabled = true;
+          call('setCurrentSeason', { season: s }).then(function (rr) {
+            if (rr && rr.ok) { TalonUI.toast('Current season is now ' + sLbl(rr.season) + '.'); openArchiveTool(); reload(); } // bundle carries CurrentSeason too (Lost & Found, sign-up pickers)
+            else { $('arc-setcur').disabled = false; TalonUI.toast((rr && (rr.msg || rr.code)) || 'Error'); }
+          });
+        });
       });
     }
     function archivePreview() {
@@ -14753,6 +15279,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         var out = $('arc-result');
         if (!r || !r.ok) { out.textContent = (r && (r.msg || r.code)) || 'Error'; return; }
         if (!r.total) { out.textContent = 'Nothing to archive for ' + sLbl(season) + '.'; return; }
+        if (r.upcoming) { out.textContent = r.total + ' rows found, but ' + sLbl(season) + ' still has ' + r.upcoming + ' upcoming event' + (r.upcoming === 1 ? '' : 's') + ' — archive it after the last one.'; return; }
         var lines = Object.keys(r.per).map(function (t) { return t + ': ' + r.per[t]; }).join(' · ');
         out.innerHTML = '<b>' + r.total + ' rows</b> across ' + Object.keys(r.per).length + ' tabs would move to cold storage.<div class="xs" style="margin-top:.2rem">' + esc(lines) + '</div>' +
           (r.archiveConfigured ? '<button class="act" id="arc-go" style="margin-top:.4rem;background:var(--err);color:#fff">Archive ' + esc(sLbl(season)) + ' (permanent move)</button>' : '<div class="s" style="color:var(--err);margin-top:.3rem">Set up the archive spreadsheet first.</div>');
@@ -14907,7 +15434,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           var phys = x.physicalOnFile
             ? '<span class="s" style="color:var(--ok)" title="Sports physical on file">✓ physical</span>'
             : '<button class="act btn-mkphys" data-k="' + esc(x.directoryKey) + '" data-n="' + esc(x.first + ' ' + x.last) + '" title="Mark sports physical received (no team needed)">Physical ✓</button>';
-          return '<div class="result-row"><div><span class="who">' + esc(x.last + ', ' + x.first) + '</span> <span class="s">gr ' + esc(x.grade) + ' · ' + x.guardianCount + ' guardian(s)</span></div><div class="flex" style="gap:.3rem">' + phys + '<button class="act btn-add" data-k="' + esc(x.directoryKey) + '">Add</button></div></div>';
+          return '<div class="result-row"><div><span class="who">' + esc(x.last + ', ' + x.first) + '</span>' + hsBadge(x) + ' <span class="s">gr ' + esc(x.grade) + ' · ' + x.guardianCount + ' guardian(s)</span></div><div class="flex" style="gap:.3rem">' + phys + '<button class="act btn-add" data-k="' + esc(x.directoryKey) + '">Add</button></div></div>';
         }).join('') || '<p class="s">No matches.</p>';
         Array.prototype.forEach.call($('search-results').querySelectorAll('.btn-add'), function (b) { b.addEventListener('click', function () { b.disabled = true; b.textContent = 'Adding…'; call('addToTeam', { teamId: state.roster.teamId, directoryKey: b.getAttribute('data-k') }).then(function (rr) { if (rr && rr.ok) { $('dir-search').value = ''; $('search-results').innerHTML = ''; if (rr.releasesAvailable && rr.releasesAvailable.length) TalonUI.toast('Career history released for this player — open their profile to view.'); loadRoster(); } else { b.disabled = false; b.textContent = 'Add'; } }); }); });
         Array.prototype.forEach.call($('search-results').querySelectorAll('.btn-mkphys'), function (b) { b.addEventListener('click', function () { b.disabled = true; b.textContent = 'Saving…'; call('markPhysical', { directoryKey: b.getAttribute('data-k') }).then(function (rr) { if (rr && rr.ok) { TalonUI.toast('Physical marked for ' + b.getAttribute('data-n')); b.outerHTML = '<span class="s" style="color:var(--ok)">✓ physical</span>'; loadRoster(); } else { b.disabled = false; b.textContent = 'Physical ✓'; } }); }); });
@@ -14915,8 +15442,9 @@ if (typeof module !== 'undefined') module.exports = Attendance;
     }
     function loadRoster() {
       if (!state.roster.teamId) { $('roster-list').innerHTML = '<p class="s">No team.</p>'; return; }
-      call('getTeamRoster', { teamId: state.roster.teamId }).then(function (r) {
+      call('getTeamRoster', { teamId: state.roster.teamId, withSchool: true }).then(function (r) {
         if (!r || !r.ok) return;
+        var school = r.school || null; // FACTS school attendance today (absent / left early)
         var pending = r.roster.filter(function (x) { return x.pending; });
         var enrolled = r.roster.filter(function (x) { return !x.pending; });
         renderPending(pending);
@@ -14925,8 +15453,8 @@ if (typeof module !== 'undefined') module.exports = Attendance;
           var needPhys = x.missingForms && x.missingForms.some(function (m) { return String(m).indexOf('Physical') === 0; });
           var forms = (x.missingForms && x.missingForms.length) ? '<div class="s" style="color:var(--err)">⚠️ ' + esc(x.missingForms.join(', ')) + '</div>' : '<div class="s" style="color:var(--ok)">✓ forms</div>';
           var physPill = '<div style="margin-top:.15rem">' + physBadge(x.physicalStatus) + '</div>';
-          return '<div class="result-row"><div class="flex">' + TalonUI.avatar(x.photo, x.first, x.last) + '<div><span class="who">' + esc(x.last + ', ' + x.first) + '</span> <span class="s">gr ' + esc(x.grade) + (x.jersey ? ' · #' + esc(x.jersey) : '') + '</span><div class="s">' + x.guardianCount + ' guardian(s)' + (x.guardianCount === 0 ? ' ⚠️ no login' : '') + '</div>' + forms + physPill + '</div></div><div>' + (needPhys ? '<button class="act btn-phys" data-a="' + esc(x.athleteId) + '" title="Mark sports physical received" style="background:var(--maroon);color:#fff">Physical ✓</button>' : '') + (can('AD') ? '<button class="act btn-gd" data-a="' + esc(x.athleteId) + '" title="Manage guardians">👪</button>' : '') + '<button class="act btn-pp" data-a="' + esc(x.athleteId) + '">Profile</button>' + (x.enrollmentId ? '<button class="act btn-totry" data-e="' + esc(x.enrollmentId) + '" data-n="' + esc(x.first + ' ' + x.last) + '" title="Move back to trying out — they and their family see “Trying out” until confirmed or tryouts finalize">↩ Tryouts</button>' : '') + '<button class="act btn-rm" data-a="' + esc(x.athleteId) + '">Remove</button></div></div><div class="pprofile-box" id="pp-' + esc(x.athleteId) + '" hidden></div>';
-        }).join('') || '<p class="s">No players yet — use “📋 Import returning players” to pull last year’s roster from the group, or search above to add.</p>';
+          return '<div class="result-row"><div class="flex">' + TalonUI.avatar(x.photo, x.first, x.last) + '<div><span class="who">' + esc(x.last + ', ' + x.first) + '</span>' + hsBadge(x) + (school && school.byAthlete && school.byAthlete[x.athleteId] ? ' ' + schoolPill_(school.byAthlete[x.athleteId]) : '') + ' <span class="s">gr ' + esc(x.grade) + (x.jersey ? ' · #' + esc(x.jersey) : '') + '</span><div class="s">' + x.guardianCount + ' guardian(s)' + (x.guardianCount === 0 ? ' ⚠️ no login' : '') + '</div>' + forms + physPill + '</div></div><div>' + (needPhys ? '<button class="act btn-phys" data-a="' + esc(x.athleteId) + '" title="Mark sports physical received" style="background:var(--maroon);color:#fff">Physical ✓</button>' : '') + (can('AD') ? '<button class="act btn-gd" data-a="' + esc(x.athleteId) + '" title="Manage guardians">👪</button>' : '') + '<button class="act btn-pp" data-a="' + esc(x.athleteId) + '">Profile</button>' + (x.enrollmentId ? '<button class="act btn-totry" data-e="' + esc(x.enrollmentId) + '" data-n="' + esc(x.first + ' ' + x.last) + '" title="Move back to trying out — they and their family see “Trying out” until confirmed or tryouts finalize">↩ Tryouts</button>' : '') + '<button class="act btn-rm" data-a="' + esc(x.athleteId) + '">Remove</button></div></div><div class="pprofile-box" id="pp-' + esc(x.athleteId) + '" hidden></div>';
+        }).join('') + (school && school.state !== 'ok' && enrolled.length ? '<p class="xs muted">School attendance (FACTS) isn’t available right now.</p>' : '') || '<p class="s">No players yet — use “📋 Import returning players” to pull last year’s roster from the group, or search above to add.</p>';
         var q = function (sel, fn) { Array.prototype.forEach.call($('roster-list').querySelectorAll(sel), fn); };
         q('.btn-rm', function (b) {
           b.addEventListener('click', async function () {
@@ -15009,6 +15537,12 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         }).catch(function () { $('gd-msg').textContent = ' Network error'; });
       });
     }
+    /* FACTS-flagged homeschool student (DIRECTORY.Homeschool, STAFF tier, 2026-10-09). Spelled out — "HS"
+       reads as High School here. Homeschool athletes
+       carry their own eligibility paperwork, so coaches and the AD should see it at a glance. */
+    function hsBadge(x) {
+      return x && x.homeschool ? ' <span class="s" title="FACTS lists this student as homeschool" style="border:1px solid currentColor;border-radius:.5em;padding:0 .35em;font-weight:700">Homeschool</span>' : '';
+    }
     function renderPending(pending) {
       var box = $('pending-block'); if (!box) return;
       if (!pending.length) { box.innerHTML = ''; return; }
@@ -15016,7 +15550,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
         '<button class="act" id="btn-confirm-all" style="float:right">Confirm all</button></div>' +
         pending.map(function (x) {
           return '<div class="result-row"><div class="flex">' + TalonUI.avatar(x.photo, x.first, x.last) +
-            '<div><span class="who">' + esc(x.last + ', ' + x.first) + '</span> <span class="s">gr ' + esc(x.grade) + '</span>' +
+            '<div><span class="who">' + esc(x.last + ', ' + x.first) + '</span>' + hsBadge(x) + ' <span class="s">gr ' + esc(x.grade) + '</span>' +
             '<div class="s">Trying out — confirm to put on the team</div></div></div>' +
             '<div><button class="act btn-confirm" data-e="' + esc(x.enrollmentId) + '">Confirm</button>' +
             '<button class="act btn-drop" data-e="' + esc(x.enrollmentId) + '">Remove</button></div></div>';
@@ -18127,7 +18661,7 @@ if (typeof module !== 'undefined') module.exports = Attendance;
       // Items usually turn up on/just after an event — default Where/When to the
       // nearest event (today's if there is one, else the soonest upcoming).
       var evs = (state.bundle.events || []).filter(function (e) { return e.Status !== 'Cancelled'; });
-      var recent = evs.filter(function (e) { return String(e.Date) === today(); })[0] || evs[0] || null;
+      var recent = evs.filter(function (e) { return String(e.Date) === today(); })[0] || evs.filter(function (e) { return String(e.Date) >= today(); })[0] || null;   // bundle carries past events too
       var defWhere = recent ? esc(recent.LocationName || '') : '';
       var defWhen = recent ? esc(fmtDate(recent.Date)) : '';
       var h = '<div class="card tight"><div class="s" style="font-weight:700;color:var(--maroon)">Post a found item</div>' +
