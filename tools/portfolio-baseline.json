@@ -18,7 +18,7 @@
       "teacherApi"
     ],
     "ops": [],
-    "hash": "c362a4aa44d2c89e"
+    "hash": "12664808c670be64"
   },
   "library": {
     "files": [
@@ -64,7 +64,7 @@
       "updateSchedule",
       "updateScheduleBulk"
     ],
-    "hash": "edff51a43ea3f4d2"
+    "hash": "e46c2dd5e2e1d4e9"
   },
   "athletics": {
     "files": [
@@ -89,7 +89,7 @@
       "api"
     ],
     "ops": [],
-    "hash": "09dd716269d1efd2"
+    "hash": "5fecfd15f95e1243"
   },
   "purchasing": {
     "files": [
@@ -171,7 +171,7 @@
       "verifyApproverPin"
     ],
     "ops": [],
-    "hash": "4e107be2df249b00"
+    "hash": "3419fecfcc8a83bc"
   },
   "leave-sub": {
     "files": [
@@ -253,7 +253,7 @@
       "count",
       "equals"
     ],
-    "hash": "465d5b523b69a3ff"
+    "hash": "172608e7ea74ce2a"
   },
   "gym-tv": {
     "files": [
@@ -354,7 +354,7 @@
       "setStanding"
     ],
     "ops": [],
-    "hash": "3defaa1b29d6f91b"
+    "hash": "29110f0eb0893ae8"
   },
   "campus-presence": {
     "files": [
@@ -398,7 +398,7 @@
       "visitorOpenList",
       "visitorOut"
     ],
-    "hash": "bcf9df2bb374f0f3"
+    "hash": "b7f7a1d6a783634f"
   },
   "transpo-routes": {
     "files": [
@@ -491,7 +491,7 @@
       "savePrefsApi"
     ],
     "ops": [],
-    "hash": "9ff92a2812defde6"
+    "hash": "b1c5cf11ea6545a4"
   },
   "conferences": {
     "files": [
