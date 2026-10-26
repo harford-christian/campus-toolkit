@@ -23,6 +23,8 @@ export const SRC = path.resolve(HERE, '../../../athletics/talon-hub/apps/fan/ser
 const DST = path.join(HERE, 'fan-logic.js');
 
 export const ORDER = ['schema.js', 'projection.js', 'announcements.js', 'labels.js', 'scoreboard.js', 'fanview.js'];
+// What this script vendors, for tools/scan-portfolio.mjs.
+export const VENDORED = [{ dir: SRC, files: ORDER }];
 
 export function assemble(srcDir) {
   let out =

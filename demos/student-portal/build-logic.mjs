@@ -32,6 +32,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SRC = path.resolve(HERE, '../../../FACTS/student-interface');
 
 export const FILES = ['Schedule.js', 'Due.js', 'Athletics.js', 'SchoolCal.js', 'News.js', 'GradeView.js', 'Code.gs', 'Sports.gs', 'Notify.gs', 'Data.gs', 'Bells.gs'];
+// What this script vendors, for tools/scan-portfolio.mjs: it also flags vendored code that starts needing a source file
+// left out of FILES (GradeView.js) or a new Config.gs symbol mock.js must supply — both missed on 2026-10-26.
+export const VENDORED = [{ dir: SRC, files: FILES }];
 
 // Apps Script services the vendored code reaches for. Bound by mock.js (env) before the first call.
 export const SERVICES = ['SpreadsheetApp', 'CacheService', 'PropertiesService', 'DriveApp', 'UrlFetchApp', 'LockService',

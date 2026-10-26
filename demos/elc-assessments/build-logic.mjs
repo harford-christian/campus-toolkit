@@ -33,6 +33,8 @@ export const FILES = [
   'GradeAudit.gs'
 ];
 export const NOT_VENDORED = ['EasyCbmHistoricalImport.gs'];
+// What this script vendors, for tools/scan-portfolio.mjs.
+export const VENDORED = [{ dir: SRC, files: FILES }];
 // Google services, plus Date and console: the server's own `new Date()` reads the demo's pinned clock, and its
 // ~270 diagnostic console.log lines go to a quiet logger, without touching the page's Date or console.
 export const SERVICES = ['SpreadsheetApp', 'CacheService', 'PropertiesService', 'Session', 'Utilities', 'MailApp',

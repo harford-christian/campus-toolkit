@@ -26,6 +26,8 @@ export const SRC = path.resolve(HERE, '../../../parent-teacher-conference-schedu
 // the wrapper function below.
 export const FILES = ['Settings.js', 'BookingService.js', 'ParentView.js', 'TeacherView.js',
                       'FactsData.js', 'RosterSync.js'];
+// What this script vendors, for tools/scan-portfolio.mjs.
+export const VENDORED = [{ dir: SRC, files: FILES }];
 
 // The names the wrapper exposes to mock.js. Every one is a function the source declares.
 export const EXPORTS = [

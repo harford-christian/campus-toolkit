@@ -23,6 +23,8 @@ const DST = path.join(HERE, 'logic.js');
 export const ORDER = ['schema.js', 'ids.js', 'fuzzy.js', 'namerules.js', 'directory.js',
                       'events.js', 'family.js', 'planned.js', 'history.js', 'badges.js', 'pickup.js',
                       'presence.js', 'search.js', 'metrics.js', 'notify.js'];
+// What this script vendors, for tools/scan-portfolio.mjs.
+export const VENDORED = [{ dir: SRC, files: ORDER }];
 
 // The ONE scrub applied to the copied source: schema.js's SETTINGS_DEFAULTS ships the school's
 // real FACTS-Finder /exec deployment URL as the default deep-link target, and no deployment URL

@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-authored map of showcased tools -> their source projects, used by scan-portfolio.mjs to detect NEW demoable projects and SIGNIFICANT changes to existing demos. Paths are relative to the Projects root (the parent of apps-script-showcase). Fingerprint baselines live in portfolio-baseline.json (machine-written by `node scan-portfolio.mjs mark`). buildMethod records how the demo was assembled; exact build-demo.mjs configs are reconstructed per-run.",
+  "_note": "Hand-authored map of showcased tools -> their source projects, used by scan-portfolio.mjs to detect NEW demoable projects and SIGNIFICANT changes to existing demos. Paths are relative to the Projects root (the parent of apps-script-showcase), except vendoredBy, which is relative to the showcase. builtFrom = the source pages build-demo.mjs inlines plus any other source a demo is built from or checked against that no build script vendors. vendoredBy = the demo's build-logic scripts; the scanner imports each one's exported VENDORED list (files copied whole, declarations picked) and fingerprints exactly that, so vendored files are NOT copied into builtFrom by hand. producers = real code whose output the demo's fabricated data must match (any change there is a PROMPT). Fingerprint baselines live in portfolio-baseline.json (machine-written by `node scan-portfolio.mjs mark`). buildMethod records how the demo was assembled.",
   "tools": {
     "facts-directory": {
       "title": "Directory Search",
@@ -70,13 +70,10 @@
         "athletics/talon-hub/apps/fan/pages/Fan.html",
         "athletics/talon-hub/apps/fan/pages/FanApp.html",
         "athletics/talon-hub/apps/fan/pages/FanStyles.html",
-        "athletics/talon-hub/apps/fan/pages/Widget.html",
-        "athletics/talon-hub/apps/fan/server/lib/fanview.js",
-        "athletics/talon-hub/apps/fan/server/lib/labels.js",
-        "athletics/talon-hub/apps/fan/server/lib/scoreboard.js",
-        "athletics/talon-hub/apps/fan/server/lib/announcements.js",
-        "athletics/talon-hub/apps/fan/server/lib/projection.js",
-        "athletics/talon-hub/apps/fan/server/lib/schema.js"
+        "athletics/talon-hub/apps/fan/pages/Widget.html"
+      ],
+      "vendoredBy": [
+        "demos/talon-hub/build-logic.mjs"
       ],
       "buildMethod": "build-demo.mjs + hand data/mock; index.html is now a hand switcher over staff.html (build.json), fan.html (build.fan.json) and widget.html (build.widget.json); build-logic.mjs vendors the fan server lib (FanView whitelist etc.) verbatim into fan-logic.js and mock.js answers publicSchedule/liveNow from the state the staff app edits"
     },
@@ -153,14 +150,10 @@
         "custom-forms/apps/chooser/pages/Index.html",
         "custom-forms/apps/runner-public/pages/Index.html",
         "custom-forms/apps/runner-staff/pages/Index.html",
-        "custom-forms/apps/runner-macs/pages/Index.html",
-        "custom-forms/apps/builder/server/Router.js",
-        "custom-forms/apps/chooser/server/Router.js",
-        "custom-forms/apps/runner-public/server/Router.js",
-        "custom-forms/apps/runner-staff/server/Router.js",
-        "custom-forms/apps/runner-macs/server/Router.js",
-        "custom-forms/apps/runner-public/server/RunnerApi.js",
-        "custom-forms/Seeds.js"
+        "custom-forms/apps/runner-macs/pages/Index.html"
+      ],
+      "vendoredBy": [
+        "demos/custom-forms/build-logic.mjs"
       ],
       "buildMethod": "node demos/custom-forms/build.mjs: build-logic.mjs vendors the five apps' server into logic.js; a template-prep step keeps each page's doGet branch (into the ignored .tmp/); build-demo.mjs x9 (build.*.json); hand index.html switcher over the five apps plus data.js/mock.js (in-memory Google, shared form store in sessionStorage). demos/custom-forms/verify.mjs"
     },
@@ -226,16 +219,17 @@
       "builtFrom": [
         "FACTS/transportation/Index.html",
         "FACTS/transportation/DismissalClient.html",
-        "FACTS/transportation/Config.gs",
-        "FACTS/transportation/Code.gs",
-        "FACTS/transportation/Roles.gs",
-        "FACTS/transportation/Walkers.gs",
-        "FACTS/transportation/Routes.gs",
+        "FACTS/transportation/Dismissal.gs",
         "FACTS/transportation-kiosk/Kiosk.html",
         "FACTS/transportation-kiosk/KioskClient.html",
-        "FACTS/transportation-kiosk/Config.gs",
-        "FACTS/transportation-kiosk/Code.gs",
         "FACTS/transportation-kiosk/Pure.gs"
+      ],
+      "vendoredBy": [
+        "demos/transportation/build-logic.mjs",
+        "demos/transportation/build-kiosk-logic.mjs"
+      ],
+      "producers": [
+        "FACTS/facts-api-sync/Transportation.gs"
       ],
       "buildMethod": "demos/transportation/build-logic.mjs vendors the SERVER layer verbatim into logic.js (Config.gs whole with ids scrubbed; the named declarations of Code.gs, Roles.gs, Walkers.gs and Routes.gs — whole-file vendoring is out because Walkers.gs/Roles.gs seed real children and staff), applying the same name scrubs build.json applies to the page; then build-demo.mjs (includeDir=project root, inlines DismissalClient; head/body wrapper that loads logic.js, sim/userEmail/presenceUrl tokens and name scrubs via the replace list — config committed at demos/transportation/build.json). mock.js is an in-memory Google (four workbooks, a Drive folder, a TTL cache, script properties, a pinned clock) under the vendored endpoints; data.js is the fabricated school. demos/transportation/verify.mjs proves the roster equals the real producer's output, logic.js is byte-identical to the source, every page method is served, and drives the board, the time-travel and every write through the real endpoints; index.html is a hand switcher over board.html (build.json) and kiosk.html (build.kiosk.json). build-kiosk-logic.mjs vendors the Ramp Kiosk's Config.gs + Code.gs whole (ids scrubbed) plus DismissalClient into kiosk-logic.js; mock.js binds it to the same Drive folder and runs the vendored publishBoardTick, so rampApi/doGet read the Dismissal_RAMP_BOARD.json the board publishes"
     },
@@ -257,6 +251,9 @@
         "campus-sign-in-out-system/apps/office/pages/OfficeStyles.html",
         "campus-sign-in-out-system/apps/office/pages/ClientLogic.html"
       ],
+      "vendoredBy": [
+        "demos/campus-presence/build-logic.mjs"
+      ],
       "buildMethod": "demos/campus-presence/build-logic.mjs (vendors the source project's logic/*.js into logic.js, scrubbing the FACTS-Finder /exec default out of SETTINGS_DEFAULTS) + build-demo.mjs once per surface, configs committed at demos/campus-presence/build.{kiosk,board,muster,metrics}.json + hand switcher/data/mock. The three kiosk surfaces are ONE built page read with ?station=hs|el|kg, as the three iPads are (the kindergarten desk also runs the midday K4/K5 release). The staff pages' History link is swapped for an inline note (the demo has no history page). The board's Dismissal link and the Dismissal Board's Campus Presence link point at each other. Settings and Flags are intentionally not built. demos/campus-presence/verify.mjs re-checks the dataset, the mock's op contract and the vendored logic bundle against the source modules"
     },
     "transpo-routes": {
@@ -270,6 +267,9 @@
       "builtFrom": [
         "FACTS/transpo-department/apps/driver/pages/Driver.html",
         "FACTS/transpo-department/apps/office/pages/Office.html"
+      ],
+      "vendoredBy": [
+        "demos/transpo-routes/build-logic.mjs"
       ],
       "buildMethod": "build-logic.mjs vendors the source project's logic/*.js verbatim into logic.js, then build-demo.mjs x2 (configs committed at demos/transpo-routes/build.driver.json and build.office.json; _self + logic.js injected via the <base> replacement, token/who tokens replaced) + hand data/mock. verify.mjs re-checks privacy (real names matched by hash, never listed), vendored-logic drift, the mock contract and the NOT_CHECKED distinction."
     },
@@ -286,13 +286,10 @@
         "macs-scheduling/secondary/Form.html",
         "macs-scheduling/secondary/AdminApp.html",
         "macs-scheduling/spelling_bee/Form.html",
-        "macs-scheduling/spelling_bee/Config.js",
-        "macs-scheduling/spelling_bee/Code.js",
-        "macs-scheduling/spelling_bee/YearRollover.js",
-        "macs-scheduling/creative_writing/Form.html",
-        "macs-scheduling/creative_writing/Config.js",
-        "macs-scheduling/creative_writing/Code.js",
-        "macs-scheduling/creative_writing/YearRollover.js"
+        "macs-scheduling/creative_writing/Form.html"
+      ],
+      "vendoredBy": [
+        "demos/macs/build-logic.mjs"
       ],
       "buildMethod": "build-logic.mjs vendors Config/Auth/Intake/MacsBridge/AdminBackend/MasterList/TestData/YearRollover verbatim into logic.js (domain, admin address, sibling-app URL and Drive ids scrubbed; HistoricalData.js NEVER); mock.js supplies in-memory Sheets/Drive/cache/properties, the sibling forms project's roster + OTP endpoints and a mail outbox, and seeds three schools' entries through the real write path. Then build-demo.mjs x2 (demos/macs/build.form.json, build.admin.json: _self base + logic.js; the embedded crest swapped for a generated badge via replaceRegex; one admin button label). verify.mjs re-checks privacy (above all that HistoricalData never ships), vendored-logic drift, fresh builds, the mock contract and the gate / submission / admin / rollover behaviour.; plus the Spelling Bee and Creative Writing forms: build.spelling.json / build.writing.json, their Config/Code/YearRollover vendored into logic-spelling.js / logic-writing.js, answered by mock-competitions.js",
       "_sourceNote": "secondary/HistoricalData.js holds ~571 real minors' names and real school names; elementary/ and spelling_bee/ carry committed xlsx files with real registrations. None of it may be read for a demo. creative_writing/ and spelling_bee/ forms are the same pattern as the secondary form and are not showcased (Josh, 2026-10-08)."
@@ -308,6 +305,9 @@
         "FACTS/student-interface/Index.html",
         "FACTS/student-interface/Client.html"
       ],
+      "vendoredBy": [
+        "demos/student-portal/build-logic.mjs"
+      ],
       "buildMethod": "build-logic.mjs vendors the project's pure engines (Schedule/Due/Athletics/SchoolCal/News.js) and endpoint + data files (Code/Sports/Notify/Data/Bells.gs) verbatim into logic.js; mock.js supplies the config (not vendored: real calendar/Drive ids), in-memory Google services (including the memo-check sheet's Chapel and MemoNotes tabs) and a pinned clock, and feeds the Directory Search demo's SIS tabs as the staging workbook. Then build-demo.mjs (demos/student-portal/build.json: includeDir inlines Client.html; _self base + shared dataset + logic.js via the <base> replacement; boot object and inline payload from the mock; admin/deny branches and the personal credit removed). verify.mjs re-checks privacy, vendored-logic drift, the fresh build, the mock contract and the schedule / due engine / game card / closures / grades / attendance / prefs through the real code.",
       "_sourceNote": "The source Config.gs holds 21 real team calendar ids, a Drive folder id and the deployment id — never vendor it; tools/.probe-cache/ holds real FACTS dumps — never copy it."
     },
@@ -322,6 +322,9 @@
         "parent-teacher-conference-scheduling/Parent.html",
         "parent-teacher-conference-scheduling/Teacher.html"
       ],
+      "vendoredBy": [
+        "demos/conferences/build-logic.mjs"
+      ],
       "buildMethod": "build-logic.mjs vendors the source project's SERVER files (Settings, BookingService, ParentView, TeacherView, FactsData, RosterSync) verbatim into logic.js; mock.js supplies an in-memory SpreadsheetApp/LockService/Session so that code runs unchanged in the browser, and feeds the Directory Search demo's SIS tabs to the real syncRoster/syncTeachers at boot. Then build-demo.mjs x2 (demos/conferences/build.parent.json, build.teacher.json: _self base, shared dataset + logic.js via the <base> replacement, the SSO ticket token replaced). verify.mjs re-checks privacy, vendored-logic drift, fresh builds, the mock contract and a parent->teacher booking round trip through the real code."
     },
     "elc-assessments": {
@@ -333,6 +336,9 @@
       ],
       "builtFrom": [
         "elc/elc-student-assessments/Index.html"
+      ],
+      "vendoredBy": [
+        "demos/elc-assessments/build-logic.mjs"
       ],
       "buildMethod": "build-logic.mjs vendors every server .gs file verbatim (Assessments/*.gs, Registry, Code, Data, Growth, Dashboard, Compliance, Coverage, Summary, Requests, Roster, IepGoals, AccommodationsChecklist, Section504, Notifications, GradeAudit; never EasyCbmHistoricalImport.gs) into logic.js inside one IIFE with Google services, Date and console bindable; mock.js supplies an in-memory spreadsheet (every SHEET_SCHEMAS tab plus the three reference tabs), Session personas (?as=elc|admin|teacher|teacher4), Properties/Cache/Lock/Mail/ScriptApp stubs and a pinned server clock (Tue 2026-10-13), and replays data.js history through the real submitSession at boot. Then build-demo.mjs (demos/elc-assessments/build.json -> app.html: logic.js in <head>, the page's today reads routed to the pinned clock, school name/address/crest swapped, hashed nameAliases). index.html is a hand-written persona switcher. verify.mjs re-checks vendoring, fresh build, the mock contract, access scopes, the concern -> score -> fulfil round trip and privacy."
     }

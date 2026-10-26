@@ -47,6 +47,9 @@ export const WANT = {
   'Walkers.gs': ['WALKERS_TAB', 'WALKERS_HEADER', 'dsEnsureColumns_'],
   'Routes.gs': ['ROUTES_TAB', 'ROUTES_HEADER']
 };
+// What this script vendors, for tools/scan-portfolio.mjs: it fingerprints exactly these, and flags vendored code that starts
+// calling a source declaration WANT leaves out (setOverrides -> dsOverrideNotify_, missed on 2026-10-26).
+export const VENDORED = [{ dir: SRC, files: ['Config.gs'], decls: WANT }];
 export const SERVICES = ['SpreadsheetApp', 'DriveApp', 'CacheService', 'PropertiesService', 'Session', 'Utilities', 'MailApp',
   'ScriptApp', 'HtmlService', 'LockService', 'AdminDirectory', 'Logger'];
 export const EXPORTS = ['dismissalApi', 'pickupsApi', 'setOverride', 'setOverrides', 'plannedApi', 'historyApi', 'setStanding', 'setWalker',

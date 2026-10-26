@@ -108,6 +108,9 @@ export const COMPETITIONS = {
   }
 };
 export const COMPETITION_FILES = ['Config.js', 'Code.js', 'YearRollover.js'];
+// What this script vendors (all three bundles), for tools/scan-portfolio.mjs.
+export const VENDORED = [{ dir: SRC, files: FILES },
+  ...Object.values(COMPETITIONS).map((c) => ({ dir: c.src, files: COMPETITION_FILES }))];
 export const COMPETITION_SERVICES = ['SpreadsheetApp', 'DriveApp', 'Utilities', 'Session', 'Logger', 'HtmlService'];
 
 export function buildCompetitionLogic(kind) {

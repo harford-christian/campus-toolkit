@@ -49,6 +49,8 @@ export const FILES = [
   'Seeds.js'                                              // the built-in form definitions (adminReseedForms)
 ];
 export const APPS = ['builder', 'chooser', 'runner-public', 'runner-staff', 'runner-macs'];
+// What this script vendors, for tools/scan-portfolio.mjs.
+export const VENDORED = [{ dir: SRC, files: [...FILES, ...APPS.map((app) => 'apps/' + app + '/server/Router.js')] }];
 
 // Mailboxes named in comments and seed rows (domain already scrubbed). Hash of the lowercased local part,
 // or of the whole address for an off-domain one.
