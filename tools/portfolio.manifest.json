@@ -341,6 +341,36 @@
         "demos/elc-assessments/build-logic.mjs"
       ],
       "buildMethod": "build-logic.mjs vendors every server .gs file verbatim (Assessments/*.gs, Registry, Code, Data, Growth, Dashboard, Compliance, Coverage, Summary, Requests, Roster, IepGoals, AccommodationsChecklist, Section504, Notifications, GradeAudit; never EasyCbmHistoricalImport.gs) into logic.js inside one IIFE with Google services, Date and console bindable; mock.js supplies an in-memory spreadsheet (every SHEET_SCHEMAS tab plus the three reference tabs), Session personas (?as=elc|admin|teacher|teacher4), Properties/Cache/Lock/Mail/ScriptApp stubs and a pinned server clock (Tue 2026-10-13), and replays data.js history through the real submitSession at boot. Then build-demo.mjs (demos/elc-assessments/build.json -> app.html: logic.js in <head>, the page's today reads routed to the pinned clock, school name/address/crest swapped, hashed nameAliases). index.html is a hand-written persona switcher. verify.mjs re-checks vendoring, fresh build, the mock contract, access scopes, the concern -> score -> fulfil round trip and privacy."
+    },
+    "memo-check": {
+      "title": "Memo Check",
+      "demoFolder": "demos/memo-check",
+      "launch": "demos/memo-check/index.html",
+      "sourceProject": [
+        "campus-control/memo-check"
+      ],
+      "builtFrom": [
+        "campus-control/memo-check/QueuePage.html"
+      ],
+      "vendoredBy": [
+        "demos/memo-check/build-logic.mjs"
+      ],
+      "buildMethod": "build-logic.mjs vendors Plan.js and Queue.js whole and named declarations of Config/Report/Analyze/Applied/Mail/Alerts/Main (the hourly memoCheckTick) into logic.js, leaving out every real id and address, the door inventory and venue notes (real door names in comments map onto the demo inventory) and the production prompt's campus rules (mcSystemPromptCore_, a stand-in in mock.js). mock.js supplies Gmail, Sheets, Calendar, an outbox, a pinned clock and a canned answer to mcAnalyze_'s one HTTPS call, and replays data.js's history through the real tick, mcQueueDecide and the applied-check. build-demo.mjs builds queue.html from QueuePage.html (demos/memo-check/build.json: logic.js first; BOOT from the in-browser mcQueueBootstrap_). inbox.html, digest.html and the index.html switcher are hand-written viewers over the same state. verify.mjs checks privacy against the source's own values, vendoring, the fresh build, the canned replies against MC_FINDINGS_SCHEMA and the pipeline end to end."
+    },
+    "onboarding-tracker": {
+      "title": "Onboarding Tracker",
+      "demoFolder": "demos/onboarding-tracker",
+      "launch": "demos/onboarding-tracker/index.html",
+      "sourceProject": [
+        "hcs-onboarding-offboarding"
+      ],
+      "builtFrom": [
+        "hcs-onboarding-offboarding/Index.html"
+      ],
+      "vendoredBy": [
+        "demos/onboarding-tracker/build-logic.mjs"
+      ],
+      "buildMethod": "build-logic.mjs vendors the named declarations of Code.js (sync, parser, discussion log, four endpoints) into logic.js, leaving out SPREADSHEET_ID, DASHBOARD_URL and SCHOOL_DOMAIN. mock.js supplies the sheet (header row = the layout Code.js documents; typed dates become Dates as in Sheets) and the Gmail label, and replays data.js's emails, ticks and one manual entry through the real code. build-demo.mjs builds dashboard.html from Index.html (demos/onboarding-tracker/build.json) with two demo-only colToKey fixes for a source bug (keys no header can produce); verify.mjs fails once the source is fixed. inbox.html and the index.html switcher are hand-written."
     }
   },
   "coveredProjects": [
@@ -385,7 +415,17 @@
     "FACTS/transportation-kiosk",
     "athletics/talon-hub/apps/fan",
     "macs-scheduling/spelling_bee",
-    "macs-scheduling/creative_writing"
+    "macs-scheduling/creative_writing",
+    "campus-control/memo-check",
+    "hcs-onboarding-offboarding"
+  ],
+  "skippedProjects": [
+    "FACTS/student-absence-tracker",
+    "FACTS/student-absence-tracker/dashboard",
+    "campus-control/campus-control-sandbox",
+    "macs-forms",
+    "staff-portal/apps/portal",
+    "uid-events-email-notification-system"
   ],
   "excludeDirs": [
     "apps-script-showcase",
@@ -396,5 +436,6 @@
     "/legacy/",
     "/.clasp-store/",
     "hcs-custom-forms-form-contexts"
-  ]
+  ],
+  "_skippedNote": "skippedProjects: demoable projects Josh decided not to showcase (2026-10-26, picked Memo Check and the onboarding dashboard from eight candidates). The scanner treats them like coveredProjects, so they stop surfacing as NEW."
 }

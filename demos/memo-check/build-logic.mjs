@@ -55,7 +55,7 @@ export const WANT = {
   'Main.js': ['memoCheckTick']
 };
 // What this script vendors, for tools/scan-portfolio.mjs.
-export const VENDORED = [{ dir: SRC, files: WHOLE.concat(Object.keys(WANT)) }];
+export const VENDORED = [{ dir: SRC, files: WHOLE, decls: WANT }];
 
 // Apps Script services the code reaches for, plus Date (so mock.js can pin the clock). Bound by mock.js.
 export const SERVICES = ['SpreadsheetApp', 'CalendarApp', 'GmailApp', 'MailApp', 'UrlFetchApp', 'PropertiesService', 'CacheService',

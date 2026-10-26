@@ -152,6 +152,32 @@
         '<p>Idempotent by design: each account is stamped when emailed, the scanner is gated by a start date and a circuit breaker, and the sender never touches anyone created before rollout.</p>'
     },
 
+    'onboarding-tracker': {
+      icon: '🧾', title: 'Onboarding Tracker', launch: 'demos/onboarding-tracker/index.html',
+      summary: 'One IT + HR checklist for every new hire, built from the identity platform&rsquo;s approval emails: start dates with a countdown, eleven checklist items split by team, a discussion log gathered from the request&rsquo;s comments, and a status that follows the approval or rejection on its own.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>New-hire requests are approved in the identity platform, but the work that follows &mdash; a Google account, a laptop, a badge, the offer letter, I-9, direct deposit, the handbook, orientation, emergency contacts, benefits &mdash; is split between IT and HR, with nothing shared to track it. Whether the person starting Monday had an account yet was a question asked by email.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>Every ten minutes the app reads the identity platform&rsquo;s notifications from a Gmail label. A new request becomes a record with the hire&rsquo;s start date, department, role and location parsed from the email; a later <b>approved</b>, <b>rejected</b> or <b>revoked</b> email moves its status; a comment on the request is added to that record&rsquo;s discussion log under the commenter&rsquo;s name. The dashboard shows pending hires as cards with a countdown and separate IT and HR progress, with approved and rejected ones below, search, and a department filter.</p>' +
+        '<p>Opening a hire gives the full checklist (each tick is saved straight to the sheet), the discussion log, a link back to the request, and a manual status override. A manual-entry form covers a hire who is not in the identity system yet.</p>' +
+        '<h4>In the demo</h4>' +
+        '<p>The demo runs the app&rsquo;s own server code in the browser over an in-memory sheet and mailbox, with fabricated hires dated relative to today. Open a pending hire and tick items, then press <b>Run the 10-minute sync</b>: two notifications that arrived this morning become a new hire&rsquo;s card and a new comment on another record. Changes last for the visit; Reset replays the sample history.</p>'
+    },
+
+    'memo-check': {
+      icon: '📨', title: 'Memo Check', launch: 'demos/memo-check/index.html',
+      summary: 'An AI reader for the staff email list. It compares each memo with what Campus Control already plans, proposes only the gaps (bell-grid swaps, early releases, closures, door windows for events) and queues them for a schedule editor. Nothing changes on its own, and an hourly check confirms each approved change reached the plan.',
+      body:
+        '<h4>The problem</h4>' +
+        '<p>The weekly memo is where schedule changes are announced: chapel moving to another day, early release for conferences, an evening concert, an in-service day. Campus Control rings the bells, unlocks the doors and plays the PA from its own master schedule, so every one of those lines had to be noticed by someone, turned into the right clicks, and remembered. A missed line meant the wrong bell grid or a locked door at a 7 PM concert; a correction two days later meant undoing what had already been set up.</p>' +
+        '<h4>How it helps now</h4>' +
+        '<p>Every hour Memo Check reads new mail to the staff list, replies included, so a correction is read against the memo it corrects. It takes a snapshot of what the plan says for the next three weeks, and one call to Claude turns the email into structured findings, guided by the school&rsquo;s written norms and an editable sheet of venue-to-door rules. Each finding carries the email&rsquo;s exact words, what the plan says now, the proposed action, the clicks to make and a confidence.</p>' +
+        '<p>The app then checks the answer. A date outside the window is dropped, a date already past becomes information, and a proposal already queued, approved or denied from an earlier memo is marked a duplicate rather than raised again. Firm proposals and low-confidence ones go out in a digest email. In the review queue, a schedule editor (the same people who can change the plan) can adjust times and doors before approving, or deny with a reason so the proposal never comes back. Memo Check never writes to Campus Control itself: a person makes the change, the hourly check marks the row <b>applied</b> once the plan shows it, and sends one reminder if it does not.</p>' +
+        '<h4>In the demo</h4>' +
+        '<p>The demo runs Memo Check&rsquo;s own server code in the browser on a fabricated school, with the clock pinned to Monday 2 November 2026. Three emails have reached the staff list: two weekly memos and a correction sent as a reply. The model&rsquo;s answers are canned and shown in full on the Staff email screen; everything after the call is the app&rsquo;s own code, including the queue rows, the duplicate the correction raised, the digests and the four changes already marked applied. Approve the Wednesday chapel swap, press <b>Make the Eagle Eye clicks</b>, then <b>Run the hourly check</b>, and the row moves to Applied. The door names are invented and the production prompt&rsquo;s campus rules are summarised; changes last for the visit.</p>'
+    },
+
     'transportation': {
       icon: '🚌', title: 'Dismissal Board', launch: 'demos/transportation/index.html',
       summary: 'A staff-only dismissal board: who is in each bus, van and car lane this afternoon, and who should NOT be waited for because they are absent, left early or were signed out at lunch. Built nightly from the SIS, refreshed from attendance every 15 minutes, with route colours matching the sticks children carry and today-only changes that record who made them.',

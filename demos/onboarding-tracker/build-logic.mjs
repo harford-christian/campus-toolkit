@@ -22,7 +22,7 @@ export const SRC = path.resolve(HERE, '../../../hcs-onboarding-offboarding');
 export const WANT = ['TAB_NAME', 'GMAIL_LABEL', 'getDashboardData', 'updateChecklistItem', 'COLS', 'processInboundOnboarding',
   'processDiscussionLog', 'parseOnboardingEmail', 'buildRowData', 'findRowById', 'manualOverrideStatus', 'addManualOnboardingRequest'];
 // What this script vendors, for tools/scan-portfolio.mjs.
-export const VENDORED = [{ dir: SRC, files: ['Code.js'] }];
+export const VENDORED = [{ dir: SRC, files: [], decls: { 'Code.js': WANT } }];
 
 export const SERVICES = ['SpreadsheetApp', 'GmailApp', 'Session', 'Utilities', 'HtmlService'];
 export const EXPORTS = ['getDashboardData', 'updateChecklistItem', 'manualOverrideStatus', 'addManualOnboardingRequest',
