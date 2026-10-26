@@ -350,7 +350,10 @@
         "campus-control/memo-check"
       ],
       "builtFrom": [
-        "campus-control/memo-check/QueuePage.html"
+        "campus-control/memo-check/QueuePage.html",
+        "campus-control/memo-check/Config.js",
+        "campus-control/memo-check/Alerts.js",
+        "campus-control/memo-check/Analyze.js"
       ],
       "vendoredBy": [
         "demos/memo-check/build-logic.mjs"
@@ -365,7 +368,8 @@
         "hcs-onboarding-offboarding"
       ],
       "builtFrom": [
-        "hcs-onboarding-offboarding/Index.html"
+        "hcs-onboarding-offboarding/Index.html",
+        "hcs-onboarding-offboarding/Code.js"
       ],
       "vendoredBy": [
         "demos/onboarding-tracker/build-logic.mjs"
