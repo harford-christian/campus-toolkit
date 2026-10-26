@@ -153,7 +153,7 @@
   ];
   G.ATTENDANCE_TODAY_TAB = 'Attendance Today'; G.ATTENDANCE_TODAY_KEEP = ['Student ID', 'Date', 'Code', 'Status', 'Detail', 'Excused']; G.ATTENDANCE_TODAY_TTL_SECS = 300;
   G.DATA_SHEET_NAME = 'Student_Portal_DATA';
-  G.DATA_TABS = { homework: 'Homework', assignments: 'Assignments', grades: 'Grades', averages: 'Averages', attendance: 'Attendance', meta: 'Meta', userState: 'UserState', log: 'SyncLog', adminViews: 'AdminViews' };
+  G.DATA_TABS = { homework: 'Homework', assignments: 'Assignments', grades: 'Grades', averages: 'Averages', averagesPast: 'AveragesPast', attendance: 'Attendance', meta: 'Meta', userState: 'UserState', log: 'SyncLog', adminViews: 'AdminViews' };
   G.ADMIN_VIEWS_KEEP = 5000; G.ATHLETICS_TEAMS = D.teams; G.SCHOOL_CALENDAR_ID = 'school-events-demo';
   G.PROP_ATHLETICS_ENABLED = 'ATHLETICS_ENABLED'; G.PROP_ATTENDANCE_ENABLED = 'ATTENDANCE_ENABLED'; G.PROP_AVERAGES_ENABLED = 'AVERAGES_ENABLED';
   // News & Info (phase 2/3 upstream): the memo-check sheet's tabs and the flag, as Config.gs declares them.
@@ -165,6 +165,13 @@
   G.PROP_QUARTER_DATES = 'QUARTER_DATES'; G.PROP_TERM_ID = 'TERM_ID'; G.PROP_ROLLOVER_TIME = 'ROLLOVER_TIME'; G.DEFAULT_ROLLOVER_TIME = '16:00';
   G.PROP_DATA_VERSION = 'DATA_VERSION'; G.PROP_STAGING_CONTENT_VERSION = 'STAGING_CONTENT_VERSION'; G.PROP_GRADES_VERSION = 'GRADES_VERSION'; G.PROP_BOOT_SALT = 'BOOT_SALT';
   G.BOOT_CACHE_TTL_SECS = 21600; G.STAGING_VERSION_TTL = 900; G.PREFS_CACHE_TTL_SECS = 21600;
+  // Each data tab's own content version (upstream 2026-10-25); unset reads as '0', as it does on a fresh project.
+  G.PROP_AVERAGES_VERSION = 'AVERAGES_VERSION'; G.PROP_AVERAGES_PAST_VERSION = 'AVERAGES_PAST_VERSION'; G.PROP_ATTENDANCE_VERSION = 'ATTENDANCE_VERSION';
+  G.PROP_GATE0_TEST_EMAIL = 'GATE0_TEST_EMAIL';
+  G.dataSheetOkKey_ = function (id) { return 'dsok_' + id; };
+  // The request path's cached Script Properties snapshot (upstream 2026-10-13). The demo's props_ IS the in-memory
+  // store, so there is nothing to snapshot; these are the globals the vendored code sets and prefetches by name.
+  G.propsSnap_ = null; G.propsFromCache_ = false; G.PROPS_FAST_ = false; G.PROPS_SNAP_KEY = 'propsnap_v1';
   G.props_ = function () { return props; };
   G.requireOperator_ = function () { throw new Error('Not authorized.'); };
   G.getRolloverMin_ = function () { return 16 * 60; };
@@ -186,6 +193,11 @@
     return { email: s.email, isStudent: true, isAdmin: false, studentId: s.id, viewingAs: '', ou: '/Students', suspended: false,
       factsId: s.id, fullName: s.name, lookupError: '', denyReason: '' };
   };
+  // Auth.gs's cache key for a resolved caller: the request path prefetches it by name.
+  G.whoKey_ = function (email) { return 'who_' + G.APP_VERSION + '_' + email; };
+  // Sync.gs (not vendored) emails the admins when no sync has finished in time. With no run recorded
+  // (LAST_SYNC_MS unset) the real check returns false without reading anything else, and so does this one.
+  G.staleAlertCheck_ = function () { return false; };
 
   /* ---------- boot-time pieces the sync would have written ----------
      Meta.lastSyncAt is relative to the visitor's real clock (the page prints "updated N min ago" against

@@ -4,8 +4,9 @@
 //
 // What is vendored, verbatim:
 //   Schedule.js  Due.js  Athletics.js  SchoolCal.js   — the project's PURE engines (period join, reverse Friday,
-//                                                       due-date parsing of teacher prose, game-day dismissal
-//                                                       parsing, school-calendar closures)
+//   News.js  GradeView.js                               due-date parsing of teacher prose, game-day dismissal
+//                                                       parsing, school-calendar closures, the News card, the
+//                                                       Grades tab's quarters)
 //   Code.gs  Sports.gs  Notify.gs  Data.gs  Bells.gs — the endpoints the page calls and the cache/data plumbing
 //                                                       behind them, exactly as the server runs them
 // What is NOT vendored, and why:
@@ -30,7 +31,7 @@ import { aliasStaffNames, aliasPhrases, PHRASE_ALIASES } from '../../tools/staff
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SRC = path.resolve(HERE, '../../../FACTS/student-interface');
 
-export const FILES = ['Schedule.js', 'Due.js', 'Athletics.js', 'SchoolCal.js', 'News.js', 'Code.gs', 'Sports.gs', 'Notify.gs', 'Data.gs', 'Bells.gs'];
+export const FILES = ['Schedule.js', 'Due.js', 'Athletics.js', 'SchoolCal.js', 'News.js', 'GradeView.js', 'Code.gs', 'Sports.gs', 'Notify.gs', 'Data.gs', 'Bells.gs'];
 
 // Apps Script services the vendored code reaches for. Bound by mock.js (env) before the first call.
 export const SERVICES = ['SpreadsheetApp', 'CacheService', 'PropertiesService', 'DriveApp', 'UrlFetchApp', 'LockService',

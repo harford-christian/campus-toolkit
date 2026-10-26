@@ -136,7 +136,7 @@ var Sched = (function () {
   /** Name / grade / homeroom for one student — Provisioning first (one row per student), then the directory tab. */
   function studentProfile(tabs, studentId, classes) {
     var sid = String(studentId || '').trim();
-    var p = { id: sid, name: '', firstName: '', grade: '', homeroom: '', homeroomTeacher: '', email: '', gender: '' };
+    var p = { id: sid, name: '', firstName: '', grade: '', homeroom: '', homeroomTeacher: '', email: '', gender: '', homeschool: false };
     var prov = tabByName(tabs, [PROVISIONING_TAB_NAME]);
     if (prov && (prov.values || []).length > 1) {
       var h = headerMap(prov.values[0]);
@@ -160,6 +160,7 @@ var Sched = (function () {
         if (!p.homeroom) p.homeroom = cell2('Homeroom');
         p.homeroomTeacher = cell2('Homeroom Teacher');
         p.gender = cell2('Gender'); // athletics: which team calendar is theirs when the course names no gender
+        p.homeschool = cell2('Homeschool').toUpperCase() === 'Y'; // FACTS flag via facts-api-sync (2026-10-09)
         if (!p.grade) p.grade = cell2('Grade Level');
         if (!p.name) { var ln = cell2('LastName FirstName').split(/\s+/); p.name = ln.length > 1 ? ln.slice(1).join(' ') + ' ' + ln[0] : ln[0]; }
         break;
@@ -374,8 +375,30 @@ var Sched = (function () {
     return w.length <= 5 ? w : w.slice(0, 1).toUpperCase() + w.slice(1, 4).toLowerCase();
   }
 
+  /**
+   * One attendance row (Attendance Today, or the quarter history) → what the student reads.
+   *
+   * ON CAMPUS OUTRANKS AN ABSENT CODE (Josh, 2026-10-12). facts-api-sync appends `On Campus` (Y/blank) and
+   * `Arrived At` (HH:mm) to Attendance Today: the kiosk saw this child sign in late and not leave. FACTS can still
+   * hold an absent code (the 200-minute rule codes a late 7th-12th grader AE; the office sometimes marks AE in
+   * homeroom before they walk in). The producer already writes Status 'Late' for these; an 'Absent' here too reads
+   * Late, so an older tab can't contradict the kiosk. The FACTS code stays in the line — it is the record.
+   * Read by header NAME: the history tab and a tab written before 2026-10-12 have neither column and come out as
+   * they always did. Past days are deliberately NOT re-judged (Josh, 2026-10-12): history is FACTS's record.
+   */
+  function attendanceRecord(r) {
+    var s = function (k) { return cellToString(r && r[k]).trim(); };
+    var rec = { date: s('Date').slice(0, 10), code: s('Code'), status: s('Status'), detail: s('Detail'), excused: s('Excused') };
+    if (/^y/i.test(s('On Campus')) && /absent/i.test(rec.status + ' ' + rec.detail)) {
+      var at = timeLabel(s('Arrived At'));
+      rec.detail = (at ? 'Signed in ' + at : 'In school') + ' · FACTS: ' + (rec.detail || rec.code || rec.status);
+      rec.status = 'Late';
+    }
+    return rec;
+  }
+
   return {
-    cellToString: cellToString, tabByName: tabByName, headerMap: headerMap,
+    cellToString: cellToString, tabByName: tabByName, headerMap: headerMap, attendanceRecord: attendanceRecord,
     timeToMin: timeToMin, timeLabel: timeLabel, timeShort: timeShort,
     buildPeriodTimes: buildPeriodTimes, isHomeroomClass: isHomeroomClass,
     studentClasses: studentClasses, studentProfile: studentProfile, teacherEmails: teacherEmails,
@@ -439,16 +462,22 @@ var Due = (function () {
 
   /** Furthest ahead a homework due date may plausibly be typed (longest real lead seen: 60 days). */
   var MAX_LEAD_DAYS = 75;
+  /** The same, for a bare M-D with no cue word in front ("TChp2 9-30"). Longest real one in the corpus: 13 days
+      (release audit 2026-10-25). Without this cap a problem range — "Do 1-20 odd" typed 11/10 — became Jan 20. */
+  var MAX_UNCUED_LEAD_DAYS = 21;
   /** How far back an explicit date may sit and still be the same task (teacher re-typing a past-due line). */
   var MAX_LAG_DAYS = 7;
   /** Undated identical text re-typed within this many days is the same rolling task (covers a weekend). */
   var ROLLING_GAP_DAYS = 4;
 
   // Things that FOLLOW a number pair and prove it is not a date (all seen in the corpus).
-  var UNIT_AFTER = /^\s*(-?\s*\d+\s*)?(pages?|pgs?\b|pp\b|lines?|min(ute)?s?|new\b|things|problems|questions|sentences|words|paragraphs|items|points|pts|cm|inch(es)?|percent|%|x\b|times|verses?|chapters?|ch\b|chp\b|lessons?|sections?|steps?)/i;
+  var UNIT_AFTER = /^\s*(-?\s*\d+\s*)?(pages?|pgs?\b|pp\b|lines?|min(ute)?s?|new\b|things|problems|questions|sentences|words|paragraphs|items|points|pts|cm|inch(es)?|percent|%|x\b|times|verses?|chapters?|ch\b|chp\b|lessons?|sections?|steps?|odds?\b|evens?\b)/i;
   // Things that PRECEDE a number pair and prove it is a page/chapter/problem reference — "p. 9-10", "pp. 281-286",
-  // "ch. 10-11", "#3-12", "Lesson 1.1-1.3", "problems 5-10".
-  var REF_BEFORE = /(\bp{1,2}\.?|\bpages?|\bpgs?\.?|\bch(ap(ter)?)?s?\.?|\bchp\.?|\blessons?|\bsec(tion)?s?\.?|\bproblems?|\bnos?\.|\bnumbers?|\bquestions?|\bex(ercise)?s?\.?|\bitems?|#|§)\s*$/i;
+  // "ch. 10-11", "#3-12", "Lesson 1.1-1.3", "problems 5-10", "Do 1-20".
+  var REF_BEFORE = /(\bp{1,2}\.?|\bpages?|\bpgs?\.?|\bch(ap(ter)?)?s?\.?|\bchp\.?|\blessons?|\bsec(tion)?s?\.?|\bproblems?|\bnos?\.|\bnumbers?|\bquestions?|\bex(ercise)?s?\.?|\bitems?|\bdo|\bcomplete|\banswer|\battempt|#|§)\s*$/i;
+  // A word just before a number pair that says a DATE follows ("due 10-27", "from 9-21 to 9-24", "Test on Friday, 9/18").
+  // Cued dates get the full MAX_LEAD_DAYS; a bare pair gets MAX_UNCUED_LEAD_DAYS.
+  var DATE_CUE = /\b(due|on|by|for|from|to|until|till|thru|through|before|test|quiz|exam|assessment|begins?|starting|date|mon(day)?|tues?(day)?|wed(nesday)?|thur?s?(day)?|fri(day)?)\b[\s:,.\-–(]*$/i;
 
   function clean(s) { return String(s || '').replace(/ /g, ' ').replace(/[ \t]+/g, ' ').trim(); }
 
@@ -478,8 +507,17 @@ var Due = (function () {
 
   /** Normalise a segment for dedupe: lowercase, strip dates/punctuation/whitespace. */
   function normKey(s) {
-    return clean(s).toLowerCase()
-      .replace(/\b(1[0-2]|0?[1-9])\s?[-\/.]\s?(3[01]|[12]?\d)(?:[-\/.]\d{2,4})?\b/g, ' ')
+    return normWords(clean(s).toLowerCase().replace(/\b(1[0-2]|0?[1-9])\s?[-\/.]\s?(3[01]|[12]?\d)(?:[-\/.]\d{2,4})?\b/g, ' '));
+  }
+  /**
+   * Key for an UNDATED carry-forward task: normKey without stripping number pairs. normKey treats every "1-7" or "1.2"
+   * as a possible date, which is right for a DATED task (its dueOn is part of the key) but wrong here: "Read pg. 1-7 in
+   * reader." and "Read pg. 8-13 in reader." typed on consecutive days became ONE rolling item that kept showing pages
+   * 1-7 (10 items in 10 classes of the real corpus; release audit 2026-10-25, N1).
+   */
+  function rollKey(s) { return normWords(clean(s).toLowerCase()); }
+  function normWords(s) {
+    return s
       .replace(/\b(next\s+)?(mon|tue|tues|wed|thu|thur|thurs|fri|monday|tuesday|wednesday|thursday|friday|tomorrow|tonight|today)\b\.?/g, ' ')
       .replace(/\b(due|by|on)\b/g, ' ')
       .replace(/[^a-z0-9]+/g, ' ').trim();
@@ -503,26 +541,33 @@ var Due = (function () {
     var anchors = [];
     var m, re;
 
-    // (a) numeric M-D, M/D, M.D with optional year — "due 11-6", "on10-23", "9/22", "9-11-26"
-    re = /(1[0-2]|0?[1-9])\s?([-\/.])\s?(3[01]|[12]?\d)(?:\s?\2\s?((?:19|20)?\d{2}))?(?![\d:])/g;
+    // (a) numeric M-D or M/D with optional year — "due 11-6", "on10-23", "9/22", "9-11-26".
+    //     NOT M.D: 0 of 429 real dates in the corpus use a dot, and "lesson 1.1 and read 1.2" typed in late October
+    //     became due Jan 2 and dropped off the student's list (release audit 2026-10-25, C2). No spaces around the
+    //     separator either (0 real; "2. 4 synonyms" was Feb 4).
+    re = /(1[0-2]|0?[1-9])([-\/])(3[01]|[12]?\d)(?:\2((?:19|20)?\d{2}))?(?![\d:])/g;
     while ((m = re.exec(text))) {
       var pre = text.charAt(m.index - 1);
       if (/[\d.:$#]/.test(pre)) continue;                          // 281-286, 1:16, 5.1-5.3
+      var cued = false;
       if (/[A-Za-z]/.test(pre)) {
         // glued to a letter: "on10-23" is fine (a preposition precedes), "Q2.1-2.2" is not
         if (!/(on|by|to|due|from|until|thru|through|of)$/i.test(text.slice(Math.max(0, m.index - 8), m.index))) continue;
+        cued = true;
       }
       if (UNIT_AFTER.test(text.slice(re.lastIndex))) continue;
       if (REF_BEFORE.test(text.slice(Math.max(0, m.index - 12), m.index))) continue;   // "p. 9-10" is pages, not Sept 10
-      var due = resolveMonthDay(+m[1], +m[3], m[4], planDate);
+      cued = cued || DATE_CUE.test(text.slice(Math.max(0, m.index - 25), m.index));
+      var due = resolveMonthDay(+m[1], +m[3], m[4], planDate, cued ? MAX_LEAD_DAYS : MAX_UNCUED_LEAD_DAYS);
       if (!due) continue;
       anchors.push({ start: m.index, end: re.lastIndex, dueOn: due, kind: 'numeric', raw: m[0].trim() });
     }
 
-    // (b) month name — "Sept. 17", "September 11th", "September 18, 2026"
-    re = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+(3[01]|[12]?\d)(?:st|nd|rd|th)?\b(?:,?\s*((?:19|20)\d{2}))?/ig;
+    // (b) month name — "Sept. 17", "September 11th", "September 18, 2026". Real month spellings only: a bare
+    //     prefix read "Read Mark 3:1-12" as March 3 and "Decimals 2 worksheet" as Dec 2 (release audit 2026-10-25).
+    re = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b\.?\s+(3[01]|[12]?\d)(?:st|nd|rd|th)?\b(?:,?\s*((?:19|20)\d{2}))?/ig;
     while ((m = re.exec(text))) {
-      var mo = MONTHS[m[1].toLowerCase()];
+      var mo = MONTHS[m[1].toLowerCase().slice(0, 3)];
       if (!mo) continue;
       var due2 = resolveMonthDay(mo, +m[2], m[3], planDate);
       if (!due2) continue;
@@ -533,14 +578,25 @@ var Due = (function () {
     re = /\b(tomm?orr?ow|tmrw|tonight|today|this weekend|over the weekend)\b/ig;
     while ((m = re.exec(text))) {
       var w = m[1].toLowerCase();
-      var due3 = (w === 'this weekend' || w === 'over the weekend')
-        ? nextSchoolDay(nextWeekday(planDate, 5), noSchool)                 // after Friday → Monday
-        : rollToSchoolDay(addDays(planDate, 1), noSchool);                  // tomorrow / tonight / today → next class day
+      var due3;
+      if (w === 'today') {
+        /* "Chapter 1 Test today", "Essay due today": something happens IN class today → due on the plan date itself.
+           It used to mean "next class day", so that real test was listed (and reminded) for the day AFTER it was taken.
+           Any other "today" is narration ("We reviewed expectations today", "since we didn't go over details today",
+           "Memory Verse was sent home today") and is not a date at all (release audit 2026-10-25, C3). */
+        if (!TODAY_EVENT.test(text.slice(Math.max(0, m.index - 40), m.index))) continue;
+        due3 = rollToSchoolDay(planDate, noSchool);
+      } else {
+        due3 = (w === 'this weekend' || w === 'over the weekend')
+          ? nextSchoolDay(nextWeekday(planDate, 5), noSchool)               // after Friday → Monday
+          : rollToSchoolDay(addDays(planDate, 1), noSchool);                // tomorrow / tonight → next class day
+      }
       anchors.push({ start: m.index, end: re.lastIndex, dueOn: due3, kind: 'relative', raw: m[0] });
     }
 
-    // (d) weekday names, optionally preceded by "next" / "next week" — "due Monday", "Quiz Friday", "NEXT week Friday"
-    re = /\b(next\s+(?:week\s+)?)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues?|weds?|thur?s?|fri|sat|sun)\b\.?/ig;
+    // (d) weekday names, optionally preceded by "next" / "next week" — "due Monday", "Quiz Friday", "NEXT week Friday".
+    //     Saturday/Sunday only spelled out: "Sat"/"Sun" matched "SAT vocab" and "Read about the Sun" (0 real uses as days).
+    re = /\b(next\s+(?:week\s+)?)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues?|weds?|thur?s?|fri)\b\.?/ig;
     while ((m = re.exec(text))) {
       var wd = WEEKDAYS[m[2].toLowerCase()];
       if (wd === undefined) continue;
@@ -593,7 +649,8 @@ var Due = (function () {
     return mondayA === mondayB;
   }
   /** Resolve month/day (+optional year) to the ISO date that plausibly follows planDate, or '' if implausible. */
-  function resolveMonthDay(mo, day, yearStr, planDate) {
+  function resolveMonthDay(mo, day, yearStr, planDate, maxLead) {
+    if (maxLead == null) maxLead = MAX_LEAD_DAYS;
     if (mo < 1 || mo > 12 || day < 1 || day > 31) return '';
     var candidates = [];
     if (yearStr) {
@@ -607,7 +664,7 @@ var Due = (function () {
       var iso = candidates[i] + '-' + pad2(mo) + '-' + pad2(day);
       if (toIso(toDate(iso)) !== iso) continue; // Feb 30 etc.
       var delta = daysBetween(planDate, iso);
-      if (delta >= -MAX_LAG_DAYS && delta <= MAX_LEAD_DAYS) return iso;
+      if (delta >= -MAX_LAG_DAYS && delta <= maxLead) return iso;
       if (yearStr && delta >= -MAX_LAG_DAYS && delta <= 400) return iso; // explicit year: trust it further out
     }
     return '';
@@ -683,8 +740,12 @@ var Due = (function () {
     result.lines = lines;
     var defaultDue = nextSchoolDay(planDate, noSchool);
 
+    var dropped = 0;
     lines.forEach(function (line) {
       if (INFO_LINE.test(line)) return;                       // "Welcome to Sophomore English!" — keep in detail, not a task
+      // "HW: None" and "CW: Unit 1 Test" — the homework slot saying there is none, and a record of what happened IN
+      // class. Both were listed as tasks due the next day (release audit 2026-10-25, H2). Kept in the detail.
+      if (HW_NONE_LINE.test(line) || (CW_LINE.test(line) && !CW_COMES_HOME.test(line))) { dropped++; return; }
       if (/^https?:\/\/\S+$/i.test(line) && result.segments.length) {   // a bare link belongs to the task above it
         result.segments[result.segments.length - 1].text += ' ' + line;
         return;
@@ -749,6 +810,7 @@ var Due = (function () {
         }
       }
     });
+    if (dropped && !result.segments.length) { result.noHomework = true; result.info = raw; }
     return result;
   }
 
@@ -760,6 +822,14 @@ var Due = (function () {
   var QUALIFIER_START = /^\s*[-–,;:(]?\s*(due|by|online|in class|turn(ed)? in|submit(ted)?|bring)\b/i;
   /** Trailing words that continue the previous task rather than start a new one. */
   var GLUE_WORDS = /^(by|will|must|use|print|bring|and|no|not|make sure|please|in class|due|turn in|submit)\b/i;
+  /** Text before "today" that makes it an event today ("Chapter 1 Test today", "Essay due today"). */
+  var TODAY_EVENT = /\b(due|tests?|quiz(zes)?|exams?|assessments?|presentations?|projects?|essays?|labs?|reports?|papers?|speech(es)?)\b[^.!?;]*$/i;
+  /** A line that only says the homework slot is empty: "HW: None", "Homework - none", "HW: N/A". */
+  var HW_NONE_LINE = /^[\s\-–•*]*(hw|homework|home work)\s*[:\-–]\s*(none|n\/a|nothing|no(\s+(hw|homework))?)?\s*[.!]*\s*$/i;
+  /** A classwork label: "CW: …", "CW : …", "- CLASSWORK (if you were out today): …". 37 lines in the corpus. */
+  var CW_LINE = /^[\s\-–•*]*(cw|classwork|class work)\s*(\([^)]*\))?\s*[:\-–]/i;
+  /** …unless the line sends the work home: "CW : Books of the Bible ws (finish at home if not finished in class)". */
+  var CW_COMES_HOME = /\b(at home|for homework|as homework|due(?!\s+to\b))\b/i;   // not "(due to the Dress Code meeting)"
 
   /* ------------------------------------------------------------------ buildItems ---- */
   /**
@@ -783,7 +853,7 @@ var Due = (function () {
         // Undated tasks ("Rd/Study chp 1 material") re-typed on consecutive school days are the manual carry-forward
         // too — they become ONE rolling item whose dueOn follows the latest planDate, instead of one item per day.
         var dated = s.dueSource === 'text';
-        var base = 'hw|' + r.classId + '|' + normKey(s.text);
+        var base = 'hw|' + r.classId + '|' + (dated ? normKey(s.text) : rollKey(s.text));
         var key = dated ? base + '|' + s.dueOn : base;
         var it = byKey[key];
         if (it && !dated && daysBetween(it.lastSeenOn, planDate) > ROLLING_GAP_DAYS) {
@@ -1723,6 +1793,139 @@ var News = (function () {
            fmtTime: fmtTime, prettyMode: prettyMode, closedReason: closedReason };
 })();
 
+/* ===== GradeView.js ===== */
+/**
+ * GradeView.js — PURE quarter logic for the Grades tab. No Apps Script services, no I/O; shared by GAS (pushed
+ * as-is) and Node (tools/test.mjs). NEVER create a GradeView.gs — clasp maps X.js and X.gs to one name and the push
+ * fails while update-deployment still ships the OLD code.
+ *
+ * Release audit 2026-10-25, C1: the averages came from ONE stored term id that only an editor function changed, so on
+ * 11/9 every student would have kept seeing Q1 with no label saying so. The quarter now comes from QUARTER_DATES.
+ *
+ * What the student sees (Josh, 2026-10-25 — decision D4):
+ *   - Every card names its quarter.
+ *   - TRANSITION: from the first day of a quarter until every class has an average in it, each card shows the new
+ *     quarter (its average, or "no average yet") AND the previous quarter's final, and the assignment list shows both
+ *     quarters under their own headings. Capped at TRANSITION_CAP_DAYS so one teacher who rarely grades cannot keep it
+ *     open all quarter (Josh had no preference; 3 weeks was the recommendation).
+ *   - After that only the current quarter shows; "X of Y graded" counts the quarter being shown.
+ *   - Quarter chips (Q1 · Q2 …) at the top of the tab show any started quarter: its averages and its assignments.
+ *
+ * FACTS assignment records carry no term, so an assignment's quarter is decided by its due date (else its assigned
+ * date) against QUARTER_DATES. One due on the last day of a quarter but graded into the next can sit under the
+ * neighbouring heading.
+ */
+var GradeView = (function () {
+  'use strict';
+
+  var TRANSITION_CAP_DAYS = 21;
+  var DAY_MS = 86400000;
+
+  function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / DAY_MS); }
+  function sorted(ranges) { return (ranges || []).slice().sort(function (x, y) { return x.start < y.start ? -1 : x.start > y.start ? 1 : 0; }); }
+
+  /**
+   * The quarter a date belongs to: the range it falls in; in a gap, the last quarter that had started by then; after
+   * the last quarter, the last; before the first, the first. 0 only when there are no ranges at all.
+   * @param {Array<{q:number,start:string,end:string}>} ranges  Sched.parseQuarterRanges(QUARTER_DATES)
+   */
+  function quarterOf(ranges, iso) {
+    var r = sorted(ranges);
+    if (!r.length) return 0;
+    var d = String(iso || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return 0;
+    var q = r[0].q;
+    for (var i = 0; i < r.length; i++) if (d >= r[i].start) q = r[i].q;
+    return q;
+  }
+  /** Quarters that have started by `today`, in order (always at least the first one). */
+  function started(ranges, today) {
+    var out = [];
+    sorted(ranges).forEach(function (r, i) { if (i === 0 || String(today) >= r.start) out.push(r.q); });
+    return out;
+  }
+  function startOf(ranges, q) { var r = sorted(ranges).filter(function (x) { return x.q === q; })[0]; return r ? r.start : ''; }
+
+  /** Schedule "Quarters" cell ("Q1,2", "Q1,2,3,4", blank = every quarter) → does the class meet in quarter q? */
+  function meets(quartersField, q) {
+    var listed = {}, any = false;
+    String(quartersField || '').replace(/[^0-9,]/g, '').split(',').forEach(function (n) { if (n) { listed[Number(n)] = true; any = true; } });
+    return !any || !!listed[q];
+  }
+
+  /**
+   * @param {Object} o
+   * @param {string} o.today            'YYYY-MM-DD', America/New_York
+   * @param {Array}  o.ranges           [{q,start,end}]
+   * @param {Array}  o.classes          [{classId, quarters, ...anything to pass through}]  (activity/support already removed)
+   * @param {Array}  o.assignments      [{classId, dateDue, dateAssigned, ...}]  this student's view of each assignment
+   * @param {Object} o.averages         {classId: {quarter: {average, letter}}}  ({} when averages are off)
+   * @param {boolean} o.showAvg
+   * @param {number=} o.capDays
+   * @return {{quarter:number, started:Array<number>, transition:{on:boolean, prev:number, endsBy:string, pending:Array<string>},
+   *           classes:Array<Object>, views:Array<{q:number, current:boolean, extra:number, classIds:Array<string>}>}}
+   */
+  function build(o) {
+    var ranges = o.ranges || [], today = String(o.today || '');
+    var cap = o.capDays == null ? TRANSITION_CAP_DAYS : o.capDays;
+    var avg = o.averages || {};
+    var q = quarterOf(ranges, today);
+    var have = q ? started(ranges, today) : [0];
+
+    var classes = (o.classes || []).map(function (c) {
+      var id = String(c.classId), byQ = {};
+      (o.assignments || []).forEach(function (a) {
+        if (String(a.classId) !== id) return;
+        var aq = q ? (quarterOf(ranges, a.dateDue) || quarterOf(ranges, a.dateAssigned) || q) : 0;
+        // Due in a quarter that has not started (a teacher building Q2 in late October): it has no chip yet, so it would
+        // vanish from the tab. It stays with the current quarter, as "Upcoming", and moves when that quarter starts.
+        if (aq > q) aq = q;
+        (byQ[aq] = byQ[aq] || []).push(a);
+      });
+      Object.keys(byQ).forEach(function (k) {
+        byQ[k].sort(function (x, y) { return x.dateDue < y.dateDue ? 1 : x.dateDue > y.dateDue ? -1 : 0; });   // newest first, as before
+      });
+      var mine = avg[id] || {}, av = {};
+      if (q) Object.keys(mine).forEach(function (k) { if (mine[k]) av[k] = mine[k]; });
+      else {   // no usable QUARTER_DATES: one whole-year view with the latest term's average, as the old screen did
+        var latest = Object.keys(mine).map(Number).filter(function (k) { return mine[k]; }).sort(function (x, y) { return y - x; })[0];
+        if (latest != null) av[0] = mine[latest];
+      }
+      var m = {}; have.forEach(function (hq) { m[hq] = q ? meets(c.quarters, hq) : true; });
+      return Object.assign({}, c, { classId: id, avg: av, byQ: byQ, meets: m });
+    });
+
+    // Transition: a previous quarter exists, we are inside the cap, and the new quarter is not "fully loaded" — i.e. some
+    // class meeting now that HAD an average last quarter has none yet. With averages off (or none at all) there is no
+    // way to see "loaded", so the cap alone decides.
+    var prev = q > 1 && have.indexOf(q - 1) !== -1 ? q - 1 : 0;
+    var start = q ? startOf(ranges, q) : '';
+    var pending = [], hadPrev = 0;
+    if (prev) classes.forEach(function (c) {
+      if (!c.meets[q] || !c.avg[prev]) return;
+      hadPrev++;
+      if (!c.avg[q]) pending.push(c.classId);
+    });
+    var loaded = !!o.showAvg && hadPrev > 0 && pending.length === 0;
+    var on = !!prev && !!start && daysBetween(start, today) < cap && !loaded;
+    var endsBy = on ? new Date(new Date(start + 'T00:00:00Z').getTime() + cap * DAY_MS).toISOString().slice(0, 10) : '';
+
+    var hasData = function (c, k) { return !!c.avg[k] || !!(c.byQ[k] && c.byQ[k].length); };
+    var views = have.map(function (vq) {
+      var isNow = vq === q, extra = isNow && on ? prev : 0;
+      var ids = classes.filter(function (c) { return c.meets[vq] || (extra && c.meets[extra] && hasData(c, extra)); })
+        .map(function (c) { return c.classId; });
+      return { q: vq, current: isNow, extra: extra, classIds: ids };
+    });
+    return { quarter: q, started: have, transition: { on: on, prev: on ? prev : 0, endsBy: endsBy, pending: on ? pending : [] },
+      classes: classes, views: views };
+  }
+
+  return { build: build, quarterOf: quarterOf, started: started, meets: meets, TRANSITION_CAP_DAYS: TRANSITION_CAP_DAYS };
+})();
+
+// Node only (GAS has no `module`): lets tools/test.mjs import the same file.
+
 /* ===== Code.gs ===== */
 /**
  * Code.gs — web app entry point + every *Api endpoint.
@@ -1736,6 +1939,7 @@ var News = (function () {
  */
 
 function doGet(e) {
+  prefetchRequest_();
   var who = resolveCaller_(e);
   // Permanent record of every admin support view. Once per page open; failures never block the page.
   if (who.viewingAs) {
@@ -1743,6 +1947,9 @@ function doGet(e) {
     try { subject = Sched.studentProfile(loadStagingTabs_(), who.studentId).name; } catch (e2) { subject = ''; }
     auditAdminView_(who.email, who.studentId, subject, (e && e.parameter && e.parameter.sim) ? 'sim=' + e.parameter.sim : '');
   }
+  /* (b) of the stale-data alert (Sync.gs): page loads keep running when the sync trigger has stopped, so one of them notices.
+     Two in-memory reads while data is fresh; the email goes out once per streak; a failure never touches the page. */
+  try { staleAlertCheck_('a page load', true); } catch (es) { /* alerting must never cost a page */ }
   var t = HtmlService.createTemplateFromFile('Index');
   var sim = String((e && e.parameter && e.parameter.sim) || '').replace(/[^0-9:\- T]/g, '').slice(0, 16);
   var boot = {
@@ -1791,8 +1998,21 @@ function include(name) {
   return HtmlService.createHtmlOutputFromFile(String(name)).getContent();
 }
 
+/**
+ * Round 1 of a page load's cache reads, before anything else: settings snapshot, who, prefs, timing log — every key
+ * that needs only the signed-in email. Also switches props_() to the request-path snapshot (see Config.gs).
+ */
+function prefetchRequest_() {
+  PROPS_FAST_ = true;
+  var email = '';
+  try { email = String(Session.getActiveUser().getEmail() || '').trim().toLowerCase(); } catch (e) {}
+  cachePrefetch_([PROPS_SNAP_KEY, email ? whoKey_(email) : '', email ? prefsCacheKey_(email) : '', 'perf_' + APP_VERSION], []);
+  bootMark_('auth.prefetch');
+}
+
 /** Re-gate for every endpoint. Throws for anyone who is not an admitted student (or an admin using ?as=). */
 function caller_(asId) {
+  prefetchRequest_();
   var who = resolveCaller_({ parameter: { as: asId || '' } });
   if (!who.studentId) throw new Error('Not authorized.');
   return who;
@@ -1853,9 +2073,22 @@ function weekDates_(iso, dow) {
  * one small cache read instead of several megabytes of JSON.parse. The clock-dependent bits are never
  * cached: they are re-stamped on every request, so a cached payload can never show a stale "NOW".
  */
+/* Step timings for one page load (2026-10-13: a fresh build took 4.9 s while every phase RUN_perfTest times was
+   warm, so the time was somewhere it does not look). Per execution; the deltas ride back in payload.perf.steps.
+   Cheap: one Date.now() per step. */
+var bootMarks_ = null;
+function bootMark_(label) { if (bootMarks_) bootMarks_.push([label, Date.now()]); }
+function bootSteps_() {
+  var out = {};
+  for (var i = 1; i < (bootMarks_ || []).length; i++) out[bootMarks_[i][0]] = bootMarks_[i][1] - bootMarks_[i - 1][1];
+  return out;
+}
+
 function bootApi(asId, sim) {
   var t0 = Date.now();
+  bootMarks_ = [['start', t0]];
   var who = caller_(asId);
+  bootMark_('auth');
   var ctx = schedCtx_(who.isAdmin ? sim : '');
   var cache = CacheService.getScriptCache();
   /* stagingCONTENTVersion, NOT stagingVersion: the latter is the whole staging FILE's timestamp, which
@@ -1863,27 +2096,39 @@ function bootApi(asId, sim) {
      contain. Keying on it discarded every student's payload every quarter hour for nothing. */
   var key = 'boot_' + APP_VERSION + '_' + (props_().getProperty(PROP_BOOT_SALT) || '0') + '_' +
     who.studentId + '_' + stagingContentVersion_() + '_' + dataVersion_() + '_' + ctx.date;
+  /* Round 2 + 3: everything else this request reads, in two getAll calls (counters + singles, then every chunk). */
+  var memoId = props_().getProperty(PROP_MEMO_SHEET_ID) || '', dsId = props_().getProperty(PROP_DATA_SHEET_ID) || '';
+  cachePrefetch_(
+    [dsId ? dataSheetOkKey_(dsId) : '', schoolNotesKey_(ctx.date), gradeBucketPrefix_() + bucketOf_(who.studentId)],
+    [ctx.simLabel ? '' : key, memoId ? memoTabKey_(memoId, CHAPEL_TAB) : '', memoId ? memoTabKey_(memoId, MEMO_NOTES_TAB) : '']);
+  bootMark_('cacheKey');
 
   var payload = null, hit = false;
   if (!ctx.simLabel) { // a simulated clock must never be served from, or written to, the shared cache
     var cached = cacheGetChunked_(cache, key);
     if (cached) { payload = JSON.parse(cached); hit = true; }
   }
+  bootMark_('cacheRead');
   if (!payload) {
     payload = buildBootPayload_(who, ctx);
     if (!ctx.simLabel) cachePutChunked_(cache, key, JSON.stringify(payload), BOOT_CACHE_TTL_SECS);
+    bootMark_('cacheWrite');
   }
 
   // Per-request, never cached: who is asking, their own settings, the clock, and every feature flag.
   payload.who = { email: who.email, name: who.fullName, isAdmin: who.isAdmin, viewingAs: who.viewingAs };
   payload.prefs = (function () { try { return prefsRead_(who.email); } catch (e) { return null; } })();
+  bootMark_('prefs');
   payload.sports.enabled = athleticsEnabled_();
   payload.attendance.enabled = attendanceEnabled_();
   payload.news = newsFor_(payload, ctx);   // per request, not in the cached payload: the Chapel tab changes on its own clock
+  bootMark_('news');
   restampClock_(payload.schedule, ctx);
   restampGrades_(payload.homework, who.studentId);
-  payload.perf = { ms: Date.now() - t0, cached: hit };
+  bootMark_('grades');
+  payload.perf = { ms: Date.now() - t0, cached: hit, steps: bootSteps_() };
   perfNote_(hit ? 'boot-cached' : 'boot-built', Date.now() - t0);
+  bootMarks_ = null;
   return payload;
 }
 
@@ -1979,6 +2224,7 @@ function restampClock_(sc, ctx) {
 function buildBootPayload_(who, ctx) {
   var sid = who.studentId;
   var tabs = loadStagingTabs_();
+  bootMark_('b.staging');
 
   var classes = Sched.studentClasses(tabs, sid);
   var profile = Sched.studentProfile(tabs, sid, classes);
@@ -1989,11 +2235,13 @@ function buildBootPayload_(who, ctx) {
 
   var classList = classListFor_(tabs, sid, classes);
   var byId = {}; classList.forEach(function (c) { byId[c.classId] = c; });
+  bootMark_('b.classes');
 
   // Bells (delay / exam days) per weekday of this week — BellHub, cached; FACTS times when unavailable.
   var week = {};
   var dates = weekDates_(ctx.date, ctx.dow);
   var weekBells = bellsForDays_(dates);   // one batched cache read, not five
+  bootMark_('b.bells');
   for (var d = 1; d <= 5; d++) {
     var bells = weekBells[dates[d - 1]];
     week[String(d)] = { date: dates[d - 1], bellMode: bells.ok ? bells.mode : '', closed: bells.ok && bells.closed && !!(bells.source || bells.mode),
@@ -2015,8 +2263,12 @@ function buildBootPayload_(who, ctx) {
      `averages` (1,664 rows) is parsed only when the Grades tab is actually opened. */
   // 'grades' is NOT loaded here any more — homeworkPayload_ reads this student's rows from their own cache
   // key (gradesForStudent_), which is what took the whole-school Grades parse out of every build.
-  var data = loadDataTabs_(['homework', 'assignments']);
+  // Meta only: homework comes from the per-class cache (classItemsFor_), which loads the big tabs only on a miss.
+  var data = loadDataTabs_([]);
+  if (data) data.lazy = true;
+  bootMark_('b.schedule+meta');
   var hw = homeworkPayload_(who, classList, ctx.date, data);
+  bootMark_('b.homework');
   return {
     appVersion: APP_VERSION,
     profile: profile, elementary: elementary, classes: classList,
@@ -2043,7 +2295,7 @@ function gradesApi(asId) {
   var t0 = Date.now();
   var who = caller_(asId);
   var classList = classListFor_(loadStagingTabs_(), who.studentId);
-  var out = gradesPayload_(who, classList, loadDataTabs_(['assignments', 'averages']));
+  var out = gradesPayload_(who, classList, loadDataTabs_(['assignments', 'averages', 'averagesPast']));
   perfNote_('grades', Date.now() - t0);
   return out;
 }
@@ -2066,10 +2318,7 @@ function attendanceApi(asId) {
   var sid = String(who.studentId);
   var todayIso = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
 
-  var pick = function (r) {
-    return { date: String(r['Date'] || '').slice(0, 10), code: String(r['Code'] || ''), status: String(r['Status'] || ''),
-      detail: String(r['Detail'] || ''), excused: String(r['Excused'] || '') };
-  };
+  var pick = Sched.attendanceRecord;   // an on-campus child with an absent code reads Late (2026-10-12)
 
   // TODAY — from staging, refreshed all day. null tab = we could not check, which is NOT "present".
   var liveRows = loadAttendanceToday_();
@@ -2136,14 +2385,9 @@ function homeworkPayload_(who, classList, todayIso, data) {
   var manual = noSchoolFromProperty_();
   Object.keys(manual).forEach(function (d) { noSchoolMap[d] = manual[d]; });
   var noSchool = Object.keys(noSchoolMap);
-  var idSet = {};
-  classList.forEach(function (c) { if (!c.support) idSet[String(c.classId)] = true; });
-  var hwRows = data.homework.filter(function (r) { return idSet[String(r['Class ID'])]; })
-    .map(function (r) { return { classId: r['Class ID'], planDate: r['Plan Date'], homework: r['Homework'], homeworkHTML: r['Homework HTML'] }; });
-  var asRows = data.assignments.filter(function (r) { return idSet[String(r['Class ID'])]; })
-    .map(function (r) { return { id: r['Assignment ID'], classId: r['Class ID'], title: r['Title'], description: r['Description'],
-      dateAssigned: r['Date Assigned'], dateDue: r['Date Due'], maxPoints: r['Max Points'] === '' ? null : Number(r['Max Points']) }; });
-  var items = Due.buildItems(hwRows, asRows, { noSchool: noSchool });
+  var ids = [];
+  classList.forEach(function (c) { if (!c.support) ids.push(String(c.classId)); });
+  var items = classItemsFor_(ids, noSchool, data);
   var byId = {}; classList.forEach(function (c) { byId[c.classId] = c; });
   /* This student's rows only, from their own cache key — see gradesForStudent_. Scanning the whole school's
      Grades table here was ~550 ms of every build, and it grows every day. */
@@ -2165,6 +2409,161 @@ function homeworkPayload_(who, classList, todayIso, data) {
   // body), request counts and ids to every student (release review 2026-10-08).
   var m = data.meta || {};
   return { connected: true, items: out, today: today, meta: { lastSyncAt: m.lastSyncAt || '', lastSyncOk: m.lastSyncOk || '' }, noSchool: noSchoolMap };
+}
+
+/* ---------------------------------------------------------------- due items, per class ---- */
+
+/* WHY PER CLASS (measured 2026-10-12, RUN_perfTest): a warm build spent 741 ms parsing the WHOLE school's
+   Homework + Assignments tabs and 224 ms running the due engine, to produce one student's ~8 classes. The engine
+   only ever compares items inside one class (the merge and markTwins both require the same classId), so a class's
+   items are the same whichever student asks. The sync builds every class once (warmClassItems_) into the 64
+   gzip'd buckets of Data.gs (one key per class was silently dropped by the cache — see "bucketed cache" there);
+   a student's build reads their classes' buckets in one getAll. A missing bucket is rebuilt here from the data
+   tabs and written back. Keyed on APP_VERSION + dataVersion + the no-school list, so new data, a release, or a
+   closure change retires them all. RUN_classItemsDiff proves the result equals the old whole-student build. */
+var CLASS_ITEMS_TTL_SECS = 21600;
+
+function classItemsPrefix_(noSchool) {
+  return 'cb2_' + APP_VERSION + '_' + dataVersion_() + '_' + shortHash_(noSchool.slice().sort().join(',')) + '_';
+}
+
+function shortHash_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, s)
+    .map(function (b) { return ((b < 0 ? b + 256 : b) + 0x100).toString(16).slice(1); }).join('').slice(0, 12);
+}
+
+/** Homework + assignment rows grouped by class, in sheet order (order matters: the engine is order-stable). */
+function rowsByClass_(data, wanted) {
+  var hwBy = {}, asBy = {};
+  data.homework.forEach(function (r) {
+    var c = String(r['Class ID']);
+    if (wanted && !wanted(c)) return;
+    (hwBy[c] = hwBy[c] || []).push({ classId: r['Class ID'], planDate: r['Plan Date'], homework: r['Homework'], homeworkHTML: r['Homework HTML'] });
+  });
+  data.assignments.forEach(function (r) {
+    var c = String(r['Class ID']);
+    if (wanted && !wanted(c)) return;
+    (asBy[c] = asBy[c] || []).push({ id: r['Assignment ID'], classId: r['Class ID'], title: r['Title'], description: r['Description'],
+      dateAssigned: r['Date Assigned'], dateDue: r['Date Due'], maxPoints: r['Max Points'] === '' ? null : Number(r['Max Points']) });
+  });
+  return { hw: hwBy, as: asBy };
+}
+
+/** {bucket: {classId: items}} for every class with rows (optionally only some buckets). */
+function classBuckets_(data, noSchool, onlyBuckets) {
+  var by = rowsByClass_(data, onlyBuckets ? function (c) { return onlyBuckets[bucketOf_(c)]; } : null), out = {}, all = {};
+  Object.keys(by.hw).concat(Object.keys(by.as)).forEach(function (c) { all[c] = true; });
+  Object.keys(all).forEach(function (c) {
+    var b = bucketOf_(c);
+    (out[b] = out[b] || {})[c] = Due.buildItems(by.hw[c] || [], by.as[c] || [], { noSchool: noSchool });
+  });
+  if (onlyBuckets) Object.keys(onlyBuckets).forEach(function (b) { if (!out[b]) out[b] = {}; });   // present = complete
+  return out;
+}
+
+/** Same comparator Due.buildItems ends with — re-applied to the union of per-class lists. */
+function sortItems_(items) {
+  return items.sort(function (a, b) { return a.dueOn < b.dueOn ? -1 : a.dueOn > b.dueOn ? 1 : String(a.classId).localeCompare(String(b.classId)); });
+}
+
+/**
+ * Due items for these classes. Buckets from the cache; any missing bucket is rebuilt from the data tabs (loaded only
+ * then, when `data` was passed lazy) and written back for the next student.
+ */
+function classItemsFor_(classIds, noSchool, data) {
+  var seen = {};
+  classIds = classIds.filter(function (c) { if (seen[c]) return false; seen[c] = true; return true; });   // two schedule rows, one class
+  if (!classIds.length) return [];
+  var prefix = classItemsPrefix_(noSchool), need = {};
+  classIds.forEach(function (c) { need[bucketOf_(c)] = true; });
+  var nums = Object.keys(need).map(Number), got = bucketsGet_(prefix, nums), buckets = {}, missing = {};
+  nums.forEach(function (b) {
+    if (got[b] == null) { missing[b] = true; return; }
+    try { buckets[b] = unpackBucket_(got[b]); } catch (e) { missing[b] = true; }
+  });
+  var nMissing = Object.keys(missing).length;
+  bucketStats_.hit += nums.length - nMissing;
+  if (nMissing) {
+    bucketStats_.miss += nMissing;
+    if (!data || data.lazy) data = loadDataTabs_(['homework', 'assignments']);
+    var built = classBuckets_(data, noSchool, missing), put = {};
+    Object.keys(built).forEach(function (b) {
+      buckets[b] = built[b];
+      try { var s = packBucket_(built[b]); if (s.length <= BUCKET_MAX_CHARS) put[prefix + b] = s; } catch (e) {}
+    });
+    try { CacheService.getScriptCache().putAll(put, CLASS_ITEMS_TTL_SECS); } catch (e) { /* uncached is slow, not wrong */ }
+    perfNote_('classItems-miss', nMissing);   // count of BUCKETS, not ms: how often a build missed the warm set
+  }
+  var out = [];
+  classIds.forEach(function (c) { out = out.concat((buckets[bucketOf_(c)] || {})[c] || []); });
+  return sortItems_(out);
+}
+
+/** Sync-time (warmCaches_): every class's items, in 64 buckets, verified by read-back. */
+function warmClassItems_() {
+  var t = Date.now();
+  var data = loadDataTabs_(['homework', 'assignments']);
+  if (!data) return null;
+  var noSchool = noSchoolList_(data.meta);
+  var all = classBuckets_(data, noSchool, null);
+  for (var b = 0; b < BUCKET_COUNT; b++) if (!all[b]) all[b] = {};   // every bucket written: present = complete
+  var r = bucketsPutVerified_(classItemsPrefix_(noSchool), all, CLASS_ITEMS_TTL_SECS);
+  r.ms = Date.now() - t;
+  Logger.log('class buckets: %s/%s present (%s too big), %s KB, %s ms', r.present, r.written, r.tooBig, r.kb, r.ms);
+  return r;
+}
+
+/** The no-school list homeworkPayload_ uses: the sync's Meta list + the manual property. */
+function noSchoolList_(meta) {
+  var m = {};
+  String((meta && meta.noSchoolDays) || '').split(',').forEach(function (d) { if (d) m[d] = 1; });
+  Object.keys(noSchoolFromProperty_()).forEach(function (d) { m[d] = 1; });
+  return Object.keys(m);
+}
+
+/**
+ * Editor check (Code.gs, Run menu) for the per-class cache: warm the buckets, then for EVERY student in Student
+ * Schedules compare the old whole-student engine run with classItemsFor_ served from the cache. Read-only apart
+ * from the cache. Acceptance: 0 differences AND 0 bucket misses.
+ */
+function RUN_classItemsDiff() {
+  requireOperator_();
+  var t0 = Date.now();
+  var w = warmClassItems_();
+  var tabs = loadStagingTabs_();
+  var data = loadDataTabs_(['homework', 'assignments']);
+  var noSchool = noSchoolList_(data.meta);
+  var sched = Sched.tabByName(tabs, ['Student Schedules']), hm = Sched.headerMap(sched.values[0]);
+  var sids = {};
+  for (var r = 1; r < sched.values.length; r++) { var s = Sched.cellToString(sched.values[r][hm['Student ID']]).trim(); if (s) sids[s] = true; }
+  var students = Object.keys(sids), same = 0, diff = 0, items = 0, shown = 0;
+  bucketStats_ = { hit: 0, miss: 0 };
+  var lazy = { meta: data.meta, lazy: true };   // what a real page build passes
+  students.forEach(function (sid) {
+    var idSet = {}, ids = [];
+    classListFor_(tabs, sid).forEach(function (c) { var k = String(c.classId); if (!c.support && !idSet[k]) { idSet[k] = true; ids.push(k); } });
+    // OLD: exactly what homeworkPayload_ did before 2026-10-12
+    var hwRows = data.homework.filter(function (r) { return idSet[String(r['Class ID'])]; })
+      .map(function (r) { return { classId: r['Class ID'], planDate: r['Plan Date'], homework: r['Homework'], homeworkHTML: r['Homework HTML'] }; });
+    var asRows = data.assignments.filter(function (r) { return idSet[String(r['Class ID'])]; })
+      .map(function (r) { return { id: r['Assignment ID'], classId: r['Class ID'], title: r['Title'], description: r['Description'],
+        dateAssigned: r['Date Assigned'], dateDue: r['Date Due'], maxPoints: r['Max Points'] === '' ? null : Number(r['Max Points']) }; });
+    var a = JSON.stringify(Due.buildItems(hwRows, asRows, { noSchool: noSchool }));
+    var b = JSON.stringify(classItemsFor_(ids, noSchool, lazy));
+    items += JSON.parse(a).length;
+    if (a === b) { same++; return; }
+    diff++;
+    if (shown++ < 5) {
+      var A = JSON.parse(a), B = JSON.parse(b), k = 0;
+      while (k < Math.max(A.length, B.length) && JSON.stringify(A[k]) === JSON.stringify(B[k])) k++;
+      Logger.log('DIFF student %s: old %s items, new %s; first difference at #%s\n  old: %s\n  new: %s', sid, A.length, B.length, k,
+        JSON.stringify(A[k] || null).slice(0, 300), JSON.stringify(B[k] || null).slice(0, 300));
+    }
+  });
+  Logger.log('warm: %s/%s buckets present, %s KB, %s ms', w.present, w.written, w.kb, w.ms);
+  Logger.log('%s students, %s items compared: %s identical, %s DIFFERENT; bucket reads %s hit, %s MISS  (%s s)', students.length, items,
+    same, diff, bucketStats_.hit, bucketStats_.miss, Math.round((Date.now() - t0) / 1000));
+  Logger.log(diff || bucketStats_.miss || w.present < w.written ? '!! NOT SAFE' : 'PASS: cached per-class results match the old build exactly, every read a cache hit.');
 }
 
 /**
@@ -2195,31 +2594,47 @@ function pickOverallAverage_(rows) {
 }
 
 /** Per class: every assignment this year with the caller's score, plus the class average when enabled + unambiguous. */
-function gradesPayload_(who, classList, data) {
+function gradesPayload_(who, classList, data, todayIso) {
   if (!data) return { connected: false, classes: [] };
   var mine = {};
   gradesForStudent_(who.studentId).forEach(function (g) { mine[g['Assignment ID']] = g; });
   // Second gate (the first is in bootApi): averages never leave the server until Josh has verified them.
   var showAvg = averagesEnabled_();
-  var avgByClass = {};
+  /* One average per class PER QUARTER: the current quarter's tab (every sync) plus AveragesPast (earlier quarters, daily).
+     Each row carries its Term ID, which is the quarter number (GbkSummary, proved 2026-09-11). */
+  var rowsBy = {};
   if (showAvg) {
-    (data.averages || []).forEach(function (r) {
+    (data.averages || []).concat(data.averagesPast || []).forEach(function (r) {
       if (String(r['Student ID']) !== String(who.studentId)) return;
-      (avgByClass[String(r['Class ID'])] = avgByClass[String(r['Class ID'])] || []).push(r);
+      var k = String(r['Class ID']) + '|' + String(r['Term ID'] || '');
+      (rowsBy[k] = rowsBy[k] || []).push(r);
     });
   }
-  var out = classList.filter(function (c) { return !c.activity && !c.support; }).map(function (c) {
-    var rows = data.assignments.filter(function (a) { return String(a['Class ID']) === String(c.classId); }).map(function (a) {
-      var g = mine[a['Assignment ID']];
-      return { id: a['Assignment ID'], title: a['Title'] || a['Description'] || 'Assignment', description: a['Description'], dateDue: a['Date Due'], dateAssigned: a['Date Assigned'],
-        maxPoints: a['Max Points'], display: g ? g['Display Grade'] : '', status: g ? g['Status'] : '', earned: g ? g['Earned'] : '', max: g ? (g['Max'] || a['Max Points']) : a['Max Points'] };
-    }).sort(function (a, b) { return a.dateDue < b.dateDue ? 1 : a.dateDue > b.dateDue ? -1 : 0; });
-    var graded = rows.filter(function (r) { return r.earned !== '' || r.display !== ''; }).length;
-    var pick = showAvg ? pickOverallAverage_(avgByClass[String(c.classId)]) : null;
-    return { classId: c.classId, name: c.name, short: c.short, color: c.color, teacher: c.teacher, assignments: rows, graded: graded, total: rows.length,
-      average: pick ? pick.average : '', letter: pick ? pick.letter : '' };
+  var averages = {};
+  Object.keys(rowsBy).forEach(function (k) {
+    var pick = pickOverallAverage_(rowsBy[k]);
+    if (!pick) return;
+    var cid = k.split('|')[0], term = k.split('|')[1];
+    (averages[cid] = averages[cid] || {})[term] = { average: pick.average, letter: pick.letter };
   });
-  return { connected: true, classes: out, averagesOn: showAvg };
+  var classes = classList.filter(function (c) { return !c.activity && !c.support; }).map(function (c) {
+    return { classId: c.classId, name: c.name, short: c.short, color: c.color, teacher: c.teacher, quarters: c.quarters };
+  });
+  var ids = {}; classes.forEach(function (c) { ids[String(c.classId)] = true; });
+  var assignments = data.assignments.filter(function (a) { return ids[String(a['Class ID'])]; }).map(function (a) {
+    var g = mine[a['Assignment ID']];
+    return { classId: String(a['Class ID']), id: a['Assignment ID'], title: a['Title'] || a['Description'] || 'Assignment', description: a['Description'],
+      dateDue: a['Date Due'], dateAssigned: a['Date Assigned'], maxPoints: a['Max Points'],
+      display: g ? g['Display Grade'] : '', status: g ? g['Status'] : '', earned: g ? g['Earned'] : '', max: g ? (g['Max'] || a['Max Points']) : a['Max Points'] };
+  });
+  var view = GradeView.build({
+    today: todayIso || Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd'),
+    ranges: Sched.parseQuarterRanges(getQuarterDatesRaw_()),
+    classes: classes, assignments: assignments, averages: averages, showAvg: showAvg
+  });
+  view.classes.forEach(function (c) { delete c.quarters; });   // the page needs `meets`, not the raw schedule cell
+  return { connected: true, averagesOn: showAvg, quarter: view.quarter, started: view.started, transition: view.transition,
+    classes: view.classes, views: view.views };
 }
 
 /** Lightweight refresh of the due list only. */
@@ -2320,6 +2735,74 @@ function RUN_diagnoseStudent() {
   var hw = homeworkPayload_({ email: email, studentId: sid }, classListFor_(tabs, sid, classes));
   Logger.log('items in window: %s', hw.items.length);
   hw.items.slice(0, 40).forEach(function (it) { Logger.log('  %s [%s] %s — %s', it.dueOn, it.dueSource, it.short, it.title.slice(0, 80)); });
+}
+
+/**
+ * Editor check (Code.gs, Run menu): every item the Ungraded tab would show for one student, with the stored Grades
+ * rows behind it and — for the first few — the LIVE FACTS assignmentGrades for that student. Read-only (GET only).
+ * Leave EMAIL blank to use the Gate 0 test student.
+ */
+function RUN_ungradedCheck() {
+  requireOperator_();
+  var EMAIL = '', LIVE_LOOKUPS = 4;
+  var email = String(EMAIL || props_().getProperty(PROP_GATE0_TEST_EMAIL) || '').toLowerCase();
+  var sid = directoryLookup_(email).factsId;
+  Logger.log('%s  student=%s  app=%s  GRADES_VERSION=%s', email, sid || '(none)', APP_VERSION, props_().getProperty(PROP_GRADES_VERSION));
+  if (!sid) return;
+  var tabs = loadStagingTabs_();
+  var data = loadDataTabs_(['homework', 'assignments', 'grades']);
+  Logger.log('meta: %s', JSON.stringify(data.meta));
+  var hw = homeworkPayload_({ email: email, studentId: sid }, classListFor_(tabs, sid));
+  var today = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+  var from = Utilities.formatDate(new Date(Date.now() - 14 * 864e5), TIMEZONE, 'yyyy-MM-dd');
+  var scored = function (it) { return !!(it.grade && (it.grade.earned !== '' || it.grade.display)); };
+  var past = hw.items.filter(function (it) { return it.source === 'assignment' && it.dueOn < today && it.dueOn >= from; });
+  var ungraded = past.filter(function (it) { return !scored(it); });
+  Logger.log('past-due gradebook items (14 d): %s, of which UNGRADED: %s', past.length, ungraded.length);
+  var byAsg = {};
+  data.grades.forEach(function (g) { (byAsg[g['Assignment ID']] = byAsg[g['Assignment ID']] || []).push(g); });
+  ungraded.forEach(function (it, i) {
+    var rows = byAsg[it.assignmentId] || [];
+    var mine = rows.filter(function (g) { return String(g['Student ID']) === String(sid); });
+    var withScore = rows.filter(function (g) { return g['Earned'] !== '' || g['Display Grade']; }).length;
+    Logger.log('#%s %s due %s [asg %s] %s — %s', i + 1, it.short, it.dueOn, it.assignmentId || '(none)', it.title.slice(0, 60), it.grade ? JSON.stringify(it.grade) : 'grade=null');
+    Logger.log('     sheet: %s row(s) for this assignment, %s with a score; this student: %s', rows.length, withScore, mine.length ? JSON.stringify(mine) : 'NO ROW');
+    if (i < LIVE_LOOKUPS && it.assignmentId) {
+      try {
+        var d = factsGet_('/Gradebooks/Assignments?Page=1&PageSize=5&IncludeAssignmentGrades=true&Filters=' + encodeURIComponent('id==' + it.assignmentId));
+        var a = (d.results || []).filter(function (x) { return String(x.id) === String(it.assignmentId); })[0];
+        if (!a) { Logger.log('     LIVE: not found (rowCount=%s — filter may be ignored)', d.rowCount); return; }
+        var g = (a.assignmentGrades || []).filter(function (x) { return String(x.studentId) === String(sid); });
+        Logger.log('     LIVE: dateDue=%s grades=%s, this student: %s', a.dateDue, (a.assignmentGrades || []).length, g.length ? JSON.stringify(g) : 'NONE');
+      } catch (e) { Logger.log('     LIVE: %s', e.message); }
+    }
+  });
+}
+
+/**
+ * Editor check (Code.gs, Run menu): the REAL page-load path — bootApi exactly as doGet calls it — for the Gate 0
+ * test student, via the admin ?as= route. Twice, so the second shows the cached cost. Logs any error with its stack.
+ */
+function RUN_bootSmoke() {
+  requireOperator_();
+  var sid = directoryLookup_(String(props_().getProperty(PROP_GATE0_TEST_EMAIL) || '').toLowerCase()).factsId;
+  Logger.log('app %s, student %s', APP_VERSION, sid || '(none)');
+  // Drop THIS student's cached page only (same key bootApi builds), so call 1 is a genuine fresh build.
+  cacheDropChunked_(CacheService.getScriptCache(), 'boot_' + APP_VERSION + '_' + (props_().getProperty(PROP_BOOT_SALT) || '0') + '_' +
+    sid + '_' + stagingContentVersion_() + '_' + dataVersion_() + '_' + schedCtx_('').date);
+  var bodies = [];
+  for (var i = 1; i <= 2; i++) {
+    // Each call must behave like a SEPARATE page load: forget this execution's memo and settings snapshot.
+    cacheMemo_ = {}; cacheMemoChunked_ = {}; propsSnap_ = null; propsFromCache_ = false;
+    try {
+      var t = Date.now(), p = bootApi(sid, '');
+      Logger.log('call %s: OK in %s ms (server says %s ms, cached=%s) · %s homework items · %s classes · %s KB',
+        i, Date.now() - t, p.perf.ms, p.perf.cached, p.homework.items.length, p.classes.length, Math.round(JSON.stringify(p).length / 1024));
+      Logger.log('   steps (ms): %s', Object.keys(p.perf.steps || {}).map(function (k) { return k + ' ' + p.perf.steps[k]; }).join(' | '));
+      bodies.push(JSON.stringify(Object.assign({}, p, { perf: null })));
+    } catch (e) { Logger.log('call %s: FAILED — %s\n%s', i, e.message, e.stack); }
+  }
+  if (bodies.length === 2) Logger.log(bodies[0] === bodies[1] ? 'SAME PAGE: fresh build and cached load are identical (timings aside).' : '!! DIFFERENT: the cached load does not match the fresh build.');
 }
 
 /** Gate 0 self-check from the editor as itscripts@ — proves the manifest + AdminDirectory scope are live. */
@@ -2702,12 +3185,12 @@ function prefsCacheKey_(email) { return 'prefs_' + APP_VERSION + '_' + String(em
  */
 function prefsRead_(email) {
   var id = getDataSheetId_(); if (!id) return null;
-  var cache = CacheService.getScriptCache(), key = prefsCacheKey_(email);
-  var got = cache.get(key);
+  var key = prefsCacheKey_(email);
+  var got = cacheGet_(key);
   if (got) return got === '~' ? null : JSON.parse(got);
   var hit = prefsAll_(SpreadsheetApp.openById(id)).filter(function (p) { return p.email === email; })[0];
   var prefs = hit ? hit.prefs : null;
-  cache.put(key, prefs ? JSON.stringify(prefs) : '~', PREFS_CACHE_TTL_SECS);
+  cachePut_(key, prefs ? JSON.stringify(prefs) : '~', PREFS_CACHE_TTL_SECS);
   return prefs;
 }
 function prefsWrite_(email, studentId, prefs) {
@@ -2961,6 +3444,47 @@ var TABS_CACHE_TTL_SECS = 21600;
 var DATA_CACHE_TTL_SECS = 21600;
 
 /** CacheService caps values at 100KB — store big JSON as <key> = chunk count + <key>_i parts. */
+/* ---------------------------------------------------------------- per-request prefetch ----
+   A cached page load made ~10 separate cache round trips (~30-60 ms each): who, settings, page count + chunks,
+   prefs, data-sheet check, chapel + memo tabs (count + chunks each), school notes, grade bucket, timing log.
+   bootApi now asks for them in batches (cachePrefetch_) and the readers below consult this memo first. Per
+   execution only. A write through cachePut_/cachePutChunked_ updates the memo, so a later read in the same request
+   sees it (doGet resolves the caller, then bootApi resolves it again). */
+var cacheMemo_ = {}, cacheMemoChunked_ = {};
+function hasOwn_(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function cacheGet_(key) {
+  if (hasOwn_(cacheMemo_, key)) return cacheMemo_[key];
+  return CacheService.getScriptCache().get(key);
+}
+function cachePut_(key, val, ttl) {
+  CacheService.getScriptCache().put(key, val, ttl);
+  cacheMemo_[key] = val;
+}
+/** One getAll for `singles` + the counters of `chunked`, then one getAll for every chunk found. */
+function cachePrefetch_(singles, chunked) {
+  singles = (singles || []).filter(function (k) { return k && !hasOwn_(cacheMemo_, k); });
+  chunked = (chunked || []).filter(function (k) { return k && !hasOwn_(cacheMemoChunked_, k); });
+  if (!singles.length && !chunked.length) return;
+  var cache = CacheService.getScriptCache(), got;
+  try { got = cache.getAll(singles.concat(chunked)) || {}; } catch (e) { return; }   // readers fall back to direct gets
+  singles.forEach(function (k) { cacheMemo_[k] = got[k] == null ? null : got[k]; });
+  var parts = [], plan = {};
+  chunked.forEach(function (k) {
+    var n = Number(got[k]);
+    if (!n) { cacheMemoChunked_[k] = null; return; }
+    plan[k] = n;
+    for (var i = 0; i < n; i++) parts.push(k + '_' + i);
+  });
+  if (!parts.length) return;
+  var g2;
+  try { g2 = cache.getAll(parts) || {}; } catch (e) { return; }
+  Object.keys(plan).forEach(function (k) {
+    var arr = [];
+    for (var i = 0; i < plan[k]; i++) { var v = g2[k + '_' + i]; if (v == null) { arr = null; break; } arr.push(v); }
+    cacheMemoChunked_[k] = arr ? arr.join('') : null;
+  });
+}
+
 function cachePutChunked_(cache, key, str, ttlSecs) {
   var SIZE = 90000;
   var n = Math.ceil(str.length / SIZE) || 1;
@@ -2968,8 +3492,10 @@ function cachePutChunked_(cache, key, str, ttlSecs) {
   payload[key] = String(n);
   for (var i = 0; i < n; i++) payload[key + '_' + i] = str.substr(i * SIZE, SIZE);
   cache.putAll(payload, ttlSecs);
+  cacheMemoChunked_[key] = str;
 }
 function cacheGetChunked_(cache, key) {
+  if (hasOwn_(cacheMemoChunked_, key)) return cacheMemoChunked_[key];
   var n = Number(cache.get(key));
   if (!n) return null;
   var keys = [];
@@ -2984,6 +3510,7 @@ function cacheGetChunked_(cache, key) {
   return parts.join('');
 }
 function cacheDropChunked_(cache, key) {
+  delete cacheMemoChunked_[key];
   var n = Number(cache.get(key)) || 0;
   var keys = [key];
   for (var i = 0; i < n; i++) keys.push(key + '_' + i);
@@ -3132,13 +3659,14 @@ function loadChapelRows_() { return loadMemoTab_(CHAPEL_TAB, CHAPEL_KEEP); }
 /** Phase 3: spirit / exam-day / picture-day lines (MemoNotes tab). Same sheet, same projection rule. */
 function loadMemoNotes_() { return loadMemoTab_(MEMO_NOTES_TAB, MEMO_NOTES_KEEP); }
 
-function loadMemoTab_(tabName, keep) {
+function memoTabKey_(id, tabName) { return 'memotab_' + APP_VERSION + '_' + String(id).slice(-10) + '_' + tabName; }
+function loadMemoTab_(tabName, keep, force) {
   var id = props_().getProperty(PROP_MEMO_SHEET_ID) || '';
   if (!id) return null;
   var cache = CacheService.getScriptCache();
   // Keyed on the sheet id too, so pointing MEMO_CHECK_SHEET_ID elsewhere takes effect at once.
-  var key = 'memotab_' + APP_VERSION + '_' + id.slice(-10) + '_' + tabName;
-  var hit = cacheGetChunked_(cache, key);
+  var key = memoTabKey_(id, tabName);
+  var hit = force ? null : cacheGetChunked_(cache, key);
   if (hit) return JSON.parse(hit);   // may be the cached 'null' below
   var rows = null;
   try {
@@ -3155,6 +3683,8 @@ function loadMemoTab_(tabName, keep) {
   }
   /* A failure is cached for 10 minutes. Uncached, every page load re-opened the sheet (0.5-1.5 s) for as long as
      the tab was missing or access was lost (release review 2026-10-08). The card shows nothing meanwhile. */
+  // A forced (sync) refresh that failed must not overwrite a good copy a student is still being served.
+  if (force && rows === null) return null;
   cachePutChunked_(cache, key, JSON.stringify(rows), rows === null ? 600 : CHAPEL_TTL_SECS);
   return rows;
 }
@@ -3174,7 +3704,19 @@ function objectsFromValues_(values) {
 
 /* ---------------------------------------------------------------- private data Sheet ---- */
 
-function dataCacheKey_(tab) { return 'dat_' + APP_VERSION + '_' + tab + '_' + dataVersion_(); }
+/* Each tab's key carries the version of THAT tab's content (release audit 2026-10-25, H1). With one shared DATA_VERSION —
+   which fingerprinted homework + assignments but only the COUNT of grade and average rows — a teacher's score change left
+   the old Grades/Averages tab cached for up to 6 h, and warmGradeBuckets_ rebuilt every student's grade bucket from that
+   stale copy. A key now always maps to exactly one content, so nothing ever needs dropping. */
+function tabVersion_(tab) {
+  var p = tab === DATA_TABS.grades ? PROP_GRADES_VERSION
+    : tab === DATA_TABS.averages ? PROP_AVERAGES_VERSION
+    : tab === DATA_TABS.averagesPast ? PROP_AVERAGES_PAST_VERSION
+    : tab === DATA_TABS.attendance ? PROP_ATTENDANCE_VERSION
+    : PROP_DATA_VERSION;   // Homework, Assignments, Meta
+  return props_().getProperty(p) || '0';
+}
+function dataCacheKey_(tab) { return 'dat_' + APP_VERSION + '_' + tab + '_' + tabVersion_(tab); }
 
 /** One data tab, cached on its own so a caller only parses what it needs. */
 function dataTab_(ss, tabName) {
@@ -3187,34 +3729,153 @@ function dataTab_(ss, tabName) {
   return rows;
 }
 
+/* ---------------------------------------------------------------- bucketed cache ----
+   MEASURED 2026-10-13 (three editor probes): the script cache SILENTLY DROPS large multi-key writes. 2,000 keys in
+   ten putAll batches -> 1 survived, and a 30 s wait brought none back; 563 per-student grade slices -> 113 lost;
+   small writes (50 keys) round-trip fine before and after. No error is ever thrown. So anything warmed for every
+   student or every class is stored as BUCKET_COUNT gzip'd buckets, never one key per id, and the sync reads its
+   own writes back and logs the coverage. A bucket that is present is COMPLETE by construction (built from every
+   row), so an id absent from a present bucket genuinely has nothing. */
+var BUCKET_COUNT = 64;
+var BUCKET_MAX_CHARS = 95000;   // CacheService value limit is 100 KB; a bigger bucket is simply not cached
+var bucketStats_ = { hit: 0, miss: 0 };   // per execution, for the editor checks
+
+function bucketOf_(id) {
+  // String hash, then a multiplicative (Fibonacci) mix so consecutive OR evenly-strided ids spread over every bucket.
+  // A plain string hash put 349 classes into only 41 of 64 buckets (2026-10-13); plain `id % 64` fails on strides.
+  // Changing this function REQUIRES a new key prefix (cb3_/gb3_ …), or readers find buckets laid out the old way.
+  var s = String(id).trim(), h = 0;
+  for (var i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+  return Math.floor(((Math.imul(h, 0x9E3779B1) >>> 0) / 4294967296) * BUCKET_COUNT);
+}
+function packBucket_(obj) { return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(JSON.stringify(obj), 'application/json')).getBytes()); }
+function unpackBucket_(str) { return JSON.parse(Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(str), 'application/x-gzip')).getDataAsString()); }
+
+/** {bucket: packedString} for these bucket numbers, one getAll. Missing buckets are absent. */
+function bucketsGet_(prefix, nums) {
+  var keys = nums.map(function (b) { return prefix + b; }), got = {};
+  var need = keys.filter(function (k) { return !hasOwn_(cacheMemo_, k); });
+  if (need.length) { try { got = CacheService.getScriptCache().getAll(need) || {}; } catch (e) { got = {}; } }
+  keys.forEach(function (k) { if (hasOwn_(cacheMemo_, k) && cacheMemo_[k] != null) got[k] = cacheMemo_[k]; });
+  var out = {};
+  nums.forEach(function (b, i) { if (got[keys[i]] != null) out[b] = got[keys[i]]; });
+  return out;
+}
+
 /**
- * ONE student's grade rows, cached on their own key.
+ * Write {bucket: object} in small batches, read every key back, retry the missing once (singly, after a pause).
+ * @return {{written:number, present:number, tooBig:number, kb:number}}
+ */
+function bucketsPutVerified_(prefix, byBucket, ttl) {
+  var cache = CacheService.getScriptCache(), packed = {}, tooBig = 0, chars = 0;
+  Object.keys(byBucket).forEach(function (b) {
+    var s = packBucket_(byBucket[b]);
+    if (s.length > BUCKET_MAX_CHARS) { tooBig++; return; }
+    packed[prefix + b] = s; chars += s.length;
+  });
+  var keys = Object.keys(packed);
+  for (var i = 0; i < keys.length; i += 8) {
+    var part = {}; keys.slice(i, i + 8).forEach(function (k) { part[k] = packed[k]; });
+    try { cache.putAll(part, ttl); } catch (e) { Logger.log('bucket putAll failed: %s', e.message); }
+  }
+  var got = cache.getAll(keys) || {};
+  var missing = keys.filter(function (k) { return got[k] == null; });
+  if (missing.length) {
+    Utilities.sleep(2000);
+    missing.forEach(function (k) { try { cache.put(k, packed[k], ttl); } catch (e) {} });
+    got = cache.getAll(keys) || {};
+  }
+  var present = keys.filter(function (k) { return got[k] != null; }).length;
+  return { written: keys.length, present: present, tooBig: tooBig, kb: Math.round(chars / 1024) };
+}
+
+/* ---------------------------------------------------------------- grades, per student ---- */
+
+function gradeBucketPrefix_() { return 'gb2_' + APP_VERSION + '_' + (props_().getProperty(PROP_GRADES_VERSION) || '0') + '_'; }
+
+/** The whole Grades tab grouped {bucket: {studentId: rows}}, rows in sheet order. */
+function gradeBuckets_(gradesRows, onlyBucket) {
+  var out = {};
+  gradesRows.forEach(function (r) {
+    var sid = String(r['Student ID']), b = bucketOf_(sid);
+    if (onlyBucket != null && b !== onlyBucket) return;
+    var o = out[b] = out[b] || {};
+    (o[sid] = o[sid] || []).push(r);
+  });
+  if (onlyBucket != null && !out[onlyBucket]) out[onlyBucket] = {};
+  return out;
+}
+
+/**
+ * ONE student's grade rows.
  *
- * The Grades table is the whole school's — 15,457 rows by 2026-09-23 and growing fast (it was 1,014 twelve
- * days earlier). Parsing all of it to find one student's couple of dozen rows was ~550 ms of the ~700 ms the
- * data tabs cost, on every build. This keeps that parse to once per grade change instead of once per student.
+ * The Grades table is the whole school's (45,127 rows on 2026-10-13, growing fast). Parsing it to find one student's
+ * rows was 677-1,526 ms cold (RUN_perfTest 2026-10-12). The sync stores it as 64 gzip'd buckets (warmGradeBuckets_);
+ * a page load reads ONE bucket. On a miss the bucket is rebuilt from the tab and written back for the ~9 students
+ * who share it.
  *
- * It is NOT optional data: the Homework tab's "Ungraded" bucket is DEFINED as assignments with no score, so
- * dropping grades from the build would silently list every assignment as ungraded.
+ * It is NOT optional data: the Past tab's "No score yet" (and the hidden Ungraded tab) is DEFINED as assignments
+ * with no score, so dropping grades would silently mark every assignment unscored.
  *
  * Keyed on the grades fingerprint, not the data version, so a teacher editing one homework line does not
- * retire every student's slice.
+ * retire every student's grades.
  *
  * @return {Array<Object>} that student's rows, possibly empty.
  */
 function gradesForStudent_(sid) {
   sid = String(sid || '');
   if (!sid) return [];
-  var cache = CacheService.getScriptCache();
-  var key = 'gstu_' + APP_VERSION + '_' + (props_().getProperty(PROP_GRADES_VERSION) || '0') + '_' + sid;
-  var hit = cacheGetChunked_(cache, key);
-  if (hit) return JSON.parse(hit);
-  var id = getDataSheetId_();
-  if (!id) return [];
-  var all = dataTab_(SpreadsheetApp.openById(id), DATA_TABS.grades);
-  var mine = all.filter(function (r) { return String(r['Student ID']) === sid; });
-  cachePutChunked_(cache, key, JSON.stringify(mine), DATA_CACHE_TTL_SECS);
-  return mine;
+  var b = bucketOf_(sid), prefix = gradeBucketPrefix_();
+  var got = bucketsGet_(prefix, [b]);
+  if (got[b] != null) {
+    try { var rows = unpackBucket_(got[b])[sid] || []; bucketStats_.hit++; return rows; } catch (e) { /* corrupt: rebuild below */ }
+  }
+  bucketStats_.miss++;
+  var data = loadDataTabs_(['grades']);
+  if (!data) return [];
+  var one = gradeBuckets_(data.grades, b)[b];
+  try { var s = packBucket_(one); if (s.length <= BUCKET_MAX_CHARS) cachePut_(prefix + b, s, DATA_CACHE_TTL_SECS); } catch (e) {}   // memo too: restampGrades_ asks again this request
+  return one[sid] || [];
+}
+
+/** Sync-time (warmCaches_): all 64 grade buckets, verified by read-back. */
+function warmGradeBuckets_() {
+  var t = Date.now();
+  var data = loadDataTabs_(['grades']);
+  if (!data) return null;
+  var all = gradeBuckets_(data.grades, null);
+  for (var b = 0; b < BUCKET_COUNT; b++) if (!all[b]) all[b] = {};   // every bucket written: present = complete
+  var r = bucketsPutVerified_(gradeBucketPrefix_(), all, DATA_CACHE_TTL_SECS);
+  r.ms = Date.now() - t; r.rows = data.grades.length;
+  Logger.log('grade buckets: %s/%s present (%s too big), %s KB, %s rows, %s ms', r.present, r.written, r.tooBig, r.kb, r.rows, r.ms);
+  return r;
+}
+
+/**
+ * Editor check (Data.gs, Run menu): warm the grade buckets, then for EVERY student read their grades the way a page
+ * load does and compare with a direct filter of the Grades tab. Pass = 0 mismatches and every read a cache hit.
+ */
+function RUN_gradeSlicesCheck() {
+  requireOperator_();
+  var w = warmGradeBuckets_();
+  /* Compared with the Grades tab read STRAIGHT FROM THE SHEET. It used to compare with loadDataTabs_, i.e. the cached
+     copy the buckets were built from, so a stale cache passed its own check (release audit 2026-10-25, H1). */
+  var by = {};
+  sheetObjects_(SpreadsheetApp.openById(getDataSheetId_()).getSheetByName(DATA_TABS.grades))
+    .forEach(function (r) { var k = String(r['Student ID']); (by[k] = by[k] || []).push(r); });
+  var sids = {}; Object.keys(by).forEach(function (k) { sids[k] = 1; });
+  var sched = Sched.tabByName(loadStagingTabs_(), ['Student Schedules']), hm = Sched.headerMap(sched.values[0]);
+  for (var r = 1; r < sched.values.length; r++) { var s = Sched.cellToString(sched.values[r][hm['Student ID']]).trim(); if (s) sids[s] = 1; }
+  var ok = 0, bad = 0, t = Date.now();
+  bucketStats_ = { hit: 0, miss: 0 };
+  Object.keys(sids).forEach(function (sid) {
+    if (JSON.stringify(gradesForStudent_(sid)) === JSON.stringify(by[sid] || [])) ok++;
+    else { bad++; if (bad <= 3) Logger.log('MISMATCH student %s', sid); }
+  });
+  var n = Object.keys(sids).length;
+  Logger.log('warm: %s/%s buckets present, %s KB, %s ms. %s students: %s match, %s MISMATCH; cache hits %s, misses %s (%s ms, %s ms/student)',
+    w.present, w.written, w.kb, w.ms, n, ok, bad, bucketStats_.hit, bucketStats_.miss, Date.now() - t, Math.round((Date.now() - t) / n));
+  Logger.log(bad || bucketStats_.miss || w.present < w.written ? '!! NOT SAFE' : 'PASS: every student grades come from the cache and equal the Grades tab.');
 }
 
 /**
@@ -3228,8 +3889,10 @@ function loadDataTabs_(want) {
   var id = getDataSheetId_();
   if (!id) return null;
   want = want || ['homework', 'assignments', 'grades'];
-  var ss = SpreadsheetApp.openById(id);
-  var out = { homework: [], assignments: [], grades: [], averages: [], attendance: [], meta: {} };
+  // Opened only if some tab misses the cache — a warm build never touches the spreadsheet at all.
+  var opened = null;
+  var ss = { getSheetByName: function (n) { if (!opened) opened = SpreadsheetApp.openById(id); return opened.getSheetByName(n); } };
+  var out = { homework: [], assignments: [], grades: [], averages: [], averagesPast: [], attendance: [], meta: {} };
   want.forEach(function (k) { if (DATA_TABS[k]) out[k] = dataTab_(ss, DATA_TABS[k]); });
   dataTab_(ss, DATA_TABS.meta).forEach(function (r) { out.meta[r['Key']] = r['Value']; });
   return out;
@@ -3308,7 +3971,7 @@ function userStateWrite_(email, itemKey, state) {
 function perfNote_(stage, ms) {
   try {
     var cache = CacheService.getScriptCache();
-    var raw = cache.get('perf_' + APP_VERSION);
+    var raw = cacheGet_('perf_' + APP_VERSION);
     var p = raw ? JSON.parse(raw) : {};
     var s = p[stage] || { n: 0, total: 0, max: 0 };
     s.n++; s.total += ms; if (ms > s.max) s.max = ms;
@@ -3392,6 +4055,15 @@ function RUN_perfTest() {
   var tabs0 = loadStagingTabs_();
   Logger.log('Student %s (%s). Staging rows: %s', sid, email, tabs0.map(function (x) { return x.name + '=' + (x.values.length - 1); }).join(', '));
   Logger.log('One raw BellHub.getLobbyForDate, cache bypassed: %s ms  (a cold week costs 5 of these)', bellRaw.ms);
+  // The per-request primitives, raw (no snapshot, no cache) — what each one cost on every build before 2026-10-12.
+  var sp = PropertiesService.getScriptProperties(), dsid = sp.getProperty(PROP_DATA_SHEET_ID);
+  Logger.log('Raw primitives: 1 getProperty %s ms · 10 getProperty %s ms · getProperties %s ms · Drive check %s ms · openById %s ms · cache.get %s ms',
+    t(function () { return sp.getProperty(PROP_DATA_VERSION); }).ms,
+    t(function () { for (var i = 0; i < 10; i++) sp.getProperty(PROP_DATA_VERSION); }).ms,
+    t(function () { return sp.getProperties(); }).ms,
+    t(function () { try { return DriveApp.getFileById(dsid).getName(); } catch (e) { return ''; } }).ms,
+    t(function () { return SpreadsheetApp.openById(dsid); }).ms,
+    t(function () { return CacheService.getScriptCache().get('x'); }).ms);
   var a = pass('PASS 1 — caches as found');
   var b = pass('PASS 2 — fully warm (what a student actually pays)');
 
@@ -3642,7 +4314,7 @@ function calendarEarlyDays_(fromIso, toIso) {
    page load and walked ~10 cold BellHub dates (4.4 s each) whenever its 6-hour entry expired mid-day. */
 function schoolNotes_(todayIso) {
   var hit = null;
-  try { hit = CacheService.getScriptCache().get(schoolNotesKey_(todayIso)); } catch (e) { hit = null; }
+  try { hit = cacheGet_(schoolNotesKey_(todayIso)); } catch (e) { hit = null; }
   if (hit) return JSON.parse(hit);
   return { calClosed: {}, early: {}, complete: false, missing: true };   // the caller still has the due engine's closed days
 }

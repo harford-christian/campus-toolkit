@@ -201,6 +201,8 @@
   .gname .m { color: var(--dt); font-size: .76rem; margin-top: 2px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .gcard .avg { display: flex; align-items: baseline; gap: 6px; margin-left: auto; white-space: nowrap; }
   .gcard .avg .num { font-size: 1.35rem; font-weight: 800; color: var(--dd); letter-spacing: -.02em; }
+  .gcard .avg .q { font-size: .7rem; font-weight: 700; color: var(--dt); }
+  .gcard .avg .none { font-size: .76rem; color: var(--dt); }
   .gcard .letter { background: var(--gold); color: var(--gold-ink); font-size: .72rem; font-weight: 800; padding: 2px 8px; border-radius: 8px; }
   .gcard .letter.lo { background: var(--miss-bg); color: var(--miss); }
   .chev { color: var(--dt); transition: transform .15s; }
@@ -380,7 +382,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
 (function () {
   'use strict';
   var S = { d: null, tab: 'homework', sub: 'today', filter: 'all', types: { tests: false, graded: false }, day: '1',
-    openGrade: {}, openItem: {}, bootedAt: Date.now(), classesOpen: false,
+    openGrade: {}, gradeQ: null, openItem: {}, bootedAt: Date.now(), classesOpen: false,
     prefs: null, prefsDirty: false, notifOpen: false, inboxOpen: false, inbox: null, openNotice: {}, saveStatus: '',
     sports: null, sportsOpen: false, dirty: {}, gradesAsked: false,
     attendance: null, attendanceOpen: false, attendanceAsked: false };
@@ -484,6 +486,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     var f = e.target.closest('[data-filter]'); if (f) { var k = f.getAttribute('data-filter'); S.types[k] = !S.types[k]; renderHomework(); return; }
     var it = e.target.closest('[data-item]'); if (it) { var ik = it.getAttribute('data-item'); S.openItem[ik] = !S.openItem[ik]; renderHomework(); return; }
     var dy = e.target.closest('[data-day]'); if (dy) { S.day = dy.getAttribute('data-day'); renderSchedule(); return; }
+    var gq = e.target.closest('[data-gq]'); if (gq) { S.gradeQ = Number(gq.getAttribute('data-gq')); renderGrades(); return; }
     var g = e.target.closest('[data-grade]'); if (g) { var gk = g.getAttribute('data-grade'); S.openGrade[gk] = !S.openGrade[gk]; renderGrades(); return; }
     var cl = e.target.closest('[data-classes]'); if (cl) { S.classesOpen = !S.classesOpen; renderMore(); return; }
     var th = e.target.closest('[data-theme-set]'); if (th) { applyTheme(th.getAttribute('data-theme-set')); return; }
@@ -713,7 +716,10 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
          with its score, unscored work flagged. The payload already carries 10 days back, so this is display only. */
       past: all.filter(function (it) { return it.dueOn < focus && it.dueOn >= addDays(focus, -7); })
     };
-    var subs = ['past', 'today', 'upcoming'].concat(buckets.ungraded.length ? ['ungraded'] : []);
+    /* Ungraded is HIDDEN, not removed (Josh, 2026-10-09: beta testing showed it confused students; it may come back).
+       The bucket is still computed — flip SHOW_UNGRADED to bring the tab back. */
+    var SHOW_UNGRADED = false;
+    var subs = ['past', 'today', 'upcoming'].concat(SHOW_UNGRADED && buckets.ungraded.length ? ['ungraded'] : []);
     if (subs.indexOf(S.sub) === -1) S.sub = 'today';
     /* A game that takes you out of class at 2:00 outranks anything else on the screen — so it sits at the top.
        That is also why it must not ARRIVE at the top: the games come from 21 calendars fetched after first
@@ -856,7 +862,8 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     return mode + ' schedule';
   }
   function scheduleRows(rows, isToday, dateIso) {
-    if (!rows.length) return '<div class="empty">No classes scheduled.</div>';
+    // A homeschool student is only on campus for the classes they take here, so an empty day is normal for them.
+    if (!rows.length) return '<div class="empty">' + (S.d && S.d.profile && S.d.profile.homeschool ? 'No HCS classes on this day.' : 'No classes scheduled.') + '</div>';
     var chapel = chapelOn(dateIso);   // only when the memo's chapel day is THIS day; a moved chapel never lands on the wrong row
     return rows.map(function (o) {
       var isChapel = chapel && /chapel/i.test(String(o.description || ''));
@@ -871,7 +878,9 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     var d = S.d, sc = d.schedule, box = $('#view-schedule');
     if (d.elementary) {
       var p = d.profile;
-      box.innerHTML = '<div class="card"><div class="today quiet"><div><div class="cls">' + esc(p.homeroomTeacher ? 'Homeroom · ' + p.homeroomTeacher : 'Homeroom') + '</div><div class="t">' + esc(p.homeroom ? 'Room ' + p.homeroom + ' · ' : '') + esc(longDate(sc.date)) + '</div></div></div></div>' +
+      // A homeschool student has no homeroom: never show an empty "Homeroom" card (FACTS flag, 2026-10-09).
+      var hrTitle = p.homeroomTeacher ? 'Homeroom · ' + p.homeroomTeacher : (p.homeschool ? 'Homeschool' : 'Homeroom');
+      box.innerHTML = '<div class="card"><div class="today quiet"><div><div class="cls">' + esc(hrTitle) + '</div><div class="t">' + esc(p.homeroom ? 'Room ' + p.homeroom + ' · ' : '') + esc(longDate(sc.date)) + '</div></div></div></div>' +
         '<div class="card"><div class="empty"><b>Lessons by day</b><br>What each class covered, day by day, arrives in a later phase.</div></div>';
       return;
     }
@@ -915,20 +924,55 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     // "Pull down" never worked: overscroll-behavior-y:contain turns pull-to-refresh off, and the app sits in Google's iframe.
     if (g && g.failed) { box.innerHTML = '<div class="card"><div class="empty"><b>Could not load your grades.</b><br>' + retryBtn('grades') + '</div></div>'; return; }
     if (!g.connected) { box.innerHTML = '<div class="card"><div class="empty"><b>Grades are not connected yet.</b><br>They arrive with the FACTS sync.</div></div>'; return; }
+    /* Quarters are decided on the server (GradeView.js): one view per started quarter, chips in order (Q1 · Q2).
+       The current view carries `extra` = the previous quarter during the TRANSITION (Josh, 2026-10-25): every card then
+       shows the new quarter and "Q1 final", and an open card lists both quarters under their own headings. */
+    var views = g.views || [];
+    var view = views.filter(function (v) { return v.q === S.gradeQ; })[0] || views.filter(function (v) { return v.current; })[0] || views[0];
+    var byId = {};
+    (g.classes || []).forEach(function (c) { byId[c.classId] = c; });
+    var qName = function (q) { return q ? 'Q' + q : ''; };
+    var avgLabel = function (q) { return !q ? '' : (q < g.quarter ? 'Q' + q + ' final' : 'Q' + q); };
+    var scored = function (a) { return a.earned !== '' || a.display !== ''; };
+    var letterPill = function (l) { return l ? '<span class="letter' + (/^[DF]/i.test(l) ? ' lo' : '') + '">' + esc(l) + '</span>' : ''; };
+    var rowHtml = function (a) {
+      var has = scored(a);
+      return '<div class="row"><div class="txt"><div class="ttl">' + esc(a.title) + '</div><div class="meta">' + (a.dateDue ? '<span class="due">Due ' + esc(dayMd(a.dateDue)) + '</span>' : '') + '</div></div>' +
+        '<div class="score">' + (has ? '<span class="s">' + esc(a.display || a.earned) + '</span> ' : '') + (a.max ? '<span class="of">/ ' + esc(a.max) + '</span>' : '') + '</div>' +
+        (!has && a.dateDue && a.dateDue >= S.d.homework.today ? '<span class="pill up">Upcoming</span>' : (!has ? '<span class="pill up">Not graded</span>' : '')) + '</div>';
+    };
     var html = '';
-    if (!g.classes.length) html += '<div class="card"><div class="empty">No classes found.</div></div>';
-    g.classes.forEach(function (c) {
-      var open = !!S.openGrade[c.classId];
-      var avg = c.average ? '<div class="avg"><span class="num">' + esc(c.average) + '</span>' + (c.letter ? '<span class="letter' + (/^[DF]/i.test(c.letter) ? ' lo' : '') + '">' + esc(c.letter) + '</span>' : '') + '</div>' : '';
-      html += '<div class="card' + (open ? ' open' : '') + '"><button type="button" class="gcard" data-grade="' + esc(c.classId) + '"><div class="rail" style="background:' + esc(c.color) + '"></div>' +
-        '<div class="gname"><div class="n">' + esc(c.name) + '</div><div class="m">' + esc(c.teacher || '') + (c.total ? ' · ' + c.graded + ' of ' + c.total + ' graded' : ' · nothing in the gradebook yet') + '</div></div>' + avg + ICON.chev + '</button>';
+    if (views.length > 1) html += '<div class="chips">' + views.map(function (v) {
+      return '<button type="button" class="chip plain' + (view && v.q === view.q ? ' on' : '') + '" data-gq="' + esc(v.q) + '">' + esc(qName(v.q)) + '</button>';
+    }).join('') + '</div>';
+    if (view && view.extra) html += '<div class="note">' + esc(qName(view.q)) + ' has just started, so ' + esc(avgLabel(view.extra)) + ' grades show too until every class has a ' +
+      esc(qName(view.q)) + ' average' + (g.transition && g.transition.endsBy ? ' (until ' + esc(dayMd(g.transition.endsBy)) + ' at the latest)' : '') + '.</div>';
+    var ids = view ? view.classIds : [];
+    if (!ids.length) html += '<div class="card"><div class="empty">No classes found.</div></div>';
+    ids.forEach(function (cid) {
+      var c = byId[cid];
+      if (!c) return;
+      var mq = view.q, xq = view.extra, avgs = c.avg || {}, byQ = c.byQ || {};
+      var meetsMain = !!(c.meets && c.meets[mq]);
+      var list = meetsMain ? (byQ[mq] || []) : [];
+      var main = meetsMain ? avgs[mq] : null, prev = xq ? avgs[xq] : null;
+      var tag = mq ? '<span class="q">' + esc(avgLabel(mq)) + '</span>' : '';
+      var avg = main && main.average ? '<div class="avg">' + tag + '<span class="num">' + esc(main.average) + '</span>' + letterPill(main.letter) + '</div>'
+        : (meetsMain && g.averagesOn && mq ? '<div class="avg">' + tag + '<span class="none">no average yet</span></div>' : '');
+      var open = !!S.openGrade[cid];
+      html += '<div class="card' + (open ? ' open' : '') + '"><button type="button" class="gcard" data-grade="' + esc(cid) + '"><div class="rail" style="background:' + esc(c.color) + '"></div>' +
+        '<div class="gname"><div class="n">' + esc(c.name) + '</div><div class="m">' + esc(c.teacher || '') +
+        (list.length ? ' · ' + list.filter(scored).length + ' of ' + list.length + ' graded' : (meetsMain ? ' · nothing in the gradebook yet' : '')) + '</div>' +
+        (prev && prev.average ? '<div class="m">' + esc(avgLabel(xq)) + ' <b>' + esc(prev.average) + '</b>' + (prev.letter ? ' ' + esc(prev.letter) : '') + '</div>' : '') +
+        '</div>' + avg + ICON.chev + '</button>';
       if (open) {
-        if (!c.assignments.length) html += '<div class="row"><div class="txt"><div class="meta">Nothing in the gradebook for this class yet.</div></div></div>';
-        c.assignments.forEach(function (a) {
-          var has = a.earned !== '' || a.display !== '';
-          html += '<div class="row"><div class="txt"><div class="ttl">' + esc(a.title) + '</div><div class="meta">' + (a.dateDue ? '<span class="due">Due ' + esc(dayMd(a.dateDue)) + '</span>' : '') + '</div></div>' +
-            '<div class="score">' + (has ? '<span class="s">' + esc(a.display || a.earned) + '</span> ' : '') + (a.max ? '<span class="of">/ ' + esc(a.max) + '</span>' : '') + '</div>' +
-            (!has && a.dateDue && a.dateDue >= S.d.homework.today ? '<span class="pill up">Upcoming</span>' : (!has ? '<span class="pill up">Not graded</span>' : '')) + '</div>';
+        var sections = [];
+        if (meetsMain) sections.push({ q: mq, rows: list });
+        if (xq) sections.push({ q: xq, rows: byQ[xq] || [] });
+        if (!sections.some(function (s) { return s.rows.length; })) html += '<div class="row"><div class="txt"><div class="meta">Nothing in the gradebook for this class yet.</div></div></div>';
+        sections.forEach(function (s) {
+          if (sections.length > 1) html += '<div class="daybar"><span>' + esc(qName(s.q)) + '</span><span>' + s.rows.filter(scored).length + ' of ' + s.rows.length + ' graded</span></div>';
+          s.rows.forEach(function (a) { html += rowHtml(a); });
         });
       }
       html += '</div>';
@@ -1062,6 +1106,12 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     if (!a.todayKnown) return "Couldn't check today";
     return a.today ? 'Today: ' + a.today.status : 'Here today';
   }
+  /* A homeschool student's mid-day arrival is usually their timetable, not lateness. The record is FACTS's and is
+     shown as-is (hiding it would hide something the office may need to fix) — this only says how to get it fixed. */
+  function hsLateNote(rec) {
+    if (!(S.d && S.d.profile && S.d.profile.homeschool) || !rec || !/late/i.test(String(rec.status || ''))) return '';
+    return ' · Homeschool schedule: if this arrival was planned, the office can correct it.';
+  }
   function attendancePanel() {
     var a = S.attendance;
     if (!a) return '<div class="notice"><div class="m">Loading…</div></div>';
@@ -1076,7 +1126,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
       html += '<div class="row"><div class="txt"><div class="ttl">Here today</div><div class="meta">No absence, late arrival or early dismissal on record for ' + esc(dayMd(a.todayIso)) + '.</div></div></div>';
     } else {
       html += '<div class="row"><div class="txt"><div class="ttl">Today · ' + esc(a.today.status) + '</div><div class="meta">' + esc(a.today.detail) +
-        (a.today.excused === 'N' ? ' · not excused' : a.today.excused === 'Y' ? ' · excused' : '') + '</div></div></div>';
+        (a.today.excused === 'N' ? ' · not excused' : a.today.excused === 'Y' ? ' · excused' : '') + hsLateNote(a.today) + '</div></div></div>';
     }
 
     var c = a.counts || {};
@@ -1089,7 +1139,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
 
     (a.days || []).forEach(function (d) {
       html += '<div class="row"><div class="txt"><div class="ttl">' + esc(dayMd(d.date)) + ' · ' + esc(d.status) + '</div><div class="meta">' + esc(d.detail) +
-        (d.excused === 'N' ? ' · not excused' : d.excused === 'Y' ? ' · excused' : '') + '</div></div></div>';
+        (d.excused === 'N' ? ' · not excused' : d.excused === 'Y' ? ' · excused' : '') + hsLateNote(d) + '</div></div></div>';
     });
     html += '<div class="row"><div class="txt"><div class="meta">Straight from FACTS. If something here looks wrong, tell the office — it can\'t be changed from this app.</div></div></div>';
     return html;

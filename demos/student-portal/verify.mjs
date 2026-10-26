@@ -176,8 +176,10 @@ ok(a.ok === true && a.partial === true && a.myTeamsFailed.length === 0, 'one unr
 // grades, attendance, prefs, inbox
 const g = M.gradesApi('');
 const gc = (short) => g.classes.find(c => c.short === short);
-ok(g.connected && g.averagesOn && gc('Eng').average === '92.5' && gc('Eng').letter === 'A-', 'the class average is the category -1 row, not the sub-average');
-ok(gc('Phys').average === '' && gc('Phys').total === 1 && gc('Phys').graded === 0, 'a class with no summary row shows no average rather than a guess');
+// Averages are per quarter (GradeView, upstream 2026-10-25): the demo clock is in Q1, with no earlier quarter to show.
+ok(g.connected && g.averagesOn && g.quarter === 1 && eq(g.started, [1]) && g.transition.on === false &&
+   gc('Eng').avg[1] && gc('Eng').avg[1].average === '92.5' && gc('Eng').avg[1].letter === 'A-', 'the class average is the category -1 row, not the sub-average (Q1, the demo clock\'s quarter)');
+ok(!gc('Phys').avg[1] && gc('Phys').byQ[1].length === 1 && gc('Phys').byQ[1].filter(x => x.status === 'Graded').length === 0, 'a class with no summary row shows no average rather than a guess');
 ok(!g.classes.some(c => c.short === 'HR' || /Soccer|Honor/.test(c.name)), 'grades skip homeroom and activities');
 const at = M.attendanceApi('');
 ok(at.connected && at.todayKnown && at.today === null && at.days.length === 1 && at.counts.late === 1 && at.quarter === 1, 'Nora: here today, one late arrival this quarter');
