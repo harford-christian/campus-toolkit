@@ -631,6 +631,10 @@ function syncRoster() {
     (schedulesByStudent[id] = schedulesByStudent[id] || []).push(row);
   });
 
+  // K-3 students with no Homeroom row who FACTS does NOT flag as homeschool: they still fall back to
+  // their Core teachers (never stranded), but they're a data gap, not a homeschooler — logged below.
+  var noHomeroomNotHomeschool = [];
+
   var outRows = Object.keys(byStudent).map(function (studentId) {
     var rows = byStudent[studentId];
     var name = splitStudentName_(rows[0]['LastName FirstName']);
@@ -665,8 +669,13 @@ function syncRoster() {
       } else {
         // Homeschool (HMSCHL) students take real Core classes but have no
         // Homeroom row — fall back to their actual Core teacher(s) instead
-        // of leaving them with nothing to book.
+        // of leaving them with nothing to book. Since 2026-10-09 the export's
+        // 'Homeschool' column (Y/blank, from facts-api-sync) says which ones
+        // really are homeschool; anyone else here is missing a homeroom in FACTS.
         teachers = distinctCoreTeachers_(studentClasses);
+        if (String(rows[0]['Homeschool'] || '').trim().toUpperCase() !== 'Y') {
+          noHomeroomNotHomeschool.push(studentId + ' (' + gradeLevel + ')');
+        }
       }
     } else if (tier === 'upperElementary') {
       teachers = distinctCoreTeachers_(studentClasses);
@@ -692,6 +701,13 @@ function syncRoster() {
       JSON.stringify(teachers)
     ];
   });
+
+  if (noHomeroomNotHomeschool.length) {
+    // On a FACTS copy converted before the Homeschool column existed, every homeschooler lands here
+    // too — re-convert the export to get the column.
+    Logger.log('syncRoster: ' + noHomeroomNotHomeschool.length + ' K-3 student(s) have no Homeroom row and are ' +
+      'not flagged Homeschool in FACTS (booked with their Core teachers): ' + noHomeroomNotHomeschool.join(', '));
+  }
 
   var headers = rosterHeaders_();
   var sheet = SpreadsheetApp.getActive().getSheetByName('Roster');
