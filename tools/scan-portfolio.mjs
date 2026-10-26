@@ -416,7 +416,9 @@ const appDirs = [];
 findAppManifests(PROJECTS, 0, appDirs);
 const demoable = [...new Set(appDirs.map(rel))].filter((d) => { try { return isDemoable(path.join(PROJECTS, d)); } catch { return false; } }).sort();
 
-const covered = new Set(manifest.coveredProjects || []);
+// skippedProjects: demoable projects Josh decided not to showcase. Kept apart from coveredProjects so "has a demo" and
+// "deliberately has none" stay distinguishable; both stop a project being reported as NEW.
+const covered = new Set([...(manifest.coveredProjects || []), ...(manifest.skippedProjects || [])]);
 const newProjects = demoable.filter((d) => !covered.has(d));
 
 const baseline = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, 'utf8')) : {};
