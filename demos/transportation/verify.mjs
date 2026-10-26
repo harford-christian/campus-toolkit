@@ -24,7 +24,7 @@ import { execFileSync } from 'node:child_process';
 import vm from 'node:vm';
 import { buildLogic, SRC, nameAliases } from './build-logic.mjs';
 import { buildKioskLogic, KIOSK_SRC } from './build-kiosk-logic.mjs';
-import { findPhrases, findStaffNames } from '../../tools/staff-aliases.mjs';
+import { findPhrases, findStaffNames, aliasPhrases, aliasStaffNames, aliasEmailLocals, PHRASE_ALIASES } from '../../tools/staff-aliases.mjs';
 const require = createRequire(import.meta.url);
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -440,8 +440,11 @@ if (!existsSync(KIOSK_SRC + '/Code.gs')) {
   check('logic.js carries the Dismissal server\'s own minute publisher (publishBoardTick) and dsPublishBundle_',
     typeof L.publishBoardTick === 'function' && typeof L.dsPublishBundle_ === 'function' && /function publishBoardTick\(\)/.test(logicJs));
   const pureSrc = lf(readFileSync(KIOSK_SRC + '/Pure.gs', 'utf8'));
-  check('KioskClient (generated from Pure.gs) is current, and kiosk.html inlines Pure.gs verbatim — not a reimplementation',
-    lf(readFileSync(KIOSK_SRC + '/KioskClient.html', 'utf8')).indexOf(pureSrc) !== -1 && kioskHtml.indexOf(pureSrc) !== -1);
+  // The page carries Pure.gs as build-demo.mjs leaves it: anyone named in its comments is already a role alias.
+  const kioskNameAliases = JSON.parse(readFileSync(HERE + 'build.kiosk.json', 'utf8')).nameAliases || {};
+  const pureAsBuilt = aliasEmailLocals(aliasStaffNames(aliasPhrases(pureSrc, Object.assign({}, PHRASE_ALIASES, kioskNameAliases)).text).text).text;
+  check('KioskClient (generated from Pure.gs) is current, and kiosk.html inlines Pure.gs verbatim (after the build\'s name aliases) — not a reimplementation',
+    lf(readFileSync(KIOSK_SRC + '/KioskClient.html', 'utf8')).indexOf(pureSrc) !== -1 && kioskHtml.indexOf(pureAsBuilt) !== -1);
   try {
     const cfg = JSON.parse(readFileSync(HERE + 'build.kiosk.json', 'utf8'));
     mkdirSync(ROOT + '.tmp', { recursive: true });
@@ -489,20 +492,25 @@ if (!existsSync(KIOSK_SRC + '/Code.gs')) {
   // who is on it: the ramp population of the board the Dismissal server builds from the same sheets
   const fresh = boot(makeSession());
   const fBoard = fresh.M.dismissalApi('').board;
-  const rampPop = fresh.S.dsFlatList(fBoard).filter((r) => fresh.S.dsRampPopulation(r, { sixthAtEl: true }));
-  check('rampApi returns the elementary ramp: K4-5 (plus EL-pickup 6th), Bus / Car / Early Bird, never a Staff Kid — the board\'s own ramp population, name for name',
+  // The iPad's population is DS_RAMP_IPAD_TYPES: the ramp line plus the Staff Kids in its grades, for lookup (2026-10-26).
+  const rampPop = fresh.S.dsFlatList(fBoard).filter((r) => fresh.S.dsRampPopulation(r, { sixthAtEl: true, types: fresh.S.DS_RAMP_IPAD_TYPES }));
+  const staffKids = r1.students.filter((s) => KP.ksIsLookupOnly(s));
+  check('rampApi returns the elementary ramp: K4-5 (plus EL-pickup 6th), Bus / Car / Early Bird, plus its Staff Kids for lookup only (counted apart, never waited for) — the board\'s own ramp population, name for name',
     r1.students.length === rampPop.length && r1.students.length > 30 &&
     eq(r1.students.map((s) => s.name).sort(), rampPop.map((r) => r.name).sort()) &&
-    r1.students.every((s) => ['Bus', 'Car', 'Early Bird'].indexOf(s.type) !== -1) &&
-    r1.students.every((s) => ['K4', 'K5', '1', '2', '3', '4', '5', '6'].indexOf(s.grade) !== -1),
+    r1.students.every((s) => ['Bus', 'Car', 'Early Bird', 'Staff Kid'].indexOf(s.type) !== -1) &&
+    r1.students.every((s) => ['K4', 'K5', '1', '2', '3', '4', '5', '6'].indexOf(s.grade) !== -1) &&
+    staffKids.length >= 1 && KP.ksCounts(r1.students).staff === staffKids.length &&
+    KP.ksCounts(r1.students).total === r1.students.length - staffKids.length,
     JSON.stringify(r1.students.map((s) => s.grade + ' ' + s.type)));
-  const flaggedNames = (st) => KP.ksApplyFilters(st, { notRidingOnly: true }).map((s) => s.name).sort();
+  // The flags the ramp waits by: lookup-only rows are never among them (ksCounts leaves them out).
+  const flaggedNames = (st) => KP.ksApplyFilters(st, { notRidingOnly: true }).filter((s) => !KP.ksIsLookupOnly(s)).map((s) => s.name).sort();
   const boardNE = fBoard.notExpected.map((r) => r.name);
-  check('the not-to-wait-for flags: Pure.gs (ksCounts / ksApplyFilters) derives the same from rampApi as from the published file, and they are the board\'s notExpected on the ramp',
+  check('the not-to-wait-for flags: Pure.gs (ksCounts / ksApplyFilters) derives the same from rampApi as from the published file, and they are the board\'s notExpected on the ramp line',
     eq(KP.ksCounts(r1.students), KP.ksCounts(JSON.parse(file1.content).students)) &&
     eq(flaggedNames(r1.students), flaggedNames(JSON.parse(file1.content).students)) &&
     KP.ksCounts(r1.students).flagged === flaggedNames(r1.students).length && flaggedNames(r1.students).length >= 1 &&
-    eq(flaggedNames(r1.students), r1.students.map((s) => s.name).filter((n) => boardNE.indexOf(n) !== -1).sort()),
+    eq(flaggedNames(r1.students), r1.students.filter((s) => !KP.ksIsLookupOnly(s)).map((s) => s.name).filter((n) => boardNE.indexOf(n) !== -1).sort()),
     JSON.stringify(flaggedNames(r1.students)));
   check('PII-minimised: a ramp row carries no student id, phone or email, and at most three name + relationship pickups',
     r1.students.every((s) => !('id' in s) && s.pickups.every((p) => p.length === 2) && s.pickups.length <= 3) && !/@|\d{3}-\d{3}-\d{4}/.test(file1.content));

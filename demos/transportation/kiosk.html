@@ -27,6 +27,10 @@
   Filters (route, bus/car, grade, not-riding) and a "Full app" button were added 2026-09-10; the
   list stays alphabetical and search stays primary — the filters sit behind one Filters button so
   the default view is still the clean full list.
+
+  Staff Kids ride along for LOOKUP only (the Office Manager, 2026-10-26): their own section at the bottom, out of
+  every ramp count, so one who turns up at the ramp can be checked against their authorized pickups
+  without anybody waiting for them. ksIsLookupOnly / ksCounts / ksSections in Pure.gs decide it.
 -->
 <style>
   :root {
@@ -90,6 +94,8 @@
          min-height: 60px; padding: .55rem .9rem; border-bottom: 1px solid var(--line);
          font-size: 1.15rem; }
   .row:last-child { border-bottom: 0; }
+  .row.staff { background: #f6f7f9; }                  /* lookup only — before .flag so an absent one still reads red */
+  .row.staff .nm { color: #4b5563; }
   .row.flag { background: var(--flag-bg); }
   .who2 { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .5rem; }
   .nm { font-weight: 700; }
@@ -110,6 +116,7 @@
   .grphdr { background: #E1F5FE; color: #01579B; font-weight: 800; padding: .5rem .9rem; border-top: 3px solid #0277BD;
             display: flex; justify-content: space-between; gap: .6rem; flex-wrap: wrap; font-size: 1rem; }
   .grphdr.rest { background: #f1f2f5; color: var(--ink); border-color: #c9ccd3; }
+  .grphdr.staff { background: #eceff1; color: #37474f; border-color: #90a4ae; }
   .pk.temp { background: #F3E5F5; border-radius: .4rem; padding: .25rem .5rem; }
   .pk .thru { color: var(--dt); font-size: .85rem; white-space: nowrap; }
   .empty { padding: 1.2rem .9rem; color: var(--dt); font-size: 1.05rem; text-align: center; }
@@ -124,6 +131,8 @@
   .csub { color: var(--dt); font-size: .9rem; margin: 0 0 .4rem; }
   .ccard h4 { margin: .7rem 0 .3rem; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dt); }
   .cflag { background: var(--flag-bg); color: var(--flag); font-weight: 800; border-radius: .4rem;
+           padding: .4rem .6rem; margin: .3rem 0 0; }
+  .cnote { background: #eceff1; color: #37474f; font-weight: 800; border-radius: .4rem;
            padding: .4rem .6rem; margin: .3rem 0 0; }
   .pk { display: flex; justify-content: space-between; align-items: baseline; gap: .7rem;
         padding: .5rem 0; border-bottom: 1px dotted var(--line); font-size: 1.1rem; }
@@ -227,11 +236,41 @@ function ksFilter(students, q) {
   });
 }
 
-/** Header counts: how many to expect, how many flagged NOT to wait for. */
+/** A row the ramp can LOOK UP but never waits for: a Staff Kid (the Office Manager, 2026-10-26). The publisher
+ *  sends the Staff Kids in the ramp's grades so one who turns up at the ramp can be checked against
+ *  their authorized pickups. They are not in the ramp line, so they sit apart and count apart. */
+function ksIsLookupOnly(s) { return !!s && s.type === 'Staff Kid'; }
+
+/** Header counts: how many to expect, how many flagged NOT to wait for. Lookup-only rows are counted
+ *  apart (`staff`) and never in total / expected / flagged — the numbers the ramp waits by. */
 function ksCounts(students) {
-  var total = (students || []).length, flagged = 0;
-  (students || []).forEach(function (s) { if (!s.expected) flagged++; });
-  return { total: total, flagged: flagged, expected: total - flagged };
+  var total = 0, flagged = 0, staff = 0;
+  (students || []).forEach(function (s) {
+    if (ksIsLookupOnly(s)) { staff++; return; }
+    total++;
+    if (!s.expected) flagged++;
+  });
+  return { total: total, flagged: flagged, expected: total - flagged, staff: staff };
+}
+
+/**
+ * The page's sections, as INDEXES into `rows` (the tap call-out indexes into exactly what is shown):
+ * the 8th-period specials groups first, sorted (those classes come out late and together), then
+ * everyone else in the ramp line, then the lookup-only Staff Kids. A Staff Kid never lands in a
+ * specials group — they are not in the ramp line at all.
+ * @return {{specials: Array<{subject:string, from:string, idx:number[]}>, rest:number[], staff:number[]}}
+ */
+function ksSections(rows) {
+  var groups = {}, order = [], rest = [], staff = [];
+  (rows || []).forEach(function (s, i) {
+    if (ksIsLookupOnly(s)) { staff.push(i); return; }
+    if (!s.special) { rest.push(i); return; }
+    var k = s.special.subject + '|' + (s.special.from || '');
+    if (!groups[k]) { groups[k] = { subject: s.special.subject, from: s.special.from || '', idx: [] }; order.push(k); }
+    groups[k].idx.push(i);
+  });
+  order.sort();
+  return { specials: order.map(function (k) { return groups[k]; }), rest: rest, staff: staff };
 }
 
 /**
@@ -283,8 +322,8 @@ function ksGrades(students) {
 }
 
 /** Distinct dismissal types present, in a fixed order — for the "Show" filter chips. The ramp gets
- *  Bus, Car and Early Bird; deriving it means a new type would appear rather than be silently
- *  unfilterable. */
+ *  Bus, Car and Early Bird, plus Staff Kid for lookup; deriving it means a new type would appear
+ *  rather than be silently unfilterable. */
 function ksTypes(students) {
   var ORDER = ['Bus', 'Car', 'Early Bird', 'Staff Kid'];
   var seen = {};
@@ -299,6 +338,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     ksStaleness: ksStaleness, ksFmtAge: ksFmtAge, ksChipStyle: ksChipStyle,
     ksFilter: ksFilter, ksCounts: ksCounts, KS_CHIP: KS_CHIP,
+    ksIsLookupOnly: ksIsLookupOnly, ksSections: ksSections,
     ksApplyFilters: ksApplyFilters, ksRoutes: ksRoutes, ksGrades: ksGrades, ksTypes: ksTypes
   };
 }
@@ -434,7 +474,8 @@ if (typeof module !== 'undefined' && module.exports) {
     return b;
   }
   function rowHtml(s, i) {
-    return '<div class="row' + (s.expected ? '' : ' flag') + '" data-idx="' + i + '" role="button" tabindex="0">' +
+    return '<div class="row' + (s.expected ? '' : ' flag') + (ksIsLookupOnly(s) ? ' staff' : '') +
+      '" data-idx="' + i + '" role="button" tabindex="0">' +
       '<div class="who2"><span class="nm">' + esc(s.name) + '</span>' + laneChips(s) + badges(s) + '</div>' +
       '<div class="gr">' + esc(s.grade) + '</div></div>';
   }
@@ -478,6 +519,7 @@ if (typeof module !== 'undefined' && module.exports) {
         '<h3>' + esc(s.name) + '</h3>' +
         '<div class="csub">Grade ' + esc(s.grade) + (lanes ? ' · ' + lanes : '') +
           (s.handedTo ? ' · to ' + esc(s.handedTo) : '') + '</div>' +
+        (ksIsLookupOnly(s) ? '<div class="cnote">Staff kid — not normally dismissed from the ramp.</div>' : '') +
         (s.special ? '<div class="cflag" style="background:#E1F5FE;color:#01579B">8th period ' + esc(s.special.subject) +
           (s.special.from ? ' — comes out late from the ' + esc(s.special.from) : ' — comes out late') + ', with the class</div>' : '') +
         flag + '<h4>Authorized to collect</h4>' + body +
@@ -539,27 +581,24 @@ if (typeof module !== 'undefined' && module.exports) {
     var showing = anyFilter() || F.q ? rows.length + ' shown · ' : '';
     $('tally').innerHTML = showing + '<b>' + c.expected + '</b> to expect' +
       (c.flagged ? ' · <span class="fl"><b>' + c.flagged + '</b> not — do not wait</span>' : '') +
-      ' · ' + c.total + ' on the ramp' + (board.dayName ? ' · ' + esc(board.dayName) : '');
+      ' · ' + c.total + ' on the ramp' +
+      (c.staff ? ' · ' + c.staff + ' staff kid' + (c.staff === 1 ? '' : 's') + ' (look-up only)' : '') +
+      (board.dayName ? ' · ' + esc(board.dayName) : '');
     // 8TH-PERIOD SPECIALS FIRST: those classes come out late and together, so they sit under one
-    // header per special above the alphabetical list. Row indexes stay aligned with lastRows.
-    var groups = {}, order = [], html = '';
-    rows.forEach(function (s, i) {
-      if (!s.special) return;
-      var k = s.special.subject + '|' + (s.special.from || '');
-      if (!groups[k]) { groups[k] = { subject: s.special.subject, from: s.special.from || '', idx: [] }; order.push(k); }
-      groups[k].idx.push(i);
-    });
-    order.sort();
-    order.forEach(function (k) {
-      var gp = groups[k];
+    // header per special above the alphabetical list. STAFF KIDS LAST, under their own header and
+    // out of every count above. ksSections returns indexes, so rows stay aligned with lastRows.
+    var sec = ksSections(rows), html = '';
+    var rowsAt = function (idx) { return idx.map(function (i) { return rowHtml(rows[i], i); }).join(''); };
+    sec.specials.forEach(function (gp) {
       html += '<div class="grphdr"><span>8th period ' + esc(gp.subject) + (gp.from ? ' · from the ' + esc(gp.from) : '') + '</span>' +
-        '<span>' + gp.idx.length + ' — come out late, together</span></div>' +
-        gp.idx.map(function (i) { return rowHtml(rows[i], i); }).join('');
+        '<span>' + gp.idx.length + ' — come out late, together</span></div>' + rowsAt(gp.idx);
     });
-    var rest = '';
-    rows.forEach(function (s, i) { if (!s.special) rest += rowHtml(s, i); });
-    if (order.length && rest) html += '<div class="grphdr rest"><span>Everyone else</span></div>';
-    html += rest;
+    if (sec.specials.length && sec.rest.length) html += '<div class="grphdr rest"><span>Everyone else</span></div>';
+    html += rowsAt(sec.rest);
+    if (sec.staff.length) {
+      html += '<div class="grphdr staff"><span>Staff kids · not in the ramp line</span>' +
+        '<span>' + sec.staff.length + ' — look up only</span></div>' + rowsAt(sec.staff);
+    }
     $('list').innerHTML = '<div class="list">' + (rows.length
       ? html
       : '<div class="empty">Nobody matches' + (anyFilter() || F.q ? ' these filters.' : ' that search.') + '</div>') + '</div>';

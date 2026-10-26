@@ -38,7 +38,7 @@ export const WANT = {
     'dsSportsFeedEnabled_', 'dsSportsFeedFile_', 'dsSportsToday_', 'dsComputeBoardBundle_', 'dsBundleAgeSec_', 'dsBoardBundle_',
     'dsRampPickups_', 'dsDriverPickups_', 'dsPublishBundle_', 'dsWriteRampFile_', 'dsWriteDriverFile_', 'dsWriteDriverAmFile_',
     'dsPublishDriverAmDaily_', 'dsPublishDriverAmNow_', 'dsWriteSharedFile_', 'PROP_PUBLISH_TICK', 'publishBoardTick', 'dsDecorateBundle_', 'dismissalApi', 'dsFreshness_',
-    'setOverride', 'setOverrides', 'plannedApi', 'historyApi', 'setStanding', 'dsWalkersSheet_', 'setWalker', 'removeWalker',
+    'setOverride', 'setOverrides', 'dsOverrideNotify_', 'plannedApi', 'historyApi', 'setStanding', 'dsWalkersSheet_', 'setWalker', 'removeWalker',
     'dsWriteWalkerRows_', 'dsPickupAuthSheet_', 'dsPickupAuthRetire_', 'dsGuardianEmails_', 'pickupAuthContacts', 'dsAuthRequesterAt_',
     'dsPickupAuthNotify_', 'dsAfterWrite_', 'pickupAuthSave', 'pickupAuthDelete', 'pickupsApi', 'dsOccasionalToday_', 'noteAdd',
     'noteDelete', 'dsViewKey_', 'dsLegacyViews_', 'dsViewFor_', 'dsAllViews_', 'getSavedView_', 'saveView'],

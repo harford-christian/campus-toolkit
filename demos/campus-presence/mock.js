@@ -227,6 +227,7 @@ window.MOCK_BACKEND = (function () {
       dismissalUrl: String(s['dismissal.url'] || '').trim(),
       followUpMode: s['dismissal.followup.mode'],
       planReasons: String(s['plan.reasons'] || '').split('|').map(function (r) { return r.trim(); }).filter(Boolean),
+      lateReasons: String(s['late.reasons'] || '').split('|').map(function (r) { return r.trim(); }).filter(Boolean),
       generatedAt: D.factsGeneratedAt
     };
   }
@@ -457,6 +458,46 @@ window.MOCK_BACKEND = (function () {
     return { ok: true, name: open.PersonName };
   }
 
+  // A late arrival recorded at the desk (the real officeLateIn_): the SAME event the iPad writes, but
+  // with no parent-driven gate (staff are the witness), Station/Source 'office', the staff email in
+  // Notes, and the time from the vendored Events.arrivalTime — now for Front Office, an earlier
+  // correction only for an Admin. An open early-out makes it a return, exactly as at the kiosk.
+  function officeLateIn(request) {
+    var who = whoami();
+    var student = studentById(request.studentId);
+    if (!student) return { ok: false, error: 'unknown student' };
+    var reason = String(request.reason || '').trim();
+    if (!reason) return { ok: false, error: 'pick a reason' };
+    var t = now();
+    var openOut = null, lastTs = '', lateAt = '';
+    eventsToday().forEach(function (e) {
+      if (e.PersonKey !== student.id) return;
+      if (String(e.Timestamp) > lastTs) lastTs = String(e.Timestamp);
+      if (e.Type === 'student_early_out' && e.PickupMatch !== 'mismatch') openOut = e;
+      if (e.Type === 'student_return_in') openOut = null;
+      if (e.Type === 'student_late_in') lateAt = String(e.Timestamp);
+    });
+    // A second tap on Save, or the iPad got there first.
+    if (lateAt && !openOut) {
+      return { ok: false, error: student.name + ' is already signed in (' + Ids.h12(lateAt) + ')' };
+    }
+    var when = Events.arrivalTime(request.at, !!who.admin, t, lastTs);
+    if (!when.ok) return { ok: false, error: when.error };
+    var type = openOut ? 'student_return_in' : 'student_late_in';
+    var notes = 'signed in at the desk by ' + who.email;
+    if (when.backdated) notes += '; time entered by admin, recorded ' + Ids.timestamp(t);
+    var ev = Events.makeEvent(type, {
+      PersonKey: student.id, PersonName: student.name, Grade: student.grade,
+      HomeBuilding: buildingOf(student.grade), Station: 'office', Source: 'office',
+      Reason: reason,
+      GuardianName: String(request.guardianName || '').trim(),
+      RelatedEventID: openOut ? openOut.EventID : '',
+      Notes: notes
+    }, when.at, nextDisambig());
+    appendEvent(ev);
+    return { ok: true, name: student.name, returned: !!openOut, at: Ids.h12(ev.Timestamp) };
+  }
+
   // Counts + exceptions always; the per-building roster only when mode=full. The roster carries
   // the FACTS id so the names can deep-link into the directory tool — that link is disabled in
   // this demo (SETTINGS factsfinder.url is blank), which is a supported production setting.
@@ -521,6 +562,7 @@ window.MOCK_BACKEND = (function () {
       case 'acknowledge': return setFollowUp(request.eventId, 'done');
       case 'markPaged': return setFollowUp(request.eventId, 'done');
       case 'manualVisitorOut': return manualVisitorOut(request);
+      case 'lateIn': return officeLateIn(request);
       case 'getMusterReport': return musterReport(request);
       case 'getMetrics': return metrics(request);
       case 'getHistory': return history(request);

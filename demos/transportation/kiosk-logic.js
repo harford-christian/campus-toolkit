@@ -54,6 +54,7 @@ function dsBuildRoster(values) {
       id: id,
       enrichment: get(row, 'Enrichment') === 'Y',
       enrichmentKnown: enrichmentKnown,
+      homeschool: get(row, 'Homeschool') === 'Y',
       name: get(row, 'Student Name'),
       grade: dsGradeKey(get(row, 'Grade')),   // canonical from here on — see dsGradeKey
       session: get(row, 'Session'),
@@ -493,6 +494,135 @@ function dsIsoDays_(key) {
   return Math.round(Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10)) / 86400000);
 }
 
+function dsTodayLine_(r, routes) {
+  routes = routes || {};
+  var people = r.expected ? dsAuthPickupsFor(r.pickupAuth) : [];
+  if (!r.expected) {
+    return { kind: 'NOT COMING', what: r.reason || 'NOT EXPECTED', detail: r.detail || '',
+             note: '', by: '', people: [] };
+  }
+  if (r.overridden || (r.fromRouteCode && !r.standing)) {
+    var fromList = (r.fromRoutes && r.fromRoutes.length) ? r.fromRoutes
+      : ((r.fromRouteCode || r.fromRouteName) ? [{ code: r.fromRouteCode, name: r.fromRouteName }] : []);
+    var from = fromList.length
+      ? 'Bus — ' + fromList.map(function (fr) {
+          return (dsRouteFor(routes, fr.code, fr.name) || {}).name || fr.name || fr.code;
+        }).join(' / ')
+      : (r.type === 'Bus' ? 'not the bus' : 'usual');
+    var to = r.type === 'Bus'
+      ? 'Bus — ' + (r.routes || []).map(function (label, i) {
+          var rt = dsRouteFor(routes, (r.routeCodes || [])[i] || '', label);
+          return (rt && rt.name) || label;
+        }).join(' / ')
+      : r.type + (r.overrideDestination ? ' → ' + r.overrideDestination : '');
+    return { kind: 'DIFFERENT', what: from + ' → ' + to, detail: '',
+             note: r.overrideNote || '', by: r.overrideBy || '', people: people };
+  }
+  if (r.reason === 'PICKUP PLANNED' || r.reason === 'GAME DAY') {
+    return { kind: 'CONFIRM', what: r.reason, detail: r.detail || '', note: '', by: '', people: people };
+  }
+  if (people.length) {
+    return { kind: 'AUTH', what: 'not on the FACTS list', detail: '', note: '', by: '', people: people };
+  }
+  return null;
+}
+
+function dsHowHome_(r, routes) {
+  routes = routes || {};
+  if (r.midday) return 'Half day — Kindergarten entrance ~11:30, by car';
+  var how;
+  if (r.routes && r.routes.length) {
+    how = 'Bus — ' + r.routes.map(function (label, i) {
+      var rt = dsRouteFor(routes, (r.routeCodes || [])[i] || '', label);
+      return ((rt && rt.name) || label) + (rt && rt.colour ? ' (' + rt.colour + ')' : '');
+    }).join(' or ');
+  } else if (r.walkUp && r.walkUpWalking) {
+    how = 'Walks up to the HS' + (r.walkUpTo ? ' → ' + r.walkUpTo : '');
+  } else if (r.walkUp) {
+    how = (r.type && r.type !== 'Staff Kid' ? r.type + ' · ' : '') + 'walk-up NOT walking' +
+      (r.walkUpWhy ? ' — ' + r.walkUpWhy : '');
+  } else if (r.type === 'Staff Kid') {
+    how = 'Staff Kid' + (r.walkTo && r.walkTo !== 'Unresolved' ? ' — walk to ' + r.walkTo : '');
+  } else if (r.type === 'Early Bird') {
+    how = 'Early Bird — out first';
+  } else {
+    how = r.type || 'Car';
+  }
+  if (r.standing) how += ' (standing' + (r.standingNote ? ': ' + r.standingNote : '') + ')';
+  return how;
+}
+
+function dsSubSheet(board, routes, pick) {
+  routes = routes || {};
+  pick = pick || {};
+  var pop = dsFlatList(board || {}).filter(function (r) {
+    var n = dsGradeNum(r.grade);
+    return n >= -2 && n <= 6;
+  });
+  var tKey = pick.teacher ? dsNameKey(pick.teacher) : '';
+  var gKey = pick.grade ? dsGradeKey(pick.grade) : '';
+  if (tKey) pop = pop.filter(function (r) { return dsNameKey(r.homeroomTeacher || '') === tKey; });
+  else if (gKey) pop = pop.filter(function (r) { return dsGradeKey(r.grade) === gKey; });
+  else pop = [];
+
+  var pages = {};
+  pop.forEach(function (r) {
+    var k = dsNameKey(r.homeroomTeacher || '') || '~';
+    if (!pages[k]) pages[k] = { teacher: r.homeroomTeacher || 'No homeroom teacher listed', grades: {},
+                                changed: [], midday: [], rest: [], specials: [], _spec: {} };
+    var P = pages[k];
+    P.grades[dsGradeKey(r.grade)] = dsGradeNum(r.grade);
+    if (r.special) {
+      var sk = [r.special.subject, r.special.from, r.special.teacher].join('|');
+      if (!P._spec[sk]) {
+        P._spec[sk] = true;
+        P.specials.push({ subject: r.special.subject, from: r.special.from || '', teacher: r.special.teacher || '' });
+      }
+    }
+    var line = dsTodayLine_(r, routes);
+    var soft = (r.expected && r.reason && !(line && line.kind === 'CONFIRM'))
+      ? r.reason + (r.detail ? ' ' + r.detail : '') : '';
+    if (!line && soft) line = { kind: r.reason, what: '', detail: r.detail || '' };
+    else if (!line && r.walkUp && !r.walkUpWalking) {
+      line = { kind: 'WALK-UP', what: 'not walking today', detail: r.walkUpWhy || '' };
+    }
+    if (line && line.kind === r.reason) soft = '';
+    var row = {
+      name: r.name, grade: dsGradeKey(r.grade), how: dsHowHome_(r, routes),
+      kind: line ? line.kind : '', what: line ? line.what : '',
+      detail: line ? [soft, line.detail || ''].filter(String).join(' · ') : '',
+      note: (line && line.note) || '', by: (line && line.by) || '',
+      people: (line && line.people) || dsAuthPickupsFor(r.pickupAuth),
+      notes: (r.notes || []).map(function (n) { return n.text; }).filter(String),
+      expected: !!r.expected
+    };
+    if (row.kind) P.changed.push(row);
+    else if (r.midday) P.midday.push(row);
+    else P.rest.push(row);
+  });
+
+  var out = Object.keys(pages).map(function (k) {
+    var P = pages[k];
+    var gs = Object.keys(P.grades).sort(function (a, b) { return P.grades[a] - P.grades[b]; });
+    P.changed.sort(function (a, b) {
+      if (a.expected !== b.expected) return a.expected ? 1 : -1;   // not coming out first
+      return dsByName(a, b);
+    });
+    P.midday.sort(dsByName);
+    P.rest.sort(dsByName);
+    return { teacher: P.teacher, grade: gs.join(' / '), gradeNum: gs.length ? P.grades[gs[0]] : 99,
+             changed: P.changed, midday: P.midday, rest: P.rest, specials: P.specials,
+             counts: { total: P.changed.length + P.midday.length + P.rest.length,
+                       changed: P.changed.length,
+                       notComing: P.changed.filter(function (x) { return !x.expected; }).length } };
+  });
+  out.sort(function (a, b) {
+    return a.gradeNum !== b.gradeNum ? a.gradeNum - b.gradeNum
+         : a.teacher < b.teacher ? -1 : a.teacher > b.teacher ? 1 : 0;
+  });
+  return { pages: out };
+}
+
 function dsKgChanges(board, routes) {
   routes = routes || {};
   var norm = dsGradeKey;
@@ -500,37 +630,7 @@ function dsKgChanges(board, routes) {
     return dsIsK4K5(r.grade) && !r.midday;
   });
 
-  function lineOf(r) {
-    var people = r.expected ? dsAuthPickupsFor(r.pickupAuth) : [];
-    if (!r.expected) {
-      return { kind: 'NOT COMING', what: r.reason || 'NOT EXPECTED', detail: r.detail || '',
-               note: '', by: '', people: [] };
-    }
-    if (r.overridden || (r.fromRouteCode && !r.standing)) {
-      var fromList = (r.fromRoutes && r.fromRoutes.length) ? r.fromRoutes
-        : ((r.fromRouteCode || r.fromRouteName) ? [{ code: r.fromRouteCode, name: r.fromRouteName }] : []);
-      var from = fromList.length
-        ? 'Bus — ' + fromList.map(function (fr) {
-            return (dsRouteFor(routes, fr.code, fr.name) || {}).name || fr.name || fr.code;
-          }).join(' / ')
-        : (r.type === 'Bus' ? 'not the bus' : 'usual');
-      var to = r.type === 'Bus'
-        ? 'Bus — ' + (r.routes || []).map(function (label, i) {
-            var rt = dsRouteFor(routes, (r.routeCodes || [])[i] || '', label);
-            return (rt && rt.name) || label;
-          }).join(' / ')
-        : r.type + (r.overrideDestination ? ' → ' + r.overrideDestination : '');
-      return { kind: 'DIFFERENT', what: from + ' → ' + to, detail: '',
-               note: r.overrideNote || '', by: r.overrideBy || '', people: people };
-    }
-    if (r.reason === 'PICKUP PLANNED' || r.reason === 'GAME DAY') {
-      return { kind: 'CONFIRM', what: r.reason, detail: r.detail || '', note: '', by: '', people: people };
-    }
-    if (people.length) {
-      return { kind: 'AUTH', what: 'not on the FACTS list', detail: '', note: '', by: '', people: people };
-    }
-    return null;   // nothing is different about this child today, so they are not on the page
-  }
+  var lineOf = function (r) { return dsTodayLine_(r, routes); };
 
   function rowOf(r, line, lane, kind, what) {
     return {
@@ -603,8 +703,9 @@ function dsWalkUpSheet(walkUp) {
   var pick = function (r) {
     return {
       name: r.name, grade: norm(r.grade), teacher: r.teacher || '', destination: r.destination || '',
-      kind: r.kind || '', why: r.why || '', changed: !!r.overridden,
-      note: [r.frequency === 'Occasional' ? 'occasional' : '', r.note || '',
+      kind: r.kind || '', why: r.why || '', changed: !!r.overridden, todayOnly: !!r.todayOnly,
+      note: [r.todayOnly ? 'TODAY ONLY — not on the approved list' : '',
+             r.frequency === 'Occasional' ? 'occasional' : '', r.note || '',
              (r.notes || []).map(function (n) { return n.text; }).join(' · '),
              r.overrideNote ? 'TODAY: ' + r.overrideNote : '',
              r.onRoster === false ? 'NOT on the current roster' : ''].filter(String).join(' · ')
@@ -612,8 +713,10 @@ function dsWalkUpSheet(walkUp) {
   };
   var walking = rows.filter(function (r) { return r.walking; }).map(pick).sort(by);
   var notWalking = rows.filter(function (r) { return !r.walking; }).map(pick).sort(by);
+  var todayOnly = rows.filter(function (r) { return r.todayOnly; }).length;
   return { walking: walking, notWalking: notWalking,
-           counts: { onList: rows.length, walking: walking.length, notWalking: notWalking.length },
+           counts: { onList: rows.length - todayOnly, todayOnly: todayOnly,
+                     walking: walking.length, notWalking: notWalking.length },
            dayName: (walkUp && walkUp.dayName) || '' };
 }
 
@@ -635,6 +738,7 @@ function dsApplyWalkUps(board, walkUp) {
       r.walkUpWalking = !!w.walking;
       r.walkUpTo = w.destination || '';
       r.walkUpWhy = w.walking ? '' : (w.why || w.kind || '');
+      r.walkUpTodayOnly = !!w.todayOnly;
     });
   });
   return board;
@@ -709,6 +813,44 @@ function dsBuildReturned(values, dayKey) {
   return back;
 }
 
+function dsBuildLateIns(values, dayKey) {
+  var here = {};
+  if (!values || values.length < 2) return here;
+  var h = dsHeaderMap(values[0]);
+  var get = dsGetter(h);
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (get(row, 'Date').slice(0, 10) !== dayKey) continue;
+    var type = get(row, 'Type');
+    var sid = get(row, 'PersonKey');
+    if (!sid) continue;
+    if (type === 'student_early_out') {
+      if (get(row, 'PickupMatch') === 'mismatch') continue;
+      delete here[sid];
+    } else if (type === 'student_late_in') {
+      here[sid] = { at: get(row, 'Timestamp').slice(11, 16) };
+    }
+  }
+  return here;
+}
+
+function dsMarkArrived(attendance, lateIns) {
+  var out = {};
+  Object.keys(attendance || {}).forEach(function (id) {
+    var a = attendance[id];
+    var li = (lateIns || {})[id];
+    if (li && a && typeof a === 'object') {
+      var c = {};
+      Object.keys(a).forEach(function (k) { c[k] = a[k]; });
+      c.arrivedAt = li.at || '';
+      out[id] = c;
+    } else {
+      out[id] = a;
+    }
+  });
+  return out;
+}
+
 function dsBuildPickups(values) {
   var out = {};
   if (!values || values.length < 2) return out;
@@ -761,9 +903,9 @@ function dsFlatList(board) {
           pickupAuth: r.pickupAuth || [],
           notes: r.notes || [],
           special: r.special || null,
-          enrichment: !!r.enrichment, midday: !!r.midday,
+          enrichment: !!r.enrichment, midday: !!r.midday, homeschool: !!r.homeschool,
           walkUp: !!r.walkUp, walkUpWalking: !!r.walkUpWalking,
-          walkUpTo: r.walkUpTo || '', walkUpWhy: r.walkUpWhy || '',
+          walkUpTo: r.walkUpTo || '', walkUpWhy: r.walkUpWhy || '', walkUpTodayOnly: !!r.walkUpTodayOnly,
           expected: r.expected, reason: r.reason, detail: r.detail, note: r.note
         };
         order.push(e);
@@ -873,6 +1015,10 @@ function dsWalkerValidate(patch) {
   } };
 }
 
+function dsWalkUpGrade(grade) {
+  return ['K4', 'K5', '1', '2', '3', '4'].indexOf(dsGradeKey(grade)) !== -1;
+}
+
 function dsWalkUpList(flat, walkers, att, outs, dayName, occasionalToday, overrides, returned, feeds) {
   feeds = feeds || {};
   var noSchool = feeds.noSchool || {}, calledAhead = feeds.calledAhead || {};
@@ -946,11 +1092,38 @@ function dsWalkUpList(flat, walkers, att, outs, dayName, occasionalToday, overri
       onRoster: !!st
     });
   });
+  var onList = rows.length;
+
+  Object.keys(overrides || {}).forEach(function (id) {
+    var ov = overrides[id];
+    if (!ov || ov.type !== 'Staff Kid' || (walkers || {})[id]) return;
+    var st = byId[id] || null;
+    if (!st || !dsWalkUpGrade(st.grade)) return;
+    var v = dsClassify(st || {}, (att || {})[id], (outs || {})[id], null, (returned || {})[id],
+                       noSchool[id], calledAhead[id]);
+    var walking = true, kind = '', why = '';
+    if (!v.expected) { walking = false; kind = v.reason; why = v.detail; }
+    else if (v.reason === 'PICKUP PLANNED' || v.reason === 'GAME DAY') {
+      walking = false; kind = v.reason; why = v.detail || '';
+    }
+    rows.push({
+      id: id, name: st ? st.name : id, grade: st ? st.grade : '',
+      teacher: st ? (st.homeroomTeacher || '') : '', frequency: 'Today only', todayOnly: true,
+      onlyDays: [], destination: ov.destination || '', standingDestination: '', note: '',
+      by: '', at: '', exceptDay: '', exceptReason: '', exceptDestination: '',
+      walking: walking, kind: kind, why: why, movedType: '', movedStanding: false,
+      notes: (st && st.notes) || [],
+      overridden: true, overrideNote: ov.note || '', overrideBy: ov.by || '', overrideAt: ov.at || '',
+      onRoster: !!st
+    });
+  });
+
   rows.sort(dsByName);
   var walkingN = rows.filter(function (r) { return r.walking; }).length;
   return {
     dayName: dayName || '', rows: rows,
-    counts: { onList: rows.length, walking: walkingN, notWalking: rows.length - walkingN }
+    counts: { onList: onList, todayOnly: rows.length - onList,
+              walking: walkingN, notWalking: rows.length - walkingN }
   };
 }
 
@@ -1362,6 +1535,10 @@ function dsClassifyRecorded_(student, att, out, back, noSchool) {
       return { expected: false, reason: 'LEFT EARLY', detail: a.reason || a.detail || '' };
     }
     if (a.code === 'AE' || a.code === 'AU' || /absent/i.test(a.status || '')) {
+      if (a.arrivedAt !== undefined) {
+        return { expected: true, reason: 'LATE',
+                 detail: 'signed in' + (a.arrivedAt ? ' ' + a.arrivedAt : '') + ' — FACTS still says absent' };
+      }
       return {
         expected: false, reason: 'ABSENT',
         detail: (a.excused === 'Y' ? 'excused' : a.excused === 'N' ? 'unexcused' : '') +
@@ -1443,6 +1620,7 @@ function dsBuildBoard(d, opts) {
       special: specials ? dsSpecialFor(specials, s) : null,
       enrichment: !!s.enrichment,
       midday: dsIsMiddayLeaver(s),
+      homeschool: !!s.homeschool,   // label only — see dsBuildRoster
       expected: v.expected, reason: v.reason, detail: v.detail
     };
 
@@ -1566,6 +1744,7 @@ function dsSpecialFor(specials, s) {
 
 var DS_RAMP_GRADES = ['K4', 'K5', '1', '2', '3', '4', '5'];
 var DS_RAMP_TYPES = ['Bus', 'Car', 'Early Bird'];
+var DS_RAMP_IPAD_TYPES = DS_RAMP_TYPES.concat(['Staff Kid']);
 
 function dsRampPopulation(r, opts) {
   opts = opts || {};
@@ -1761,6 +1940,40 @@ function dsPickupAuthEmail(kind, auth, studentName, actor) {
   return { subject: subject, body: body };
 }
 
+function dsOverrideEmail(change, studentName, actor) {
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
+                'October', 'November', 'December'];
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var label = function (k) {
+    var p = String(k).split('-').map(Number);
+    return DAYS[dsDayOfWeek(k)] + ', ' + MONTHS[p[1] - 1] + ' ' + p[2];
+  };
+  var dates = (change.dates || []).slice().sort();
+  var when = dates.map(label);
+  var whenText = when.length < 2 ? (when[0] || '') : when.slice(0, -1).join(', ') + ' and ' + when[when.length - 1];
+  var type = String(change.type || '').trim();
+  var how;
+  if (type === 'Bus') how = 'will ride the ' + (String(change.routeName || '').trim() || 'assigned') + ' bus home';
+  else if (type === 'Car') how = 'will be picked up by car';
+  else if (type === 'Early Bird') how = 'will be dismissed as an Early Bird (released before the buses) for car pickup';
+  else if (type === 'Staff Kid') {
+    how = 'will be walked up to ' + (String(change.destination || '').trim() || 'the High School lobby');
+  }
+  var subject, body;
+  if (type === 'Usual') {
+    subject = 'Dismissal change cancelled — ' + studentName;
+    body = 'The dismissal change for ' + studentName + ' on ' + whenText + ' has been CANCELLED.\n\n' +
+           studentName + ' will go home the usual way on ' + (dates.length < 2 ? 'that day' : 'those days') + '.';
+  } else {
+    subject = 'Dismissal change — ' + studentName + ' — ' + (dates.length < 2 ? when[0] : dates.length + ' days');
+    body = 'A dismissal change has been recorded for ' + studentName + '.\n\n' +
+           'On ' + whenText + ', ' + studentName + ' ' + how + '.';
+  }
+  body += '\n\nRecorded by ' + actor + '. If this is not what you asked for, reply to this email or call ' +
+          'the office as soon as possible.\n\nThis is an automated confirmation from the HCS Dismissal app.';
+  return { subject: subject, body: body };
+}
+
 function dsDriverLists(board, routes, dayName, only) {
   routes = routes || {};
   var lists = {}, aliases = {}, routesOf = {}, rows = [];
@@ -1890,7 +2103,7 @@ function dsRampSlice(board, routes, opts, pickups) {
   pickups = pickups || {};
   var norm = dsGradeKey;
   return dsFlatList(board).filter(function (r) {
-    return dsRampPopulation(r, { grades: opts.grades, types: opts.types, sixthAtEl: true });
+    return dsRampPopulation(r, { grades: opts.grades, types: opts.types || DS_RAMP_IPAD_TYPES, sixthAtEl: true });
   }).map(function (r) {
     var lanes;
     if (r.routes && r.routes.length) {

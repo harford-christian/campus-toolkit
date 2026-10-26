@@ -101,6 +101,12 @@ var PICKUP_AUTH_HEADER = ['Auth ID', 'Student ID', 'Student Name', 'Person', 'Re
 // Script Property: the office mailbox copied on every confirmation (elemreception@…). Set it in
 // Project Settings → Script Properties; unset, parents still get the mail and readiness warns.
 var PROP_PICKUP_AUTH_NOTIFY = 'PICKUP_AUTH_NOTIFY';
+// DISMISSAL-CHANGE EMAILS (Josh, 2026-10-19), two Script Properties, both in Project Settings:
+//   OVERRIDE_NOTIFY_REVIEW  — comma-separated reviewer addresses (Josh, the office manager). Blank = no email at all.
+//   OVERRIDE_NOTIFY_PARENTS — 'Y' sends to the guardians on file with the reviewers BCC'd. Anything
+//                             else is the TRIAL: the reviewers alone get exactly what a parent would.
+var PROP_OVERRIDE_NOTIFY_REVIEW = 'OVERRIDE_NOTIFY_REVIEW';
+var PROP_OVERRIDE_NOTIFY_PARENTS = 'OVERRIDE_NOTIFY_PARENTS';
 var STAGING_ROSTER_TAB = 'Sheet1';          // the FACTS roster on the staging sheet: guardian emails live here
 
 /*
@@ -647,7 +653,8 @@ function dsSignOutFeedToday_(dayKey) {
     // the real column names — see dsBuildSignedOut / dsBuildReturned.
     var rows = dsReadTailRows_(id, SIGNINOUT_EVENTS_TAB, 600);
     return { out: dsBuildSignedOut(rows, dayKey), back: dsBuildReturned(rows, dayKey),
-             plans: dsBuildCalledAhead(rows, dayKey), available: true, why: '' };
+             plans: dsBuildCalledAhead(rows, dayKey), lateIns: dsBuildLateIns(rows, dayKey),
+             available: true, why: '' };
   } catch (err) {
     // Never let an unreachable sign-out sheet take the whole board down; the bus lists matter more.
     Logger.log('sign-out read failed (board still renders): %s', err.message);
@@ -809,6 +816,8 @@ function dsComputeBoardBundle_(sim) {
   var delay = dsDelayToday_(realToday);
   var signOutFeed = dsSignOutFeedToday_(realToday);
   var signedOut = signOutFeed.out, returned = signOutFeed.back;
+  // A kiosk late sign-in outranks an absent code (Jade Appel, 2026-10-12) — see dsBuildLateIns.
+  attendance = dsMarkArrived(attendance, signOutFeed.lateIns || {});
   // Parents who rang the office this morning and have not been collected yet. A plan is a heads-up,
   // never a departure — see dsBuildCalledAhead.
   var calledAhead = signOutFeed.plans || {};
@@ -1029,7 +1038,7 @@ function dsPublishBundle_(bundle) {
     attendanceOffDay: !!(bundle.freshness && bundle.freshness.attendanceOffDay),
     signOutActive: !!(bundle.freshness && bundle.freshness.signOutActive),
     signOutCount: (bundle.freshness && bundle.freshness.signOutCount) || 0,
-    students: dsRampSlice(bundle.board, bundle.routes, null, dsRampPickups_())   // K4-5, Bus + Car; PII minimised
+    students: dsRampSlice(bundle.board, bundle.routes, null, dsRampPickups_())   // K4-5 + EL 6th, Bus/Car/Early Bird + Staff Kid (lookup only); PII minimised
   };
   var id = dsWriteRampFile_(JSON.stringify(slice));
 
@@ -1289,8 +1298,8 @@ function setOverrides(studentId, type, routeCode, note, sim, destination, dates)
   // WHICH BUS (the office manager, 2026-09-29). Checked here as well as in the page, because an old open page
   // still sends a typed code. Known = the Routes tab plus every code a child rides on the roster —
   // the same list the dropdown offers (dsRouteChoices).
-  var rv = dsOverrideRoute(type, routeCode,
-    dsRouteChoices(dsBuildRoutes(dsReadTabShort_(id, ROUTES_TAB, 'routes')), rosterRows));
+  var choices = dsRouteChoices(dsBuildRoutes(dsReadTabShort_(id, ROUTES_TAB, 'routes')), rosterRows);
+  var rv = dsOverrideRoute(type, routeCode, choices);
   if (rv.error) throw new Error(rv.error);
   routeCode = rv.routeCode;
 
@@ -1334,7 +1343,58 @@ function setOverrides(studentId, type, routeCode, note, sim, destination, dates)
   }
   var res = dsDecorateBundle_(bundle, T0);
   res.plannedDates = dv.dates;
+  // The family's confirmation. Never for ?sim — a pretend day must not mail a real parent.
+  if (!String(sim || '').trim()) {
+    var routeName = '';
+    choices.forEach(function (c) { if (c.code === routeCode) routeName = c.name; });
+    res.mail = dsOverrideNotify_({ type: type, routeName: routeName, destination: String(destination || '').trim(),
+                                   dates: dv.dates }, studentId, name || studentId, email, String(note || '').trim());
+  }
   return res;
+}
+
+/**
+ * Send the dismissal-change email (Josh, 2026-10-19). TRIAL until OVERRIDE_NOTIFY_PARENTS is 'Y':
+ * the reviewers get the parent's email word for word, under a header naming the guardian addresses
+ * it WOULD have gone to and the staff note it deliberately leaves out. Live: to the guardians, the
+ * reviewers BCC'd; with no guardian address on file it goes to the reviewers flagged instead.
+ * NEVER throws — the change is already saved, and the page says when the mail did not go.
+ * @return null (switched off) | {to: [...], sent, mode: 'trial'|'live', error}
+ */
+function dsOverrideNotify_(change, studentId, studentName, actor, staffNote) {
+  var props = PropertiesService.getScriptProperties();
+  var review = String(props.getProperty(PROP_OVERRIDE_NOTIFY_REVIEW) || '').split(',')
+    .map(function (e) { return e.trim().toLowerCase(); })
+    .filter(function (e) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e); });
+  var live = String(props.getProperty(PROP_OVERRIDE_NOTIFY_PARENTS) || '').trim().toUpperCase() === 'Y';
+  if (!review.length && !live) return null;
+  var guardians = dsGuardianEmails_(studentId);
+  var msg = dsOverrideEmail(change, studentName, actor);
+  var office = String(props.getProperty(PROP_PICKUP_AUTH_NOTIFY) || '').trim();
+  var opts = { subject: msg.subject, body: msg.body, name: 'HCS Dismissal' };
+  if (office) opts.replyTo = office;
+  var mode = live && guardians.length ? 'live' : 'trial';
+  if (mode === 'live') {
+    opts.to = guardians.join(',');
+    if (review.length) opts.bcc = review.join(',');
+  } else {
+    if (!review.length) return { to: [], sent: false, mode: 'live', error: 'no guardian email on file' };
+    opts.to = review.join(',');
+    opts.subject = (live ? '[NOT SENT — no guardian email] ' : '[PREVIEW] ') + msg.subject;
+    opts.body = (live
+      ? 'NOT SENT TO PARENTS: FACTS holds no guardian email for this student. Please let the family know.'
+      : 'PREVIEW ONLY — parents were NOT emailed. Once OVERRIDE_NOTIFY_PARENTS is set to Y this goes to: ' +
+        (guardians.length ? guardians.join(', ') : '(no guardian email on file)')) +
+      '\nStaff note (never sent to parents): ' + (staffNote || '(none)') +
+      '\n\n------------------------------------------------------------\n\n' + msg.body;
+  }
+  try {
+    MailApp.sendEmail(opts);
+    return { to: opts.to.split(','), sent: true, mode: mode, error: '' };
+  } catch (e) {
+    Logger.log('override mail failed: %s', e.message);
+    return { to: opts.to.split(','), sent: false, mode: mode, error: String(e.message || e) };
+  }
 }
 
 /**

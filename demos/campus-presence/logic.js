@@ -545,7 +545,7 @@ var Directory = (function () {
    * Enrolled students from the LONG-format directory tab (one row per
    * student+guardian). Guardians are kept OFFICE/SYSTEM-side only — the kiosk
    * client never receives them.
-   * @return {Array<{id,name,grade,homeroomTeacher,status,guardians:[{name,emails[]}]}>}
+   * @return {Array<{id,name,grade,homeroomTeacher,status,homeschool,guardians:[{name,emails[]}]}>}
    */
   function buildStudents(tabs, opts) {
     opts = opts || {};
@@ -569,6 +569,9 @@ var Directory = (function () {
           grade: cell('Grade Level'),
           homeroomTeacher: cell('Homeroom Teacher'), // grades 7–12 only; blank PK–6
           status: status,
+          // facts-api-sync's Homeschool column (appended 2026-10-09): 'Y' when FACTS files the
+          // student as homeschool. false on an older export without the column.
+          homeschool: cell('Homeschool').toUpperCase() === 'Y',
           guardians: []
         };
         order.push(p);
@@ -884,7 +887,42 @@ var Events = (function () {
     return o;
   }
 
-  return { makeEvent: makeEvent, rowFromEvent: rowFromEvent, objFromRow: objFromRow, REQUIRED: REQUIRED };
+  /**
+   * WHEN an office-recorded late arrival happened (Josh, 2026-10-13).
+   *
+   * Front Office records it as NOW, always. Only an Admin may give an earlier time, and only to
+   * correct an error (power loss, a sign-in that failed) — because the time is what the FACTS
+   * push turns into TU/LA or an absence, a typed-in time is a way to change a child's code.
+   *
+   * An earlier time must be today, before now, and AFTER this student's last event today:
+   * presence folds each student's rows in append order, so a correction slotted in before a
+   * later departure would be read as the newest thing that happened to them.
+   *
+   * @param {string} hhmm      '' = now; else 'HH:mm' (24-hour)
+   * @param {boolean} isAdmin
+   * @param {Date} now
+   * @param {string} lastTs    this student's latest Timestamp today ('yyyy-MM-dd HH:mm:ss'), or ''
+   * @return {{ok:boolean, at?:Date, backdated?:boolean, error?:string}}
+   */
+  function arrivalTime(hhmm, isAdmin, now, lastTs) {
+    var want = String(hhmm == null ? '' : hhmm).trim();
+    if (!want) return { ok: true, at: now, backdated: false };
+    if (!isAdmin) return { ok: false, error: 'only an administrator can enter an earlier time' };
+    var m = /^(\d{1,2}):(\d{2})$/.exec(want);
+    if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return { ok: false, error: 'that is not a time' };
+    var at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), Number(m[1]), Number(m[2]), 0);
+    if (at.getTime() > now.getTime()) return { ok: false, error: 'that time has not happened yet' };
+    var R = ref_();
+    var last = String(lastTs || '');
+    if (last && R.Ids.timestamp(at) <= last) {
+      return { ok: false, error: 'this student already has a record at ' + last.slice(11, 16) +
+        ' today; an earlier arrival has to be corrected in FACTS' };
+    }
+    return { ok: true, at: at, backdated: true };
+  }
+
+  return { makeEvent: makeEvent, rowFromEvent: rowFromEvent, objFromRow: objFromRow, REQUIRED: REQUIRED,
+    arrivalTime: arrivalTime };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = Events;

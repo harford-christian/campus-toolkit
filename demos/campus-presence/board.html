@@ -509,7 +509,10 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
         <div id="visList"></div>
       </section>
       <section class="board-col">
-        <h2 class="section-h">Student exceptions <span class="count" id="excCount">0</span></h2>
+        <h2 class="section-h">Student exceptions <span class="count" id="excCount">0</span>
+          <button type="button" class="btn btn-plain btn-sm" id="lateAddBtn"
+                  title="A student who came in on their own (dropped at the curb).">Sign in late arrival</button>
+        </h2>
         <div id="excList"></div>
       </section>
     </div>
@@ -558,6 +561,36 @@ textarea.form-control{min-height:110px;font-family:ui-monospace,SFMono-Regular,M
     <div class="plan-actions">
       <button type="button" class="btn btn-plain" id="planCancel">Cancel</button>
       <button type="button" class="btn btn-hcs" id="planSave">Save &amp; notify</button>
+    </div>
+  </div>
+</div>
+
+<div class="plan-modal hidden" id="lateModal">
+  <div class="plan-card">
+    <h3>Sign in a late arrival</h3>
+    <p class="muted small">For a student who came in without a parent at the iPad. Recorded exactly
+      as an iPad sign-in, so FACTS attendance is updated the same way.</p>
+
+    <label class="f-label" for="lateSearch">Student</label>
+    <input class="form-control" id="lateSearch" type="search" autocomplete="off"
+           placeholder="Type a name, then pick from the list&hellip;">
+    <div id="lateResults" class="plan-results"></div>
+    <div id="lateChosen" class="plan-chosen"></div>
+
+    <label class="f-label" for="lateReason">Reason</label>
+    <select class="form-control" id="lateReason"></select>
+    <label class="f-label" for="lateWho">Dropped off by <span class="muted">(optional)</span></label>
+    <input class="form-control" id="lateWho" type="text" autocomplete="off" placeholder="If you know who drove them">
+    <div class="hidden" id="lateAtWrap">
+      <label class="f-label" for="lateAt">Arrival time <span class="muted">(admin only &mdash; leave blank for now)</span></label>
+      <input class="form-control" id="lateAt" type="time">
+      <div class="muted small">Only to correct a missed sign-in. The time you enter is what FACTS records.</div>
+    </div>
+
+    <div class="plan-err" id="lateErr"></div>
+    <div class="plan-actions">
+      <button type="button" class="btn btn-plain" id="lateCancel">Cancel</button>
+      <button type="button" class="btn btn-hcs" id="lateSave">Sign in</button>
     </div>
   </div>
 </div>
@@ -1738,6 +1771,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = History;
       ALERT_STATION = String(res.alertStation || 'all').toLowerCase();
       FINDER_URL = String(res.factsFinderUrl || '').trim();
       PLAN_REASONS = res.planReasons || [];
+      LATE_REASONS = res.lateReasons || [];
+      IS_ADMIN = !!res.isAdmin;
       planRefresh();
       // Only offer the button when Settings actually has a Finder URL — a dead
       // link on a front-desk screen is worse than no link.
@@ -2056,6 +2091,96 @@ if (typeof module !== 'undefined' && module.exports) module.exports = History;
         note: $('planNote').value || ''
       });
   }
+
+  // ---------------------------------------------------------------------------
+  // LATE ARRIVAL AT THE DESK (Josh, 2026-10-13): dropped at the curb, walked in alone.
+  // Front Office records it as now; an Admin may enter an earlier time to correct a missed
+  // sign-in. The server enforces both — this page only hides the field.
+  var LATE_REASONS = [], IS_ADMIN = false, LATE_CHOSEN = null, lateDebounce = null;
+
+  function lateOpen() {
+    LATE_CHOSEN = null;
+    $('lateSearch').value = ''; $('lateResults').innerHTML = '';
+    $('lateWho').value = ''; $('lateAt').value = ''; $('lateErr').textContent = '';
+    $('lateAtWrap').classList.toggle('hidden', !IS_ADMIN);
+    $('lateReason').innerHTML = '<option value="">Pick a reason&hellip;</option>' +
+      LATE_REASONS.map(function (r) { return '<option>' + esc(r) + '</option>'; }).join('');
+    latePaintChosen();
+    $('lateModal').classList.remove('hidden');
+    $('lateSearch').focus();
+  }
+  function lateClose() { $('lateModal').classList.add('hidden'); }
+  function latePaintChosen() {
+    $('lateChosen').innerHTML = LATE_CHOSEN
+      ? '<span class="plan-chip">' + esc(LATE_CHOSEN.name) +
+          (LATE_CHOSEN.grade ? ' (' + esc(LATE_CHOSEN.grade) + ')' : '') +
+          '<button type="button" class="plan-chip-x">&times;</button></span>'
+      : '<span class="muted small">No student picked yet.</span>';
+  }
+  function lateSearch() {
+    var q = String($('lateSearch').value || '').trim();
+    if (q.length < 3) { $('lateResults').innerHTML = ''; return; }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        var rows = (res && res.results) || [];
+        $('lateResults').innerHTML = rows.length
+          ? rows.map(function (r) {
+              return '<button type="button" class="plan-hit" data-id="' + esc(r.id) +
+                '" data-name="' + esc(r.name) + '" data-grade="' + esc(r.grade) + '">' +
+                esc(r.name) + ' <span class="muted">(' + esc(r.grade) + ')</span></button>';
+            }).join('')
+          : '<div class="muted small">No match.</div>';
+      })
+      .withFailureHandler(function () { $('lateResults').innerHTML = '<div class="muted small">Search failed.</div>'; })
+      .officeApi({ op: 'searchStudents', q: q });
+  }
+  function lateSave() {
+    if (!LATE_CHOSEN) { $('lateErr').textContent = 'Pick the student.'; return; }
+    if (!$('lateReason').value) { $('lateErr').textContent = 'Pick a reason.'; return; }
+    $('lateErr').textContent = '';
+    $('lateSave').disabled = true;
+    google.script.run
+      .withSuccessHandler(function (res) {
+        $('lateSave').disabled = false;
+        if (!res || !res.ok) { $('lateErr').textContent = (res && res.error) || 'Could not save.'; return; }
+        lateClose();
+        toast(res.name + (res.returned ? ' signed back in' : ' signed in late') + ' at ' + res.at);
+        poll();
+      })
+      .withFailureHandler(function (e) {
+        $('lateSave').disabled = false;
+        $('lateErr').textContent = String((e && e.message) || e);
+      })
+      .officeApi({
+        op: 'lateIn',
+        studentId: LATE_CHOSEN.id,
+        reason: $('lateReason').value,
+        guardianName: $('lateWho').value || '',
+        at: IS_ADMIN ? ($('lateAt').value || '') : ''
+      });
+  }
+  $('lateAddBtn').addEventListener('click', lateOpen);
+  $('lateCancel').addEventListener('click', lateClose);
+  $('lateSave').addEventListener('click', lateSave);
+  $('lateSearch').addEventListener('input', function () {
+    clearTimeout(lateDebounce);
+    lateDebounce = setTimeout(lateSearch, 220);
+  });
+  $('lateResults').addEventListener('click', function (ev) {
+    var b = ev.target;
+    while (b && b !== document && !(b.classList && b.classList.contains('plan-hit'))) b = b.parentNode;
+    if (!b || b === document) return;
+    LATE_CHOSEN = { id: b.getAttribute('data-id'), name: b.getAttribute('data-name'),
+      grade: b.getAttribute('data-grade') };
+    $('lateSearch').value = ''; $('lateResults').innerHTML = '';
+    latePaintChosen();
+  });
+  $('lateChosen').addEventListener('click', function (ev) {
+    if (!ev.target.classList.contains('plan-chip-x')) return;
+    LATE_CHOSEN = null;
+    latePaintChosen();
+    $('lateSearch').focus();
+  });
 
   $('planAddBtn').addEventListener('click', planOpen);
   $('planCancel').addEventListener('click', planClose);

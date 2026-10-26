@@ -441,6 +441,18 @@ check('Work Release is grade 7+ AND on the list, and the expired row is refused'
 check('signing a young child IN without an adult is refused by the server, not just the UI',
   MB.kioskApi({ op: 'lateIn', station: 'el', studentId: '400118', reason: 'Overslept' })
     .error === 'guardian-required');
+check('a late arrival signed in at the desk (office lateIn) needs no adult, lands on the board\'s late list, and a second save is refused',
+  (() => {
+    const id = '400134';   // a 4th grader with nothing recorded today
+    const noReason = MB.officeApi({ op: 'lateIn', studentId: id });
+    const future = MB.officeApi({ op: 'lateIn', studentId: id, reason: 'Overslept', at: '23:59' });
+    const res = MB.officeApi({ op: 'lateIn', studentId: id, reason: 'Overslept' });
+    const again = MB.officeApi({ op: 'lateIn', studentId: id, reason: 'Overslept' });
+    const onBoard = MB.officeApi({ op: 'getBoardSnapshot' }).presence.late.some((x) => x.id === id);
+    return noReason.error === 'pick a reason' && future.error === 'that time has not happened yet' &&
+      res.ok === true && res.returned === false && onBoard && /already signed in/.test(again.error) &&
+      MB.officeApi({ op: 'bootstrap' }).lateReasons.length >= 3;
+  })());
 check('the badge registry answers unknown / inactive / in-use distinctly',
   MB.kioskApi({ op: 'visitorIn', station: 'hs', name: 'A Visitor', reason: 'Meeting',
                 destination: 'High School', badge: 'V99' }).badge === 'unknown' &&

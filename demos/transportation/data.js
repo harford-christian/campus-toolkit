@@ -413,13 +413,16 @@ window.DISMISSAL_DATA = (function () {
   // Afternoon Enrichment: the K4/K5 children who stay past the midday release (producer's trEnrichmentSet_).
   // On a 2- or 3-hour delay the OTHER K4/K5 children read NO SCHOOL; these two still come in.
   var enrichment = { '400122': true, '400131': true };
+  // FACTS-flagged homeschool children (producer's opts.homeschool, 2026-10-09): none in this school.
+  var homeschool = {};
 
   /* ---------- assemble the Roster exactly as the producer does ---------- */
   var ROSTER_HEADER = ['Student ID', 'Student Name', 'Grade', 'Session', 'Type',
                        'Route Code', 'Route Name', 'Vehicle', 'Split',
                        'Building', 'Pickup', 'Pickup Basis', 'Walk To',
                        'Family ID', 'Homeroom', 'Homeroom Teacher', 'Source', 'Note',
-                       'Enrichment'];   // appended 2026-09-16 upstream: K4/K5 children who stay past the midday release
+                       'Enrichment',    // appended 2026-09-16 upstream: K4/K5 children who stay past the midday release
+                       'Homeschool'];   // appended 2026-10-09 upstream: 'Y' = FACTS files the child as homeschool
   function pickupFor(grade, sibGrades) {
     var fixed = PICKUP_BY_GRADE[grade];
     if (fixed) return { pickup: fixed, basis: 'grade' };
@@ -455,7 +458,7 @@ window.DISMISSAL_DATA = (function () {
                        'course-enrollment',
                        route.split ? 'SPLIT: rides ' + route.split.join(' or ') + ' on different days ' +
                                      '(e.g. split custody) — confirm which today' : '',
-                       enrichment[sid] ? 'Y' : '']);
+                       enrichment[sid] ? 'Y' : '', homeschool[sid] ? 'Y' : '']);
           });
           return;
         }
@@ -473,19 +476,19 @@ window.DISMISSAL_DATA = (function () {
                       : 'same building as parent (' + kid.parentName + ')' + basis);
           rows.push([sid, name, grade, sess, 'Staff Kid', '', '', '', '', building, pk.pickup, pk.basis,
                      walkTo, fid, hrCode, hrTeacher, 'parent-link', note,
-                     enrichment[sid] ? 'Y' : '']);
+                     enrichment[sid] ? 'Y' : '', homeschool[sid] ? 'Y' : '']);
           return;
         }
         if (earlyBird[sid]) {                             // 3. Early Bird
           rows.push([sid, name, grade, sess, 'Early Bird', '', '', '', '', building, pk.pickup, pk.basis,
                      '', fid, hrCode, hrTeacher, 'family-rule', 'every enrolled sibling is in grades 1-3',
-                     enrichment[sid] ? 'Y' : '']);
+                     enrichment[sid] ? 'Y' : '', homeschool[sid] ? 'Y' : '']);
           return;
         }
         rows.push([sid, name, grade, sess, 'Car', '', '', '', '', building, pk.pickup, pk.basis,   // 4. Car
                    '', fid, hrCode, hrTeacher, 'residual-default',
                    'assumed: no route, no staff parent, not Early Bird',
-                   enrichment[sid] ? 'Y' : '']);
+                   enrichment[sid] ? 'Y' : '', homeschool[sid] ? 'Y' : '']);
       });
     });
     return rows;
@@ -740,7 +743,7 @@ window.DISMISSAL_DATA = (function () {
     producerInputs: {
       routesByStudent: routesByStudent, staffChild: staffChild, earlyBird: earlyBird,
       familyById: familyById, nameById: nameById, gradeById: gradeById, homeroomById: homeroomById,
-      teacherBuildings: teacherBuildings, enrichment: enrichment
+      teacherBuildings: teacherBuildings, enrichment: enrichment, homeschool: homeschool
     }
   };
 })();
