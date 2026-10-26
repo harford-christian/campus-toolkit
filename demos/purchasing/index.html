@@ -4017,7 +4017,7 @@
       // Purchasing's pricing card (vendor/bank/payment + subtotal/adjustments +
       // grand total), with an Edit Items button. opts.withNote adds the note box
       // used by Send Back / Reject (Pending Approval only). Item unit-cost inputs
-      // live in the shared items table, gated by canBeckyEdit.
+      // live in the shared items table, gated by canPurchasingEdit.
       function buildPricingCardHtml(order, opts) {
         opts = opts || {};
         const bankOpt = v => `<option value="${v}"${order.bank === v ? ' selected' : ''}>${v}</option>`;
@@ -4047,7 +4047,7 @@
             ${opts.withNote ? `
               <div style="margin-top:10px;">
                 <label>Note to requestor (required to Send Back or Reject)</label>
-                <textarea id="becky-note" rows="2" placeholder="e.g. Please attach a vendor quote — or — This exceeds budget for this category." style="width:100%; box-sizing:border-box;"></textarea>
+                <textarea id="purchasing-note" rows="2" placeholder="e.g. Please attach a vendor quote — or — This exceeds budget for this category." style="width:100%; box-sizing:border-box;"></textarea>
               </div>` : ''}
             <div style="margin-top:10px;">
               <button type="button" class="btn btn-secondary" style="width:auto;" onclick='openEditOrderModal(${safeAttrJson(order)})'>Edit Items (add / remove / change)</button>
@@ -4078,7 +4078,7 @@
         // Purchasing (Manager/Owner) can edit items + pricing while the order is
         // still theirs, before the approver signs (Pending Signature), or after a
         // Hold bounce (On Hold).
-        const canBeckyEdit = (userRole === 'Manager' || userRole === 'Owner') &&
+        const canPurchasingEdit = (userRole === 'Manager' || userRole === 'Owner') &&
           ['Pending Approval', 'Needs Info', 'Pending Signature', 'On Hold'].includes(order.status);
         // After approval the cost is locked to the approved amount, but the real invoice
         // often differs. Purchasing can correct the recorded total; the server enforces
@@ -4106,7 +4106,7 @@
           html += `
             <tr>
               <td>${itemNameCellHtml(item)}${item.notes ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px; white-space:pre-wrap;">${escHtml(item.notes)}</div>` : ''}</td><td>${item.qty}</td>
-              <td>${canBeckyEdit
+              <td>${canPurchasingEdit
                 ? `<input type="number" step="0.01" class="m-cost-input" data-lineid="${item.lineId}" value="${item.unitCost}" style="width:80px; margin:0;" onchange="recalculateModalTotal()">`
                 : `$${item.unitCost}`
               }</td>
@@ -4118,7 +4118,7 @@
 
         // Read-only totals for priced orders in non-editing views (Approved, Fulfillment,
         // the Approver's sign/hold view, etc.). The editing views show these in the pricing card instead.
-        if (order.total && !canBeckyEdit) {
+        if (order.total && !canPurchasingEdit) {
           const sub = (order.items || []).reduce((s, it) => s + (it.qty || 0) * (parseFloat(it.unitCost) || 0), 0);
           html += `
             <div style="text-align:right; margin:-8px 0 18px; font-size:0.95rem;">
@@ -4176,7 +4176,7 @@
           html += buildPricingCardHtml(order, { withNote: true });
           html += buildItemTrackingHtml(order, { inlineSave: true, preOrder: true });
           footer.innerHTML = `
-            <button class="btn" style="flex:1;" onclick="submitToBryan('${order.id}')">Send to the Approver</button>
+            <button class="btn" style="flex:1;" onclick="submitToApprover('${order.id}')">Send to the Approver</button>
             <button class="btn" style="flex:1; background-color:#e65100;" onclick="sendBackForInfo('${order.id}')">Send Back for Info</button>
             <button class="btn btn-danger" style="flex:1;" onclick="rejectRequest('${order.id}')">Reject</button>
             ${(order.items && order.items.length > 1) ? `<button class="btn btn-secondary" style="flex:1;" onclick="enterSplitMode('${order.id}')">Split…</button>` : ''}
@@ -4190,7 +4190,7 @@
           html += buildPricingCardHtml(order, { withNote: true });
           html += buildItemTrackingHtml(order, { inlineSave: true, preOrder: true });
           footer.innerHTML = `
-            <button class="btn" style="flex:1;" onclick="submitToBryan('${order.id}')">Send to the Approver</button>
+            <button class="btn" style="flex:1;" onclick="submitToApprover('${order.id}')">Send to the Approver</button>
             <button class="btn btn-danger" style="flex:1;" onclick="rejectRequest('${order.id}')">Reject</button>
             <button class="btn btn-secondary" style="flex:1;" onclick="closeModal()">Close</button>
           `;
@@ -4200,7 +4200,7 @@
           html += buildPricingCardHtml(order, { withNote: false });
           html += buildItemTrackingHtml(order, { inlineSave: true, preOrder: true });
           footer.innerHTML = `
-            <button class="btn" style="flex:1;" onclick="submitToBryan('${order.id}')">Save &amp; Send to the Approver</button>
+            <button class="btn" style="flex:1;" onclick="submitToApprover('${order.id}')">Save &amp; Send to the Approver</button>
             ${(order.items && order.items.length > 1) ? `<button class="btn btn-secondary" style="flex:1;" onclick="enterSplitMode('${order.id}')">Split…</button>` : ''}
             <button class="btn btn-secondary" style="flex:1;" onclick="enterMergeMode('${order.id}')">Merge…</button>
             <button class="btn btn-secondary" style="flex:1;" onclick="enterRouteMode('${order.id}')">Route…</button>
@@ -4243,7 +4243,7 @@
             html += `<div style="margin-top:12px;"><label>Enter PIN (to approve &amp; sign)</label><input type="password" id="sign-pin" style="text-align:center; font-size:1.2rem; letter-spacing:5px;" autocomplete="off"></div>`;
           }
           let f = '';
-          if (canEdit)   f += `<button class="btn" style="flex:1;" onclick="submitToBryan('${order.id}')">Save &amp; Send to the Approver</button>`;
+          if (canEdit)   f += `<button class="btn" style="flex:1;" onclick="submitToApprover('${order.id}')">Save &amp; Send to the Approver</button>`;
           if (canEdit && order.items && order.items.length > 1) f += `<button class="btn btn-secondary" style="flex:1;" onclick="enterSplitMode('${order.id}')">Split…</button>`;
           if (canEdit) f += `<button class="btn btn-secondary" style="flex:1;" onclick="enterMergeMode('${order.id}')">Merge…</button>`;
           if (canEdit) f += `<button class="btn btn-secondary" style="flex:1;" onclick="enterRouteMode('${order.id}')">Route…</button>`;
@@ -4299,7 +4299,7 @@
 
         body.innerHTML = html;
         modal.style.display = 'block';
-        if (canBeckyEdit) {
+        if (canPurchasingEdit) {
           (order.adjustments || []).forEach(a => addAdjustmentRow(a.type, a.label, (a.value != null ? a.value : a.amount), a.mode));
           recalculateModalTotal();
         }
@@ -4620,7 +4620,7 @@
         recalculateModalTotal();
       }
 
-      function submitToBryan(orderId) {
+      function submitToApprover(orderId) {
         const itemCosts = Array.from(document.querySelectorAll('.m-cost-input')).map(i => ({ id: i.dataset.lineid, cost: parseFloat(i.value || 0) }));
         const adjustments = Array.from(document.querySelectorAll('.adj-row')).map(r => ({
           label: r.querySelector('.adj-label').value.trim(),
@@ -4644,7 +4644,7 @@
             setModalBusy(false);
             appAlert('Could not send to the approver: ' + ((err && err.message) ? err.message : err));
           })
-          .beckyUpdateOrder(orderId, poData, itemCosts);
+          .purchasingUpdateOrder(orderId, poData, itemCosts);
       }
 
       // Disable/enable every button in the order modal while a mutation is in
@@ -5244,26 +5244,26 @@
       }
 
       function sendBackForInfo(orderId) {
-        const el = document.getElementById('becky-note');
+        const el = document.getElementById('purchasing-note');
         const note = el ? el.value.trim() : '';
         if (!note) { appAlert('Please add a note telling the requestor what is needed.'); return; }
         appConfirm('Send this request back to the requestor for more info?', function() {
           google.script.run
             .withSuccessHandler(m => { appAlert(m); closeModal(); switchTab('admin'); })
             .withFailureHandler(e => appAlert((e && e.message) ? e.message : e))
-            .beckySendBack(orderId, note);
+            .purchasingSendBack(orderId, note);
         });
       }
 
       function rejectRequest(orderId) {
-        const el = document.getElementById('becky-note');
+        const el = document.getElementById('purchasing-note');
         const note = el ? el.value.trim() : '';
         if (!note) { appAlert('Please add a note for the requestor explaining the rejection.'); return; }
         appConfirm('Reject this request? The requestor will be notified with your note. This is final.', function() {
           google.script.run
             .withSuccessHandler(m => { appAlert(m); closeModal(); switchTab('admin'); })
             .withFailureHandler(e => appAlert((e && e.message) ? e.message : e))
-            .beckyRejectRequest(orderId, note);
+            .purchasingRejectRequest(orderId, note);
         });
       }
 
@@ -5319,7 +5319,7 @@
               .generatePOPDF(orderId);
           })
           .withFailureHandler(e => { if (restore) restore(); appAlert((e && e.message) ? e.message : e); })
-          .bryanVerifyAndSign(orderId, pin);
+          .approverVerifyAndSign(orderId, pin);
       }
 
       // -----------------------------------------------------------------------
@@ -5416,7 +5416,7 @@
         google.script.run
           .withSuccessHandler(m => { appAlert(m); closeModal(); switchTab('admin'); })
           .withFailureHandler(e => appAlert((e && e.message) ? e.message : e))
-          .bryanHoldOrder(orderId, comment);
+          .approverHoldOrder(orderId, comment);
         });
       }
 
@@ -5428,7 +5428,7 @@
         google.script.run
           .withSuccessHandler(m => { appAlert(m); closeModal(); switchTab('admin'); })
           .withFailureHandler(e => appAlert((e && e.message) ? e.message : e))
-          .bryanRejectOrder(orderId, comment);
+          .approverRejectOrder(orderId, comment);
         });
       }
 
@@ -5440,7 +5440,7 @@
         google.script.run
           .withSuccessHandler(m => { appAlert(m); closeModal(); switchTab('admin'); })
           .withFailureHandler(e => appAlert((e && e.message) ? e.message : e))
-          .beckyPublishRejection(orderId, note);
+          .purchasingPublishRejection(orderId, note);
         });
       }
 

@@ -75,7 +75,9 @@ export const PHRASE_ALIASES = {
 /** Per-build phrase aliases: { sha256(lowercased phrase).slice(0,16): replacement }. A phrase is one to
  *  three letter-words joined by single spaces, matched case-insensitively, longest first — so a surname
  *  shared by a family ("the X boys") and a staff full name ("X Y") can map differently, and the config
- *  that carries the table never spells the names. Returns { text, count }. */
+ *  that carries the table never spells the names. A hyphen joins too, for a double first name ("X-Y Z"):
+ *  the key keeps the real separator, so a space-joined key never matches across a hyphen and every
+ *  space-joined key behaves exactly as before. Returns { text, count }. */
 export function aliasPhrases(text, table) {
   if (!table || !Object.keys(table).length) return { text, count: 0 };
   const words = [...text.matchAll(WORDS)];
@@ -84,10 +86,14 @@ export function aliasPhrases(text, table) {
     let hit = null;
     for (let n = 3; n >= 1 && !hit; n--) {
       if (i + n > words.length) continue;
-      let joined = true;
-      for (let k = i; k < i + n - 1; k++) if (text.slice(words[k].index + words[k][0].length, words[k + 1].index) !== ' ') { joined = false; break; }
+      let key = words[i][0], joined = true;
+      for (let k = i; k < i + n - 1; k++) {
+        const sep = text.slice(words[k].index + words[k][0].length, words[k + 1].index);
+        if (sep !== ' ' && sep !== '-') { joined = false; break; }
+        key += sep + words[k + 1][0];
+      }
       if (!joined) continue;
-      const alias = table[h(words.slice(i, i + n).map((w) => w[0]).join(' '))];
+      const alias = table[h(key)];
       if (alias !== undefined) hit = { n, alias };
     }
     if (!hit) { i++; continue; }
@@ -103,15 +109,56 @@ export function aliasPhrases(text, table) {
 /** Every phrase from `table` still present in text (for verifiers and the scanner). */
 export function findPhrases(text, table, capitalOnly) {
   if (!table) return [];
-  const words = [...text.matchAll(WORDS)].map((m) => m[0]);
+  const ms = [...text.matchAll(WORDS)], words = ms.map((m) => m[0]);
   const found = [];
   for (let i = 0; i < words.length; i++) {
     if (capitalOnly && !/^[A-Z]/.test(words[i])) continue;
-    for (let n = 1; n <= 3 && i + n <= words.length; n++) if (table[h(words.slice(i, i + n).join(' '))] !== undefined) found.push(i);
+    let real = words[i];   // the same words joined by their real separators while those are ' ' or '-' (see aliasPhrases)
+    for (let n = 1; n <= 3 && i + n <= words.length; n++) {
+      if (n > 1 && real !== null) {
+        const sep = text.slice(ms[i + n - 2].index + words[i + n - 2].length, ms[i + n - 1].index);
+        real = sep === ' ' || sep === '-' ? real + sep + words[i + n - 1] : null;
+      }
+      if (table[h(words.slice(i, i + n).join(' '))] !== undefined || (real !== null && table[h(real)] !== undefined)) found.push(i);
+    }
   }
   return found;
 }
 const WORDS = /(?<![A-Za-z0-9])[A-Za-z]+(?![A-Za-z0-9])/g;
+
+/** Staff first names INSIDE an identifier: a camelCase, snake_case or kebab-case part (canXEdit, xUpdateOrder,
+ *  submitToX, x-note). Source code names server methods and element ids after the person who uses them, and
+ *  aliasStaffNames (whole capitalised words only) cannot see those. Opt-in per build (cfg.aliasIdentifiers): a part
+ *  can be an ordinary word that is also someone's name (a ...Miles distance), and a renamed server method means the
+ *  demo's hand-written mock and verifier must use the new name. The alias becomes an identifier part, in the case of
+ *  the part it replaces: 'the Approver' -> approver / Approver. Returns { text, count }. */
+export function aliasIdentifierParts(text) {
+  let count = 0;
+  const out = text.replace(IDENT, (id) => {
+    if (!isCompound(id)) return id;
+    return id.replace(PART, (part) => {
+      const alias = STAFF_ALIASES[h(part)];
+      if (!alias) return part;
+      count++;
+      return identForm(alias, /^[A-Z]/.test(part));
+    });
+  });
+  return { text: out, count };
+}
+/** Identifiers that carry a staff first name as a part, minus ones known not to name anyone (for scanners). */
+export function findIdentifierNames(text) {
+  return (text.match(IDENT) || []).filter((id) => isCompound(id) && !IDENT_NOT_NAMES.has(id) &&
+    (id.match(PART) || []).some((p) => STAFF_ALIASES[h(p)]));
+}
+export const IDENT_NOT_NAMES = new Set(['distanceMiles']);   // a unit, not a person
+const IDENT = /[A-Za-z_$][\w$]*(?:-[A-Za-z][\w$]*)*/g;
+const PART = /[A-Z]?[a-z]+/g;
+const isCompound = (id) => /[_-]/.test(id) || /[a-z0-9][A-Z]/.test(id);
+function identForm(alias, upper) {
+  const w = alias.replace(/^the\s+/i, '').split(/[^A-Za-z0-9]+/).filter(Boolean);
+  const s = w.map((x, i) => (i ? x[0].toUpperCase() + x.slice(1).toLowerCase() : x.toLowerCase())).join('');
+  return upper ? s[0].toUpperCase() + s.slice(1) : s;
+}
 
 /** True if any aliased name still appears (for scanners). */
 export function findStaffNames(text) {

@@ -121,16 +121,16 @@ let o = M.getMasterQueue().find((x) => x.id === newId);
 check('submitOrder returns an ORD-yyyymmdd-nnnn id and creates a Pending Approval order with a blank total', /^ORD-\d{8}-\d{4}$/.test(newId) && o.status === 'Pending Approval' && o.total === '' &&
   o.items.length === 2 && o.items[0].notes === 'White | Copy room' && o.additionalNotify === 'jwolf@example.edu' && M.getUserOrderHistory(ME)[0].id === newId);
 check('a custom item with neither a link nor a quote is refused', throws(() => M.submitOrder({}, [{ category: 'Custom', name: 'X', qty: 1, price: 1 }]), /link or an attached quote/));
-M.beckyUpdateOrder(newId, { vendor: 'Staples', bank: 'HCS Operating', payType: 'Credit Card', total: '0.00', adjustments: [{ label: 'Shipping', type: 'charge', mode: 'flat', value: 7.5 }, { label: 'Coupon', type: 'discount', mode: 'pct', value: 10 }] },
+M.purchasingUpdateOrder(newId, { vendor: 'Staples', bank: 'HCS Operating', payType: 'Credit Card', total: '0.00', adjustments: [{ label: 'Shipping', type: 'charge', mode: 'flat', value: 7.5 }, { label: 'Coupon', type: 'discount', mode: 'pct', value: 10 }] },
   [{ id: newId + '-1', cost: 40 }, { id: newId + '-2', cost: 35 }]);
 o = M.getMasterQueue().find((x) => x.id === newId);
-check('beckyUpdateOrder prices it server-side (3×40 + 35 = 155, +7.50 shipping −10% = 147.00, the client total ignored) → Pending Signature',
+check('purchasingUpdateOrder prices it server-side (3×40 + 35 = 155, +7.50 shipping −10% = 147.00, the client total ignored) → Pending Signature',
   o.status === 'Pending Signature' && near(o.total, 147) && o.vendor === 'Staples' && !!o.pricedAt && o.adjustments.length === 2);
 check('a wrong PIN is refused (Invalid Approval PIN) and a bad PIN at the gate throws Invalid PIN',
-  throws(() => M.bryanVerifyAndSign(newId, '0000'), /Invalid Approval PIN/) && throws(() => M.verifyApproverPin('0000'), /^Invalid PIN$/) && M.verifyApproverPin('1234') === true);
-const signed = M.bryanVerifyAndSign(newId, '1234');
+  throws(() => M.approverVerifyAndSign(newId, '0000'), /Invalid Approval PIN/) && throws(() => M.verifyApproverPin('0000'), /^Invalid PIN$/) && M.verifyApproverPin('1234') === true);
+const signed = M.approverVerifyAndSign(newId, '1234');
 o = M.getMasterQueue().find((x) => x.id === newId);
-check('bryanVerifyAndSign with PIN 1234 → Approved, stamped and signed by the caller', typeof signed === 'string' && o.status === 'Approved' && !!o.approvedAt && o.approvedBy === ME);
+check('approverVerifyAndSign with PIN 1234 → Approved, stamped and signed by the caller', typeof signed === 'string' && o.status === 'Approved' && !!o.approvedAt && o.approvedBy === ME);
 check('the approved order\'s lines show up in Buy by Vendor, grouped by store', M.getBuyByVendor().some((g) => g.vendor === 'Amazon' && g.items.some((it) => it.orderId === newId)));
 M.markOrderFulfilled(newId);
 check('markOrderFulfilled → Fulfillment', M.getMasterQueue().find((x) => x.id === newId).status === 'Fulfillment');
@@ -142,15 +142,15 @@ check('closing is refused unless the order is in Fulfillment', throws(() => M.ma
 
 /* ---------- the other branches ---------- */
 const pa = M.submitOrder({ chargingDepartment: 'Science' }, [{ category: 'Office Supply', name: 'Sticky Notes (Pack of 24)', qty: 1, price: 14.75 }]);
-M.beckySendBack(pa, 'Which color?'); const needs = M.getMasterQueue().find((x) => x.id === pa);
+M.purchasingSendBack(pa, 'Which color?'); const needs = M.getMasterQueue().find((x) => x.id === pa);
 M.resubmitOrder(pa, 'Yellow'); const back = M.getMasterQueue().find((x) => x.id === pa);
 check('send back → Needs Info with a public note; resubmit → Pending Approval',
   needs.status === 'Needs Info' && M.getOrderComments(pa).some((c) => c.visibility === 'public' && c.body === 'Which color?') && back.status === 'Pending Approval');
-M.beckyUpdateOrder(pa, { vendor: 'Staples', bank: 'HCS Operating', payType: 'Check', adjustments: [] }, []);
-M.bryanHoldOrder(pa, 'Why now?'); const held = M.getMasterQueue().find((x) => x.id === pa).status;
-M.bryanRejectOrder(pa, 'No.'); const ur = M.getMasterQueue().find((x) => x.id === pa).status;
+M.purchasingUpdateOrder(pa, { vendor: 'Staples', bank: 'HCS Operating', payType: 'Check', adjustments: [] }, []);
+M.approverHoldOrder(pa, 'Why now?'); const held = M.getMasterQueue().find((x) => x.id === pa).status;
+M.approverRejectOrder(pa, 'No.'); const ur = M.getMasterQueue().find((x) => x.id === pa).status;
 M.reopenUnderReview(pa); const reopened = M.getMasterQueue().find((x) => x.id === pa).status;
-M.bryanRejectOrder(pa, 'Still no.'); M.beckyPublishRejection(pa, 'Not this year.');
+M.approverRejectOrder(pa, 'Still no.'); M.purchasingPublishRejection(pa, 'Not this year.');
 check('hold → On Hold, approver reject → Under Review, reopen → Pending Signature, publish → Rejected (out of the queue)',
   held === 'On Hold' && ur === 'Under Review' && reopened === 'Pending Signature' && M.searchOrders({ q: pa }).orders[0].status === 'Rejected' && !M.getMasterQueue().some((x) => x.id === pa));
 const cr = queue.find((x) => x.status === 'Cancellation Requested');

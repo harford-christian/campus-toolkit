@@ -29,5 +29,11 @@
       "var DEEP_NAME = '<?= personName ?>';",
       "var DEEP_NAME = (new URLSearchParams(location.search).get('n') || '').replace(/[^A-Za-z ,.'\\-]/g, '').slice(0, 60);"
     ]
-  ]
+  ],
+  "_nameAliasesNote": "Two source comments explain the search with real people (two students and a teacher). nameAliases swaps them for fabricated names, matched by sha256 of the lowercased phrase so this public file names no one; privacy-scan.mjs then fails if any of them remains anywhere.",
+  "nameAliases": {
+    "0b34b66d3224e564": "Ezra Hale",
+    "9f569cc98519e080": "Ezra Lindqvist",
+    "b2581b90449f426c": "Marguerite Hale"
+  }
 }

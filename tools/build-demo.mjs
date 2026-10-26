@@ -1,11 +1,12 @@
 // build-demo.mjs — assemble a standalone demo HTML from a real Apps Script template.
 // Usage: node tools/build-demo.mjs <config.json>
-// Config: { src, dst, includeDir?, replace?: [[find,repl],...], replaceRegex?: [[pattern,flags,repl],...], demoName }
+// Config: { src, dst, includeDir?, replace?: [[find,repl],...], replaceRegex?: [[pattern,flags,repl],...], demoName,
+//           nameAliases?: {hash: replacement}, aliasIdentifiers?: true }
 // Steps: inline <?!= include('X') ?> · apply literal replacements (GAS tokens / scrubs)
 //        · strip control scriptlets <? ... ?> (keep inner content) · inject demo <head> block.
 import fs from 'node:fs';
 import path from 'node:path';
-import { aliasStaffNames, aliasEmailLocals, aliasPhrases, PHRASE_ALIASES } from './staff-aliases.mjs';
+import { aliasStaffNames, aliasEmailLocals, aliasPhrases, aliasIdentifierParts, PHRASE_ALIASES } from './staff-aliases.mjs';
 
 const cfg = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 // Sources are read as LF whatever the checkout's line endings (a CRLF checkout must not change a build).
@@ -55,6 +56,10 @@ if (scrubbed) console.log('  privacy scrub: replaced ' + scrubbed + ' real-world
   if (r.count) console.log('  name aliases: replaced ' + r.count + ' name(s) from this build\'s hashed table'); }
 { const r = aliasStaffNames(html); html = r.text;
   if (r.count) console.log('  staff aliases: replaced ' + r.count + ' staff name(s) with role aliases'); }
+// Opt-in: staff first names inside identifiers (server methods and element ids named after a person). The demo's
+// mock and verifier then use the renamed identifiers, so this is a per-build decision, never a default.
+if (cfg.aliasIdentifiers) { const r = aliasIdentifierParts(html); html = r.text;
+  if (r.count) console.log('  identifier aliases: replaced ' + r.count + ' staff name(s) inside identifiers'); }
 { const r = aliasEmailLocals(html); html = r.text; if (r.count) console.log('  email aliases: replaced ' + r.count + ' staff mailbox(es) with role mailboxes'); }
 
 // 3. Strip remaining control scriptlets <? ... ?> but NOT <?= / <?!= output tags.

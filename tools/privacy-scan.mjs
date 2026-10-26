@@ -13,7 +13,7 @@
 // is there anything real in here?
 import { readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
-import { findStaffNames, findPhrases, PHRASE_ALIASES } from './staff-aliases.mjs';
+import { findStaffNames, findPhrases, findIdentifierNames, PHRASE_ALIASES } from './staff-aliases.mjs';
 
 const ROOT = new URL('../demos/', import.meta.url).pathname.replace(/^\//, '');
 const SCANNABLE = /\.(js|mjs|html|json|css|md)$/;
@@ -73,6 +73,18 @@ for (const file of walk(ROOT)) {
     findings++;
     console.log(`LEAK  ${path.relative(ROOT, file)}:${i + 1}  real staff first name`);
     console.log('      -> rebuild; tools/staff-aliases.mjs replaces it with a role alias');
+  });
+}
+
+// The same names INSIDE identifiers (canXEdit, xUpdateOrder, x-note), which the word rule above cannot see. Found
+// 2026-10-26 in the Purchasing demo, public since it was first built. (data.js skipped, as above.)
+for (const file of walk(ROOT)) {
+  if (/data\.js$/.test(file)) continue;
+  readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+    if (!findIdentifierNames(line).length) return;
+    findings++;
+    console.log(`LEAK  ${path.relative(ROOT, file)}:${i + 1}  real staff first name inside an identifier`);
+    console.log('      -> set "aliasIdentifiers": true in the build config, rebuild, and use the renamed identifiers in mock.js / verify.mjs');
   });
 }
 

@@ -390,7 +390,7 @@
   }
 
   /* ---------- purchasing (Manager/Owner) and approver actions ---------- */
-  function beckyUpdateOrder(id, poData, itemCosts) {
+  function purchasingUpdateOrder(id, poData, itemCosts) {
     var o = mustOrder(id);
     if (PRE_SIGN.indexOf(o.status) === -1) fail('This order can no longer be priced/sent (status: ' + o.status + '). Please reopen it.');
     poData = poData || {};
@@ -404,31 +404,31 @@
     audit(id, 'Priced', 'Total ' + money(total) + (o.vendor ? ' · ' + o.vendor : ''));
     return true;
   }
-  function beckySendBack(id, note) {
+  function purchasingSendBack(id, note) {
     var o = mustOrder(id), n = needText(note, 'A note telling the requestor what is needed is required.');
     if (['Pending Approval', 'Needs Info'].indexOf(o.status) === -1) fail('This request can no longer be sent back here (status: ' + o.status + ').');
     o.status = 'Needs Info'; comment(id, 'public', n);
     return 'Sent back to the requestor for more info.';
   }
-  function beckyRejectRequest(id, note) {
+  function purchasingRejectRequest(id, note) {
     var o = mustOrder(id), n = needText(note, 'A note to the requestor is required to reject.');
     if (['Pending Approval', 'Needs Info'].indexOf(o.status) === -1) fail('This request can no longer be rejected here (status: ' + o.status + ').');
     o.status = 'Rejected'; comment(id, 'public', n);
     return 'Order rejected. The requestor has been notified.';
   }
-  function bryanHoldOrder(id, text) {
+  function approverHoldOrder(id, text) {
     var o = mustOrder(id), c = needText(text, 'A comment is required to hold an order.');
     if (o.status !== 'Pending Signature') fail('Only an order awaiting signature can be held (status: ' + o.status + ').');
     o.status = 'On Hold'; comment(id, 'internal', c);
     return 'Order placed on hold.';
   }
-  function bryanRejectOrder(id, text) {
+  function approverRejectOrder(id, text) {
     var o = mustOrder(id), c = needText(text, 'A comment is required to reject an order.');
     if (AWAITING_SIGNATURE.indexOf(o.status) === -1) fail('This order is not awaiting signature (status: ' + o.status + ').');
     o.status = 'Under Review'; comment(id, 'internal', c);
     return 'Order rejected and sent for review.';
   }
-  function beckyPublishRejection(id, note) {
+  function purchasingPublishRejection(id, note) {
     var o = mustOrder(id), n = needText(note, 'A summary note is required to publish the rejection.');
     if (o.status !== 'Under Review') fail('This order is not awaiting rejection review.');
     o.status = 'Rejected'; comment(id, 'public', n);
@@ -440,7 +440,7 @@
     o.status = 'Pending Signature'; audit(id, 'Reopened', 'rejection reversed → Pending Signature');
     return 'Order reopened and returned to the approver.';
   }
-  function bryanVerifyAndSign(id, pin) {
+  function approverVerifyAndSign(id, pin) {
     var o = mustOrder(id);
     if (AWAITING_SIGNATURE.indexOf(o.status) === -1) fail('This order is not awaiting signature (status: ' + o.status + ').');
     var typed = (pin || '').toString();
@@ -1129,8 +1129,8 @@
     getOrderComments: getOrderComments, addOrderComment: addOrderComment, getOrderTimeline: getOrderTimeline, getOrderAudit: getOrderAudit,
     getMasterQueue: getMasterQueue, searchOrders: searchOrders,
     getApproverSettings: getApproverSettings, verifyApproverPin: verifyApproverPin, updateApproverPIN: updateApproverPIN, updateApproverSettings: updateApproverSettings,
-    beckyUpdateOrder: beckyUpdateOrder, beckySendBack: beckySendBack, beckyRejectRequest: beckyRejectRequest, beckyPublishRejection: beckyPublishRejection,
-    reopenUnderReview: reopenUnderReview, bryanVerifyAndSign: bryanVerifyAndSign, bryanHoldOrder: bryanHoldOrder, bryanRejectOrder: bryanRejectOrder,
+    purchasingUpdateOrder: purchasingUpdateOrder, purchasingSendBack: purchasingSendBack, purchasingRejectRequest: purchasingRejectRequest, purchasingPublishRejection: purchasingPublishRejection,
+    reopenUnderReview: reopenUnderReview, approverVerifyAndSign: approverVerifyAndSign, approverHoldOrder: approverHoldOrder, approverRejectOrder: approverRejectOrder,
     approveCancellation: approveCancellation, denyCancellation: denyCancellation, routeToBackupApprover: routeToBackupApprover, approveOnBehalf: approveOnBehalf,
     splitOrder: splitOrder, mergeOrders: mergeOrders, adjustOrderCost: adjustOrderCost, updateItemStatuses: updateItemStatuses,
     markOrderFulfilled: markOrderFulfilled, markOrderClosed: markOrderClosed, generatePOPDF: generatePOPDF, generateOrderPacket: generateOrderPacket,

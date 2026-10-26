@@ -4,6 +4,8 @@
   "dst": "demos/purchasing/index.html",
   "includeDir": "../hcs-purchasing-system",
   "demoName": "Purchasing & Procurement",
+  "_aliasIdentifiersNote": "The source names server methods, a permission flag and an element id after the two people who use them. aliasIdentifiers swaps those name parts for the same role aliases (purchasingUpdateOrder, approverVerifyAndSign, canPurchasingEdit, purchasing-note); mock.js and verify.mjs use the renamed methods.",
+  "aliasIdentifiers": true,
   "replace": [
     [
       "<?= (userData.firstName || ' ').charAt(0) ?><?= (userData.lastName || ' ').charAt(0) ?>",

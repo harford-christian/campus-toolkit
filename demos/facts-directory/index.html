@@ -350,8 +350,8 @@ function searchWorkbook(tabs, query, opts) {
 /* ====================================================================
    People search — the staff UI is a person picker: match PEOPLE (students),
    list them, then fetch one person's full profile by ID. This keeps
-   "noah may" from surfacing Noah Lambert just because his teacher is
-   Ann-Marie May: schedule teachers are NOT part of a person's search blob.
+   "Ezra Hale" from surfacing Ezra Lindqvist just because his teacher is
+   Marguerite Hale: schedule teachers are NOT part of a person's search blob.
    ==================================================================== */
 
 var SEARCH_MAX_PEOPLE = 50;
@@ -3567,7 +3567,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
   /* ---------- deep link (?id=…&n=…) ----------
      Campus Presence's muster roster links straight to a student's record, so a
-     front-office question ('where is Noah May right now?') lands on the answer
+     front-office question ('where is Ezra Hale right now?') lands on the answer
      instead of a search box. openPerson falls back to the personApi server call
      because tabsData is still loading at this point; push=false keeps the entry
      out of the back stack, so Back returns to an empty search rather than here. */
