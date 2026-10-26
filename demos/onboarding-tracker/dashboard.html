@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>HCS Onboarding Dashboard</title>
+  <base target="_top">
+  <script src="logic.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root { --hcs-red: #B22222; --hcs-gold: #D4AF37; }
+    body { background-color: #f4f7f6; font-family: 'Inter', sans-serif; color: #333; }
+    .navbar { background-color: var(--hcs-red); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .section-header { border-left: 5px solid var(--hcs-red); padding-left: 15px; margin: 30px 0 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #444; }
+    .pending-card { border: none; border-left: 5px solid var(--hcs-gold); transition: all 0.2s; cursor: pointer; background: white; border-radius: 8px; }
+    .pending-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); }
+    .approved-row { background: white; border-radius: 8px; margin-bottom: 8px; transition: background 0.2s; cursor: pointer; border: 1px solid #eee; }
+    .approved-row:hover { background: #fdfdfd; border-color: #ddd; }
+    .rejected-row { background: #fff5f5; border-radius: 8px; margin-bottom: 8px; cursor: pointer; border: 1px solid #feb2b2; opacity: 0.9; }
+    .filter-pane { background: white; padding: 25px; border-radius: 12px; position: sticky; top: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    .checklist-section { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .checklist-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .checklist-item:last-child { border-bottom: none; }
+    .check-btn { width: 28px; height: 28px; border-radius: 6px; border: 2px solid #dee2e6; background: white; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+    .check-btn.checked { background: #198754; border-color: #198754; color: white; }
+    .check-btn:hover { border-color: #198754; }
+    .progress-bar-custom { height: 6px; border-radius: 3px; background: #dee2e6; overflow: hidden; }
+    .progress-bar-custom .fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+    .badge-pending  { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #d1e7dd; color: #0f5132; }
+    .badge-rejected { background: #f8d7da; color: #842029; }
+    .countdown-badge { background: #e7f3ff; color: #0c5460; font-size: 0.7rem; padding: 2px 7px; border-radius: 20px; }
+    .sort-controls { display: flex; align-items: center; gap: 10px; margin-top: -5px; }
+    .required-asterisk { color: red; font-weight: bold; }
+    .it-tag { background: #cfe2ff; color: #084298; font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; }
+    .hr-tag { background: #d1e7dd; color: #0f5132; font-size: 0.7rem; padding: 2px 7px; border-radius: 4px; }
+  </style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Onboarding Tracker" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+
+<!-- Loading Overlay -->
+<div id="loader" class="loading-overlay">
+  <div class="spinner-border text-danger" role="status"></div>
+  <p class="mt-3 fw-bold">Loading HCS Onboarding Dashboard...</p>
+</div>
+
+<!-- Navbar -->
+<nav class="navbar navbar-dark p-3">
+  <div class="container-fluid">
+    <span class="navbar-brand mb-0 h1">🦅 HCS ONBOARDING DASHBOARD</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-light" onclick="softRefresh()">🔄 Refresh</button>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Layout -->
+<div class="container-fluid p-4">
+  <div class="row">
+
+    <!-- Filter Pane -->
+    <div class="col-md-3">
+      <div class="filter-pane">
+        <h6 class="fw-bold mb-3 small text-muted">DASHBOARD FILTERS</h6>
+        <input type="text" id="nameSearch" class="form-control mb-3" placeholder="Search Name, ID, Dept..." oninput="renderDashboard()">
+
+        <label class="small fw-bold text-muted">DEPARTMENT</label>
+        <select id="deptFilter" class="form-select mb-3" onchange="renderDashboard()">
+          <option value="All">All Departments</option>
+        </select>
+
+        <label class="small fw-bold text-muted">VIEW</label>
+        <select id="viewFilter" class="form-select mb-3" onchange="renderDashboard()">
+          <option value="All">Show All</option>
+          <option value="Pending">Pending Only</option>
+          <option value="Approved">Approved Only</option>
+        </select>
+
+        <hr>
+        <button class="btn btn-dark btn-sm w-100 mb-2" onclick="resetFilters()">Reset Filters</button>
+        <button class="btn btn-success fw-bold btn-sm w-100 shadow-sm" onclick="openManualModal()">➕ Add Manual Onboarding</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="col-md-9">
+
+      <!-- Pending -->
+      <div class="d-flex justify-content-between align-items-end mb-2">
+        <h5 class="section-header m-0">
+          Pending Onboarding
+          <span id="pendingCount" class="badge bg-warning text-dark ms-2">0</span>
+        </h5>
+        <div class="sort-controls">
+          <label class="small fw-bold text-muted">Sort By:</label>
+          <select id="pendingSort" class="form-select form-select-sm w-auto" onchange="renderDashboard()">
+            <option value="startDate">Start Date</option>
+            <option value="dateSubmitted">Date Submitted</option>
+            <option value="name">Name</option>
+            <option value="dept">Department</option>
+          </select>
+        </div>
+      </div>
+      <div id="pendingArea" class="row g-3 mb-5"></div>
+
+      <!-- Approved -->
+      <div class="d-flex justify-content-between align-items-end mb-2">
+        <h5 class="section-header m-0">Approved / Completed</h5>
+        <div class="sort-controls">
+          <label class="small fw-bold text-muted">Sort By:</label>
+          <select id="approvedSort" class="form-select form-select-sm w-auto" onchange="renderDashboard()">
+            <option value="dateUpdated">Recently Updated</option>
+            <option value="startDate">Start Date</option>
+            <option value="name">Name</option>
+          </select>
+        </div>
+      </div>
+      <div id="approvedArea" class="mb-5"></div>
+
+      <!-- Rejected -->
+      <h5 class="section-header text-danger">Rejected / Revoked</h5>
+      <div id="rejectedArea"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- DETAILS MODAL -->
+<!-- ============================================================ -->
+<div class="modal fade" id="detailsModal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0" style="background: var(--hcs-red);">
+        <h5 class="modal-title fw-bold text-white" id="modalTitle">Onboarding Details</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4" id="modalBody"></div>
+      <div class="modal-footer border-0 bg-light" id="modalActionFooter">
+        <a id="uidPortalBtn" href="#" target="_blank" class="btn btn-danger fw-bold flex-grow-1">OPEN IN UID PORTAL</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MANUAL ENTRY MODAL — FAILSAFE C -->
+<!-- ============================================================ -->
+<div class="modal fade" id="manualModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold">➕ Add Manual Onboarding Record</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">First Name <span class="required-asterisk">*</span></label>
+            <input type="text" class="form-control" id="manFirstName" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Last Name <span class="required-asterisk">*</span></label>
+            <input type="text" class="form-control" id="manLastName" required>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Work Email</label>
+            <input type="email" class="form-control" id="manEmail" placeholder="Will be created during onboarding">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Start Date <span class="required-asterisk">*</span></label>
+            <input type="date" class="form-control" id="manStartDate" required>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Department <span class="required-asterisk">*</span></label>
+            <input type="text" class="form-control" id="manDept" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Role / Position <span class="required-asterisk">*</span></label>
+            <input type="text" class="form-control" id="manRole" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Manager</label>
+            <input type="text" class="form-control" id="manManager">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label small fw-bold">Location</label>
+            <input type="text" class="form-control" id="manLocation" placeholder="e.g. Main Campus, Remote">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-bold">Notes (System Log)</label>
+          <textarea class="form-control bg-light" id="manNotes" rows="2" placeholder="Any initial notes for the checklist..."></textarea>
+        </div>
+        <button class="btn btn-success w-100 fw-bold" onclick="submitManual()">➕ Add Onboarding Record</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  let rawData = [];
+  const detailsModal = new bootstrap.Modal(document.getElementById('detailsModal'));
+  const manualModal  = new bootstrap.Modal(document.getElementById('manualModal'));
+
+  // IT checklist columns (letter → label)
+  const IT_CHECKS = [
+    { col: 'M', label: 'Create Google Account' },
+    { col: 'N', label: 'Assign Equipment (Laptop, etc.)' },
+    { col: 'O', label: 'Create ID / Badge Access' }
+  ];
+
+  // HR checklist columns (letter → label)
+  const HR_CHECKS = [
+    { col: 'P', label: 'Offer Letter Signed' },
+    { col: 'Q', label: 'I-9 / Employment Verification' },
+    { col: 'R', label: 'Direct Deposit Setup' },
+    { col: 'S', label: 'Employee Handbook Acknowledged' },
+    { col: 'T', label: 'Orientation Scheduled' },
+    { col: 'U', label: 'Emergency Contacts Collected' },
+    { col: 'V', label: 'Benefits Enrollment' },
+    { col: 'W', label: 'ID / Badge Issued' }
+  ];
+
+  // Map column letter → row object key (generated from header)
+  function colToKey(letter) {
+    const map = {
+      M: 'IT_Create_Google_Account',
+      N: 'IT_Assign_Equipment', // demo fix: the key getDashboardData makes from "IT: Assign Equipment"
+      O: 'IT_Create_IDBadge_Access',
+      P: 'HR_Offer_Letter_Signed',
+      Q: 'HR_I_9_Verification', // demo fix: the key getDashboardData makes from "HR: I-9 Verification"
+      R: 'HR_Direct_Deposit_Setup',
+      S: 'HR_Handbook_Acknowledged',
+      T: 'HR_Orientation_Scheduled',
+      U: 'HR_Emergency_Contacts_Collected',
+      V: 'HR_Benefits_Enrollment',
+      W: 'HR_IDBadge_Issued'
+    };
+    return map[letter] || '';
+  }
+
+  window.onload = () => { fetchData(); };
+
+  function softRefresh() {
+    document.getElementById('loader').style.display = 'flex';
+    fetchData();
+  }
+
+  function fetchData() {
+    google.script.run
+      .withSuccessHandler(data => {
+        rawData = data || [];
+        populateDeptFilter();
+        renderDashboard();
+        document.getElementById('loader').style.display = 'none';
+      })
+      .withFailureHandler(err => {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('pendingArea').innerHTML =
+          '<p class="text-danger">Error loading data: ' + err + '</p>';
+      })
+      .getDashboardData();
+  }
+
+  function populateDeptFilter() {
+    const depts = [...new Set(rawData.map(r => r.Department).filter(d => d && d !== '---'))].sort();
+    const sel   = document.getElementById('deptFilter');
+    sel.innerHTML = '<option value="All">All Departments</option>';
+    depts.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      sel.appendChild(opt);
+    });
+  }
+
+  function resetFilters() {
+    document.getElementById('nameSearch').value = '';
+    document.getElementById('deptFilter').value = 'All';
+    document.getElementById('viewFilter').value = 'All';
+    renderDashboard();
+  }
+
+  // ===========================================================
+  // RENDER DASHBOARD
+  // ===========================================================
+  function renderDashboard() {
+    const search     = document.getElementById('nameSearch').value.toLowerCase();
+    const deptFilter = document.getElementById('deptFilter').value;
+    const viewFilter = document.getElementById('viewFilter').value;
+    const pSort      = document.getElementById('pendingSort').value;
+    const aSort      = document.getElementById('approvedSort').value;
+
+    let filtered = rawData.filter(r => {
+      const fullName = ((r.First_Name || '') + ' ' + (r.Last_Name || '')).toLowerCase();
+      const matchSearch = !search ||
+        fullName.includes(search) ||
+        (r.Approval_ID || '').toLowerCase().includes(search) ||
+        (r.Department  || '').toLowerCase().includes(search) ||
+        (r.Role        || '').toLowerCase().includes(search);
+      const matchDept = deptFilter === 'All' || r.Department === deptFilter;
+      return matchSearch && matchDept;
+    });
+
+    const pending  = filtered.filter(r => r.Status === 'Pending');
+    const approved = filtered.filter(r => r.Status === 'Approved');
+    const rejected = filtered.filter(r => r.Status !== 'Pending' && r.Status !== 'Approved');
+
+    if (viewFilter === 'Pending')  { renderPendingCards(pending, pSort); clearArea('approvedArea'); clearArea('rejectedArea'); return; }
+    if (viewFilter === 'Approved') { clearArea('pendingArea'); renderApprovedRows(approved, aSort); clearArea('rejectedArea'); return; }
+
+    renderPendingCards(pending, pSort);
+    renderApprovedRows(approved, aSort);
+    renderRejectedRows(rejected);
+    document.getElementById('pendingCount').textContent = pending.length;
+  }
+
+  function clearArea(id) { document.getElementById(id).innerHTML = ''; }
+
+  function sortByStartDate(a, b) {
+    const da = a.Start_Date_Raw || 0;
+    const db = b.Start_Date_Raw || 0;
+    return da - db;
+  }
+
+  // ===========================================================
+  // PENDING CARDS
+  // ===========================================================
+  function renderPendingCards(items, sortBy) {
+    if (sortBy === 'startDate')    items.sort(sortByStartDate);
+    if (sortBy === 'dateSubmitted') items.sort((a,b) => (b.Initial_Entry_Date_Raw||0) - (a.Initial_Entry_Date_Raw||0));
+    if (sortBy === 'name')         items.sort((a,b) => ((a.First_Name||'')+(a.Last_Name||'')).localeCompare((b.First_Name||'')+(b.Last_Name||'')));
+    if (sortBy === 'dept')         items.sort((a,b) => (a.Department||'').localeCompare(b.Department||''));
+
+    const area = document.getElementById('pendingArea');
+    document.getElementById('pendingCount').textContent = items.length;
+    if (items.length === 0) {
+      area.innerHTML = '<p class="text-muted fst-italic ps-2">No pending onboarding requests.</p>';
+      return;
+    }
+
+    area.innerHTML = items.map(r => {
+      const name      = (r.First_Name + ' ' + r.Last_Name).trim();
+      const countdown = getCountdown(r.Start_Date_Raw);
+      const progress  = getChecklistProgress(r);
+      const itDone    = progress.itDone;
+      const hrDone    = progress.hrDone;
+      const itTotal   = IT_CHECKS.length;
+      const hrTotal   = HR_CHECKS.length;
+
+      return `
+      <div class="col-md-6 col-lg-4">
+        <div class="pending-card card shadow-sm p-3" onclick="showDetails('${r.rowId}')">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <h6 class="fw-bold mb-0">${name}</h6>
+              <small class="text-muted">${r.Role !== '---' ? r.Role : ''}</small>
+            </div>
+            <span class="badge badge-pending rounded-pill">Pending</span>
+          </div>
+          <div class="small text-muted mb-1">🏢 ${r.Department !== '---' ? r.Department : 'Unknown Dept.'}</div>
+          <div class="small text-muted mb-2">📅 Starts: <strong>${r.Start_Date !== '---' ? r.Start_Date : 'TBD'}</strong>
+            ${countdown ? '<span class="ms-1 countdown-badge">' + countdown + '</span>' : ''}
+          </div>
+          <div class="mb-1">
+            <div class="d-flex justify-content-between small mb-1">
+              <span><span class="it-tag me-1">IT</span>${itDone}/${itTotal}</span>
+              <span><span class="hr-tag me-1">HR</span>${hrDone}/${hrTotal}</span>
+            </div>
+            <div class="progress-bar-custom">
+              <div class="fill" style="background:${progress.allDone ? '#198754' : '#D4AF37'}; width:${progress.pct}%"></div>
+            </div>
+          </div>
+          <div class="text-end mt-2">
+            <small class="text-muted">#${r.Approval_ID}</small>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ===========================================================
+  // APPROVED ROWS
+  // ===========================================================
+  function renderApprovedRows(items, sortBy) {
+    if (sortBy === 'startDate')   items.sort(sortByStartDate);
+    if (sortBy === 'name')        items.sort((a,b) => ((a.First_Name||'')+(a.Last_Name||'')).localeCompare((b.First_Name||'')+(b.Last_Name||'')));
+    if (sortBy === 'dateUpdated') items.sort((a,b) => (b.Last_Updated_Raw||0) - (a.Last_Updated_Raw||0));
+
+    const area = document.getElementById('approvedArea');
+    if (items.length === 0) { area.innerHTML = '<p class="text-muted fst-italic ps-2">No approved onboardings.</p>'; return; }
+
+    area.innerHTML = items.map(r => {
+      const name     = (r.First_Name + ' ' + r.Last_Name).trim();
+      const progress = getChecklistProgress(r);
+      return `
+      <div class="approved-row p-3 px-4 d-flex align-items-center justify-content-between" onclick="showDetails('${r.rowId}')">
+        <div class="d-flex align-items-center gap-3 flex-grow-1">
+          <div>
+            <div class="fw-bold">${name}</div>
+            <div class="small text-muted">${r.Department} · ${r.Role}</div>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <div class="text-end">
+            <div class="small text-muted">Starts ${r.Start_Date !== '---' ? r.Start_Date : 'TBD'}</div>
+            <div style="width:80px;" class="progress-bar-custom mt-1">
+              <div class="fill" style="background:#198754; width:${progress.pct}%"></div>
+            </div>
+          </div>
+          <span class="badge badge-approved">Approved</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ===========================================================
+  // REJECTED ROWS
+  // ===========================================================
+  function renderRejectedRows(items) {
+    const area = document.getElementById('rejectedArea');
+    if (items.length === 0) { area.innerHTML = '<p class="text-muted fst-italic ps-2">None.</p>'; return; }
+    area.innerHTML = items.map(r => {
+      const name = (r.First_Name + ' ' + r.Last_Name).trim();
+      return `
+      <div class="rejected-row p-3 px-4 d-flex align-items-center justify-content-between" onclick="showDetails('${r.rowId}')">
+        <div>
+          <div class="fw-bold">${name}</div>
+          <div class="small text-muted">${r.Department} · ${r.Role}</div>
+        </div>
+        <span class="badge badge-rejected">${r.Status}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ===========================================================
+  // DETAILS MODAL
+  // ===========================================================
+  function showDetails(rowId) {
+    const r = rawData.find(x => x.rowId === rowId);
+    if (!r) return;
+
+    const name     = (r.First_Name + ' ' + r.Last_Name).trim();
+    const progress = getChecklistProgress(r);
+
+    document.getElementById('modalTitle').textContent = name + ' — Onboarding Details';
+
+    const itRows = IT_CHECKS.map(c => renderChecklistRow(r, c, 'IT')).join('');
+    const hrRows = HR_CHECKS.map(c => renderChecklistRow(r, c, 'HR')).join('');
+
+    const statusBadge = {
+      Pending  : '<span class="badge badge-pending">Pending</span>',
+      Approved : '<span class="badge badge-approved">Approved</span>',
+      Rejected : '<span class="badge badge-rejected">Rejected</span>'
+    }[r.Status] || `<span class="badge bg-secondary">${r.Status}</span>`;
+
+    const countdown = getCountdown(r.Start_Date_Raw);
+
+    document.getElementById('modalBody').innerHTML = `
+      <!-- Info Grid -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted small fw-bold" style="width:40%">Status</td><td>${statusBadge}</td></tr>
+            <tr><td class="text-muted small fw-bold">ID</td><td><code>${r.Approval_ID}</code></td></tr>
+            <tr><td class="text-muted small fw-bold">Email</td><td>${r.Email}</td></tr>
+            <tr><td class="text-muted small fw-bold">Start Date</td><td><strong>${r.Start_Date}</strong>${countdown ? ' <span class="countdown-badge">'+countdown+'</span>' : ''}</td></tr>
+          </table>
+        </div>
+        <div class="col-md-6">
+          <table class="table table-sm table-borderless mb-0">
+            <tr><td class="text-muted small fw-bold" style="width:40%">Department</td><td>${r.Department}</td></tr>
+            <tr><td class="text-muted small fw-bold">Role</td><td>${r.Role}</td></tr>
+            <tr><td class="text-muted small fw-bold">Manager</td><td>${r.Manager}</td></tr>
+            <tr><td class="text-muted small fw-bold">Location</td><td>${r.Location}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Overall Progress -->
+      <div class="mb-3 p-3 bg-light rounded">
+        <div class="d-flex justify-content-between small fw-bold mb-1">
+          <span>Overall Checklist Progress</span>
+          <span>${progress.totalDone}/${progress.totalItems} items complete</span>
+        </div>
+        <div class="progress-bar-custom" style="height:10px;">
+          <div class="fill" style="background:${progress.allDone ? '#198754' : '#D4AF37'}; width:${progress.pct}%"></div>
+        </div>
+        ${progress.allDone ? '<p class="text-success small mt-2 mb-0 fw-bold">✅ All items complete — ready to approve in UID!</p>' : ''}
+      </div>
+
+      <!-- IT Checklist -->
+      <div class="checklist-section">
+        <h6 class="fw-bold mb-3"><span class="it-tag me-2">IT</span>IT Checklist (${progress.itDone}/${IT_CHECKS.length})</h6>
+        ${itRows}
+      </div>
+
+      <!-- HR Checklist -->
+      <div class="checklist-section">
+        <h6 class="fw-bold mb-3"><span class="hr-tag me-2">HR</span>HR Checklist (${progress.hrDone}/${HR_CHECKS.length})</h6>
+        ${hrRows}
+      </div>
+
+      <!-- Discussion Log -->
+      ${r.Discussion_Log && r.Discussion_Log !== '---' ? `
+      <div class="mt-3">
+        <h6 class="fw-bold small text-muted text-uppercase">Discussion Log</h6>
+        <pre class="bg-light p-3 rounded small" style="white-space: pre-wrap;">${r.Discussion_Log}</pre>
+      </div>` : ''}
+
+      <!-- Manual Override -->
+      <div class="mt-3 pt-3 border-top">
+        <h6 class="fw-bold small text-muted text-uppercase mb-2">Manual Status Override</h6>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-success" onclick="overrideStatus('${r.rowId}','Approved')">✅ Force Approve</button>
+          <button class="btn btn-sm btn-danger"  onclick="overrideStatus('${r.rowId}','Rejected')">❌ Force Reject</button>
+          <button class="btn btn-sm btn-warning text-dark" onclick="overrideStatus('${r.rowId}','Pending')">⏳ Reset to Pending</button>
+        </div>
+      </div>
+    `;
+
+    // UID Portal button
+    const portalBtn = document.getElementById('uidPortalBtn');
+    if (r.UID_Portal_Link && r.UID_Portal_Link !== '---') {
+      portalBtn.href = r.UID_Portal_Link;
+      portalBtn.style.display = '';
+    } else {
+      portalBtn.style.display = 'none';
+    }
+
+    detailsModal.show();
+  }
+
+  // ===========================================================
+  // CHECKLIST ROW (interactive)
+  // ===========================================================
+  function renderChecklistRow(r, check, team) {
+    const key      = colToKey(check.col);
+    const isChecked = r[key] === '✅';
+    const checkedClass = isChecked ? 'checked' : '';
+    const checkedIcon  = isChecked ? '✅' : '';
+    return `
+    <div class="checklist-item" id="checkrow-${r.rowId}-${check.col}">
+      <button class="check-btn ${checkedClass}" onclick="toggleCheck('${r.rowId}','${check.col}','${key}',this)">${checkedIcon}</button>
+      <span class="small flex-grow-1 ${isChecked ? 'text-decoration-line-through text-muted' : ''}">${check.label}</span>
+      <span class="${team === 'IT' ? 'it-tag' : 'hr-tag'}">${team}</span>
+    </div>`;
+  }
+
+  function toggleCheck(rowId, col, key, btn) {
+  const isChecked = btn.classList.contains('checked');
+  const newVal    = isChecked ? '' : '✅';
+
+  // Optimistic UI update inside modal
+  btn.classList.toggle('checked', !isChecked);
+  btn.textContent = !isChecked ? '✅' : '';
+  const labelEl = btn.nextElementSibling;
+  if (labelEl) {
+    labelEl.classList.toggle('text-decoration-line-through', !isChecked);
+    labelEl.classList.toggle('text-muted', !isChecked);
+  }
+
+  // Update rawData in memory
+  const record = rawData.find(r => r.rowId === rowId);
+  if (record) record[key] = newVal;
+
+  // Recalculate and update the progress bar inside the modal immediately
+  if (record) {
+    const progress = getChecklistProgress(record);
+
+    // Update modal progress bar
+    const modalBar = document.querySelector('#modalBody .progress-bar-custom .fill');
+    if (modalBar) {
+      modalBar.style.width = progress.pct + '%';
+      modalBar.style.background = progress.allDone ? '#198754' : '#D4AF37';
+    }
+
+    // Update modal progress text
+    const modalProgressText = document.querySelector('#modalBody .d-flex.justify-content-between.small.fw-bold span:last-child');
+    if (modalProgressText) modalProgressText.textContent = progress.totalDone + '/' + progress.totalItems + ' items complete';
+
+    // Update IT/HR counts in modal headers
+    const itHeader = document.querySelector('#modalBody .it-tag')?.closest('h6');
+    if (itHeader) itHeader.innerHTML = `<span class="it-tag me-2">IT</span>IT Checklist (${progress.itDone}/${IT_CHECKS.length})`;
+    const hrHeader = document.querySelector('#modalBody .hr-tag')?.closest('h6');
+    if (hrHeader) hrHeader.innerHTML = `<span class="hr-tag me-2">HR</span>HR Checklist (${progress.hrDone}/${HR_CHECKS.length})`;
+
+    // Show "ready to approve" message if all done
+    const readyMsg = document.querySelector('#modalBody .text-success.small');
+    if (readyMsg) readyMsg.textContent = progress.allDone ? '✅ All items complete — ready to approve in UID!' : '';
+
+    // Update the pending card on the dashboard behind the modal
+    updateCardProgress(rowId, progress);
+  }
+
+  function updateCardProgress(rowId, progress) {
+  const cards = document.querySelectorAll('#pendingArea .pending-card');
+  cards.forEach(card => {
+    if (!card.getAttribute('onclick') || !card.getAttribute('onclick').includes(`'${rowId}'`)) return;
+
+    // Just re-render the counts and progress bar section entirely
+    const countRow = card.querySelector('.d-flex.justify-content-between.small');
+    const barRow   = card.querySelector('.progress-bar-custom');
+
+    if (countRow) {
+      countRow.innerHTML = `
+        <span><span class="it-tag me-1">IT</span>${progress.itDone}/${IT_CHECKS.length}</span>
+        <span><span class="hr-tag me-1">HR</span>${progress.hrDone}/${HR_CHECKS.length}</span>
+      `;
+    }
+
+    if (barRow) {
+      barRow.innerHTML = `
+        <div class="fill" style="background:${progress.allDone ? '#198754' : '#D4AF37'}; width:${progress.pct}%"></div>
+      `;
+    }
+  });
+}
+
+  // Persist to sheet
+  google.script.run
+    .withFailureHandler(err => {
+      // Roll back on failure
+      btn.classList.toggle('checked', isChecked);
+      btn.textContent = isChecked ? '✅' : '';
+      if (record) record[key] = isChecked ? '✅' : '';
+      alert('Error saving: ' + err);
+    })
+    .updateChecklistItem(rowId, col, newVal);
+}
+
+  // ===========================================================
+  // HELPERS
+  // ===========================================================
+  function getChecklistProgress(r) {
+    const itDone  = IT_CHECKS.filter(c => r[colToKey(c.col)] === '✅').length;
+    const hrDone  = HR_CHECKS.filter(c => r[colToKey(c.col)] === '✅').length;
+    const total   = IT_CHECKS.length + HR_CHECKS.length;
+    const done    = itDone + hrDone;
+    return {
+      itDone, hrDone,
+      totalDone  : done,
+      totalItems : total,
+      pct        : Math.round((done / total) * 100),
+      allDone    : done === total
+    };
+  }
+
+  function getCountdown(rawTimestamp) {
+    if (!rawTimestamp) return null;
+    const now   = new Date();
+    const start = new Date(rawTimestamp);
+    now.setHours(0,0,0,0);
+    start.setHours(0,0,0,0);
+    const days = Math.round((start - now) / 86400000);
+    if (days < 0)  return null;
+    if (days === 0) return 'Today!';
+    if (days === 1) return 'Tomorrow';
+    return 'In ' + days + ' days';
+  }
+
+  // ===========================================================
+  // MANUAL OVERRIDE
+  // ===========================================================
+  function overrideStatus(rowId, newStatus) {
+    if (!confirm('Set status to "' + newStatus + '"?')) return;
+    google.script.run
+      .withSuccessHandler(msg => {
+        if (msg === 'Success') { detailsModal.hide(); softRefresh(); }
+        else alert('Error: ' + msg);
+      })
+      .manualOverrideStatus(rowId, newStatus);
+  }
+
+  // ===========================================================
+  // MANUAL ENTRY FORM
+  // ===========================================================
+  function openManualModal() { manualModal.show(); }
+
+  function submitManual() {
+    const firstName = document.getElementById('manFirstName').value.trim();
+    const lastName  = document.getElementById('manLastName').value.trim();
+    const startDate = document.getElementById('manStartDate').value;
+    const dept      = document.getElementById('manDept').value.trim();
+    const role      = document.getElementById('manRole').value.trim();
+
+    if (!firstName || !lastName || !startDate || !dept || !role) {
+      alert('Please fill in all required fields (First Name, Last Name, Start Date, Department, Role).');
+      return;
+    }
+
+    manualModal.hide();
+    document.getElementById('loader').style.display = 'flex';
+
+    google.script.run
+      .withSuccessHandler(msg => {
+        if (msg === 'Success') { fetchData(); }
+        else { document.getElementById('loader').style.display = 'none'; alert(msg); }
+      })
+      .addManualOnboardingRequest({
+        firstName : firstName,
+        lastName  : lastName,
+        email     : document.getElementById('manEmail').value.trim(),
+        startDate : startDate,
+        department: dept,
+        role      : role,
+        manager   : document.getElementById('manManager').value.trim(),
+        location  : document.getElementById('manLocation').value.trim(),
+        notes     : document.getElementById('manNotes').value.trim()
+      });
+  }
+</script>
+</body>
+</html>

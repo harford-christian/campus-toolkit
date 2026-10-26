@@ -1,0 +1,11 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/onboarding-tracker/build-logic.mjs && node tools/build-demo.mjs demos/onboarding-tracker/build.json, then node demos/onboarding-tracker/verify.mjs. Index.html is the dashboard's whole page (no template tokens). Demo edits: (1) the charset and the title doGet's setTitle supplies, plus logic.js ahead of the shim so mock.js can run the vendored server; (2) TWO DEMO-ONLY FIXES of a source bug, reported to Josh 2026-10-26: the page's colToKey map expects the keys IT_Assign_Equipment_laptop_etc and HR_I9_Verification, but getDashboardData builds keys from the header row, and no header it can be given (neither the layout Code.js documents nor the one initializeProject writes) produces those two, so those checklist items always read as unticked after a refresh. The demo maps them to the keys the documented headers produce. When the source is fixed, these two replacements stop matching and can be removed.",
+  "src": "../hcs-onboarding-offboarding/Index.html",
+  "dst": "demos/onboarding-tracker/dashboard.html",
+  "demoName": "Onboarding Tracker",
+  "replace": [
+    ["<base target=\"_top\">", "<meta charset=\"utf-8\">\n  <title>HCS Onboarding Dashboard</title>\n  <base target=\"_top\">\n  <script src=\"logic.js\"></script>"],
+    ["N: 'IT_Assign_Equipment_laptop_etc',", "N: 'IT_Assign_Equipment', // demo fix: the key getDashboardData makes from \"IT: Assign Equipment\""],
+    ["Q: 'HR_I9_Verification',", "Q: 'HR_I_9_Verification', // demo fix: the key getDashboardData makes from \"HR: I-9 Verification\""]
+  ]
+}

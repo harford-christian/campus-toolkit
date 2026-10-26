@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memo Check — staff email</title>
+<script src="logic.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<style>
+  :root { --red:#B22222; --ink:#222; --mute:#666; --line:#e4e4e4; --bg:#f7f6f3; --card:#fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 Inter,"Segoe UI",Arial,sans-serif; }
+  .wrap { display:grid; grid-template-columns:minmax(220px, 300px) 1fr; min-height:100vh; }
+  aside { border-right:1px solid var(--line); background:#fff; padding:14px 10px; }
+  aside h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:4px 8px 10px; }
+  .msg { display:block; width:100%; text-align:left; border:0; background:none; font:inherit; padding:10px; border-radius:10px; cursor:pointer; color:inherit; }
+  .msg:hover { background:#faf5f5; } .msg.on { background:#fde8e8; }
+  .msg b { display:block; font-size:13.5px; } .msg small { color:var(--mute); }
+  main { padding:18px 22px 40px; max-width:980px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+  .hdr { display:grid; grid-template-columns:70px 1fr; gap:2px 10px; font-size:13px; color:var(--mute); margin-bottom:12px; }
+  .hdr span:nth-child(even) { color:var(--ink); }
+  h1 { font-size:18px; margin:0 0 10px; }
+  .body { white-space:pre-wrap; font-size:14px; }
+  h3 { font-size:14px; margin:0 0 8px; color:var(--red); }
+  .note { color:var(--mute); font-size:12.5px; margin:0 0 10px; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td, th { text-align:left; padding:7px 8px; border-top:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mute); font-weight:600; border-top:0; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; background:#eee; color:#444; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; }
+  .pill.proposed { background:#fde8e8; color:var(--red); } .pill.approved { background:#fff3e0; color:#b26a00; }
+  .pill.applied { background:#e6f4ea; color:#2e7d32; } .pill.denied { background:#eee; color:#555; }
+  a.q { color:var(--red); cursor:pointer; text-decoration:underline; }
+  details { margin-top:10px; } summary { cursor:pointer; font-weight:600; font-size:13px; }
+  pre { white-space:pre-wrap; background:#faf7f2; border-left:3px solid var(--red); padding:10px 12px; font-size:12px; max-height:420px; overflow:auto; }
+  .empty { color:var(--mute); padding:40px 0; text-align:center; }
+  @media (max-width: 760px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside><h2>staff@example.edu · newest last</h2><div id="list"></div></aside>
+  <main id="view"><div class="empty">Pick an email.</div></main>
+</div>
+<script>
+  var L = window.MEMO_LOGIC, M = window.MEMO_DEMO;
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function nice(iso) { var d = new Date(iso); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+  function openQueue(id) { var src = 'queue.html?id=' + encodeURIComponent(id); if (window.parent !== window && window.parent.memoOpen) window.parent.memoOpen(src); else location.href = src; }
+  var msgs = M.messages(), calls = M.calls(), rows = M.rows();
+  var current = (location.hash || '').slice(1) || (msgs.length ? msgs[msgs.length - 1].id : '');
+
+  function renderList() {
+    document.getElementById('list').innerHTML = msgs.map(function (m) {
+      var n = rows.filter(function (r) { return r.MessageId === m.id; }).length;
+      return '<button class="msg' + (m.id === current ? ' on' : '') + '" data-id="' + esc(m.id) + '"><b>' + esc(m.subject) + '</b>' +
+        '<small>' + esc(m.from.replace(/\s*<.*/, '')) + ' · ' + esc(nice(m.date)) + ' · ' + n + ' finding' + (n === 1 ? '' : 's') + '</small></button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('.msg'), function (b) {
+      b.onclick = function () { current = b.getAttribute('data-id'); history.replaceState(null, '', '#' + current); render(); };
+    });
+  }
+
+  function renderView() {
+    var m = msgs.filter(function (x) { return x.id === current; })[0];
+    var v = document.getElementById('view');
+    if (!m) { v.innerHTML = '<div class="empty">Pick an email.</div>'; return; }
+    var call = calls[m.id], mine = rows.filter(function (r) { return r.MessageId === m.id; });
+    var H = '<div class="card"><h1>' + esc(m.subject) + '</h1><div class="hdr">' +
+      '<span>From</span><span>' + esc(m.from) + '</span><span>To</span><span>' + esc(m.to) + '</span>' +
+      '<span>Sent</span><span>' + esc(nice(m.date)) + '</span></div><div class="body">' + esc(m.body) + '</div></div>';
+    H += '<div class="card"><h3>What Memo Check made of it</h3>';
+    if (!call) H += '<p class="note">Not read yet: the hourly check has not run since this arrived.</p>';
+    else {
+      H += '<p class="note">Read by the hourly check at ' + esc(call.at) + '. Every row below is a queue row the app stored; a row marked ' +
+        '<b>duplicate</b> matched a proposal already in the queue, and an <b>info</b> row has nothing to click.</p>';
+      H += '<table><tr><th>Date</th><th>Proposal</th><th>Confidence</th><th>Status</th><th></th></tr>' + mine.map(function (r) {
+        return '<tr><td>' + esc(r.Date) + ' ' + esc(L._mcDow_(r.Date)) + '</td><td><b>' + esc(L.mcActionLabel_({ action: r.Action, action_params: r.ActionParams })) +
+          '</b><br><span style="color:#666">“' + esc(r.Quote) + '”</span></td><td>' + Math.round(Number(r.Confidence) * 100) + '%</td>' +
+          '<td><span class="pill ' + esc(r.Status) + '">' + esc(r.Status) + '</span></td>' +
+          '<td><a class="q" data-q="' + esc(r.Id) + '">open in queue</a></td></tr>';
+      }).join('') + '</table>';
+      H += '<details><summary>What Memo Check sent the model (' + esc(call.model) + ', effort ' + esc(call.effort) + ')</summary>' +
+        '<p class="note">Assembled by the app\'s own prompt builders from this email, the plan snapshot, the door inventory and the Rules tab. ' +
+        'The production prompt\'s campus rules are summarised in this public copy.</p>' +
+        '<pre>' + esc(call.system) + '</pre><pre>' + esc(call.user) + '</pre></details>';
+      H += '<details><summary>What came back</summary><p class="note">Canned in this demo: these are the structured findings, in the ' +
+        'production JSON schema, that the model returned. The app checked, filtered and deduplicated them before storing anything. ' +
+        esc(call.usage.input_tokens) + ' input tokens (' + esc(call.usage.cache_read_input_tokens) + ' from cache) · ' +
+        esc(call.usage.output_tokens) + ' output.</p><pre>' + esc(JSON.stringify(call.reply, null, 2)) + '</pre></details>';
+    }
+    v.innerHTML = H + '</div>';
+    Array.prototype.forEach.call(v.querySelectorAll('[data-q]'), function (a) { a.onclick = function () { openQueue(a.getAttribute('data-q')); }; });
+  }
+  function render() { renderList(); renderView(); }
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/memo-check/build-logic.mjs && node tools/build-demo.mjs demos/memo-check/build.json, then node demos/memo-check/verify.mjs. QueuePage.html is the queue web app's whole page; its one template token is the BOOT object doGet fills from mcQueueBootstrap_. Demo-only edits, both markup: logic.js (the vendored server) loads first in <head> so mock.js can run it, and BOOT comes from the same mcQueueBootstrap_ running in the browser instead of from doGet.",
+  "src": "../campus-control/memo-check/QueuePage.html",
+  "dst": "demos/memo-check/queue.html",
+  "demoName": "Memo Check",
+  "replace": [
+    ["<meta charset=\"utf-8\">", "<meta charset=\"utf-8\">\n<script src=\"logic.js\"></script>"],
+    ["var BOOT = <?!= boot ?>;", "var BOOT = MEMO_DEMO.boot(); // demo: doGet injects mcQueueBootstrap_'s output here"]
+  ]
+}

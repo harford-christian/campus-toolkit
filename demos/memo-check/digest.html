@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memo Check — digest email</title>
+<script src="logic.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<style>
+  :root { --red:#B22222; --ink:#222; --mute:#666; --line:#e4e4e4; --bg:#f7f6f3; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 Inter,"Segoe UI",Arial,sans-serif; }
+  .wrap { display:grid; grid-template-columns:minmax(220px, 320px) 1fr; min-height:100vh; }
+  aside { border-right:1px solid var(--line); background:#fff; padding:14px 10px; }
+  aside h2 { font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--mute); margin:4px 8px 10px; }
+  .mail { display:block; width:100%; text-align:left; border:0; background:none; font:inherit; padding:10px; border-radius:10px; cursor:pointer; color:inherit; }
+  .mail:hover { background:#faf5f5; } .mail.on { background:#fde8e8; }
+  .mail b { display:block; font-size:13px; } .mail small { color:var(--mute); }
+  main { padding:18px 22px 40px; }
+  .env { background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 20px; max-width:940px; }
+  .hdr { display:grid; grid-template-columns:70px 1fr; gap:2px 10px; font-size:13px; color:var(--mute); margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+  .hdr span:nth-child(even) { color:var(--ink); }
+  .empty { color:var(--mute); padding:40px 0; text-align:center; }
+  @media (max-width: 760px) { .wrap { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside><h2>Sent by Memo Check · newest first</h2><div id="list"></div></aside>
+  <main id="view"><div class="empty">Nothing sent yet.</div></main>
+</div>
+<script>
+  // Every email the app sent this visit, as MailApp received it: the digests from mcRenderDigest_, and any
+  // "approved but not yet applied" reminder from mcSendNudge_. The HTML is the app's own rendering.
+  var mails = window.MEMO_DEMO.outbox().reverse(), current = 0;
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function go(src) { if (window.parent !== window && window.parent.memoOpen) window.parent.memoOpen(src); else location.href = src; }
+  function render() {
+    document.getElementById('list').innerHTML = mails.map(function (m, i) {
+      return '<button class="mail' + (i === current ? ' on' : '') + '" data-i="' + i + '"><b>' + esc(m.subject) + '</b><small>' + esc(m.at) + ' · to ' + esc(m.to) + '</small></button>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('.mail'), function (b) { b.onclick = function () { current = +b.getAttribute('data-i'); render(); }; });
+    var m = mails[current], v = document.getElementById('view');
+    if (!m) { v.innerHTML = '<div class="empty">Nothing sent yet.</div>'; return; }
+    v.innerHTML = '<div class="env"><div class="hdr"><span>From</span><span>HCS Memo Check</span><span>To</span><span>' + esc(m.to) + '</span>' +
+      '<span>Sent</span><span>' + esc(m.at) + '</span><span>Subject</span><span><b>' + esc(m.subject) + '</b></span></div>' + m.html + '</div>';
+    // The digest links to Gmail, the queue and Eagle Eye; in the demo they open the matching view.
+    Array.prototype.forEach.call(v.querySelectorAll('a[href]'), function (a) {
+      var href = a.getAttribute('href');
+      a.onclick = function (e) {
+        e.preventDefault();
+        if (/mail\.google\.com/.test(href)) go('inbox.html#' + href.split('/').pop());
+        else if (/^queue\.html/.test(href)) go(href);
+        else window.open(href, '_blank', 'noopener');
+      };
+    });
+  }
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="logic.js"></script>
+<title>Memo Check — proposed changes</title>
+<style>
+  :root { --red:#B22222; --ink:#222; --mute:#666; --line:#e4e4e4; --bg:#f7f6f3; --ok:#2e7d32; --warn:#b26a00; --card:#fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 Inter,"Segoe UI",Arial,sans-serif; padding:0 16px 40px; }
+  header { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:16px 0 10px; }
+  header h1 { font-size:20px; margin:0; color:var(--red); }
+  header .who { color:var(--mute); font-size:13px; margin-left:auto; }
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 14px; }
+  .tab { border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .tab.on { background:var(--red); color:#fff; border-color:var(--red); }
+  .tab .n { opacity:.75; margin-left:4px; }
+  .day { margin:18px 0 6px; font-weight:600; color:var(--mute); font-size:13px; letter-spacing:.02em; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+  .card.focus { outline:3px solid #f2b8b8; }
+  .top { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:baseline; }
+  .act { font-weight:700; font-size:15px; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; background:#eee; color:#444; text-transform:uppercase; letter-spacing:.04em; }
+  .pill.proposed { background:#fde8e8; color:var(--red); } .pill.approved { background:#fff3e0; color:var(--warn); }
+  .pill.applied { background:#e6f4ea; color:var(--ok); } .pill.denied { background:#eee; color:#555; } .pill.duplicate,.pill.info { background:#f0f0f0; color:#777; }
+  .conf { color:var(--mute); font-size:12px; margin-left:auto; }
+  .quote { margin:8px 0 4px; font-style:italic; }
+  .why { color:#444; } .plan { color:var(--mute); font-size:13px; margin-top:6px; }
+  .steps { margin-top:8px; padding:8px 10px; background:#faf7f2; border-left:3px solid var(--red); font-size:13px; }
+  .steps b { color:var(--red); }
+  .meta { color:#888; font-size:12px; margin-top:8px; }
+  .meta a { color:#888; }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  button { font:inherit; border-radius:8px; padding:7px 12px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button.primary { background:var(--red); color:#fff; border-color:var(--red); }
+  button.ghost { background:transparent; }
+  button:disabled { opacity:.5; cursor:default; }
+  .form { margin-top:10px; padding:10px; border:1px dashed var(--line); border-radius:8px; display:grid; gap:8px; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); }
+  .form label { font-size:12px; color:var(--mute); display:block; }
+  .form input,.form select,.form textarea { width:100%; font:inherit; padding:6px 8px; border:1px solid #ccc; border-radius:6px; }
+  .form .full { grid-column:1/-1; }
+  .doors { display:flex; flex-wrap:wrap; gap:6px 12px; } .doors label { display:inline-flex; gap:4px; align-items:center; font-size:13px; color:var(--ink); }
+  .msg { font-size:13px; margin-top:6px; } .msg.err { color:var(--red); } .msg.ok { color:var(--ok); }
+  .empty { color:var(--mute); padding:30px 0; text-align:center; }
+  .note { font-size:12px; color:#777; margin-top:6px; white-space:pre-wrap; }
+  .foot { color:#888; font-size:12px; margin-top:28px; }
+  .setup { border-style:solid; border-color:#f2c7c7; background:#fffafa; }
+  .setup-head { font-weight:600; color:var(--red); }
+  .window { padding:8px 10px; border-radius:6px; background:#e6f4ea; color:#1e5e24; }
+  .window.bad { background:#fde8e8; color:var(--red); }
+</style>
+<!-- ===== Showcase demo shim (standalone build) ===== -->
+<link rel="stylesheet" href="../../assets/demo-banner.css">
+<script>window.DEMO_META = { name: "Memo Check" };</script>
+<script src="../../assets/gsr-shim.js"></script>
+<script src="data.js"></script>
+<script src="mock.js"></script>
+<script src="../../assets/demo-banner.js" defer></script>
+</head>
+<body>
+<header>
+  <h1>Memo Check — proposed changes</h1>
+  <a id="eagle" href="#" target="_blank" rel="noopener" style="color:var(--red);font-size:13px">Open Eagle Eye ↗</a>
+  <span class="who" id="who"></span>
+</header>
+<div class="tabs" id="tabs"></div>
+<div id="list"></div>
+<p class="foot">Memo Check never changes Campus Control. <b>Set up &amp; approve</b> lets you adjust the event (title, times, how early the doors open, which groups) before it records your decision and takes you to Eagle Eye to make the clicks; the row marks itself <b>applied</b> once the plan shows the change (checked hourly). <b>Deny</b> with a reason and the same proposal will not be raised again. An approved row can be re-edited with <b>Edit setup</b> until it is applied.</p>
+
+<script>
+var BOOT = MEMO_DEMO.boot(); // demo: doGet injects mcQueueBootstrap_'s output here
+var TABS = [
+  { key:'proposed',  label:'Proposed' },
+  { key:'approved',  label:'Awaiting apply' },
+  { key:'applied',   label:'Applied' },
+  { key:'denied',    label:'Denied' },
+  { key:'other',     label:'Duplicates & info' }
+];
+var state = { tab: 'proposed', rows: BOOT.rows.slice(), open: {} };
+document.getElementById('eagle').href = BOOT.eagleEyeUrl;
+document.getElementById('who').textContent = (BOOT.user || 'not signed in') + (BOOT.canDecide ? ' · schedule editor' : ' · view only');
+if (BOOT.focusId) { var fr = state.rows.filter(function(r){ return r.id === BOOT.focusId; })[0]; if (fr) state.tab = tabOf(fr); }
+
+function tabOf(r) { return (r.status === 'proposed' || r.status === 'approved' || r.status === 'applied' || r.status === 'denied') ? r.status : 'other'; }
+function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
+
+function renderTabs() {
+  var t = document.getElementById('tabs'); t.innerHTML = '';
+  TABS.forEach(function(tb) {
+    var n = state.rows.filter(function(r){ return tabOf(r) === tb.key; }).length;
+    var b = el('<div class="tab' + (state.tab === tb.key ? ' on' : '') + '">' + esc(tb.label) + '<span class="n">' + n + '</span></div>');
+    b.onclick = function(){ state.tab = tb.key; render(); };
+    t.appendChild(b);
+  });
+}
+
+function stepsFor(r) {
+  var p = r.params || {}, g = (r.groups || []).join(', ');
+  switch (r.action) {
+    case 'bells_ring_as': return 'Eagle Eye → <b>Status</b> → click <b>' + esc(r.dow + ' ' + r.date) + '</b> → <b>Adjust this day</b> → Bells ring as: <b>' + (p.ringAs === 'Thu' ? 'Thursday grid' : 'Mon/Tue/Wed/Fri grid') + '</b> → reason → Save.';
+    case 'closure': return 'Eagle Eye → <b>Status</b> → click <b>' + esc(r.dow + ' ' + r.date) + '</b> → <b>Adjust this day</b> → Doors: <b>Weekend_Holiday</b> → reason → Save. (Bells follow: NO_Bells.)';
+    case 'early_release': return 'Eagle Eye → <b>Status</b> → click <b>' + esc(r.dow + ' ' + r.date) + '</b> → <b>Adjust this day</b> → Doors: <b>' + esc(p.hours) + 'HR Release</b> → reason → Save.';
+    case 'delay': return 'Eagle Eye → <b>Status</b> → click <b>' + esc(r.dow + ' ' + r.date) + '</b> → <b>Adjust this day</b> → Doors: <b>' + esc(p.hours) + 'HR Delay</b> → reason → Save.';
+    case 'no_bells': return 'Eagle Eye → <b>Schedule Event</b> → Staff Events, all-day <b>' + esc(r.date) + '</b> → Bell Schedule: <b>NO_Bells</b> (leave Door Schedule blank) → Create.';
+    case 'exam_custom_span': return 'Eagle Eye → <b>Schedule Event</b> → Staff Events, all-day <b>' + esc(r.date) + (r.endDate && r.endDate !== r.date ? ' → ' + esc(r.endDate) : '') + '</b> → Bell Schedule: <b>Exam</b> → Create. Then build the Custom grid from the attached exam schedule (bell seeder).';
+    case 'door_unlock':
+      var evS = p.eventStart || p.start, evE = p.eventEnd || p.end;
+      var named = (p.doors || []).filter(function(d){ return BOOT.doorGroups.indexOf(d) < 0; });
+      return 'Eagle Eye → <b>Schedule Event</b> → Calendar: <b>Staff Events</b>' +
+        ' → Title: <b>' + esc(p.title || '(event name)') + '</b>' + (p.location ? ' → Location: <b>' + esc(p.location) + '</b>' : '') +
+        ' → Date <b>' + esc(r.date) + '</b>, time <b>' + esc(evS) + '–' + esc(evE) + '</b>' +
+        ' → tick <b>Unlock doors</b> → Doors: <b>' + esc(g || '?') + '</b> → Unlock <b>' + esc(p.start) + '</b> → Lock <b>' + esc(p.end) + '</b> → Create.' +
+        (named.length ? '<br><span style="color:#777">The memo rule named ' + esc(named.join(', ')) + '; Eagle Eye unlocks by group, so the whole <b>' + esc(g) + '</b> group opens.</span>' : '');
+    default: return esc(r.steps || '');
+  }
+}
+
+function card(r) {
+  var c = el('<div class="card' + (r.id === BOOT.focusId ? ' focus' : '') + '" id="row-' + esc(r.id) + '"></div>');
+  var conf = r.confidence === '' ? '' : Math.round(Number(r.confidence) * 100) + '%';
+  c.innerHTML =
+    '<div class="top"><span class="act">' + esc(r.actionLabel) + '</span><span class="pill ' + esc(r.status) + '">' + esc(r.status) + '</span>' +
+    (r.endDate && r.endDate !== r.date ? '<span style="color:#666">' + esc(r.date) + ' → ' + esc(r.endDate) + '</span>' : '') +
+    (conf ? '<span class="conf">confidence ' + conf + '</span>' : '') + '</div>' +
+    '<div class="quote">“' + esc(r.quote) + '”</div>' +
+    '<div class="why">' + esc(r.interpretation) + '</div>' +
+    (r.planNow ? '<div class="plan">Plan now: ' + esc(r.planNow) + '</div>' : '') +
+    (r.action && r.action !== 'none' ? '<div class="steps">' + stepsFor(r) + '</div>' : '') +
+    '<div class="meta">' + esc(r.from) + ' · ' + esc(r.emailDate) + ' · “' + esc(r.subject) + '”' + (r.permalink ? ' · <a href="' + esc(r.permalink) + '" target="_blank" rel="noopener">open email</a>' : '') + ' · id ' + esc(r.id) +
+    (r.decidedBy ? '<br>' + esc(r.status) + ' by ' + esc(r.decidedBy) + ' · ' + esc(r.decidedAt) : '') + '</div>' +
+    (r.note ? '<div class="note">' + esc(r.note) + '</div>' : '');
+  if (BOOT.canDecide && r.action && r.action !== 'none' && r.status !== 'duplicate' && r.status !== 'info') c.appendChild(buttons(r));
+  return c;
+}
+
+function buttons(r) {
+  var b = el('<div class="btns"></div>');
+  function btn(label, cls, fn) { var x = el('<button class="' + cls + '">' + esc(label) + '</button>'); x.onclick = fn; b.appendChild(x); return x; }
+  if (r.status === 'proposed' || r.status === 'denied') btn('Set up & approve…', 'primary', function(){ setupForm(r, b); });
+  if (r.status === 'approved') {
+    btn('Open Eagle Eye ↗', 'primary', function(){ window.open(BOOT.eagleEyeUrl, '_blank'); });
+    btn('Edit setup…', '', function(){ setupForm(r, b); });
+  }
+  if (r.status !== 'applied' && r.status !== 'denied') btn('Deny…', '', function(){ denyForm(r, b); });
+  if (r.status === 'approved' || r.status === 'denied') btn('Reopen', 'ghost', function(){ decide(r, 'reopen', '', b); });
+  return b;
+}
+
+// ---- time helpers (HH:MM, same day) ----
+function toMin(s) { var m = String(s || '').match(/^(\d{1,2}):(\d{2})$/); return m ? (+m[1]) * 60 + (+m[2]) : NaN; }
+function fromMin(n) { if (isNaN(n)) return ''; n = Math.max(0, Math.min(23 * 60 + 59, n)); return ('0' + Math.floor(n / 60)).slice(-2) + ':' + ('0' + (n % 60)).slice(-2); }
+function nice(s) { var n = toMin(s); if (isNaN(n)) return s || '?'; var h = Math.floor(n / 60), m = n % 60; return ((h + 11) % 12 + 1) + ':' + ('0' + m).slice(-2) + (h < 12 ? ' AM' : ' PM'); }
+function guessTitle(r) {
+  var q = String(r.quote || '').replace(/\s+/g, ' ').trim();
+  q = q.split(/\s+(?:at|beginning|from|on)\s+\d/i)[0].replace(/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)[:\s–-]+/i, '').replace(/[.:;,\s]+$/, '');
+  return q.length > 60 ? q.slice(0, 57) + '…' : q;
+}
+
+// "Set up & approve": everything Eagle Eye will ask for, pre-filled from the recommendation and editable.
+function setupForm(r, host) {
+  closeForms(host);
+  var p = r.params || {}, a = r.action;
+  var f = el('<div class="form setup"></div>');
+  var H = '<div class="full setup-head">Set up this change — adjust anything, then save and continue to Eagle Eye.</div>';
+  H += '<div><label>Date</label><input name="date" type="date" value="' + esc(r.date) + '"></div>';
+  if (a === 'exam_custom_span' || (r.endDate && r.endDate !== r.date)) H += '<div><label>End date</label><input name="endDate" type="date" value="' + esc(r.endDate || r.date) + '"></div>';
+
+  if (a === 'door_unlock') {
+    var evS = p.eventStart, evE = p.eventEnd, lead, lag;
+    if (evS && evE) { lead = toMin(evS) - toMin(p.start); lag = toMin(p.end) - toMin(evE); }
+    else {                                                   // the model only gave an unlock window: assume a 30/30 lead/lag around it
+      lead = 30; lag = 30; evS = fromMin(toMin(p.start) + 30); evE = fromMin(toMin(p.end) - 30);
+      if (!(toMin(evE) > toMin(evS))) { evS = p.start; evE = p.end; lead = 0; lag = 0; }
+    }
+    H += '<div class="full"><label>Event title (as it will appear on the Staff Events calendar)</label><input name="title" value="' + esc(p.title || guessTitle(r)) + '"></div>';
+    H += '<div class="full"><label>Location (optional)</label><input name="location" value="' + esc(p.location || '') + '"></div>';
+    H += '<div><label>Event starts</label><input name="eventStart" type="time" step="300" value="' + esc(evS) + '"></div>';
+    H += '<div><label>Event ends</label><input name="eventEnd" type="time" step="300" value="' + esc(evE) + '"></div>';
+    H += '<div><label>Unlock how long before (min)</label><input name="lead" type="number" min="0" max="240" step="5" value="' + lead + '"></div>';
+    H += '<div><label>Stay open how long after (min)</label><input name="lag" type="number" min="0" max="240" step="5" value="' + lag + '"></div>';
+    H += '<div class="full window" data-win></div>';
+    H += '<div class="full"><label>Door groups (Eagle Eye unlocks whole groups)</label><div class="doors">';
+    var pre = BOOT.doorGroups.filter(function(g){ return (r.groups || []).indexOf(g) >= 0 || (p.doors || []).indexOf(g) >= 0; });
+    BOOT.doorGroups.forEach(function(g) {
+      H += '<label title="' + esc(BOOT.doors[g].join(', ')) + '"><input type="checkbox" name="group" value="' + esc(g) + '"' + (pre.indexOf(g) >= 0 ? ' checked' : '') + '><b>' + esc(g) + '</b> <span style="color:#888">(' + esc(BOOT.doors[g].join(', ')) + ')</span></label>';
+    });
+    H += '</div></div>';
+  }
+  if (a === 'bells_ring_as') H += '<div><label>Bells ring as</label><select name="ringAs"><option value="Thu"' + (p.ringAs === 'Thu' ? ' selected' : '') + '>Thursday grid</option><option value="Wed"' + (p.ringAs === 'Wed' ? ' selected' : '') + '>Mon/Tue/Wed/Fri grid</option></select></div>';
+  if (a === 'early_release' || a === 'delay') H += '<div><label>Hours</label><select name="hours"><option value="2"' + (String(p.hours) === '2' ? ' selected' : '') + '>2</option><option value="3"' + (String(p.hours) === '3' ? ' selected' : '') + '>3</option></select></div>';
+  if (a === 'pa_dismissal') H += '<div><label>Time</label><input name="time" type="time" value="' + esc(p.time || '') + '"></div>';
+  H += '<div class="full"><label>Note for the queue (optional)</label><input name="note"></div>';
+  H += '<div class="full btns"><button class="primary" data-save>Save &amp; continue to Eagle Eye ↗</button><button data-saveonly>Save only</button><button class="ghost" data-cancel>Cancel</button></div>';
+  f.innerHTML = H;
+  var q = function(n){ var x = f.querySelector('[name="' + n + '"]'); return x ? String(x.value).trim() : ''; };
+
+  // Live unlock-window readout for door unlocks.
+  function windowCalc() {
+    var s = toMin(q('eventStart')) - (+q('lead') || 0), e = toMin(q('eventEnd')) + (+q('lag') || 0);
+    return { start: fromMin(s), end: fromMin(e), ok: !isNaN(s) && !isNaN(e) && e > s && s >= 0 && e <= 23 * 60 + 59 && toMin(q('eventEnd')) > toMin(q('eventStart')) };
+  }
+  function refresh() {
+    var w = f.querySelector('[data-win]'); if (!w) return;
+    var c = windowCalc();
+    w.className = 'full window' + (c.ok ? '' : ' bad');
+    w.innerHTML = c.ok ? 'Doors unlock <b>' + nice(c.start) + '</b> and lock <b>' + nice(c.end) + '</b> on ' + esc(q('date')) + '.'
+                       : 'Check the times — the event must end after it starts, and the unlock window must stay within the same day.';
+  }
+  Array.prototype.forEach.call(f.querySelectorAll('input,select'), function(x){ x.addEventListener('input', refresh); });
+  refresh();
+
+  function collect() {
+    var params = {};
+    if (a === 'door_unlock') {
+      var c = windowCalc();
+      if (!c.ok) return { err: 'Check the event times and lead/lag.' };
+      params = { title: q('title'), location: q('location'), eventStart: q('eventStart'), eventEnd: q('eventEnd'), start: c.start, end: c.end,
+                 doors: Array.prototype.map.call(f.querySelectorAll('[name="group"]:checked'), function(x){ return x.value; }) };
+      if (!params.doors.length) return { err: 'Pick at least one door group.' };
+      if (!params.title) return { err: 'Give the event a title.' };
+    }
+    if (a === 'bells_ring_as') params.ringAs = q('ringAs');
+    if (a === 'early_release' || a === 'delay') params.hours = q('hours');
+    if (a === 'pa_dismissal') params.time = q('time');
+    return { params: params, date: q('date'), endDate: q('endDate') || q('date'), note: q('note') };
+  }
+  function save(openEE) {
+    var c = collect();
+    if (c.err) { msg(host, c.err, true); return; }
+    decide(r, 'approve', c.note, host, c.params, c.date, c.endDate, openEE);
+  }
+  f.querySelector('[data-save]').onclick = function(){ save(true); };
+  f.querySelector('[data-saveonly]').onclick = function(){ save(false); };
+  f.querySelector('[data-cancel]').onclick = function(){ f.remove(); };
+  host.parentNode.insertBefore(f, host.nextSibling);
+}
+
+function denyForm(r, host) {
+  closeForms(host);
+  var f = el('<div class="form"><div class="full"><label>Reason (required — the same proposal will not be raised again)</label><textarea rows="2"></textarea></div><div class="full btns"><button class="primary">Deny</button><button class="ghost">Cancel</button></div></div>');
+  var ta = f.querySelector('textarea'), bs = f.querySelectorAll('button');
+  bs[0].onclick = function(){ if (!ta.value.trim()) { msg(host, 'A reason is required.', true); return; } decide(r, 'deny', ta.value.trim(), host); };
+  bs[1].onclick = function(){ f.remove(); };
+  host.parentNode.insertBefore(f, host.nextSibling); ta.focus();
+}
+
+function closeForms(host) { var p = host.parentNode; Array.prototype.forEach.call(p.querySelectorAll('.form'), function(x){ x.remove(); }); }
+function msg(host, text, isErr) {
+  var p = host.parentNode, old = p.querySelector('.msg'); if (old) old.remove();
+  p.appendChild(el('<div class="msg ' + (isErr ? 'err' : 'ok') + '">' + esc(text) + '</div>'));
+}
+
+function decide(r, decision, note, host, params, date, endDate, openEE) {
+  // Open the Eagle Eye tab NOW (inside the click) — browsers block tabs opened after an async round-trip.
+  var w = openEE ? window.open('', '_blank') : null;
+  if (w) { try { w.document.write('<p style="font:14px sans-serif;padding:20px">Saving your setup, then opening Eagle Eye…</p>'); } catch (x) {} }
+  Array.prototype.forEach.call(host.parentNode.querySelectorAll('button'), function(b){ b.disabled = true; });
+  msg(host, 'Saving…', false);
+  function fail(text) {
+    if (w) try { w.close(); } catch (x) {}
+    msg(host, text, true);
+    Array.prototype.forEach.call(host.parentNode.querySelectorAll('button'), function(b){ b.disabled = false; });
+  }
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (res.token) BOOT.token = res.token;
+      if (!res.ok) { fail(res.error || 'Failed'); return; }
+      var i = state.rows.findIndex(function(x){ return x.id === r.id; });
+      if (i >= 0) state.rows[i] = res.row;
+      if (w) { try { w.location.href = BOOT.eagleEyeUrl; } catch (x) { window.open(BOOT.eagleEyeUrl, '_blank'); } }
+      if (decision === 'approve') state.tab = 'approved';
+      BOOT.focusId = res.row.id;
+      render();
+      var c = document.getElementById('row-' + res.row.id); if (c) c.scrollIntoView({ block: 'center' });
+    })
+    .withFailureHandler(function(e) { fail('Error: ' + (e && e.message ? e.message : e)); })
+    .mcQueueDecide({ id: r.id, decision: decision, note: note || '', params: params || {}, date: date || r.date, endDate: endDate || r.endDate || r.date, token: BOOT.token });
+}
+
+function render() {
+  renderTabs();
+  var list = document.getElementById('list'); list.innerHTML = '';
+  var rows = state.rows.filter(function(r){ return tabOf(r) === state.tab; });
+  if (!rows.length) { list.appendChild(el('<div class="empty">Nothing here.</div>')); return; }
+  var lastDay = '';
+  rows.forEach(function(r) {
+    var dayKey = r.date + ' ' + r.dow;
+    if (dayKey !== lastDay) { list.appendChild(el('<div class="day">' + esc(r.dow) + ' ' + esc(r.date) + (r.date < BOOT.today ? ' · past' : '') + '</div>')); lastDay = dayKey; }
+    list.appendChild(card(r));
+  });
+}
+render();
+if (BOOT.focusId) { var fc = document.getElementById('row-' + BOOT.focusId); if (fc) fc.scrollIntoView({ block: 'center' }); }
+</script>
+</body>
+</html>
