@@ -106,6 +106,8 @@
     if (d) who.value = d.user();
   }
   frame.addEventListener('load', refreshTools);
+  // A decision in the queue does not reload the frame, so keep the approved count current.
+  setInterval(function () { if (tools.classList.contains('show')) refreshTools(); }, 1000);
   who.addEventListener('change', function () { var d = demo(); if (d) d.setUser(who.value); frame.src = frame.src; });
   document.getElementById('clicks').addEventListener('click', function () {
     var d = demo(); if (!d) return;
