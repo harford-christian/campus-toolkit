@@ -397,7 +397,47 @@ var Sched = (function () {
     return rec;
   }
 
+  /**
+   * A grade cell as a number: PK/K4 = -1, K/K5 = 0, 1..12. Tolerates "06", "Grade 6", "6th". null = unreadable.
+   * The grade gate (Auth.gs) and the elementary view (Code.gs) both read the grade through this, so the two can
+   * never disagree about what grade a student is in.
+   */
+  function gradeNumber(grade) {
+    var s = String(grade == null ? '' : grade).trim().toUpperCase();
+    if (!s) return null;
+    if (/^(PK|PRE-?K|K4)$/.test(s)) return -1;
+    if (/^(K|K5|KG|KINDERGARTEN)$/.test(s)) return 0;
+    var m = /^(?:GRADE\s*)?0*(\d{1,2})(?:ST|ND|RD|TH)?$/.exec(s);
+    if (!m) return null;
+    var n = Number(m[1]);
+    return n >= 1 && n <= 12 ? n : null;
+  }
+
+  /**
+   * "6-12", "6,7,8", "K4-12", "K-5,9-12" → the set of allowed grade numbers, or null when ANY part is unreadable
+   * (the caller then falls back to its default rather than guessing what a half-readable list meant).
+   */
+  function parseGradeSpec(spec) {
+    var parts = String(spec || '').split(',').map(function (p) { return p.trim(); }).filter(function (p) { return p; });
+    if (!parts.length) return null;
+    var out = {};
+    for (var i = 0; i < parts.length; i++) {
+      var r = /^([A-Za-z0-9]+)\s*-\s*([A-Za-z0-9]+)$/.exec(parts[i]);
+      var lo = gradeNumber(r ? r[1] : parts[i]), hi = r ? gradeNumber(r[2]) : lo;
+      if (lo === null || hi === null || lo > hi) return null;
+      for (var g = lo; g <= hi; g++) out[g] = true;
+    }
+    return out;
+  }
+
+  /** Is this grade cell inside the spec? An unreadable grade is never allowed. */
+  function gradeAllowed(grade, spec) {
+    var set = parseGradeSpec(spec), n = gradeNumber(grade);
+    return !!set && n !== null && !!set[n];
+  }
+
   return {
+    gradeNumber: gradeNumber, parseGradeSpec: parseGradeSpec, gradeAllowed: gradeAllowed,
     cellToString: cellToString, tabByName: tabByName, headerMap: headerMap, attendanceRecord: attendanceRecord,
     timeToMin: timeToMin, timeLabel: timeLabel, timeShort: timeShort,
     buildPeriodTimes: buildPeriodTimes, isHomeroomClass: isHomeroomClass,
@@ -1814,6 +1854,9 @@ var News = (function () {
  * FACTS assignment records carry no term, so an assignment's quarter is decided by its due date (else its assigned
  * date) against QUARTER_DATES. One due on the last day of a quarter but graded into the next can sit under the
  * neighbouring heading.
+ *
+ * Also here: scoreView / gradedCount — how one grade row is shown (status words, never a status letter as a score) and
+ * the "X of Y graded · N missing" count. Computed on the server and shipped as `view` on every grade object.
  */
 var GradeView = (function () {
   'use strict';
@@ -1921,7 +1964,72 @@ var GradeView = (function () {
       classes: classes, views: views };
   }
 
-  return { build: build, quarterOf: quarterOf, started: started, meets: meets, TRANSITION_CAP_DAYS: TRANSITION_CAP_DAYS };
+  /* ---------------------------------------------------------------- one grade row → what the page shows ----
+     FACTS grade Status codes as the sync stores them (the Grades tab). Counted live 2026-10-29 over the whole school
+     (69,937 rows; parent-portal probe 3 + Josh's read-only query): 86 Valid 68,777 · 69 Excused 652 · 77 Missing 231 ·
+     65 Absent 196 · 80 Pending 66 · 73 Incomplete 24 — no other code, no blank. 68 Dropped: none seen yet. Every status
+     row's Earned is exactly 0. A status row's Display Grade is a STATUS LETTER, and an unreliable
+     one (54 Pending rows show "A", 126 Excused show "C"), so the CODE decides and the letter is never printed as a score:
+     the page used to show an absent student "A / 10". Labels, colours and the count rule are Josh's (2026-10-29):
+     Missing red; Absent, Excused, Dropped grey; Pending, Incomplete amber; "3 of 5 graded · 1 missing", where Missing
+     and Pending are not graded and Excused and Dropped are not in the total. */
+  var VALID = 86;
+  var STATUS = {
+    65: { label: 'Absent', tone: 'grey', count: 'open' },
+    68: { label: 'Dropped', tone: 'grey', count: 'out' },
+    69: { label: 'Excused', tone: 'grey', count: 'out' },
+    73: { label: 'Incomplete', tone: 'amber', count: 'open' },
+    77: { label: 'Missing', tone: 'red', count: 'missing' },
+    80: { label: 'Pending', tone: 'amber', count: 'pending' }
+  };
+
+  /**
+   * @param {?{display:string, status:(string|number), earned:string}} g  null = no grade row (nothing entered yet)
+   * @return {{score:string, pill:?{label:string, tone:string}, graded:boolean, count:string}}
+   *   score: what goes in the score slot ('' = none); pill: the status word; graded: counts as graded;
+   *   count: 'graded' | 'none' (no row) | 'open' | 'missing' | 'pending' | 'out' (not in the total)
+   */
+  function scoreView(g) {
+    if (!g) return { score: '', pill: null, graded: false, count: 'none' };
+    var code = Number(String(g.status == null ? '' : g.status).trim()) || 0;
+    var earned = String(g.earned == null ? '' : g.earned).trim();
+    var display = String(g.display == null ? '' : g.display).trim();
+    if (!code || code === VALID) {
+      // A normal grade shows its POINTS (0 is a real zero here; live range 0–994). Display is blank on 68,744 of the 68,777
+      // live Valid rows; the other 33 say "HP" WITH points 11–31 (meaning unknown — ask the registrar), so a display
+      // value sits beside the points as a tag, never instead of them. No points + a display value (a letter-graded
+      // assignment, none seen yet) shows the display. A blank status is a row written before the code was stored.
+      var s = earned !== '' ? earned : display;
+      var tag = display && earned !== '' ? { label: display, tone: 'grey' } : null;
+      return { score: s, pill: tag, graded: !!s, count: s ? 'graded' : 'none' };
+    }
+    /* On a STATUS row FACTS stores 0 points as a placeholder: all 1,175 status rows on 2026-10-29 held exactly 0 (min = max
+       = 0; Josh's read-only query of the Grades tab). Shown, it would read "0 / 10 · Excused" — a zero grade on excused
+       work. So a status row's 0 is no score: the word alone. Points above 0 (none seen yet) are shown with the word. */
+    var pts = earned !== '' && Number(earned) !== 0 ? earned : '';
+    var st = STATUS[code];
+    if (!st) {
+      // A code never seen before: still never print its letter as if it were a score.
+      return { score: pts, pill: { label: display || 'See teacher', tone: 'grey' }, graded: false, count: 'open' };
+    }
+    var graded = st.count === 'open' && pts !== '';
+    return { score: pts, pill: { label: st.label, tone: st.tone }, graded: graded, count: graded ? 'graded' : st.count };
+  }
+
+  /** {graded, total, missing} for a list of scoreViews — the "3 of 5 graded · 1 missing" line. */
+  function gradedCount(views) {
+    var c = { graded: 0, total: 0, missing: 0 };
+    (views || []).forEach(function (v) {
+      if (!v || v.count === 'out') return;
+      c.total++;
+      if (v.graded) c.graded++;
+      if (v.count === 'missing') c.missing++;
+    });
+    return c;
+  }
+
+  return { build: build, quarterOf: quarterOf, started: started, meets: meets, TRANSITION_CAP_DAYS: TRANSITION_CAP_DAYS,
+    scoreView: scoreView, gradedCount: gradedCount, STATUS: STATUS, VALID: VALID };
 })();
 
 // Node only (GAS has no `module`): lets tools/test.mjs import the same file.
@@ -1955,7 +2063,7 @@ function doGet(e) {
   var boot = {
     appName: APP_NAME, appVersion: APP_VERSION,
     email: who.email, fullName: who.fullName, isAdmin: who.isAdmin, viewingAs: who.viewingAs, asId: who.viewingAs || '',
-    ou: who.ou, factsId: who.factsId, denyReason: who.denyReason, lookupError: who.lookupError,
+    ou: who.ou, factsId: who.factsId, denyReason: who.denyReason, denyKind: who.denyKind || '', lookupError: who.lookupError,
     ok: !!who.studentId, switchUrl: withAccountChooser_(appUrl_()), sim: sim,
     serverTime: Utilities.formatDate(new Date(), TIMEZONE, 'EEE MMM d, yyyy h:mm a z')
   };
@@ -2186,6 +2294,15 @@ function RUN_newsCheck() {
   News.build(Object.assign({ grade: '4', elementary: true }, base)).forEach(function (it) { Logger.log('   [%s] %s — %s%s', it.kind, it.title, it.body, it.isToday ? '  (TODAY)' : ''); });
 }
 
+/** A Grades-tab row as the page gets it on a homework item: the raw fields plus `view` (GradeView.scoreView — the status
+    word, never a status letter printed as a score). null = no grade row. */
+function gradeObj_(g) {
+  if (!g) return null;
+  var o = { display: g['Display Grade'], status: g['Status'], earned: g['Earned'], max: g['Max'] };
+  o.view = GradeView.scoreView(o);
+  return o;
+}
+
 /**
  * Re-attach this student's scores to a (possibly cached) homework list, every request.
  * The boot payload is cached up to 6 h against the homework/assignment fingerprint, which does NOT move when a
@@ -2200,7 +2317,7 @@ function restampGrades_(hw, studentId) {
   hw.items.forEach(function (it) {
     if (!it.assignmentId) return;
     var g = mine[it.assignmentId];
-    it.grade = g ? { display: g['Display Grade'], status: g['Status'], earned: g['Earned'], max: g['Max'] } : null;
+    it.grade = gradeObj_(g);
   });
 }
 
@@ -2231,7 +2348,11 @@ function buildBootPayload_(who, ctx) {
   var academic = classes.filter(function (c) { return !c.activity; });
   var periodTimes = Sched.buildPeriodTimes(tabs);
   var hasPeriods = academic.some(function (c) { return c.pattern; });
-  var elementary = !hasPeriods || /^(K4|K5|K|PK|[1-6])$/i.test(String(profile.grade || '').trim());
+  /* 6th grade STAYS on the elementary view (Josh, 2026-10-28): chapel with EL and not on the HS bells, so the HS-slot
+     Schedule tab and the HS chapel/bells lines would be wrong for them. Read through Sched.gradeNumber so "06" or
+     "Grade 6" cannot slip a 6th grader into the HS view now that the grade gate admits them. */
+  var gradeN = Sched.gradeNumber(profile.grade);
+  var elementary = !hasPeriods || (gradeN !== null && gradeN <= 6);
 
   var classList = classListFor_(tabs, sid, classes);
   var byId = {}; classList.forEach(function (c) { byId[c.classId] = c; });
@@ -2401,7 +2522,7 @@ function homeworkPayload_(who, classList, todayIso, data) {
     return { key: it.key, classId: it.classId, className: c.name || '', short: c.short || '', color: c.color || '#4b5563', teacher: c.teacher || '',
       source: it.source, assignmentId: it.assignmentId || '', title: it.title, detail: it.detail, assignedOn: it.assignedOn, lastSeenOn: it.lastSeenOn, dueOn: it.dueOn,
       dueSource: it.dueSource, anchor: it.anchor, points: it.points, timesTyped: it.timesTyped, dateConflict: it.dateConflict || null,
-      grade: g ? { display: g['Display Grade'], status: g['Status'], earned: g['Earned'], max: g['Max'] } : null };
+      grade: gradeObj_(g) };
   });
   // NOTE: `data` is deliberately NOT returned. It is the whole school's gradebook; returning it once shipped
   // every student's scores to every student's browser. Callers that need it pass it in.
@@ -2625,14 +2746,20 @@ function gradesPayload_(who, classList, data, todayIso) {
     var g = mine[a['Assignment ID']];
     return { classId: String(a['Class ID']), id: a['Assignment ID'], title: a['Title'] || a['Description'] || 'Assignment', description: a['Description'],
       dateDue: a['Date Due'], dateAssigned: a['Date Assigned'], maxPoints: a['Max Points'],
-      display: g ? g['Display Grade'] : '', status: g ? g['Status'] : '', earned: g ? g['Earned'] : '', max: g ? (g['Max'] || a['Max Points']) : a['Max Points'] };
+      display: g ? g['Display Grade'] : '', status: g ? g['Status'] : '', earned: g ? g['Earned'] : '', max: g ? (g['Max'] || a['Max Points']) : a['Max Points'],
+      view: GradeView.scoreView(g ? { display: g['Display Grade'], status: g['Status'], earned: g['Earned'] } : null) };
   });
   var view = GradeView.build({
     today: todayIso || Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd'),
     ranges: Sched.parseQuarterRanges(getQuarterDatesRaw_()),
     classes: classes, assignments: assignments, averages: averages, showAvg: showAvg
   });
-  view.classes.forEach(function (c) { delete c.quarters; });   // the page needs `meets`, not the raw schedule cell
+  view.classes.forEach(function (c) {
+    delete c.quarters;   // the page needs `meets`, not the raw schedule cell
+    // "3 of 5 graded · 1 missing" per quarter list, by the one rule (GradeView.gradedCount) — the page only formats it.
+    c.counts = {};
+    Object.keys(c.byQ).forEach(function (q) { c.counts[q] = GradeView.gradedCount(c.byQ[q].map(function (a) { return a.view; })); });
+  });
   return { connected: true, averagesOn: showAvg, quarter: view.quarter, started: view.started, transition: view.transition,
     classes: view.classes, views: view.views };
 }
@@ -2755,7 +2882,7 @@ function RUN_ungradedCheck() {
   var hw = homeworkPayload_({ email: email, studentId: sid }, classListFor_(tabs, sid));
   var today = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
   var from = Utilities.formatDate(new Date(Date.now() - 14 * 864e5), TIMEZONE, 'yyyy-MM-dd');
-  var scored = function (it) { return !!(it.grade && (it.grade.earned !== '' || it.grade.display)); };
+  var scored = function (it) { return !!(it.grade && it.grade.view && it.grade.view.graded); };   // the page's own rule (GradeView.scoreView)
   var past = hw.items.filter(function (it) { return it.source === 'assignment' && it.dueOn < today && it.dueOn >= from; });
   var ungraded = past.filter(function (it) { return !scored(it); });
   Logger.log('past-due gradebook items (14 d): %s, of which UNGRADED: %s', past.length, ungraded.length);
@@ -2764,7 +2891,7 @@ function RUN_ungradedCheck() {
   ungraded.forEach(function (it, i) {
     var rows = byAsg[it.assignmentId] || [];
     var mine = rows.filter(function (g) { return String(g['Student ID']) === String(sid); });
-    var withScore = rows.filter(function (g) { return g['Earned'] !== '' || g['Display Grade']; }).length;
+    var withScore = rows.filter(function (g) { return GradeView.scoreView({ display: g['Display Grade'], status: g['Status'], earned: g['Earned'] }).graded; }).length;
     Logger.log('#%s %s due %s [asg %s] %s — %s', i + 1, it.short, it.dueOn, it.assignmentId || '(none)', it.title.slice(0, 60), it.grade ? JSON.stringify(it.grade) : 'grade=null');
     Logger.log('     sheet: %s row(s) for this assignment, %s with a score; this student: %s', rows.length, withScore, mine.length ? JSON.stringify(mine) : 'NO ROW');
     if (i < LIVE_LOOKUPS && it.assignmentId) {
@@ -3282,11 +3409,15 @@ function notifyAfterSync_(changes) {
   var isSchoolDay = dow >= 1 && dow <= 5 && !noSchool[today];
   var tabs = loadStagingTabs_();
   var sent = 0;
+  var gradeSpec = allowedGrades_();
 
   subs.forEach(function (sub) {
     try {
       var p = sub.prefs, sid = sub.studentId;
       if (!sid) return;
+      // Grade gate (Josh, 2026-10-28): a student who cannot open the portal gets no email and no Inbox notice from it.
+      // Prefs are left untouched, so widening ALLOWED_GRADES brings their settings back as they were.
+      if (!Sched.gradeAllowed(Sched.studentProfile(tabs, sid).grade, gradeSpec)) return;
       var classList = classListFor_(tabs, sid);
       var hw = homeworkPayload_({ email: sub.email, studentId: sid }, classList, today);
       if (!hw.connected) return;

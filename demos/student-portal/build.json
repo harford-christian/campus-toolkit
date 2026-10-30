@@ -1,5 +1,5 @@
 {
-  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/student-portal/build-logic.mjs && node tools/build-demo.mjs demos/student-portal/build.json. The source Index.html is a complete template; Client.html is its one whitelisted include, inlined via includeDir. Each replacement reproduces what doGet supplies at runtime or removes a server-only branch, never the app's logic: (1) base target becomes _self because the switcher's iframe is this page's home, and the shared school dataset + logic.js are pulled in ahead of the shim; (2) the boot object and the inline payload come from the mock exactly where doGet would have serialised them; (3) the admin badge, the admin ?sim bar (re-purposed as the demo-clock bar) and the not-a-student deny panel are server-side branches a student never sees — build-demo strips control scriptlets but keeps their bodies, so the deny panel is hidden by its own style; (4) the one personal credit in the footer is removed.",
+  "_note": "Config for tools/build-demo.mjs. Run build-logic.mjs FIRST: node demos/student-portal/build-logic.mjs && node tools/build-demo.mjs demos/student-portal/build.json. The source Index.html is a complete template; Client.html is its one whitelisted include, inlined via includeDir. Each replacement reproduces what doGet supplies at runtime or removes a server-only branch, never the app's logic: (1) base target becomes _self because the switcher's iframe is this page's home, and the shared school dataset + logic.js are pulled in ahead of the shim; (2) the boot object and the inline payload come from the mock exactly where doGet would have serialised them; (3) the admin badge, the admin ?sim bar (re-purposed as the demo-clock bar) and the two deny panels (not-a-student, and the grade gate's 'Coming soon') are server-side branches a student never sees — build-demo strips control scriptlets but keeps their bodies, so both are hidden by their own style; (4) the one personal credit in the footer is removed.",
   "src": "../FACTS/student-interface/Index.html",
   "dst": "demos/student-portal/portal.html",
   "includeDir": "../FACTS/student-interface",
@@ -18,6 +18,9 @@
     ["<?= boot.ou || '—' ?>", ""],
     ["<?= boot.lookupError ? 'failed: ' + boot.lookupError : 'ok' ?>", ""],
     ["<?= boot.serverTime ?>", ""],
+    ["<?= boot.denyKind === 'grade' ? 'Coming soon' : 'One moment' ?>", ""],
+    ["<?= boot.denyReason ?>", ""],
+    ["<?= boot.email || \"—\" ?>", ""],
     ["<div class=\"credit\">by NJM</div>", ""],
     ["var BOOT = <?!= bootJson ?>;", "var BOOT = window.PORTAL_DEMO.boot();"],
     ["var BOOT_DATA = <?!= dataJson ?>;", "var BOOT_DATA = window.PORTAL_DEMO.bootData();"]

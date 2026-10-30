@@ -182,6 +182,13 @@
   G.athleticsEnabled_ = function () { return props.getProperty('ATHLETICS_ENABLED') === '1'; };
   G.attendanceEnabled_ = function () { return props.getProperty('ATTENDANCE_ENABLED') === '1'; };
   G.newsEnabled_ = function () { return props.getProperty('NEWS_ENABLED') === '1'; };
+  // Grade gate (upstream 2026-10-28): Notify.gs skips subscribers outside it. Same rule as Config.gs — unset or
+  // unreadable falls back to 6-12, never to everyone. The demo's resolveCaller_ stands in for Auth.gs and does not gate.
+  G.PROP_ALLOWED_GRADES = 'ALLOWED_GRADES'; G.DEFAULT_ALLOWED_GRADES = '6-12';
+  G.allowedGrades_ = function () {
+    var raw = String(props.getProperty('ALLOWED_GRADES') || '').trim();
+    return raw && L.Sched.parseGradeSpec(raw) ? raw : G.DEFAULT_ALLOWED_GRADES;
+  };
   G.getStagingSheetId_ = function () { return 'staging-demo'; };
   G.getDataSheetId_ = function () { return 'data-demo'; };
   G.appUrl_ = function () { return '#'; };

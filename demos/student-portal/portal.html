@@ -345,6 +345,16 @@
 
 
 <main class="deny" style="display:none">
+  <!-- A real student outside ALLOWED_GRADES (or a grade we could not read). Not an account problem, so no personal-account explainer. -->
+  <div class="card">
+    <h2></h2>
+    <p style="margin:0;color:var(--dt);font-size:.92rem"></p>
+    <p style="color:var(--dt);font-size:.85rem;margin:10px 0 0">Signed in as </p>
+    <a class="btn wide" href="#">Switch account</a>
+  </div>
+</main>
+
+<main class="deny" style="display:none">
   <div class="card">
     <h2>Not recognized as a student account</h2>
     <p style="margin:0;color:var(--dt);font-size:.92rem"></p>
@@ -554,13 +564,27 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
       copy.grades = { connected: !!(d.grades && d.grades.connected), classes: [], pending: true };
       /* No SCORE is ever stored on the device — but a yes/no "has been scored" flag is kept. Stripping the grade with
          nothing in its place made every past-due assignment look unscored, so the instant-open view filled the
-         Ungraded tab with work that was already graded until the real data landed (Josh, 2026-10-08). */
-      if (copy.homework && copy.homework.items) copy.homework.items.forEach(function (it) { it.scored = hasScore(it); delete it.grade; });
+         Ungraded tab with work that was already graded until the real data landed (Josh, 2026-10-08). The status word
+         ("Missing", "Excused"…) is kept for the same reason, or a missing item would flash "No score yet". */
+      if (copy.homework && copy.homework.items) copy.homework.items.forEach(function (it) {
+        it.scored = hasScore(it);
+        if (it.grade && it.grade.view && it.grade.view.pill) it.spill = it.grade.view.pill;
+        delete it.grade;
+      });
       localStorage.setItem(CACHE_KEY, JSON.stringify({ email: BOOT.email, d: copy }));
     } catch (e) { /* private mode, or quota — the app just loads the normal way */ }
   }
 
-  function hasScore(it) { return !!(it.scored || (it.grade && (it.grade.earned !== '' || it.grade.display))); }
+  /* Scores and status words are decided on the server (GradeView.scoreView): `view.graded`, `view.score`, `view.pill`.
+     A status row's letter (A = Absent, M = Missing…) is never shown as a score — it used to read "A / 10". */
+  function hasScore(it) { return !!(it.scored || (it.grade && it.grade.view && it.grade.view.graded)); }
+  var PILL_TONE = { red: 'miss', amber: 'late', grey: 'up' };
+  function statusPill(p) { return p ? ' <span class="pill ' + (PILL_TONE[p.tone] || 'up') + '">' + esc(p.label) + '</span>' : ''; }
+  function gradedLine(cnt, n) {
+    if (!n) return '';
+    if (!cnt || !cnt.total) return ' · all excused';
+    return ' · ' + cnt.graded + ' of ' + cnt.total + ' graded' + (cnt.missing ? ' · ' + cnt.missing + ' missing' : '');
+  }
   function defaultPrefs() { return { daily: { on: false, time: '18:00', schoolDaysOnly: true }, weekly: { on: false, day: 0, time: '18:00' }, changes: { on: false, classes: [] }, tests: { on: false, daysBefore: 2 } }; }
   function onBoot(d, fromCache) {
     if (fromCache && S.gotFresh) return;
@@ -802,8 +826,10 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
         var late = it.dueOn < today;
         var meta = dueMeta(it, today);
         if (it.dateConflict) meta += ' <span class="pill late">Dates differ</span>';
-        if (S.sub === 'past' && it.source === 'assignment' && !hasScore(it)) meta += ' <span class="pill up">No score yet</span>';
-        if (it.grade && (it.grade.earned !== '' || it.grade.display)) meta += '<span class="src">· score <b>' + esc(it.grade.display || it.grade.earned) + (it.grade.max ? '/' + esc(it.grade.max) : '') + '</b></span>';
+        var gv = it.grade && it.grade.view, pill = gv ? gv.pill : it.spill;
+        if (pill) meta += statusPill(pill);   // Missing / Absent / Excused…, on any tab (a teacher can mark Missing early)
+        else if (S.sub === 'past' && it.source === 'assignment' && !hasScore(it)) meta += ' <span class="pill up">No score yet</span>';
+        if (gv && gv.score) meta += '<span class="src">· score <b>' + esc(gv.score) + (it.grade.max ? '/' + esc(it.grade.max) : '') + '</b></span>';
         html += '<div class="item' + (late ? ' late' : '') + '">' +
           '<span class="kchip" style="--c:' + esc(it.color) + '">' + esc(it.short) + '</span>' +
           '<button type="button" class="txt" data-item="' + esc(it.key) + '" style="text-align:left"><div class="ttl">' + esc(it.title) + '</div><div class="meta">' + meta + '</div></button>' +
@@ -933,13 +959,15 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
     (g.classes || []).forEach(function (c) { byId[c.classId] = c; });
     var qName = function (q) { return q ? 'Q' + q : ''; };
     var avgLabel = function (q) { return !q ? '' : (q < g.quarter ? 'Q' + q + ' final' : 'Q' + q); };
-    var scored = function (a) { return a.earned !== '' || a.display !== ''; };
     var letterPill = function (l) { return l ? '<span class="letter' + (/^[DF]/i.test(l) ? ' lo' : '') + '">' + esc(l) + '</span>' : ''; };
     var rowHtml = function (a) {
-      var has = scored(a);
+      var v = a.view || { score: '', pill: null, count: 'none' };
+      // "/ 10" goes with a score, or alone on work not graded yet (as before) — never next to a status word with no points
+      var outOf = a.max && (v.score || v.count === 'none') ? '<span class="of">/ ' + esc(a.max) + '</span>' : '';
+      var tag = v.pill ? statusPill(v.pill)
+        : v.count === 'none' ? (a.dateDue && a.dateDue >= S.d.homework.today ? '<span class="pill up">Upcoming</span>' : '<span class="pill up">Not graded</span>') : '';
       return '<div class="row"><div class="txt"><div class="ttl">' + esc(a.title) + '</div><div class="meta">' + (a.dateDue ? '<span class="due">Due ' + esc(dayMd(a.dateDue)) + '</span>' : '') + '</div></div>' +
-        '<div class="score">' + (has ? '<span class="s">' + esc(a.display || a.earned) + '</span> ' : '') + (a.max ? '<span class="of">/ ' + esc(a.max) + '</span>' : '') + '</div>' +
-        (!has && a.dateDue && a.dateDue >= S.d.homework.today ? '<span class="pill up">Upcoming</span>' : (!has ? '<span class="pill up">Not graded</span>' : '')) + '</div>';
+        '<div class="score">' + (v.score ? '<span class="s">' + esc(v.score) + '</span> ' : '') + outOf + '</div>' + tag + '</div>';
     };
     var html = '';
     if (views.length > 1) html += '<div class="chips">' + views.map(function (v) {
@@ -962,7 +990,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
       var open = !!S.openGrade[cid];
       html += '<div class="card' + (open ? ' open' : '') + '"><button type="button" class="gcard" data-grade="' + esc(cid) + '"><div class="rail" style="background:' + esc(c.color) + '"></div>' +
         '<div class="gname"><div class="n">' + esc(c.name) + '</div><div class="m">' + esc(c.teacher || '') +
-        (list.length ? ' · ' + list.filter(scored).length + ' of ' + list.length + ' graded' : (meetsMain ? ' · nothing in the gradebook yet' : '')) + '</div>' +
+        (list.length ? gradedLine((c.counts || {})[mq], list.length) : (meetsMain ? ' · nothing in the gradebook yet' : '')) + '</div>' +
         (prev && prev.average ? '<div class="m">' + esc(avgLabel(xq)) + ' <b>' + esc(prev.average) + '</b>' + (prev.letter ? ' ' + esc(prev.letter) : '') + '</div>' : '') +
         '</div>' + avg + ICON.chev + '</button>';
       if (open) {
@@ -971,7 +999,7 @@ var BOOT_DATA = window.PORTAL_DEMO.bootData();</script>
         if (xq) sections.push({ q: xq, rows: byQ[xq] || [] });
         if (!sections.some(function (s) { return s.rows.length; })) html += '<div class="row"><div class="txt"><div class="meta">Nothing in the gradebook for this class yet.</div></div></div>';
         sections.forEach(function (s) {
-          if (sections.length > 1) html += '<div class="daybar"><span>' + esc(qName(s.q)) + '</span><span>' + s.rows.filter(scored).length + ' of ' + s.rows.length + ' graded</span></div>';
+          if (sections.length > 1) html += '<div class="daybar"><span>' + esc(qName(s.q)) + '</span><span>' + gradedLine((c.counts || {})[s.q], s.rows.length).replace(/^ · /, '') + '</span></div>';
           s.rows.forEach(function (a) { html += rowHtml(a); });
         });
       }
