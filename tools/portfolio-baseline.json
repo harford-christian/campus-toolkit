@@ -961,6 +961,7 @@
       "a2b31c4ef4a5d80e",
       "a75925e16a034d52",
       "ba3e89af29c04e75",
+      "bab50823d2152d7c",
       "bd789667abe497c5",
       "bf990232042fbedc",
       "bfee8384cd6e1ff8",
@@ -988,19 +989,19 @@
     "fileHashes": {
       "FACTS/student-interface/Athletics.js": "b545b86c5121bdd3",
       "FACTS/student-interface/Bells.gs": "3ed6e17f9074c054",
-      "FACTS/student-interface/Client.html": "f2cfa15bc0b46a4a",
-      "FACTS/student-interface/Code.gs": "bcc98eaa4917809e",
+      "FACTS/student-interface/Client.html": "7a99b798c2d87636",
+      "FACTS/student-interface/Code.gs": "5c26e535bf37c601",
       "FACTS/student-interface/Data.gs": "35be74a5d273f92e",
       "FACTS/student-interface/Due.js": "28ff7fdaa11436d1",
-      "FACTS/student-interface/GradeView.js": "38a28977976fa945",
-      "FACTS/student-interface/Index.html": "0ebdd131aa0be67e",
+      "FACTS/student-interface/GradeView.js": "06a7d4c53366e0cc",
+      "FACTS/student-interface/Index.html": "b654013acc0af6c8",
       "FACTS/student-interface/News.js": "e4cbc9b70540bf82",
-      "FACTS/student-interface/Notify.gs": "22e5adcf86c7812b",
-      "FACTS/student-interface/Schedule.js": "1397ddcca5471423",
+      "FACTS/student-interface/Notify.gs": "8d45b76c36393895",
+      "FACTS/student-interface/Schedule.js": "cfca7d0b43008c07",
       "FACTS/student-interface/SchoolCal.js": "286618e46bcbd91c",
       "FACTS/student-interface/Sports.gs": "0f4d9b4eb5729950"
     },
-    "hash": "9b1df2803220f5bb"
+    "hash": "31b5b8a29df442b7"
   },
   "conferences": {
     "v": 2,
