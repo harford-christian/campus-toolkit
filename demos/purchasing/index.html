@@ -1308,10 +1308,19 @@
         const name = item.url
           ? `<a href="${escUrl(item.url)}" target="_blank" style="color:var(--hcs-red); font-weight:600;">${escHtml(item.name)}</a>`
           : escHtml(item.name);
+        // Visible product link under the name (Purchasing asked to see/click the URL itself,
+        // not just the linked name). Protocol + www stripped and long paths shortened;
+        // the full URL is in the title tooltip.
+        let link = '';
+        if (item.url && escUrl(item.url) !== '#') {
+          let shown = String(item.url).trim().replace(/^https?:\/{2}(www\.)?/i, '');
+          if (shown.length > 60) shown = shown.slice(0, 57) + '...';
+          link = `<br><a href="${escUrl(item.url)}" target="_blank" title="${escUrl(item.url)}" style="font-size:0.8rem; color:var(--text-muted); word-break:break-all;">&#128279; ${escHtml(shown)}</a>`;
+        }
         const att = item.attachmentUrl
           ? `<br><a href="${escUrl(item.attachmentUrl)}" target="_blank" style="font-size:0.8rem; color:var(--text-muted);">&#128206; ${escHtml(item.attachmentFileName || 'attachment')}</a>`
           : '';
-        return name + att;
+        return name + link + att;
       }
 
       function getStatusClass(status) {

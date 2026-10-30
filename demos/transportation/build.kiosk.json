@@ -37,5 +37,9 @@
       "<?!= JSON.stringify(fullAppUrl) ?>",
       "KIOSK_DEMO.page.fullAppUrl"
     ]
-  ]
+  ],
+  "_nameAliasesNote": "Hashed phrase table for people named in Kiosk.html comments (sha256 of the lowercased phrase, first 16 hex): the 2026-10-29 pickup-list comment names one child. Same scheme and value as build.json; verify.mjs checks the kiosk output against build.json's table too.",
+  "nameAliases": {
+    "47862eec43d3c5c6": "one child"
+  }
 }

@@ -1454,7 +1454,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = History;
           (p.with ? 'with ' + esc(p.with) + ' &middot; ' : '') +
           (p.reason ? esc(p.reason) + ' &middot; ' : '') +
           esc(STATION_KIOSK[p.station] || p.station) + ' &middot; ' + esc(tOf(p.at)) +
-          ' &middot; mode: ' + esc(p.mode) + '</div>' +
+          ' &middot; mode: ' + esc(p.mode) +
+          (p.note ? ' &middot; ' + esc(p.note) : '') + '</div>' +
       '</div>' +
       '<button type="button" class="btn btn-outline-hcs pend-ok" data-eid="' + esc(p.eventId) + '">OK</button>' +
     '</div>';

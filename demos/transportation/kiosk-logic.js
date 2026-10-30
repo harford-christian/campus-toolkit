@@ -567,9 +567,13 @@ function dsSubSheet(board, routes, pick) {
 
   var pages = {};
   pop.forEach(function (r) {
-    var k = dsNameKey(r.homeroomTeacher || '') || '~';
-    if (!pages[k]) pages[k] = { teacher: r.homeroomTeacher || 'No homeroom teacher listed', grades: {},
-                                changed: [], midday: [], rest: [], specials: [], _spec: {} };
+    var tk = dsNameKey(r.homeroomTeacher || '');
+    var k = tk || (r.homeschool ? '~hs' : '~');
+    if (!pages[k]) pages[k] = { teacher: tk ? r.homeroomTeacher
+                                           : (r.homeschool ? 'Homeschool (FACTS) — no homeroom' : 'No homeroom teacher listed'),
+                                homeschool: !tk && !!r.homeschool,
+                                rank: tk ? 0 : (r.homeschool ? 1 : 2),
+                                grades: {}, changed: [], midday: [], rest: [], specials: [], _spec: {} };
     var P = pages[k];
     P.grades[dsGradeKey(r.grade)] = dsGradeNum(r.grade);
     if (r.special) {
@@ -594,7 +598,8 @@ function dsSubSheet(board, routes, pick) {
       note: (line && line.note) || '', by: (line && line.by) || '',
       people: (line && line.people) || dsAuthPickupsFor(r.pickupAuth),
       notes: (r.notes || []).map(function (n) { return n.text; }).filter(String),
-      expected: !!r.expected
+      expected: !!r.expected,
+      homeschool: !!r.homeschool     // tagged on a teacher's page; the Homeschool page says it once
     };
     if (row.kind) P.changed.push(row);
     else if (r.midday) P.midday.push(row);
@@ -611,6 +616,7 @@ function dsSubSheet(board, routes, pick) {
     P.midday.sort(dsByName);
     P.rest.sort(dsByName);
     return { teacher: P.teacher, grade: gs.join(' / '), gradeNum: gs.length ? P.grades[gs[0]] : 99,
+             homeschool: P.homeschool, rank: P.rank,
              changed: P.changed, midday: P.midday, rest: P.rest, specials: P.specials,
              counts: { total: P.changed.length + P.midday.length + P.rest.length,
                        changed: P.changed.length,
@@ -618,6 +624,7 @@ function dsSubSheet(board, routes, pick) {
   });
   out.sort(function (a, b) {
     return a.gradeNum !== b.gradeNum ? a.gradeNum - b.gradeNum
+         : a.rank !== b.rank ? a.rank - b.rank               // real homerooms, then Homeschool, then the gap
          : a.teacher < b.teacher ? -1 : a.teacher > b.teacher ? 1 : 0;
   });
   return { pages: out };
@@ -1732,6 +1739,7 @@ function dsBuildSpecials(values, dayName) {
 function dsSpecialFor(specials, s) {
   if (!specials) return null;
   var k = dsNameKey(s.homeroomTeacher || '');
+  if (!k && s.homeschool) return null;
   if (k && specials.byTeacher[k]) return specials.byTeacher[k];
   var g = String(s.grade || '').trim().toUpperCase().replace(/\.0+$/, '');
   if (/^0\d$/.test(g)) g = g.replace(/^0+/, '');

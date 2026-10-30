@@ -2388,8 +2388,11 @@ var Notify = (function () {
 
   /**
    * Decide the follow-up for an early dismissal.
-   * @return {{mode, sendEmail?:{to,cc,teacherName}, pending:boolean, degraded?:string}}
+   * @return {{mode, sendEmail?:{to,cc,teacherName}, pending:boolean, degraded?:string, note?:string}}
    *   pending=true ⇒ the event row is written FollowUpStatus='pending' (alert bus).
+   *   degraded     ⇒ something we meant to do could not be done (a fault to fix).
+   *   note         ⇒ plain words for the event's Notes and the board card — an EXPECTED
+   *                  situation the desk should still be told about, not a fault.
    */
   function resolveFollowUp(settings, student, ctx) {
     var mode = (settings || {})['dismissal.followup.mode'] || 'record_only';
@@ -2406,6 +2409,16 @@ var Notify = (function () {
       }
       var t = resolveTeacherEmail(student, ctx || {});
       if (t.email) return { mode: mode, sendEmail: { to: t.email, cc: cc, teacherName: t.teacherName }, pending: false };
+      // A FACTS-flagged homeschool student has no homeroom BY DESIGN (FACTS removed them from
+      // homerooms, 2026-10-29), so "no teacher" is not a fault here. The desk is still alerted
+      // — Josh, 2026-10-29: keep the chime — because with nobody to email, the chime is the
+      // only "go and fetch the child from class" signal there is. Labelled as what it is rather
+      // than as a degradation, so the desk does not read it as a system error. A flagged
+      // student whose homeroom is NAMED but has no address is still the real gap below.
+      if (student && student.homeschool && !t.teacherName) {
+        return { mode: 'office_alert', pending: true,
+                 note: 'homeschool — no homeroom teacher on file; the desk fetches the child' };
+      }
       // Unresolvable teacher → degrade to office_alert and say so on the event.
       return { mode: 'office_alert', pending: true, degraded: 'teacher-unresolved' + (t.teacherName ? ':' + t.teacherName : '') };
     }

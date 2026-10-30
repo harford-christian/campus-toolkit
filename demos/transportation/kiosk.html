@@ -140,6 +140,8 @@
   .pkn { font-weight: 700; }
   .pk .rel { color: var(--dt); font-size: .88rem; white-space: nowrap; text-transform: capitalize; }
   .ccard .none { color: var(--dt); font-size: 1rem; padding: .3rem 0; }
+  .pkmore-btn { margin-top: .4rem; width: 100%; min-height: 44px; border: 2px solid var(--line);
+                border-radius: .55rem; background: #fff; color: var(--ink); font-size: 1rem; font-weight: 800; }
   .cbtn { margin-top: 1rem; width: 100%; min-height: 48px; border: 0; border-radius: .55rem;
           background: var(--red); color: #fff; font-size: 1.05rem; font-weight: 800; }
   @media (max-width: 420px) { .gr { display: none; } h1 { font-size: 1.1rem; } }
@@ -493,10 +495,22 @@ if (typeof module !== 'undefined' && module.exports) {
     } else if (!pk.length) {
       body = '<div class="none">No authorized pickups recorded in FACTS for this child.</div>';
     } else {
-      body = pk.map(function (p) {
+      // FIRST THREE, THEN "+ N more" (Josh, 2026-10-29). The file now carries EVERY name — a cap at
+      // three hid one child's grandmother from the ramp for two days with nothing on screen to
+      // say the list was cut. The card keeps its short glance, and the button says how many more
+      // there are, so a name not in the first three never reads as "not on the list". The extra
+      // names sit in a plain <div hidden>: hiding the .pk rows themselves would not work, because
+      // .pk sets display:flex, which outranks the browser's [hidden] rule.
+      var pkRow = function (p) {
         return '<div class="pk"><span class="pkn">' + esc(p[0]) + '</span>' +
           (p[1] ? '<span class="rel">' + esc(p[1]) + '</span>' : '') + '</div>';
-      }).join('');
+      };
+      body = pk.slice(0, PK_SHOWN).map(pkRow).join('');
+      if (pk.length > PK_SHOWN) {
+        body += '<div id="pkmore" hidden>' + pk.slice(PK_SHOWN).map(pkRow).join('') + '</div>' +
+          '<button class="pkmore-btn" id="pkmorebtn" data-more="1" type="button">+ ' +
+          (pk.length - PK_SHOWN) + ' more authorized</button>';
+      }
     }
     // TEMPORARY authorizations the office recorded from a parent's email — name, relationship and
     // the last day they apply. Shown apart from the FACTS list, so the ramp knows this one is a
@@ -526,9 +540,16 @@ if (typeof module !== 'undefined' && module.exports) {
         '<button class="cbtn" data-close="1" type="button">Close</button>' +
       '</div></div>';
   }
+  /** How many authorized names the call-out shows before the "+ N more" button. */
+  var PK_SHOWN = 3;
   function closeCallout() { $('callout').innerHTML = ''; }
   $('callout').addEventListener('click', function (ev) {
     var t = ev.target;
+    if (t && t.getAttribute && t.getAttribute('data-more') === '1') {
+      $('pkmore').hidden = false;
+      t.parentNode.removeChild(t);
+      return;
+    }
     if (t && t.getAttribute && t.getAttribute('data-close') === '1') closeCallout();
   });
   $('list').addEventListener('click', function (ev) {

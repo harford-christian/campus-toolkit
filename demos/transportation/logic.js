@@ -476,9 +476,8 @@ var DS_TAB_MEMO_ = {};          // the same tab asked for twice in one request i
 var OFFICE_TAB_TTL_SEC = 60;
 
 /**
- * How many guardians either published surface shows per child. Enough to reach somebody, short
- * enough to scan — and the same number on the ramp iPad and the driver's phone, which was not true
- * until the 2026-09-18 audit found the ramp emitting all of them.
+ * How many guardians the DRIVER sheet shows per child, with phones: enough to reach somebody, short
+ * enough to scan. The ramp iPad is NOT capped — see dsRampPickups_ (Josh, 2026-10-29).
  */
 var DRIVER_CONTACTS_MAX = 3;
 
@@ -969,11 +968,14 @@ function dsBoardBundle_(sim) {
  * details on an anonymous device (Josh, 2026-09-10). Mirrors pickupsApi minus the phone; cached
  * against the FACTS sync stamp, since contacts change once a day at most.
  *
- * CAPPED, like the driver sheet (audit, 2026-09-18). This emitted EVERY authorised adult — FACTS
- * holds about eight per child across 5,500 rows — onto a file read by an anonymous iPad, while the
- * driver path next door had capped at three since it was written. dsBuildPickups has already sorted
- * by the family's own portal order, so the first three are the ones the family put first, and the
- * ramp's question is "is this adult on the list", not "recite the list".
+ * EVERY NAME, NO CAP (Josh, 2026-10-29). The 2026-09-18 audit capped this at three to match the
+ * driver sheet, and that made the iPad answer the ramp's one question wrongly: "is this adult on the
+ * list" read NO for anyone the family had put fourth or later, with nothing on the screen to say the
+ * list was cut. one child has six; her grandmother and two others were on the computer card
+ * and missing from the ramp lead's iPad two days running. FACTS averages about eight per child, so a cap
+ * only hides the people a family relies on least often — exactly when the ramp most needs to check.
+ * The driver sheet keeps DRIVER_CONTACTS_MAX: it answers a different question ("who do I ring") and
+ * carries phones. Still name + relationship only here; dsBuildPickups keeps the family's own order.
  * @return {Object} {studentId: [[name, relationship], ...]}
  */
 function dsRampPickups_() {
@@ -985,8 +987,7 @@ function dsRampPickups_() {
   var out = {};
   Object.keys(full).forEach(function (sid) {
     if (!enrolled[sid]) return;
-    out[sid] = full[sid].slice(0, DRIVER_CONTACTS_MAX)
-      .map(function (p) { return [p.name, p.rel || '']; });   // NO phone/email
+    out[sid] = full[sid].map(function (p) { return [p.name, p.rel || '']; });   // NO phone/email
   });
   return out;
 }
