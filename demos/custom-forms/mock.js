@@ -27,15 +27,18 @@
    labelled on screen. Hashing, the 10-minute expiry, the 5-try lockout and the session tokens are the
    app's own, untouched.
 
-   Not reproduced: PDF templates (built on Google Slides + Drive thumbnails) and the branded PDF copy
+   Not reproduced: PDF templates built on Google Slides + Drive thumbnails, and the branded PDF copy
    (Google's HTML->PDF converter) — those calls answer with a plain notice or are skipped, exactly as
-   the server already tolerates a PDF failure. */
+   the server already tolerates a PDF failure. Reproduced: the "Sharp PDF" renderer (pdf-lib drawing on
+   the original PDF), for the Maryland sports physical form — see PHYSICAL_FORM below. */
 (function () {
   'use strict';
   var D = window.FORMS_DEMO_DATA;
   var APP = window.DEMO_APP || 'builder';
   var SURFACE = window.DEMO_SURFACE || APP;
   var STORE_KEY = 'hcs-forms-demo-v1';
+  // Bumped when the seeded world changes, so a tab holding an older one starts over (2: the Maryland physical form).
+  var STATE_VERSION = 2;
   var TZ = 'America/New_York';
   var APP_URL = { builder: 'builder.html', chooser: 'chooser.html', 'runner-public': 'parent.html', 'runner-staff': 'staff.html', 'runner-macs': 'macs.html' };
   // doGet's branch -> the built page that carries it (each page is one branch of its app's Index.html)
@@ -46,6 +49,17 @@
   };
   var DRIVE_URL = 'https://drive.example.invalid/file/';
   var PREVIEW_PAGE = /[?&]preview=1(&|$)/.test(location.search || '');
+  // The Maryland physical form (data.js physicalForm) prints through the app's "Sharp PDF" renderer, which draws
+  // with pdf-lib on the official PDF. Both load only when the parent page opens that form: pdf-lib 1.17.1 (the
+  // release HCS Forms vendors) from a CDN, the PDF from mpssaa-pdf.js. The Drive stand-in serves that PDF by
+  // reference (staticRef) and never copies it into the saved state.
+  var PHYSICAL_FORM = 'FRM-MPSSAA-PHYSICAL', PHYSICAL_PDF_REF = 'mpssaa-may-2024';
+  if (SURFACE === 'parent-form' && new RegExp('[?&]form=' + PHYSICAL_FORM + '(&|$)').test(location.search || '') &&
+      typeof document !== 'undefined' && document.head && document.createElement) {
+    ['https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js', 'mpssaa-pdf.js'].forEach(function (src) {
+      var s = document.createElement('script'); s.src = src; s.async = false; document.head.appendChild(s);
+    });
+  }
 
   /* ======================= storage ======================= */
   function store() { try { return window.sessionStorage; } catch (e) { return null; } }
@@ -395,11 +409,15 @@
     function childFiles(id) { return Object.keys(drive.files).map(function (k) { return drive.files[k]; }).filter(function (x) { return !x.trashed && x.parents.indexOf(id) > -1; }); }
     function newFolder(name, parentId) { var id = nextId('folder'); drive.folders[id] = { id: id, name: String(name), parents: [parentId || 'root'], created: nowMs(), trashed: false }; return drive.folders[id]; }
     var STORE_CAP = 1500000; // bytes kept per uploaded file in this tab's storage
+    // A PDF over this is listed in Drive without its bytes: each Maryland physical form the app saves is the full
+    // 4-page original (~330 KB), and sessionStorage (shared by every demo on this site) would fill after a few.
+    // The parent's own copy still downloads — it comes back in the submit result, not from Drive.
+    var PDF_STORE_CAP = 250000;
     function newFile(a, b, c, parentId) {
       var blob = (a instanceof Blob_) ? a : new Blob_(utf8(b == null ? '' : String(b)), c || MimeType.PLAIN_TEXT, a);
       var id = nextId('file');
       var rec = { id: id, name: blob.name || 'Untitled', mime: blob.type, parents: [parentId || 'root'], created: nowMs(), updated: nowMs(), trashed: false, desc: '', size: blob.bytes.length };
-      if (blob.bytes.length > STORE_CAP) rec.omitted = true; else rec.b64 = b64enc(blob.bytes);
+      if (blob.bytes.length > (blob.type === MimeType.PDF ? PDF_STORE_CAP : STORE_CAP)) rec.omitted = true; else rec.b64 = b64enc(blob.bytes);
       drive.files[id] = rec;
       return rec;
     }
@@ -418,6 +436,11 @@
         getParents: function () { return iter((f.parents || []).filter(function (p) { return drive.folders[p]; }).map(function (p) { return folderObj(drive.folders[p]); })); },
         getBlob: function () {
           if (books[f.id]) throw new Error('demo mock: exporting a spreadsheet is not modelled');
+          if (f.staticRef) { // a file this site ships (the Maryland form's PDF), served by reference, never stored
+            var shipped = (window.DEMO_STATIC_FILES || {})[f.staticRef];
+            if (!shipped) throw new Error('"' + f.name + '" is still loading in this demo (or this page doesn\'t load it). Try again in a moment.');
+            return new Blob_(b64dec(String(shipped).replace(/^base64,/, '')), f.mime, f.name);
+          }
           return new Blob_(f.b64 ? b64dec(f.b64) : [], f.mime, f.name);
         },
         getAs: function (type) { return api.getBlob().getAs(type); },
@@ -549,7 +572,7 @@
   var IDS = { hcsRoot: 'demo-folder-hcs', macsRoot: 'demo-folder-macs', hcsSys: 'demo-sheet-hcs-system', macsSys: 'demo-sheet-macs-system', parent: 'demo-folder-forms' };
 
   function freshState() {
-    return { version: 1, seq: 100, drive: { folders: { root: { id: 'root', name: 'My Drive', parents: [], created: Date.now(), trashed: false } }, files: {} },
+    return { version: STATE_VERSION, seq: 100, drive: { folders: { root: { id: 'root', name: 'My Drive', parents: [], created: Date.now(), trashed: false } }, files: {} },
       books: {}, outbox: [], newMail: 0,
       props: {
         builder: { SYSTEM_SHEET_ID: IDS.hcsSys, FORMS_ROOT_FOLDER_ID: IDS.hcsRoot, AUTH_HMAC_SECRET: 'demo-secret-builder-7f3a', APP_HANDOFF_SECRET: 'demo-handoff-secret-21c9', EDIT_LINK_SECRET: 'demo-edit-link-secret-9d44', DEVELOPER_OVERRIDE: 'false' },
@@ -597,6 +620,7 @@
       while (adm.getLastRow() > 1) adm.deleteRow(2);
       (data.admins || []).concat([['it@example.edu', 'Deploying account']]).forEach(function (r) { adm.appendRow(r); });
       [[T.DIRECTORY, data.directory], [T.CLASSES, data.classes], [T.FACTS_STAFF, data.factsStaff], [T.STAFF, data.staff],
+       [T.EMERGENCY, data.emergency],
        [T.GROUPS, data.approvalGroups], [T.APPS, data.apps], [T.MACS_SCHOOLS, data.schools]].forEach(function (p) {
         var sh = ss.getSheetByName(p[0]); (p[1] || []).forEach(function (r) { sh.appendRow(r); });
       });
@@ -614,6 +638,27 @@
         S.saveSchemaObj_(f.formId, schema);
         if (f.lifecycle === 'published' && !f.isTemplate) S.ensureResponseSheet_(f.formId, schema);
       });
+    }
+    // The Maryland sports physical form, as RUN_createMpssaaPhysicalForm (MpssaaPhysical.js) creates it at the school:
+    // the app's own schema and measured box map, a "Sharp PDF" document over the official PDF, Athletics, private
+    // (parents sign in) — then published, as it is there. Only the steps that need Google are skipped: the PDF is not
+    // downloaded (the site ships it, mpssaa-pdf.js) and no page previews are rendered (the Builder's PDF tab draws
+    // them from Drive thumbnails).
+    function addPhysicalForm(S, cfg) {
+      var id = PHYSICAL_FORM, schema = S.mpssaaPhysicalSchema_(cfg.turnInLink);
+      schema.settings.lifecycle = 'published';
+      var folder = S.getFormFolder_(id, schema.title);
+      var now = new Date(Date.now() - 86400000 * 2).toISOString();
+      S.sysTab_(S.SYS.TABS.REGISTRY).appendRow([id, schema.title, cfg.owner, 'published', 'private', false, now, now, '', folder.getId(), '', 1,
+        false, '', '', 'Athletics', '', '', '', '', '']);
+      var tplId = 'tpl_demo0001', src = 'demo-file-mpssaa-source';
+      drive.files[src] = { id: src, name: 'MPSSAA physical form (May 2024).pdf', mime: MimeType.PDF, parents: [S.pdfTemplateFolder_(id, tplId).getId()],
+        created: Date.now(), updated: Date.now(), trashed: false, desc: '', size: 335331, staticRef: PHYSICAL_PDF_REF };
+      schema.settings.pdfTemplates.push({ id: tplId, name: 'MPSSAA physical form (May 2024)', enabled: true, renderer: 'stamp',
+        sourcePdfFileId: src, slidesTemplateId: '', pageCount: 4, pages: [], fieldBoxes: clone(S.MPSSAA_BOXES_), calcFields: {},
+        mappedAt: now, lastBuildError: '' });
+      S.saveSchemaObj_(id, schema);
+      S.ensureResponseSheet_(id, schema);
     }
     var seq = 0;
     function addSubmissions(S, list) {
@@ -636,6 +681,7 @@
       var schema = S.loadSchemaObj_(id); schema.settings.closeDate = close; S.saveSchemaObj_(id, schema); S.regSet_(id, 'CloseDate', close);
     });
     addForms(S, D.hcs.forms);
+    if (D.hcs.physicalForm) addPhysicalForm(S, D.hcs.physicalForm);
     addSubmissions(S, D.hcs.submissions);
     S = context('macs', D.macs);
     addForms(S, D.macs.forms);
@@ -647,7 +693,7 @@
 
   function state() {
     var st = loadState();
-    if (!st || st.version !== 1) { st = bootstrap(); saveState(st); }
+    if (!st || st.version !== STATE_VERSION) { st = bootstrap(); saveState(st); }
     return st;
   }
 

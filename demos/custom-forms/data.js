@@ -45,16 +45,30 @@ window.FORMS_DEMO_DATA = {
     admins: [['m.avery@example.edu', 'Morgan Avery (operations)'], ['p.lindqvist@example.edu', 'Priya Lindqvist (principal)']],
     // FACTS_Directory: StudentId, Last, First, DisplayName, Grade, StudentEmail, Homeroom, HomeroomTeacher,
     //                  GuardianName ("Last First", as the export writes it), GuardianEmail, GuardianSlot
+    //                  [, Homeschool, Gender, Birthdate] — the last three only where the physical form reads them
+    //                  (the Whitfields: the form's sample family; every other row stops at GuardianSlot)
     directory: [
-      ['700101', 'Whitfield', 'Ellie', 'Ellie Whitfield', '10', 'ellie.whitfield@example.edu', 'HR-10A', 'Rosa Castillo', 'Whitfield Sam', 'sam.whitfield@example.com', '1'],
-      ['700101', 'Whitfield', 'Ellie', 'Ellie Whitfield', '10', 'ellie.whitfield@example.edu', 'HR-10A', 'Rosa Castillo', 'Whitfield Dana', 'dana.whitfield@example.com', '2'],
-      ['700102', 'Whitfield', 'Theo', 'Theo Whitfield', '7', '', 'HR-7B', 'Gideon Marsh', 'Whitfield Sam', 'sam.whitfield@example.com', '1'],
-      ['700102', 'Whitfield', 'Theo', 'Theo Whitfield', '7', '', 'HR-7B', 'Gideon Marsh', 'Whitfield Dana', 'dana.whitfield@example.com', '2'],
+      ['700101', 'Whitfield', 'Ellie', 'Ellie Whitfield', '10', 'ellie.whitfield@example.edu', 'HR-10A', 'Rosa Castillo', 'Whitfield Sam', 'sam.whitfield@example.com', '1', '', 'Female', '2011-02-09'],
+      ['700101', 'Whitfield', 'Ellie', 'Ellie Whitfield', '10', 'ellie.whitfield@example.edu', 'HR-10A', 'Rosa Castillo', 'Whitfield Dana', 'dana.whitfield@example.com', '2', '', 'Female', '2011-02-09'],
+      ['700102', 'Whitfield', 'Theo', 'Theo Whitfield', '7', '', 'HR-7B', 'Gideon Marsh', 'Whitfield Sam', 'sam.whitfield@example.com', '1', '', 'Male', '2014-06-21'],
+      ['700102', 'Whitfield', 'Theo', 'Theo Whitfield', '7', '', 'HR-7B', 'Gideon Marsh', 'Whitfield Dana', 'dana.whitfield@example.com', '2', '', 'Male', '2014-06-21'],
       ['700103', 'Ortiz', 'Lucas', 'Lucas Ortiz', '3', '', 'HR-3A', 'Lydia Chen', 'Ortiz Jamie', 'jamie.ortiz@example.com', '1'],
       ['700104', 'Nakamura', 'Aiko', 'Aiko Nakamura', '11', 'aiko.nakamura@example.edu', 'HR-11A', 'Gideon Marsh', 'Nakamura Chris', 'chris.nakamura@example.com', '1'],
       ['700105', 'Brooks', 'Mason', 'Mason Brooks', '9', 'mason.brooks@example.edu', 'HR-9A', 'Rosa Castillo', 'Brooks Taylor', 'taylor.brooks@example.com', '1'],
       ['700106', 'Avery', 'Quinn', 'Quinn Avery', '4', '', 'HR-4A', 'Lydia Chen', 'Avery Morgan', 'm.avery@example.edu', '1']
     ],
+    // FACTS_Emergency: StudentId, Order, Name, Relationship, Cell, Home, Work, Source — the two page-4 contacts the
+    // Maryland physical form fills in (daytime = work, else cell, else home; evening = home). 555-01xx numbers are
+    // the range set aside for fiction.
+    emergency: [
+      ['700101', 1, 'Dana Whitfield', 'Parent', '(410) 555-0142', '(410) 555-0118', '(443) 555-0167', 'emergency'],
+      ['700101', 2, 'Robin Calder', 'Aunt', '(443) 555-0193', '', '', 'emergency'],
+      ['700102', 1, 'Dana Whitfield', 'Parent', '(410) 555-0142', '(410) 555-0118', '(443) 555-0167', 'emergency'],
+      ['700102', 2, 'Robin Calder', 'Aunt', '(443) 555-0193', '', '', 'emergency']
+    ],
+    // The Maryland (MPSSAA) sports physical form, built by mock.js from the app's own MpssaaPhysical.js (its schema and
+    // measured box map) on the official May 2024 PDF (mpssaa-pdf.js), published for parents as at the school.
+    physicalForm: { owner: 'd.okafor@example.edu', turnInLink: 'parent.html?form=FRM-SPORTS-PHYSICAL' },
     // FACTS_Classes: StudentId, ClassCode, ClassDescription, Category, Teacher
     classes: [
       ['700101', 'ENG10-1', 'English 10', 'English', 'Rosa Castillo'],

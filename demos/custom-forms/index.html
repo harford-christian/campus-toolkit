@@ -50,11 +50,13 @@
       <button data-src="staff.html" aria-selected="false">🏫 Staff portal</button>
       <span class="rule" aria-hidden="true"></span>
       <button data-src="parent.html" aria-selected="false">👪 Parent portal</button>
+      <button data-src="parent-form.html?form=FRM-MPSSAA-PHYSICAL" aria-selected="false">🩺 Sports physical</button>
       <button data-src="macs.html" aria-selected="false">🎓 MACS forms</button>
     </div>
     <span class="spacer"></span>
     <span class="hint">Build and publish a form in the Builder, fill it in as a parent (sign in with the
-      emailed one-time code), then find the response — and any approval — back in the Builder.</span>
+      emailed one-time code), then find the response — and any approval — back in the Builder. Sports physical:
+      the Maryland form, filled in from the school's records for each child, ready to print.</span>
     <a class="back" href="../../index.html" target="_top">← Gallery</a>
   </div>
   <div class="stage">
@@ -80,8 +82,11 @@
   // Links inside the apps (a portal tile, the chooser's buttons, the Builder's preview) move the frame
   // without these buttons; re-sync the highlight when the browser lets us read the frame's address.
   frame.addEventListener('load', function () {
-    var here = '';
-    try { here = frame.contentWindow.location.pathname.split('/').pop(); } catch (e) { return; }
+    var here = '', full = '';
+    try { var at = frame.contentWindow.location; here = at.pathname.split('/').pop(); full = here + at.search; } catch (e) { return; }
+    // A button that names one form (Sports physical) wins over its page's family (Parent portal).
+    var exact = btns.filter(function (b) { return b.getAttribute('data-src') === full; })[0];
+    if (exact) { activate(exact); return; }
     here = FAMILY[here] || here;
     activate(btns.filter(function (b) { return b.getAttribute('data-src') === here; })[0]);
   });

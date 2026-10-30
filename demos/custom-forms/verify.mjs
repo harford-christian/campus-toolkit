@@ -52,11 +52,14 @@ try {
 
 /* ---------- boot a page the way the browser does ---------- */
 function makeSession() { const s = {}; return { s, getItem: (k) => (k in s ? s[k] : null), setItem: (k, v) => { s[k] = String(v); }, removeItem: (k) => { delete s[k]; }, clear: () => { for (const k in s) delete s[k]; } }; }
-function boot(surface, search, session) {
+// ownRealm: the page keeps the sandbox's own built-ins (Object, Array, Uint8Array ...) instead of Node's, as a browser
+// page has one realm. pdf-lib needs that: it checks its arguments with instanceof (5b, the Sharp PDF).
+function boot(surface, search, session, ownRealm) {
   const [app] = SURFACES[surface];
   const el = () => ({ setAttribute() {}, appendChild() {}, style: {}, addEventListener() {} });
-  const ctx = { console, Date, Math, JSON, Object, Array, String, Number, RegExp, Error, parseInt, parseFloat, isNaN, isFinite, URLSearchParams,
-    setTimeout: () => 0, clearTimeout() {}, Proxy, Intl, Promise, Uint8Array, Symbol, Map, Set, encodeURIComponent, decodeURIComponent, crypto: globalThis.crypto };
+  const host = ownRealm ? {} : { Date, Math, JSON, Object, Array, String, Number, RegExp, Error, parseInt, parseFloat, isNaN, isFinite,
+    Proxy, Intl, Promise, Uint8Array, Symbol, Map, Set, encodeURIComponent, decodeURIComponent };
+  const ctx = Object.assign({ console, URLSearchParams, setTimeout: () => 0, clearTimeout() {}, crypto: globalThis.crypto }, host);
   ctx.window = ctx; ctx.globalThis = ctx; ctx.sessionStorage = session || makeSession();
   const loc = { search: search || '', hash: '', href: 'file:///demo/' + surface + '.html' + (search || ''), replaced: null };
   loc.replace = (u) => { loc.replaced = u; };
@@ -276,10 +279,73 @@ check('approving it records the decision on the response row and emails the pare
   check('a token for one school fills nothing for another, and an open school offers no verification', riv.verified === false && riv.otpAvailable === false);
 }
 
+/* ---------- 5b. the Maryland sports physical form (Sharp PDF) ---------- */
+{
+  const t = makeSession();
+  const PP = boot('parent', '', t).MOCK_BACKEND;
+  PP.authRequestOtp('sam.whitfield@example.com');
+  const tok = PP.authVerifyOtp('sam.whitfield@example.com', '482193').token;
+  const PF = boot('parent-form', '?form=FRM-MPSSAA-PHYSICAL', t, true);
+  // What the page's two script tags load in a browser: pdf-lib 1.17.1 (the copy HCS Forms vendors, here from the
+  // source repo) and the shipped PDF. pdf-lib waits on timers, so this page gets a real (guarded) setTimeout.
+  vm.runInContext(readFileSync(path.join(SRC, 'apps/builder/server/PdfLibVendor.js'), 'utf8'), PF, { filename: 'PdfLibVendor.js' });
+  vm.runInContext(read('mpssaa-pdf.js'), PF, { filename: 'mpssaa-pdf.js' });
+  PF.setTimeout = (fn) => setTimeout(() => { try { fn(); } catch (e) { /* page-only work (the inbox) */ } }, 0);
+  const pageCount = vm.runInContext('(arr) => PDFLib.PDFDocument.load(new Uint8Array(arr)).then((d) => d.getPageCount())', PF);
+  const shipped = Buffer.from(PF.DEMO_STATIC_FILES['mpssaa-may-2024'].replace(/^base64,/, ''), 'base64');
+  const { createHash } = await import('node:crypto');
+  const M = PF.FORMS_SERVER('builder', {});
+  check('the shipped PDF is the official May 2024 form the box map was measured on (the SHA-256 MpssaaPhysical.js pins)',
+    createHash('sha256').update(shipped).digest('hex') === M.MPSSAA_PDF_SHA256_);
+  const R = PF.MOCK_BACKEND;
+  const f = R.getPublicForm('FRM-MPSSAA-PHYSICAL', tok);
+  const kids = (f.prefill && f.prefill.students) || [];
+  const ellie = kids.find((s) => s.displayName === 'Ellie Whitfield'), theo = kids.find((s) => s.displayName === 'Theo Whitfield');
+  check('the physical form: published, one child at a time, and the parent\'s two children pre-filled from FACTS (DOB, sex, age, both emergency contacts)',
+    f.ok && f.form.title === 'Maryland Sports Physical Form' && f.form.childByChild === true && kids.length === 2 &&
+    ellie && ellie.dob === '2011-02-09' && ellie.sex === 'Female' && ellie.age !== '' && ellie.contacts.length === 2 &&
+    ellie.contacts[0].name === 'Dana Whitfield' && ellie.contacts[0].day === '(443) 555-0167' && theo && theo.sex === 'Male' && theo.dob === '2014-06-21',
+    JSON.stringify(f).slice(0, 300));
+  const base = (s, extra) => Object.assign({ student: s.displayName, grade: s.grade, dob: s.dob, age: String(s.age), sex: s.sex, school: f.prefill.org,
+    pName: 'Sam Whitfield', pEmail: 'sam.whitfield@example.com', c1Name: s.contacts[0].name, c1Rel: s.contacts[0].relationship, c1Day: s.contacts[0].day,
+    c1Eve: s.contacts[0].evening, c1Cell: s.contacts[0].cell, c2Name: s.contacts[1].name, c2Rel: s.contacts[1].relationship, c2Cell: s.contacts[1].cell,
+    inhaler: 'No', epipen: 'No', q1: 'No', q2: 'No' }, extra);
+  const girl = await R.submitForm('FRM-MPSSAA-PHYSICAL', base(ellie, { sportsF: ['Soccer', 'Volleyball'] }), tok, {}, '');
+  const boy = await R.submitForm('FRM-MPSSAA-PHYSICAL', base(theo, { sportsM: ['Baseball'] }), tok, {}, '');
+  check('a girl\'s and a boy\'s submission each go through with their own sports list (the other, hidden by sex, is not required)',
+    girl.ok && boy.ok && girl.status === 'Submitted' && boy.status === 'Submitted', JSON.stringify(girl).slice(0, 200) + ' / ' + JSON.stringify(boy).slice(0, 200));
+  const { inflateSync } = await import('node:zlib');
+  const drawn = async (res) => {
+    const bytes = Buffer.from(res.pdfCopies[0].b64, 'base64');
+    const pages = await pageCount(Array.from(bytes));
+    const s = bytes.toString('latin1'), texts = [];
+    for (const m of s.matchAll(/stream\r?\n/g)) {
+      const end = s.indexOf('endstream', m.index);
+      try { texts.push(inflateSync(bytes.subarray(m.index + m[0].length, end)).toString('latin1')); } catch (e) { /* not a Flate stream */ }
+    }
+    return { pages, content: texts.join('\n') };
+  };
+  const hex = (x) => Buffer.from(x, 'latin1').toString('hex').toUpperCase();
+  const g = girl.ok && girl.pdfCopies && girl.pdfCopies.length === 1 ? await drawn(girl) : { pages: 0, content: '' };
+  const b = boy.ok && boy.pdfCopies && boy.pdfCopies.length === 1 ? await drawn(boy) : { pages: 0, content: '' };
+  check('each child gets a "Download a copy" PDF: the 4-page Maryland form with that child\'s name, DOB and sport drawn on it (the app\'s Sharp PDF renderer)',
+    g.pages === 4 && b.pages === 4 && g.content.includes(hex('Ellie Whitfield')) && g.content.includes(hex('2011-02-09')) && g.content.includes(hex('Soccer')) &&
+    b.content.includes(hex('Theo Whitfield')) && b.content.includes(hex('Baseball')) && !b.content.includes(hex('Ellie Whitfield')),
+    'pages ' + g.pages + '/' + b.pages + '; copies ' + JSON.stringify((girl.pdfCopies || []).map((c) => c.name)) + '; content ' + g.content.length +
+    ' chars; hex? ' + [hex('Ellie Whitfield'), hex('2011-02-09'), hex('Soccer')].map((x) => g.content.includes(x)).join() + '; sample ' + JSON.stringify((g.content.match(/<[0-9A-F]{6,}>/) || [''])[0].slice(0, 40)));
+  const st = PF.FORMS_DEMO.state();
+  const pdfs = Object.values(st.drive.files).filter((x) => x.mime === 'application/pdf');
+  const src = st.drive.files['demo-file-mpssaa-source'];
+  check('the saved state stays small: the source PDF is served by reference and each 4-page copy is listed in Drive without its bytes',
+    src && src.staticRef === 'mpssaa-may-2024' && !src.b64 && pdfs.filter((x) => x.id !== src.id).length >= 2 &&
+    pdfs.filter((x) => x.id !== src.id && x.size > 250000).every((x) => x.omitted && !x.b64) && t.s['hcs-forms-demo-v1'].length < 1500000,
+    'state ' + (t.s['hcs-forms-demo-v1'] || '').length + ' chars');
+}
+
 /* ---------- 6. privacy ---------- */
 {
   const DOMAIN = 'harford' + 'christian';
-  const published = ['logic.js', 'mock.js', 'data.js', 'index.html', 'build-logic.mjs', 'build.mjs', 'verify.mjs', ...PAGES.map((p) => p + '.html'), ...PAGES.map((p) => 'build.' + p + '.json')];
+  const published = ['logic.js', 'mock.js', 'data.js', 'index.html', 'build-logic.mjs', 'build.mjs', 'verify.mjs', 'mpssaa-pdf.js', ...PAGES.map((p) => p + '.html'), ...PAGES.map((p) => 'build.' + p + '.json')];
   const leaks = [];
   const phrases = Object.assign({}, PHRASE_ALIASES, nameAliases());
   for (const f of published) {

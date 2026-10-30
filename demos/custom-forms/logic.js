@@ -8604,6 +8604,393 @@ function adminMigrateResponseSheet(contextId, formId, opts) {
   return RespSheet.migrateResponseSheetToV3_(formId, opts);
 }
 
+/* ===================== apps/builder/server/MpssaaPhysical.js ===================== */
+/**
+ * GENERATED FILE — DO NOT HAND-EDIT.
+ * Produced by tools/wrap.js from MpssaaPhysical.js. Edit the source, then run `npm run build`.
+ */
+/**
+ * MpssaaPhysical.js — the pre-filled Maryland (MPSSAA) sports physical form, FRM-MPSSAA-PHYSICAL.
+ * Spec: docs/MPSSAA_PHYSICAL_FORM.md (approved by Josh 2026-10-28).
+ *
+ * A parent opens it from the FACTS email, signs in with their FACTS email, ticks which children need
+ * a physical (one child at a time), and for each child downloads the official MPSSAA Recommended
+ * Preparticipation Physical Form (Revised May 2024) filled from FACTS — name, grade, DOB, age, sex,
+ * school, emergency contacts — plus the medical answers the parent types once (remembered per child
+ * next year). They print it, sign pages 2 and 4, and take it to the doctor; the completed form is
+ * turned in on Sports Physical Submission (FRM-SPORTS-PHYSICAL), which this file never touches.
+ *
+ * The box map was MEASURED from the PDF itself (text positions, the 0.5 pt rules under each blank,
+ * the printed squares at 600 dpi), not placed by hand; the official file is pinned by SHA-256 so a
+ * revised form at the same address can't silently get the old box map. When MPSSAA revises the
+ * form: Builder → PDF Template → Replace document (keeps the boxes) → move any that shifted.
+ *
+ * Builder-only (tools/wrap.js). NOT in Seeds.js's SEED_FNS_: "Reseed forms" must never overwrite it.
+ */
+
+var MPSSAA_FORM_ID_ = 'FRM-MPSSAA-PHYSICAL';
+var MPSSAA_PDF_URL_ = 'https://www.mpssaa.org/wp-content/uploads/2026/03/Physical-Examination-Form_REVISED_May_2024.pdf';
+var MPSSAA_PDF_SHA256_ = '8e1343bf898f98f461c200f06bcf2ee3f87136b8bc7fe9712573cbcaae8ed299';
+
+/** The 40 numbered Part II yes/no questions, in the form's own words (lightly shortened). */
+var MPSSAA_QUESTIONS_ = {
+  1: 'Do you have any concerns you want to discuss with your provider?',
+  2: 'Has a provider ever denied or restricted your participation in sports for any reason?',
+  3: 'Do you have any ongoing medical conditions?',
+  4: 'Are you taking any medications or supplements daily?',
+  5: 'Do you have allergies to any medications?',
+  6: 'Do you have any recurring skin rashes or rashes that come and go, including herpes or MRSA?',
+  7: 'Have you ever spent the night in the hospital?',
+  8: 'Have you ever had surgery?',
+  9: 'Have you ever passed out or nearly passed out DURING or AFTER exercise?',
+  10: 'Have you ever had discomfort, pain, tightness, or pressure in your chest during exercise?',
+  11: 'Does your heart race, flutter in your chest, or skip beats (irregular beats) during exercise?',
+  12: 'Has a doctor ever ordered a test for your heart (for example, an ECG or echocardiogram)?',
+  13: 'Has a doctor ever told you that you have any heart problems?',
+  14: 'Do you get light-headed or feel shorter of breath than your friends during exercise?',
+  15: 'Have you ever had a seizure?',
+  16: 'Does anyone in your family have a heart problem?',
+  17: 'Has any family member or relative died of heart problems or had an unexpected or unexplained sudden death before age 50 (including drowning or unexplained car crash)?',
+  18: 'Does anyone in your family have a genetic heart problem such as HCM, Marfan syndrome, ARVC, long QT syndrome, short QT syndrome, Brugada syndrome, or CPVT?',
+  19: 'Has anyone in your family had a pacemaker or an implanted defibrillator before age 50?',
+  20: 'Have you ever had a stress fracture or an injury to a bone, muscle, ligament, joint, or tendon that caused you to miss a practice or game?',
+  21: 'Do you currently have a bone, muscle, or joint injury that bothers you?',
+  22: 'Do you cough, wheeze, or have difficulty breathing during or after exercise?',
+  23: 'Do you have asthma or use asthma medicine (inhaler, nebulizer)?',
+  24: 'Have you had mononucleosis (mono) within the last month?',
+  25: 'Are you missing a kidney, eye, testicle, spleen, or other internal organ?',
+  26: 'Do you have groin or testicle pain or a painful bulge or hernia in the groin area?',
+  27: 'Have you ever become ill while exercising in the heat?',
+  28: 'When exercising in the heat, do you have severe muscle cramps?',
+  29: 'Do you have headaches from exercise?',
+  30: 'Have you ever had numbness, tingling, or weakness in your arms or legs, or been unable to move your arms or legs AFTER being hit or falling?',
+  31: 'Do you have sickle cell trait or disease?',
+  32: 'Have you had any other blood disorders?',
+  33: 'Have you had a concussion or head injury that caused confusion, a prolonged headache, or memory problems?',
+  34: 'Have you had or do you have any problems with your eyes or vision?',
+  35: 'Do you wear glasses or contacts?',
+  36: 'Do you wear protective eyewear like goggles or a face shield?',
+  37: 'Do you worry about your weight?',
+  38: 'Have you ever been diagnosed with an eating disorder?',
+  39: 'Are you on a special diet or do you avoid certain types of foods or food groups?',
+  40: 'Allergies to food or stinging insects?'
+};
+var MPSSAA_SECTIONS_ = { 1: 'General medical history', 9: 'Heart health questions about you',
+  16: 'Heart health questions about your family', 20: 'Bone and joint questions', 22: 'Medical questions' };
+/** The sports HCS offers, by the child's sex (Josh 2026-10-29): Basketball, Cross Country, Golf and Soccer for both,
+ *  Baseball for boys, Softball and Volleyball for girls. One Sport(s) question each, shown by the sex field. */
+var MPSSAA_SPORTS_ = {
+  Female: ['Basketball', 'Cross Country', 'Golf', 'Soccer', 'Softball', 'Volleyball'],
+  Male: ['Baseball', 'Basketball', 'Cross Country', 'Golf', 'Soccer']
+};
+
+/** Pure. The form's fields, in order (ids match MPSSAA_BOXES_). */
+function mpssaaFields_() {
+  function yn(id, label, extra) {
+    var f = { id: id, type: 'yesno', label: label, required: false, priorYear: true };
+    Object.keys(extra || {}).forEach(function (k) { f[k] = extra[k]; });
+    return f;
+  }
+  function limit(n) { return { maxLen: n }; }
+  function contact(n, who) {
+    var p = 'c' + n, k = 'ec' + n;
+    return [
+      { id: p + 'Name', type: 'text', label: who + ' contact name', required: n === 1, prefillFrom: k + 'Name', priorYear: true },
+      { id: p + 'Rel', type: 'text', label: 'Relationship to student', required: n === 1, prefillFrom: k + 'Relationship', priorYear: true },
+      { id: p + 'Day', type: 'phone', label: 'Daytime phone', prefillFrom: k + 'DayPhone', priorYear: true },
+      { id: p + 'Eve', type: 'phone', label: 'Evening phone', prefillFrom: k + 'EveningPhone', priorYear: true },
+      { id: p + 'Cell', type: 'phone', label: 'Cell phone', prefillFrom: k + 'CellPhone', priorYear: true }
+    ];
+  }
+  var fem = { field: 'sex', op: 'equals', value: 'Female' }, male = { field: 'sex', op: 'equals', value: 'Male' };
+  var out = [
+    { id: 'secS', type: 'sectionHeader', label: 'Student (from FACTS)' },
+    { id: 'student', type: 'studentPicker', label: 'Student', required: true },
+    { id: 'grade', type: 'text', label: 'Grade', prefillFrom: 'studentGrade' },
+    { id: 'dob', type: 'date', label: 'Date of birth', required: true, prefillFrom: 'studentDob' },
+    { id: 'age', type: 'text', label: 'Age', prefillFrom: 'studentAge' },
+    { id: 'sex', type: 'text', label: 'Sex assigned at birth', required: true, prefillFrom: 'studentSex',
+      validation: { pattern: '^(Female|Male)$', patternMsg: 'Type Female or Male.' } },
+    { id: 'school', type: 'text', label: 'School', prefillFrom: 'orgName' },
+    { id: 'sportsF', type: 'checkboxes', label: 'Sport(s)', required: true, priorYear: true, options: MPSSAA_SPORTS_.Female.slice(), showIf: fem },
+    { id: 'sportsM', type: 'checkboxes', label: 'Sport(s)', required: true, priorYear: true, options: MPSSAA_SPORTS_.Male.slice(), showIf: male },
+    { id: 'secG', type: 'sectionHeader', label: 'You (parent / guardian)' },
+    { id: 'pName', type: 'text', label: 'Your name', required: true, prefillFrom: 'parentName',
+      help: 'Printed as the parent/guardian name on page 4.' },
+    { id: 'pEmail', type: 'email', label: 'Email', required: true, prefillFrom: 'parentEmail', help: 'Verified — the email you signed in with.' },
+    { id: 'secC', type: 'sectionHeader', label: 'Emergency contacts (from FACTS)' },
+    { id: 'cNote', type: 'description', label: 'These come from the school’s emergency contact list in FACTS (or, where it has none, the parents FACTS lists). A change here only changes this printout — to fix it for good, update FACTS Family Portal or tell the school office.' }
+  ].concat(contact(1, 'Primary'), contact(2, 'Secondary'), [
+    { id: 'secH', type: 'sectionHeader', label: 'Emergency health information (page 4)' },
+    { id: 'health', type: 'textarea', label: 'Significant health problems a doctor should know about in an emergency', priorYear: true, validation: limit(600) },
+    { id: 'allergies', type: 'textarea', label: 'Allergies to medications, etc.', priorYear: true, validation: limit(450) },
+    yn('inhaler', 'Is the student currently prescribed an inhaler?', { required: true }),
+    yn('epipen', 'Is the student currently prescribed an EpiPen?', { required: true }),
+    { id: 'secP2', type: 'sectionHeader', label: 'Part II — Medical history (page 2)' },
+    { id: 'p2Note', type: 'description', label: 'Answer for your child as of today. If you used this form before, last time’s answers are filled in — check every one. Leave a question blank if you don’t know; circle it on the printed form.' }
+  ]);
+  for (var n = 1; n <= 40; n++) {
+    if (MPSSAA_SECTIONS_[n]) out.push({ id: 'secQ' + n, type: 'sectionHeader', label: MPSSAA_SECTIONS_[n] });
+    out.push(yn('q' + n, n + '. ' + MPSSAA_QUESTIONS_[n]));
+    if (n === 3) {
+      out.push({ id: 'q3Conds', type: 'checkboxes', label: 'Which conditions?', priorYear: true,
+        options: ['Asthma', 'Anemia', 'Diabetes', 'Infections', 'Other'], showIf: { field: 'q3', op: 'equals', value: 'Yes' } });
+      out.push({ id: 'q3Other', type: 'text', label: 'Other condition', priorYear: true, validation: limit(60),
+        showIf: { field: 'q3Conds', op: 'contains', value: 'Other' } });
+    }
+    if (n === 7) out.push({ id: 'q7Why', type: 'text', label: 'Why?', priorYear: true, validation: limit(70), showIf: { field: 'q7', op: 'equals', value: 'Yes' } });
+    if (n === 13) {
+      out.push({ id: 'q13Conds', type: 'checkboxes', label: 'Which heart problems?', priorYear: true,
+        options: ['High blood pressure', 'A heart murmur', 'High cholesterol', 'A heart infection', 'Kawasaki disease', 'Other'],
+        showIf: { field: 'q13', op: 'equals', value: 'Yes' } });
+      out.push({ id: 'q13Other', type: 'text', label: 'Other heart problem', priorYear: true, validation: limit(30),
+        showIf: { field: 'q13Conds', op: 'contains', value: 'Other' } });
+    }
+    if (n === 31) out.push(yn('q31b', '31b. Does someone in your family have sickle cell trait or disease?'));
+  }
+  return out.concat([
+    yn('q41', '41. Have you ever had a COVID-19 diagnosis?'),
+    { id: 'q41Date', type: 'text', label: 'COVID-19 diagnosis date', priorYear: true, placeholder: 'MM/YYYY', validation: limit(12),
+      showIf: { field: 'q41', op: 'equals', value: 'Yes' } },
+    { id: 'q42Type', type: 'radio', label: '42. Last tetanus shot — which type?', priorYear: true, options: ['Tdap', 'Td'] },
+    { id: 'q42Date', type: 'text', label: '42. Date of the last Tdap or Td shot', priorYear: true, placeholder: 'MM/YYYY', validation: limit(12) },
+    { id: 'secFem', type: 'sectionHeader', label: 'Females only', showIf: fem },
+    yn('q45', '45. Have you ever had a menstrual period?', { showIf: fem }),
+    { id: 'q46', type: 'text', label: '46. Age when you had your first menstrual period', priorYear: true, validation: limit(8), showIf: fem },
+    { id: 'q47', type: 'text', label: '47. Number of periods in the last 12 months', validation: limit(10), showIf: fem },
+    { id: 'q48', type: 'text', label: '48. When was your most recent menstrual period?', validation: limit(12), showIf: fem },
+    { id: 'explain', type: 'textarea', label: 'Explain each YES answer', priorYear: true, validation: limit(500),
+      help: 'Start each line with the question number, e.g. “5: penicillin, hives”. Seven lines print on the form.' },
+    { id: 'meds', type: 'textarea', label: 'Medications and nutritional supplements your child takes now', priorYear: true, validation: limit(450) }
+  ]);
+}
+
+/** Pure. The whole schema, given the turn-in form's link for the confirmation message. */
+function mpssaaPhysicalSchema_(turnInUrl) {
+  return {
+    id: MPSSAA_FORM_ID_,
+    title: 'Maryland Sports Physical Form',
+    description: 'Fills in the Maryland (MPSSAA) sports physical form for each of your children from the school’s records. ' +
+      'Print all 4 pages, sign pages 2 and 4, and take them to the doctor.',
+    settings: {
+      access: 'private', lifecycle: 'draft', locked: false, notifyEmails: [],
+      childByChild: true, pdfCopy: true,
+      confirmationMessage: 'Download the form below (it’s also attached to your confirmation email) and print all 4 pages. ' +
+        'Sign pages 2 and 4 and take it to the doctor. After the exam, turn the completed form in on Sports Physical Submission' +
+        (turnInUrl ? ': ' + turnInUrl : '.'),
+      pdfTemplates: []
+    },
+    prefill: { audience: 'parent', identityBlock: true },
+    pages: [{ title: 'Main', fields: mpssaaFields_() }]
+  };
+}
+
+/** The measured box map: {fieldId: [{page (0-based), x, y, w, h (PDF points, top-left), optionValue?, mark?, lines?}]}.
+ *  Generated from the official PDF (docs/MPSSAA_PHYSICAL_FORM.md §5) — regenerate, don't hand-edit. */
+var MPSSAA_BOXES_ = {
+  "q1": [{"page": 1, "x": 269.8, "y": 92.0, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 92.0, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q2": [{"page": 1, "x": 269.8, "y": 113.3, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 113.3, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q3": [{"page": 1, "x": 269.8, "y": 139.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 139.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q4": [{"page": 1, "x": 269.8, "y": 166.9, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 166.9, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q5": [{"page": 1, "x": 269.8, "y": 182.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 182.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q6": [{"page": 1, "x": 269.8, "y": 205.0, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 205.0, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q7": [{"page": 1, "x": 269.8, "y": 231.3, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 231.3, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q8": [{"page": 1, "x": 269.8, "y": 246.8, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 246.8, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q9": [{"page": 1, "x": 269.8, "y": 274.3, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 274.3, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q10": [{"page": 1, "x": 269.8, "y": 296.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 296.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q11": [{"page": 1, "x": 269.8, "y": 318.4, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 318.4, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q12": [{"page": 1, "x": 269.8, "y": 340.9, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 340.9, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q13": [{"page": 1, "x": 269.8, "y": 395.0, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 395.0, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q14": [{"page": 1, "x": 269.8, "y": 432.9, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 432.9, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q15": [{"page": 1, "x": 269.8, "y": 447.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 447.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q16": [{"page": 1, "x": 269.8, "y": 469.5, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 469.5, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q17": [{"page": 1, "x": 269.8, "y": 491.8, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 491.8, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q18": [{"page": 1, "x": 269.8, "y": 538.3, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 538.3, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q19": [{"page": 1, "x": 269.8, "y": 579.8, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 579.8, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q20": [{"page": 1, "x": 269.8, "y": 615.5, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 615.5, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q21": [{"page": 1, "x": 269.8, "y": 641.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 641.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q22": [{"page": 1, "x": 269.8, "y": 672.4, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 672.4, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q23": [{"page": 1, "x": 269.8, "y": 693.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 292.2, "y": 693.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q24": [{"page": 1, "x": 539.9, "y": 85.6, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 85.6, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q25": [{"page": 1, "x": 539.4, "y": 102.9, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 561.7, "y": 102.9, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q26": [{"page": 1, "x": 539.9, "y": 123.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 123.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q27": [{"page": 1, "x": 539.9, "y": 138.4, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 138.4, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q28": [{"page": 1, "x": 539.9, "y": 159.8, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 159.8, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q29": [{"page": 1, "x": 539.9, "y": 171.2, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 171.2, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q30": [{"page": 1, "x": 539.9, "y": 194.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 194.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q31": [{"page": 1, "x": 540.0, "y": 214.0, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.3, "y": 213.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q31b": [{"page": 1, "x": 539.9, "y": 223.0, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 222.5, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q32": [{"page": 1, "x": 539.9, "y": 235.3, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 235.3, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q33": [{"page": 1, "x": 539.9, "y": 253.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 253.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q34": [{"page": 1, "x": 539.9, "y": 274.3, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 274.3, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q35": [{"page": 1, "x": 539.9, "y": 289.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 289.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q36": [{"page": 1, "x": 539.9, "y": 300.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 300.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q37": [{"page": 1, "x": 539.9, "y": 312.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 312.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q38": [{"page": 1, "x": 539.9, "y": 329.9, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 329.9, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q39": [{"page": 1, "x": 539.9, "y": 340.0, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 340.0, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q40": [{"page": 1, "x": 539.9, "y": 362.2, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 362.2, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q45": [{"page": 1, "x": 539.9, "y": 447.7, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 447.7, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q41": [{"page": 1, "x": 539.9, "y": 382.1, "w": 6.5, "h": 7.6, "optionValue": "Yes", "mark": "x"}, {"page": 1, "x": 562.2, "y": 382.1, "w": 6.5, "h": 7.6, "optionValue": "No", "mark": "x"}],
+  "q3Conds": [{"page": 1, "x": 82.5, "y": 138.7, "w": 6.1, "h": 7.0, "optionValue": "Asthma", "mark": "x"}, {"page": 1, "x": 119.1, "y": 138.7, "w": 6.1, "h": 7.0, "optionValue": "Anemia", "mark": "x"}, {"page": 1, "x": 153.9, "y": 138.7, "w": 6.1, "h": 7.0, "optionValue": "Diabetes", "mark": "x"}, {"page": 1, "x": 192.0, "y": 138.7, "w": 6.1, "h": 7.0, "optionValue": "Infections", "mark": "x"}, {"page": 1, "x": 53.0, "y": 148.8, "w": 6.1, "h": 7.0, "optionValue": "Other", "mark": "x"}],
+  "q13Conds": [{"page": 1, "x": 56.9, "y": 382.5, "w": 6.1, "h": 7.0, "optionValue": "High blood pressure", "mark": "x"}, {"page": 1, "x": 137.1, "y": 382.5, "w": 6.1, "h": 7.0, "optionValue": "A heart murmur", "mark": "x"}, {"page": 1, "x": 56.9, "y": 392.7, "w": 6.1, "h": 7.0, "optionValue": "High cholesterol", "mark": "x"}, {"page": 1, "x": 138.0, "y": 392.7, "w": 6.1, "h": 7.0, "optionValue": "A heart infection", "mark": "x"}, {"page": 1, "x": 56.9, "y": 402.9, "w": 6.1, "h": 7.0, "optionValue": "Kawasaki disease", "mark": "x"}, {"page": 1, "x": 138.2, "y": 402.9, "w": 6.1, "h": 7.0, "optionValue": "Other", "mark": "x"}],
+  "q3Other": [{"page": 1, "x": 82, "y": 146.6, "w": 177, "h": 9}],
+  "q7Why": [{"page": 1, "x": 56, "y": 233.5, "w": 203, "h": 8.5}],
+  "q13Other": [{"page": 1, "x": 167, "y": 401.0, "w": 92, "h": 8.8}],
+  "q41Date": [{"page": 1, "x": 485, "y": 377.2, "w": 46, "h": 9}],
+  "q42Type": [{"page": 1, "x": 417.4, "y": 397.8, "w": 18.3, "h": 8.0, "optionValue": "Tdap", "mark": "circle"}, {"page": 1, "x": 444.0, "y": 397.8, "w": 10.1, "h": 8.0, "optionValue": "Td", "mark": "circle"}],
+  "q42Date": [{"page": 1, "x": 452, "y": 405.6, "w": 79, "h": 9}],
+  "q46": [{"page": 1, "x": 480, "y": 457.2, "w": 44, "h": 8.6}],
+  "q47": [{"page": 1, "x": 462, "y": 468.2, "w": 60, "h": 8.7}],
+  "q48": [{"page": 1, "x": 481, "y": 478.9, "w": 41, "h": 8.7}],
+  "explain": [{"page": 1, "x": 324, "y": 500.6, "w": 251, "h": 142.6, "lines": 7}],
+  "meds": [{"page": 1, "x": 310, "y": 655.5, "w": 265, "h": 51}],
+  "student": [{"page": 1, "x": 308, "y": 38.5, "w": 183, "h": 10.8}, {"page": 2, "x": 60, "y": 75.0, "w": 188, "h": 9.6}, {"page": 3, "x": 132, "y": 97.5, "w": 195, "h": 12.3}],
+  "grade": [{"page": 1, "x": 523, "y": 38.5, "w": 42, "h": 10.8}, {"page": 3, "x": 372, "y": 97.5, "w": 40, "h": 12.3}],
+  "dob": [{"page": 2, "x": 310, "y": 75.0, "w": 71, "h": 9.6}, {"page": 3, "x": 510, "y": 97.5, "w": 64, "h": 12.3}],
+  "school": [{"page": 2, "x": 414, "y": 75.0, "w": 161, "h": 9.6}],
+  "sex": [{"page": 2, "x": 450, "y": 92.9, "w": 124, "h": 10.4}],
+  "age": [{"page": 3, "x": 449, "y": 97.5, "w": 29, "h": 12.3}],
+  "sportsF": [{"page": 3, "x": 88, "y": 112.1, "w": 486, "h": 12.3}],
+  "sportsM": [{"page": 3, "x": 88, "y": 112.1, "w": 486, "h": 12.3}],
+  "health": [{"page": 3, "x": 38, "y": 158.5, "w": 540, "h": 42}],
+  "allergies": [{"page": 3, "x": 38, "y": 220.5, "w": 540, "h": 32}],
+  "inhaler": [{"page": 3, "x": 390.7, "y": 256.3, "w": 23, "h": 12.5, "optionValue": "Yes", "mark": "circle"}, {"page": 3, "x": 418.7, "y": 256.3, "w": 17, "h": 12.5, "optionValue": "No", "mark": "circle"}],
+  "epipen": [{"page": 3, "x": 391.5, "y": 270.9, "w": 23, "h": 12.6, "optionValue": "Yes", "mark": "circle"}, {"page": 3, "x": 419.7, "y": 270.9, "w": 17, "h": 12.6, "optionValue": "No", "mark": "circle"}],
+  "c1Name": [{"page": 3, "x": 156, "y": 299.3, "w": 213, "h": 12.6}],
+  "c1Rel": [{"page": 3, "x": 494, "y": 299.3, "w": 77, "h": 12.6}],
+  "c1Day": [{"page": 3, "x": 336, "y": 328.8, "w": 226, "h": 10.6}],
+  "c1Eve": [{"page": 3, "x": 353, "y": 347.6, "w": 220, "h": 11.0}],
+  "c1Cell": [{"page": 3, "x": 134, "y": 369.2, "w": 322, "h": 10.6}],
+  "c2Name": [{"page": 3, "x": 169, "y": 387.5, "w": 196, "h": 12.6}],
+  "c2Rel": [{"page": 3, "x": 489, "y": 387.5, "w": 82, "h": 12.6}],
+  "c2Day": [{"page": 3, "x": 336, "y": 417.0, "w": 226, "h": 10.6}],
+  "c2Eve": [{"page": 3, "x": 333, "y": 435.2, "w": 222, "h": 11.0}],
+  "c2Cell": [{"page": 3, "x": 134, "y": 453.8, "w": 198, "h": 10.6}],
+  "pName": [{"page": 3, "x": 329, "y": 556.6, "w": 237, "h": 11.2}]
+};
+
+/**
+ * Creates FRM-MPSSAA-PHYSICAL as a DRAFT, private form: schema + box map + the official PDF
+ * (downloaded, checked against its SHA-256) as a "Sharp PDF" document, page previews for the Builder,
+ * and an empty Responses sheet. Refuses if the form already exists. Admin-only; sends nothing,
+ * publishes nothing. In MpssaaPhysical.gs (apps/builder), from the editor Run menu.
+ */
+async function RUN_createMpssaaPhysicalForm() {
+  var who = assertAdminRun_();
+  if (regFind_(MPSSAA_FORM_ID_)) throw new Error(MPSSAA_FORM_ID_ + ' already exists — nothing changed. Edit it in the Builder.');
+
+  var res = UrlFetchApp.fetch(MPSSAA_PDF_URL_, { muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('Could not download the MPSSAA form (HTTP ' + res.getResponseCode() + ') from ' + MPSSAA_PDF_URL_);
+  var bytes = res.getContent();
+  var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes).map(function (b) {
+    return ('0' + (b & 0xff).toString(16)).slice(-2);
+  }).join('');
+  if (hash !== MPSSAA_PDF_SHA256_) {
+    throw new Error('The MPSSAA PDF at ' + MPSSAA_PDF_URL_ + ' is not the May 2024 file the box map was measured on (SHA-256 ' +
+      hash + '). Nothing was created. If MPSSAA revised the form, the boxes need re-measuring first.');
+  }
+
+  var publicUrl = cfGetConfig_('PUBLIC_URL', '');
+  var schema = mpssaaPhysicalSchema_(publicUrl ? publicUrl + '?form=FRM-SPORTS-PHYSICAL' : '');
+  var folder = getFormFolder_(MPSSAA_FORM_ID_, schema.title);
+  var now = new Date().toISOString();
+  sysTab_(SYS.TABS.REGISTRY).appendRow([MPSSAA_FORM_ID_, schema.title, who, 'draft', 'private',
+    false, now, now, '', folder.getId(), '', 1, false, '', '', 'Athletics']);
+
+  var templateId = newPdfTemplateId_();
+  var ingested = await ingestPdfTemplateSource_(pdfTemplateFolder_(MPSSAA_FORM_ID_, templateId),
+    'MPSSAA physical form (May 2024).pdf', 'application/pdf', Utilities.base64Encode(bytes));
+  schema.settings.pdfTemplates.push({
+    id: templateId, name: 'MPSSAA physical form (May 2024)', enabled: true, renderer: 'stamp',
+    sourcePdfFileId: ingested.sourcePdfFileId, slidesTemplateId: '',
+    pageCount: ingested.pageCount, pages: ingested.pages,
+    fieldBoxes: JSON.parse(JSON.stringify(MPSSAA_BOXES_)), calcFields: {}, mappedAt: now, lastBuildError: ''
+  });
+  saveSchemaObj_(MPSSAA_FORM_ID_, schema);
+  ensureResponseSheet_(MPSSAA_FORM_ID_, schema);
+  Logger.log('Created ' + MPSSAA_FORM_ID_ + ' as a DRAFT (owner ' + who + '). Nothing is published or sent.\n' +
+    'Builder: open "' + schema.title + '" → Preview. Parent link once published: ' + (publicUrl || '(PUBLIC_URL not set)') + '?form=' + MPSSAA_FORM_ID_);
+  return { ok: true, formId: MPSSAA_FORM_ID_ };
+}
+
+/**
+ * Pure. What RUN_updateMpssaaPhysicalForm changes on the live form: its questions become mpssaaFields_()
+ * and its Sharp PDF document's boxes become MPSSAA_BOXES_. Everything else — title, settings, publish
+ * state, the PDF itself — is kept. Returns {schema, changes}: one line per question or box added (+),
+ * removed (-) or changed (~); no changes means the live form already matches this file.
+ */
+function mpssaaUpdatePlan_(live, now) {
+  var schema = JSON.parse(JSON.stringify(live));
+  if ((schema.pages || []).length !== 1) throw new Error('Expected one page, found ' + (schema.pages || []).length + ' — nothing changed.');
+  var stamps = ((schema.settings || {}).pdfTemplates || []).filter(function (t) { return t.renderer === 'stamp'; });
+  if (stamps.length !== 1) throw new Error('Expected one Sharp PDF document, found ' + stamps.length + ' — nothing changed.');
+  var changes = [];
+  // Compare content, not text: after a Builder save the live copy's keys come back in another order
+  // (seen 2026-10-29 — every question differed as text and none in content).
+  function canon(v) {
+    if (Array.isArray(v)) return v.map(canon);
+    if (!v || typeof v !== 'object') return v;
+    var o = {};
+    Object.keys(v).sort().forEach(function (k) { o[k] = canon(v[k]); });
+    return o;
+  }
+  function diff(kind, before, after) {
+    Object.keys(after).forEach(function (k) {
+      if (!(k in before)) changes.push('+ ' + kind + ' ' + k);
+      else if (JSON.stringify(canon(before[k])) !== JSON.stringify(canon(after[k]))) changes.push('~ ' + kind + ' ' + k);
+    });
+    Object.keys(before).forEach(function (k) { if (!(k in after)) changes.push('- ' + kind + ' ' + k); });
+  }
+  function byId(fields) { var m = {}; fields.forEach(function (f) { m[f.id] = f; }); return m; }
+  var fields = mpssaaFields_();
+  var oldFields = schema.pages[0].fields || [];
+  diff('question', byId(oldFields), byId(fields));
+  if (!changes.length && JSON.stringify(oldFields.map(function (f) { return f.id; })) !== JSON.stringify(fields.map(function (f) { return f.id; }))) {
+    changes.push('~ question order');
+  }
+  var questionChanges = changes.length;
+  diff('box', stamps[0].fieldBoxes || {}, MPSSAA_BOXES_);
+  schema.pages[0].fields = fields;
+  stamps[0].fieldBoxes = JSON.parse(JSON.stringify(MPSSAA_BOXES_));
+  if (changes.length > questionChanges) stamps[0].mappedAt = now;
+  return { schema: schema, changes: changes };
+}
+
+/** Logs what RUN_updateMpssaaPhysicalForm would change; changes nothing. In MpssaaPhysical.gs (apps/builder), editor Run menu. */
+function RUN_previewMpssaaPhysicalUpdate() {
+  assertAdminRun_();
+  if (!regFind_(MPSSAA_FORM_ID_)) throw new Error(MPSSAA_FORM_ID_ + ' does not exist — nothing to update.');
+  var plan = mpssaaUpdatePlan_(loadSchemaObj_(MPSSAA_FORM_ID_), new Date().toISOString());
+  Logger.log(plan.changes.length ? 'Would change ' + MPSSAA_FORM_ID_ + ':\n' + plan.changes.join('\n') : 'Already matches this file — nothing to change.');
+  return { ok: true, changes: plan.changes };
+}
+
+/**
+ * Brings the live FRM-MPSSAA-PHYSICAL up to this file's questions and box map (first used for the sports
+ * by sex, 2026-10-29). Keeps title, settings, publish state, owner, the PDF and the responses; bumps the
+ * form's version so a Builder tab opened earlier can't save its old copy over it. Run
+ * RUN_previewMpssaaPhysicalUpdate first. Admin-only; publishes and sends nothing. In MpssaaPhysical.gs
+ * (apps/builder), from the editor Run menu.
+ */
+function RUN_updateMpssaaPhysicalForm() {
+  var who = assertAdminRun_();
+  var r = regFind_(MPSSAA_FORM_ID_);
+  if (!r) throw new Error(MPSSAA_FORM_ID_ + ' does not exist — nothing to update.');
+  var plan = mpssaaUpdatePlan_(loadSchemaObj_(MPSSAA_FORM_ID_), new Date().toISOString());
+  if (!plan.changes.length) { Logger.log('Already matches this file — nothing changed.'); return { ok: true, changes: [] }; }
+  var version = checkAndBumpVersion_(r, MPSSAA_FORM_ID_);
+  saveSchemaObj_(MPSSAA_FORM_ID_, plan.schema);
+  Logger.log('Updated ' + MPSSAA_FORM_ID_ + ' to version ' + version + ' (' + who + '):\n' + plan.changes.join('\n') +
+    '\nNothing published or sent.');
+  return { ok: true, version: version, changes: plan.changes };
+}
+
+if (typeof module !== 'undefined') module.exports = {
+  MPSSAA_FORM_ID_: MPSSAA_FORM_ID_, MPSSAA_PDF_SHA256_: MPSSAA_PDF_SHA256_, MPSSAA_BOXES_: MPSSAA_BOXES_,
+  MPSSAA_SPORTS_: MPSSAA_SPORTS_, mpssaaFields_: mpssaaFields_, mpssaaPhysicalSchema_: mpssaaPhysicalSchema_,
+  mpssaaUpdatePlan_: mpssaaUpdatePlan_
+};
+
 /* ===================== apps/runner-public/server/RunnerApi.js ===================== */
 /**
  * GENERATED FILE — DO NOT HAND-EDIT.
@@ -10828,6 +11215,13 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     FACTS_OK_MIMES: typeof FACTS_OK_MIMES === 'undefined' ? undefined : FACTS_OK_MIMES,
     FIELD_BOX_METADATA_MARKER: typeof FIELD_BOX_METADATA_MARKER === 'undefined' ? undefined : FIELD_BOX_METADATA_MARKER,
     FactsLogic: typeof FactsLogic === 'undefined' ? undefined : FactsLogic,
+    MPSSAA_BOXES_: typeof MPSSAA_BOXES_ === 'undefined' ? undefined : MPSSAA_BOXES_,
+    MPSSAA_FORM_ID_: typeof MPSSAA_FORM_ID_ === 'undefined' ? undefined : MPSSAA_FORM_ID_,
+    MPSSAA_PDF_SHA256_: typeof MPSSAA_PDF_SHA256_ === 'undefined' ? undefined : MPSSAA_PDF_SHA256_,
+    MPSSAA_PDF_URL_: typeof MPSSAA_PDF_URL_ === 'undefined' ? undefined : MPSSAA_PDF_URL_,
+    MPSSAA_QUESTIONS_: typeof MPSSAA_QUESTIONS_ === 'undefined' ? undefined : MPSSAA_QUESTIONS_,
+    MPSSAA_SECTIONS_: typeof MPSSAA_SECTIONS_ === 'undefined' ? undefined : MPSSAA_SECTIONS_,
+    MPSSAA_SPORTS_: typeof MPSSAA_SPORTS_ === 'undefined' ? undefined : MPSSAA_SPORTS_,
     Mailer: typeof Mailer === 'undefined' ? undefined : Mailer,
     OVERLAY_DEFAULT_FONT_SIZE_POINTS: typeof OVERLAY_DEFAULT_FONT_SIZE_POINTS === 'undefined' ? undefined : OVERLAY_DEFAULT_FONT_SIZE_POINTS,
     OVERLAY_MAX_FONT_SIZE_POINTS: typeof OVERLAY_MAX_FONT_SIZE_POINTS === 'undefined' ? undefined : OVERLAY_MAX_FONT_SIZE_POINTS,
@@ -10841,7 +11235,10 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     REG_COL: typeof REG_COL === 'undefined' ? undefined : REG_COL,
     RESP_PREFIX: typeof RESP_PREFIX === 'undefined' ? undefined : RESP_PREFIX,
     RUN_authFingerprint_: typeof RUN_authFingerprint_ === 'undefined' ? undefined : RUN_authFingerprint_,
+    RUN_createMpssaaPhysicalForm: typeof RUN_createMpssaaPhysicalForm === 'undefined' ? undefined : RUN_createMpssaaPhysicalForm,
+    RUN_previewMpssaaPhysicalUpdate: typeof RUN_previewMpssaaPhysicalUpdate === 'undefined' ? undefined : RUN_previewMpssaaPhysicalUpdate,
     RUN_setPhysicalMirrorConfig: typeof RUN_setPhysicalMirrorConfig === 'undefined' ? undefined : RUN_setPhysicalMirrorConfig,
+    RUN_updateMpssaaPhysicalForm: typeof RUN_updateMpssaaPhysicalForm === 'undefined' ? undefined : RUN_updateMpssaaPhysicalForm,
     RespSheet: typeof RespSheet === 'undefined' ? undefined : RespSheet,
     RespSheetLogic: typeof RespSheetLogic === 'undefined' ? undefined : RespSheetLogic,
     SEED_FNS_: typeof SEED_FNS_ === 'undefined' ? undefined : SEED_FNS_,
@@ -11098,6 +11495,9 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     mintAppHandoffTicket_: typeof mintAppHandoffTicket_ === 'undefined' ? undefined : mintAppHandoffTicket_,
     mirrorPhysicalRow_: typeof mirrorPhysicalRow_ === 'undefined' ? undefined : mirrorPhysicalRow_,
     mostRecentPriorAnswers_: typeof mostRecentPriorAnswers_ === 'undefined' ? undefined : mostRecentPriorAnswers_,
+    mpssaaFields_: typeof mpssaaFields_ === 'undefined' ? undefined : mpssaaFields_,
+    mpssaaPhysicalSchema_: typeof mpssaaPhysicalSchema_ === 'undefined' ? undefined : mpssaaPhysicalSchema_,
+    mpssaaUpdatePlan_: typeof mpssaaUpdatePlan_ === 'undefined' ? undefined : mpssaaUpdatePlan_,
     newFormId_: typeof newFormId_ === 'undefined' ? undefined : newFormId_,
     newPdfTemplateId_: typeof newPdfTemplateId_ === 'undefined' ? undefined : newPdfTemplateId_,
     nextEnabledAfterBuild_: typeof nextEnabledAfterBuild_ === 'undefined' ? undefined : nextEnabledAfterBuild_,

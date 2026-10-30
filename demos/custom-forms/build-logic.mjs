@@ -13,10 +13,12 @@
 // as Apps Script re-initialises a project's globals (the _SYS_SS / _DIR_ROWS / _ACTIVE_CTX memos) on
 // every request.
 //
-// NOT vendored: PdfLibVendor.js + PdfLibPolyfills.js (526 KB of pdf-lib, used only to split an uploaded
-// PDF while building a PDF template on Google Slides — mock.js answers those builder calls with a
-// plain "runs on Google Slides" notice). Builder's Maintenance.js is vendored for the one endpoint the
-// page calls (adminMigrateResponseSheet).
+// NOT vendored: PdfLibVendor.js + PdfLibPolyfills.js (526 KB of pdf-lib; the Builder uses it to split an
+// uploaded PDF while building a PDF template on Google Slides — mock.js answers those builder calls with a
+// plain "runs on Google Slides" notice). The same pdf-lib release (1.17.1) is loaded from a CDN by mock.js
+// only when the parent page opens the Maryland physical form, whose "Sharp PDF" renderer draws with it.
+// Builder's Maintenance.js is vendored for the one endpoint the page calls (adminMigrateResponseSheet);
+// MpssaaPhysical.js for the physical form's schema and box map, which mock.js seeds the form from.
 //
 // Scrubs, all mechanical (verify.mjs re-runs this build and fails on any drift):
 //   - the real school domain -> example.edu; live /exec URLs and deployment ids -> placeholders;
@@ -45,6 +47,7 @@ export const FILES = [
   B + '/Theme.js', B + '/Facts.js', B + '/ResponseSheet.js', B + '/Forms.js', B + '/Approvals.js', B + '/AppsManager.js',
   B + '/PdfTemplate.js',
   B + '/AdminSettings.js', B + '/Maintenance.js',          // builder only
+  B + '/MpssaaPhysical.js',                               // builder only: the Maryland physical form's schema + measured box map
   'apps/runner-public/server/RunnerApi.js',               // the three runners only (byte-identical in each)
   'Seeds.js'                                              // the built-in form definitions (adminReseedForms)
 ];
