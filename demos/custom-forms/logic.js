@@ -142,7 +142,7 @@ function isContentType(type) {
  * Form-level settings persisted via setFormState, by coercion kind — the single list the server
  * (Forms.setFormState) and the builder (stateFromSettings_) both iterate.
  */
-var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames'];
+var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames', 'childByChild'];
 var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage', 'humanDriveNameField'];
 
 /**
@@ -475,7 +475,14 @@ var FactsLogic = (function () {
   var COLS = {
     sheet1: { studentId: 0, name: 1, studentEmail: 2, status: 3, grade: 4,
               guardianName: 5, guardianEmail1: 6, guardianEmail2: 7, homeroom: 8, homeroomTeacher: 9, gender: 10,
-              homeschool: 12 }, // 'Homeschool' (Y/blank) appended by facts-api-sync 2026-10-09 (after Locker)
+              homeschool: 12, // 'Homeschool' (Y/blank) appended by facts-api-sync 2026-10-09 (after Locker)
+              // the guardian link's own facts, appended by facts-api-sync 2026-10-26 (talon-hub family contacts)
+              guardianId: 13, guardianRelationship: 14, guardianCustody: 15, guardianCell: 17,
+              guardianFirst: 18, guardianLast: 19 },
+    // 'Student Birthdates' tab (facts-api-sync 2026-10-28) and 'Emergency Contacts' tab — the
+    // pre-filled MPSSAA physical form (docs/MPSSAA_PHYSICAL_FORM.md)
+    birthdates: { studentId: 0, birthdate: 1 },
+    emergency: { studentId: 0, order: 2, name: 3, relationship: 4, cell: 5, home: 6, work: 7 },
     schedules: { studentId: 0, studentName: 1, grade: 2, classCode: 3,
                  classDescription: 4, category: 5, teacher: 6, quarters: 7 },
     teachers: { staffId: 0, teacherName: 1 },
@@ -492,8 +499,13 @@ var FactsLogic = (function () {
       guardianName: ['lastname firstname 1', 'contact name', 'parent name', 'guardian name'],
       guardianEmail1: ['email 1', 'email1'], guardianEmail2: ['email2', 'email 2'],
       homeroom: ['homeroom'], homeroomTeacher: ['homeroom teacher'], gender: ['gender'],
-      homeschool: ['homeschool']
+      homeschool: ['homeschool'], guardianId: ['guardian id'], guardianRelationship: ['guardian relationship'],
+      guardianCustody: ['guardian custody'], guardianCell: ['guardian cell'],
+      guardianFirst: ['guardian first name'], guardianLast: ['guardian last name']
     },
+    birthdates: { studentId: ['student id'], birthdate: ['birthdate'] },
+    emergency: { studentId: ['student id'], order: ['order'], name: ['contact name'], relationship: ['relationship'],
+      cell: ['cell phone'], home: ['home phone'], work: ['work phone'] },
     schedules: {
       studentId: ['student id (system)', 'student id', 'studentid'],
       studentName: ['student name', 'lastname firstname'], grade: ['grade level', 'grade'],
@@ -543,6 +555,8 @@ var FactsLogic = (function () {
       var email = String(raw || '').trim().toLowerCase();
       if (email) guardians.push({ name: guardianName, email: email });
     });
+    var gFirst = String(cells[idx.guardianFirst] || '').trim(), gLast = String(cells[idx.guardianLast] || '').trim();
+    var gNm = (gFirst || gLast) ? { first: gFirst, last: gLast } : splitName(guardianName);
     return {
       studentId: String(cells[idx.studentId] || '').trim(),
       last: nm.last,
@@ -552,7 +566,14 @@ var FactsLogic = (function () {
       homeroom: String(cells[idx.homeroom] || '').trim(),
       homeroomTeacher: String(cells[idx.homeroomTeacher] || '').trim(),
       homeschool: String(cells[idx.homeschool] || '').trim().toUpperCase() === 'Y',
-      guardians: guardians
+      gender: String(cells[idx.gender] || '').trim(),
+      guardians: guardians,
+      // this row's guardian link — the page-4 contact fallback when FACTS lists no emergency contact
+      link: { id: String(cells[idx.guardianId] == null ? '' : cells[idx.guardianId]).trim(),
+        name: displayName(gNm.first, gNm.last),
+        relationship: String(cells[idx.guardianRelationship] || '').trim(),
+        custodial: String(cells[idx.guardianCustody] || '').trim().toUpperCase() === 'Y',
+        cell: String(cells[idx.guardianCell] || '').trim() }
     };
   }
 
@@ -577,8 +598,15 @@ var FactsLogic = (function () {
       var e = byId[rec.studentId];
       if (!e) e = byId[rec.studentId] = { studentId: rec.studentId, last: rec.last, first: rec.first,
         grade: rec.grade, studentEmail: rec.studentEmail, homeroom: rec.homeroom,
-        homeroomTeacher: rec.homeroomTeacher, homeschool: !!rec.homeschool, guardians: [], _seen: {} };
+        homeroomTeacher: rec.homeroomTeacher, homeschool: !!rec.homeschool, gender: rec.gender || '',
+        guardians: [], custodial: [], _seen: {}, _seenLink: {} };
       if (rec.homeschool) e.homeschool = true;
+      if (!e.gender && rec.gender) e.gender = rec.gender;
+      var lk = rec.link;
+      if (lk && lk.custodial && lk.name && !e._seenLink[lk.id || nameKey_(lk.name)]) {
+        e._seenLink[lk.id || nameKey_(lk.name)] = true;
+        e.custodial.push({ name: lk.name, relationship: lk.relationship, cell: lk.cell });
+      }
       if (!e.studentEmail && rec.studentEmail) e.studentEmail = rec.studentEmail;
       if (!e.homeroom && rec.homeroom) e.homeroom = rec.homeroom;
       if (!e.homeroomTeacher && rec.homeroomTeacher) e.homeroomTeacher = rec.homeroomTeacher;
@@ -587,7 +615,7 @@ var FactsLogic = (function () {
 
     return Object.keys(byId).map(function (id) {
       var e = byId[id];
-      delete e._seen;
+      delete e._seen; delete e._seenLink;
       e.displayName = displayName(e.first, e.last);
       return e;
     });
@@ -599,12 +627,12 @@ var FactsLogic = (function () {
     entries.forEach(function (e) {
       if (!e.guardians.length) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, '', '', 0, e.homeschool ? 'Y' : '']);
+          e.homeroom, e.homeroomTeacher, '', '', 0, e.homeschool ? 'Y' : '', e.gender || '', e.birthdate || '']);
         return;
       }
       e.guardians.forEach(function (g, i) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1, e.homeschool ? 'Y' : '']);
+          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1, e.homeschool ? 'Y' : '', e.gender || '', e.birthdate || '']);
       });
     });
     return rows;
@@ -745,6 +773,121 @@ var FactsLogic = (function () {
       .map(function (r) { return { classCode: r[1], classDescription: r[2], category: r[3], teacher: r[4] }; });
   }
 
+  // ---------- pre-filled MPSSAA physical form (docs/MPSSAA_PHYSICAL_FORM.md) ----------
+
+  /** A person's name as a comparison key: lower-case, single spaces. */
+  function nameKey_(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
+  /** A date as YYYY-MM-DD, or '' — never a guess. Takes the export's text ('2011-03-14', an ISO
+   *  date-time, or a US 3/14/2011 if a converter reformatted it) or a Date (its local calendar day). */
+  function normalizeDate(v) {
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return '';
+      return v.getFullYear() + '-' + ('0' + (v.getMonth() + 1)).slice(-2) + '-' + ('0' + v.getDate()).slice(-2);
+    }
+    var s = String(v == null ? '' : v).trim();
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(s);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2);
+    return '';
+  }
+
+  /** 'Student Birthdates' body rows -> { studentId: 'YYYY-MM-DD' } (blank and unreadable dates skipped). */
+  function birthdateMap(rows, idx) {
+    idx = resolveIdx_(idx, 'birthdates');
+    var out = {};
+    (rows || []).forEach(function (r) {
+      var id = String((r || [])[idx.studentId] == null ? '' : r[idx.studentId]).trim();
+      var d = normalizeDate((r || [])[idx.birthdate]);
+      if (id && d) out[id] = d;
+    });
+    return out;
+  }
+
+  /** One 'Emergency Contacts' row (FACTS's own order; 99 when FACTS has none). `idx` optional. */
+  function parseEmergencyRow(cells, idx) {
+    idx = resolveIdx_(idx, 'emergency');
+    var order = Number(cells[idx.order]);
+    return {
+      studentId: String(cells[idx.studentId] == null ? '' : cells[idx.studentId]).trim(),
+      order: (cells[idx.order] === '' || cells[idx.order] == null || !isFinite(order)) ? 99 : order,
+      name: String(cells[idx.name] || '').trim(),
+      relationship: String(cells[idx.relationship] || '').trim(),
+      cell: String(cells[idx.cell] || '').trim(),
+      home: String(cells[idx.home] || '').trim(),
+      work: String(cells[idx.work] || '').trim()
+    };
+  }
+
+  /**
+   * The two page-4 contacts per student, as FACTS_Emergency rows
+   * [StudentId, Order (1|2), Name, Relationship, Cell, Home, Work, Source]:
+   * FACTS's emergency contacts in FACTS order first (Source 'emergency'); a gap is filled from the
+   * custodial parents FACTS links to the child (Source 'guardian' — Josh, 2026-10-28), skipping anyone
+   * already listed by name. A student with neither gets no rows.
+   */
+  function buildContactRows(entries, emergencyParsed) {
+    var byStudent = {};
+    (emergencyParsed || []).forEach(function (c, i) {
+      if (!c || !c.studentId || !c.name) return;
+      (byStudent[c.studentId] = byStudent[c.studentId] || []).push({ c: c, i: i });
+    });
+    var rows = [];
+    (entries || []).forEach(function (e) {
+      var picked = [], seen = {};
+      (byStudent[e.studentId] || []).sort(function (a, b) { return a.c.order - b.c.order || a.i - b.i; })
+        .forEach(function (x) {
+          if (picked.length >= 2 || seen[nameKey_(x.c.name)]) return;
+          seen[nameKey_(x.c.name)] = true;
+          picked.push([x.c.name, x.c.relationship, x.c.cell, x.c.home, x.c.work, 'emergency']);
+        });
+      (e.custodial || []).forEach(function (g) {
+        if (picked.length >= 2 || !g.name || seen[nameKey_(g.name)]) return;
+        seen[nameKey_(g.name)] = true;
+        picked.push([g.name, g.relationship || '', g.cell || '', '', '', 'guardian']);
+      });
+      picked.forEach(function (p, k) { rows.push([e.studentId, k + 1].concat(p)); });
+    });
+    return rows;
+  }
+
+  /** Whole years from a YYYY-MM-DD birthdate to a YYYY-MM-DD day, as a string; '' when either is
+   *  unreadable or the result is negative. A Feb 29 birthday counts from Mar 1 in other years. */
+  function ageOn(dob, today) {
+    var b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dob || '')), t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(today || ''));
+    if (!b || !t) return '';
+    var age = Number(t[1]) - Number(b[1]);
+    if (Number(t[2]) < Number(b[2]) || (t[2] === b[2] && Number(t[3]) < Number(b[3]))) age--;
+    return age >= 0 ? String(age) : '';
+  }
+
+  /** FACTS gender as the form prints it ("Sex assigned at birth"): Male / Female, else as FACTS holds it. */
+  function sexLabel(g) {
+    var s = String(g || '').trim();
+    if (/^m(ale)?$/i.test(s)) return 'Male';
+    if (/^f(emale)?$/i.test(s)) return 'Female';
+    return s;
+  }
+
+  /**
+   * What the physical form auto-fills for one student: { dob, sex, age, contacts: [{name, relationship,
+   * day, evening, cell}] } from FACTS_Directory (cols 12/13) and FACTS_Emergency rows. Daytime = work,
+   * else cell, else home; evening = home (Josh, 2026-10-28).
+   */
+  function studentPrefillExtras(directoryRows, contactRows, studentId, today) {
+    var id = String(studentId == null ? '' : studentId).trim();
+    var dir = (directoryRows || []).filter(function (r) { return String(r[0]).trim() === id; })[0] || [];
+    var dob = normalizeDate(dir[13]);
+    var contacts = (contactRows || []).filter(function (r) { return String(r[0]).trim() === id; })
+      .sort(function (a, b) { return Number(a[1]) - Number(b[1]); })
+      .map(function (r) {
+        var cell = String(r[4] || ''), home = String(r[5] || ''), work = String(r[6] || '');
+        return { name: String(r[2] || ''), relationship: String(r[3] || ''), day: work || cell || home, evening: home, cell: cell };
+      });
+    return { dob: dob, sex: sexLabel(dir[12]), age: ageOn(dob, today), contacts: contacts };
+  }
+
   return {
     slug: slug, splitName: splitName, displayName: displayName,
     COLS: COLS, colIndex: colIndex, parseRow: parseRow,
@@ -752,6 +895,8 @@ var FactsLogic = (function () {
     parseScheduleRow: parseScheduleRow, consolidateSchedules: consolidateSchedules, toClassRows: toClassRows,
     studentsForGuardian: studentsForGuardian, guardianForEmail: guardianForEmail,
     classesForStudent: classesForStudent,
+    normalizeDate: normalizeDate, birthdateMap: birthdateMap, parseEmergencyRow: parseEmergencyRow,
+    buildContactRows: buildContactRows, ageOn: ageOn, sexLabel: sexLabel, studentPrefillExtras: studentPrefillExtras,
     parseTeacherLinkRow: parseTeacherLinkRow, parseStaffRow: parseStaffRow,
     consolidateStaff: consolidateStaff, toStaffDirectoryRows: toStaffDirectoryRows,
     teacherNameForEmail: teacherNameForEmail, classesForTeacher: classesForTeacher
@@ -1281,6 +1426,7 @@ var SYS = {
     DIRECTORY: 'FACTS_Directory',
     CLASSES: 'FACTS_Classes',
     FACTS_STAFF: 'FACTS_Staff',
+    EMERGENCY: 'FACTS_Emergency',
     GROUPS: 'Approval_Groups',
     ADMINS: 'Admins',
     STAFF: 'Staff',
@@ -1297,9 +1443,13 @@ var SYS_HEADERS = {
     'IsTemplate', 'TemplateScope', 'LayoutLock', 'Category', 'IconUrl', 'Notes',
     'ClassCode', 'ClassTeacher', 'CloseDate'],
   FACTS_Directory: ['StudentId', 'Last', 'First', 'DisplayName', 'Grade', 'StudentEmail',
-    'Homeroom', 'HomeroomTeacher', 'GuardianName', 'GuardianEmail', 'GuardianSlot', 'Homeschool'],
+    'Homeroom', 'HomeroomTeacher', 'GuardianName', 'GuardianEmail', 'GuardianSlot', 'Homeschool',
+    'Gender', 'Birthdate'], // appended 2026-10-28 (MPSSAA physical form); positional readers stop at Homeschool
   FACTS_Classes: ['StudentId', 'ClassCode', 'ClassDescription', 'Category', 'Teacher'],
   FACTS_Staff: ['Email', 'TeacherName'],
+  // The two page-4 contacts per student for the MPSSAA physical form: FACTS emergency contacts, gaps
+  // filled from custodial parents (Source emergency|guardian). Weekly sync target (FactsLogic.buildContactRows).
+  FACTS_Emergency: ['StudentId', 'Order', 'Name', 'Relationship', 'Cell', 'Home', 'Work', 'Source'],
   Approval_Groups: ['GroupName', 'MemberEmails', 'Notes'],
   Admins: ['Email', 'Notes'],
   Staff: ['Name', 'Email', 'Dept', 'Level', 'Active'],
@@ -3127,7 +3277,14 @@ var FactsLogic = (function () {
   var COLS = {
     sheet1: { studentId: 0, name: 1, studentEmail: 2, status: 3, grade: 4,
               guardianName: 5, guardianEmail1: 6, guardianEmail2: 7, homeroom: 8, homeroomTeacher: 9, gender: 10,
-              homeschool: 12 }, // 'Homeschool' (Y/blank) appended by facts-api-sync 2026-10-09 (after Locker)
+              homeschool: 12, // 'Homeschool' (Y/blank) appended by facts-api-sync 2026-10-09 (after Locker)
+              // the guardian link's own facts, appended by facts-api-sync 2026-10-26 (talon-hub family contacts)
+              guardianId: 13, guardianRelationship: 14, guardianCustody: 15, guardianCell: 17,
+              guardianFirst: 18, guardianLast: 19 },
+    // 'Student Birthdates' tab (facts-api-sync 2026-10-28) and 'Emergency Contacts' tab — the
+    // pre-filled MPSSAA physical form (docs/MPSSAA_PHYSICAL_FORM.md)
+    birthdates: { studentId: 0, birthdate: 1 },
+    emergency: { studentId: 0, order: 2, name: 3, relationship: 4, cell: 5, home: 6, work: 7 },
     schedules: { studentId: 0, studentName: 1, grade: 2, classCode: 3,
                  classDescription: 4, category: 5, teacher: 6, quarters: 7 },
     teachers: { staffId: 0, teacherName: 1 },
@@ -3144,8 +3301,13 @@ var FactsLogic = (function () {
       guardianName: ['lastname firstname 1', 'contact name', 'parent name', 'guardian name'],
       guardianEmail1: ['email 1', 'email1'], guardianEmail2: ['email2', 'email 2'],
       homeroom: ['homeroom'], homeroomTeacher: ['homeroom teacher'], gender: ['gender'],
-      homeschool: ['homeschool']
+      homeschool: ['homeschool'], guardianId: ['guardian id'], guardianRelationship: ['guardian relationship'],
+      guardianCustody: ['guardian custody'], guardianCell: ['guardian cell'],
+      guardianFirst: ['guardian first name'], guardianLast: ['guardian last name']
     },
+    birthdates: { studentId: ['student id'], birthdate: ['birthdate'] },
+    emergency: { studentId: ['student id'], order: ['order'], name: ['contact name'], relationship: ['relationship'],
+      cell: ['cell phone'], home: ['home phone'], work: ['work phone'] },
     schedules: {
       studentId: ['student id (system)', 'student id', 'studentid'],
       studentName: ['student name', 'lastname firstname'], grade: ['grade level', 'grade'],
@@ -3195,6 +3357,8 @@ var FactsLogic = (function () {
       var email = String(raw || '').trim().toLowerCase();
       if (email) guardians.push({ name: guardianName, email: email });
     });
+    var gFirst = String(cells[idx.guardianFirst] || '').trim(), gLast = String(cells[idx.guardianLast] || '').trim();
+    var gNm = (gFirst || gLast) ? { first: gFirst, last: gLast } : splitName(guardianName);
     return {
       studentId: String(cells[idx.studentId] || '').trim(),
       last: nm.last,
@@ -3204,7 +3368,14 @@ var FactsLogic = (function () {
       homeroom: String(cells[idx.homeroom] || '').trim(),
       homeroomTeacher: String(cells[idx.homeroomTeacher] || '').trim(),
       homeschool: String(cells[idx.homeschool] || '').trim().toUpperCase() === 'Y',
-      guardians: guardians
+      gender: String(cells[idx.gender] || '').trim(),
+      guardians: guardians,
+      // this row's guardian link — the page-4 contact fallback when FACTS lists no emergency contact
+      link: { id: String(cells[idx.guardianId] == null ? '' : cells[idx.guardianId]).trim(),
+        name: displayName(gNm.first, gNm.last),
+        relationship: String(cells[idx.guardianRelationship] || '').trim(),
+        custodial: String(cells[idx.guardianCustody] || '').trim().toUpperCase() === 'Y',
+        cell: String(cells[idx.guardianCell] || '').trim() }
     };
   }
 
@@ -3229,8 +3400,15 @@ var FactsLogic = (function () {
       var e = byId[rec.studentId];
       if (!e) e = byId[rec.studentId] = { studentId: rec.studentId, last: rec.last, first: rec.first,
         grade: rec.grade, studentEmail: rec.studentEmail, homeroom: rec.homeroom,
-        homeroomTeacher: rec.homeroomTeacher, homeschool: !!rec.homeschool, guardians: [], _seen: {} };
+        homeroomTeacher: rec.homeroomTeacher, homeschool: !!rec.homeschool, gender: rec.gender || '',
+        guardians: [], custodial: [], _seen: {}, _seenLink: {} };
       if (rec.homeschool) e.homeschool = true;
+      if (!e.gender && rec.gender) e.gender = rec.gender;
+      var lk = rec.link;
+      if (lk && lk.custodial && lk.name && !e._seenLink[lk.id || nameKey_(lk.name)]) {
+        e._seenLink[lk.id || nameKey_(lk.name)] = true;
+        e.custodial.push({ name: lk.name, relationship: lk.relationship, cell: lk.cell });
+      }
       if (!e.studentEmail && rec.studentEmail) e.studentEmail = rec.studentEmail;
       if (!e.homeroom && rec.homeroom) e.homeroom = rec.homeroom;
       if (!e.homeroomTeacher && rec.homeroomTeacher) e.homeroomTeacher = rec.homeroomTeacher;
@@ -3239,7 +3417,7 @@ var FactsLogic = (function () {
 
     return Object.keys(byId).map(function (id) {
       var e = byId[id];
-      delete e._seen;
+      delete e._seen; delete e._seenLink;
       e.displayName = displayName(e.first, e.last);
       return e;
     });
@@ -3251,12 +3429,12 @@ var FactsLogic = (function () {
     entries.forEach(function (e) {
       if (!e.guardians.length) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, '', '', 0, e.homeschool ? 'Y' : '']);
+          e.homeroom, e.homeroomTeacher, '', '', 0, e.homeschool ? 'Y' : '', e.gender || '', e.birthdate || '']);
         return;
       }
       e.guardians.forEach(function (g, i) {
         rows.push([e.studentId, e.last, e.first, e.displayName, e.grade, e.studentEmail,
-          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1, e.homeschool ? 'Y' : '']);
+          e.homeroom, e.homeroomTeacher, g.name, g.email, i + 1, e.homeschool ? 'Y' : '', e.gender || '', e.birthdate || '']);
       });
     });
     return rows;
@@ -3397,6 +3575,121 @@ var FactsLogic = (function () {
       .map(function (r) { return { classCode: r[1], classDescription: r[2], category: r[3], teacher: r[4] }; });
   }
 
+  // ---------- pre-filled MPSSAA physical form (docs/MPSSAA_PHYSICAL_FORM.md) ----------
+
+  /** A person's name as a comparison key: lower-case, single spaces. */
+  function nameKey_(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
+  /** A date as YYYY-MM-DD, or '' — never a guess. Takes the export's text ('2011-03-14', an ISO
+   *  date-time, or a US 3/14/2011 if a converter reformatted it) or a Date (its local calendar day). */
+  function normalizeDate(v) {
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return '';
+      return v.getFullYear() + '-' + ('0' + (v.getMonth() + 1)).slice(-2) + '-' + ('0' + v.getDate()).slice(-2);
+    }
+    var s = String(v == null ? '' : v).trim();
+    var m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(s);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2);
+    return '';
+  }
+
+  /** 'Student Birthdates' body rows -> { studentId: 'YYYY-MM-DD' } (blank and unreadable dates skipped). */
+  function birthdateMap(rows, idx) {
+    idx = resolveIdx_(idx, 'birthdates');
+    var out = {};
+    (rows || []).forEach(function (r) {
+      var id = String((r || [])[idx.studentId] == null ? '' : r[idx.studentId]).trim();
+      var d = normalizeDate((r || [])[idx.birthdate]);
+      if (id && d) out[id] = d;
+    });
+    return out;
+  }
+
+  /** One 'Emergency Contacts' row (FACTS's own order; 99 when FACTS has none). `idx` optional. */
+  function parseEmergencyRow(cells, idx) {
+    idx = resolveIdx_(idx, 'emergency');
+    var order = Number(cells[idx.order]);
+    return {
+      studentId: String(cells[idx.studentId] == null ? '' : cells[idx.studentId]).trim(),
+      order: (cells[idx.order] === '' || cells[idx.order] == null || !isFinite(order)) ? 99 : order,
+      name: String(cells[idx.name] || '').trim(),
+      relationship: String(cells[idx.relationship] || '').trim(),
+      cell: String(cells[idx.cell] || '').trim(),
+      home: String(cells[idx.home] || '').trim(),
+      work: String(cells[idx.work] || '').trim()
+    };
+  }
+
+  /**
+   * The two page-4 contacts per student, as FACTS_Emergency rows
+   * [StudentId, Order (1|2), Name, Relationship, Cell, Home, Work, Source]:
+   * FACTS's emergency contacts in FACTS order first (Source 'emergency'); a gap is filled from the
+   * custodial parents FACTS links to the child (Source 'guardian' — Josh, 2026-10-28), skipping anyone
+   * already listed by name. A student with neither gets no rows.
+   */
+  function buildContactRows(entries, emergencyParsed) {
+    var byStudent = {};
+    (emergencyParsed || []).forEach(function (c, i) {
+      if (!c || !c.studentId || !c.name) return;
+      (byStudent[c.studentId] = byStudent[c.studentId] || []).push({ c: c, i: i });
+    });
+    var rows = [];
+    (entries || []).forEach(function (e) {
+      var picked = [], seen = {};
+      (byStudent[e.studentId] || []).sort(function (a, b) { return a.c.order - b.c.order || a.i - b.i; })
+        .forEach(function (x) {
+          if (picked.length >= 2 || seen[nameKey_(x.c.name)]) return;
+          seen[nameKey_(x.c.name)] = true;
+          picked.push([x.c.name, x.c.relationship, x.c.cell, x.c.home, x.c.work, 'emergency']);
+        });
+      (e.custodial || []).forEach(function (g) {
+        if (picked.length >= 2 || !g.name || seen[nameKey_(g.name)]) return;
+        seen[nameKey_(g.name)] = true;
+        picked.push([g.name, g.relationship || '', g.cell || '', '', '', 'guardian']);
+      });
+      picked.forEach(function (p, k) { rows.push([e.studentId, k + 1].concat(p)); });
+    });
+    return rows;
+  }
+
+  /** Whole years from a YYYY-MM-DD birthdate to a YYYY-MM-DD day, as a string; '' when either is
+   *  unreadable or the result is negative. A Feb 29 birthday counts from Mar 1 in other years. */
+  function ageOn(dob, today) {
+    var b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dob || '')), t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(today || ''));
+    if (!b || !t) return '';
+    var age = Number(t[1]) - Number(b[1]);
+    if (Number(t[2]) < Number(b[2]) || (t[2] === b[2] && Number(t[3]) < Number(b[3]))) age--;
+    return age >= 0 ? String(age) : '';
+  }
+
+  /** FACTS gender as the form prints it ("Sex assigned at birth"): Male / Female, else as FACTS holds it. */
+  function sexLabel(g) {
+    var s = String(g || '').trim();
+    if (/^m(ale)?$/i.test(s)) return 'Male';
+    if (/^f(emale)?$/i.test(s)) return 'Female';
+    return s;
+  }
+
+  /**
+   * What the physical form auto-fills for one student: { dob, sex, age, contacts: [{name, relationship,
+   * day, evening, cell}] } from FACTS_Directory (cols 12/13) and FACTS_Emergency rows. Daytime = work,
+   * else cell, else home; evening = home (Josh, 2026-10-28).
+   */
+  function studentPrefillExtras(directoryRows, contactRows, studentId, today) {
+    var id = String(studentId == null ? '' : studentId).trim();
+    var dir = (directoryRows || []).filter(function (r) { return String(r[0]).trim() === id; })[0] || [];
+    var dob = normalizeDate(dir[13]);
+    var contacts = (contactRows || []).filter(function (r) { return String(r[0]).trim() === id; })
+      .sort(function (a, b) { return Number(a[1]) - Number(b[1]); })
+      .map(function (r) {
+        var cell = String(r[4] || ''), home = String(r[5] || ''), work = String(r[6] || '');
+        return { name: String(r[2] || ''), relationship: String(r[3] || ''), day: work || cell || home, evening: home, cell: cell };
+      });
+    return { dob: dob, sex: sexLabel(dir[12]), age: ageOn(dob, today), contacts: contacts };
+  }
+
   return {
     slug: slug, splitName: splitName, displayName: displayName,
     COLS: COLS, colIndex: colIndex, parseRow: parseRow,
@@ -3404,6 +3697,8 @@ var FactsLogic = (function () {
     parseScheduleRow: parseScheduleRow, consolidateSchedules: consolidateSchedules, toClassRows: toClassRows,
     studentsForGuardian: studentsForGuardian, guardianForEmail: guardianForEmail,
     classesForStudent: classesForStudent,
+    normalizeDate: normalizeDate, birthdateMap: birthdateMap, parseEmergencyRow: parseEmergencyRow,
+    buildContactRows: buildContactRows, ageOn: ageOn, sexLabel: sexLabel, studentPrefillExtras: studentPrefillExtras,
     parseTeacherLinkRow: parseTeacherLinkRow, parseStaffRow: parseStaffRow,
     consolidateStaff: consolidateStaff, toStaffDirectoryRows: toStaffDirectoryRows,
     teacherNameForEmail: teacherNameForEmail, classesForTeacher: classesForTeacher
@@ -3418,7 +3713,10 @@ if (typeof module !== 'undefined') module.exports = FactsLogic;
 /** Read the FACTS export from Drive, parse, and replace FACTS_Directory + FACTS_Classes +
  *  FACTS_Staff. Weekly trigger target. */
 function syncFactsDirectory_() {
-  var sheets = factsReadExportSheets_(['Sheet1', 'Student Schedules', 'Teachers', 'Staff']);
+  // 'Student Birthdates' is read as DISPLAYED text: its dates are text in the export, and if a converter
+  // ever turned them into Date cells, the displayed string still parses without a time-zone shift.
+  var sheets = factsReadExportSheets_(['Sheet1', 'Student Schedules', 'Teachers', 'Staff', 'Student Birthdates', 'Emergency Contacts'],
+    ['Student Birthdates']);
 
   // Resolve each sheet's columns from its HEADER ROW (falls back to the observed positions),
   // so FACTS reordering a column can't silently corrupt the import.
@@ -3430,8 +3728,20 @@ function syncFactsDirectory_() {
   var dirBody = sheets['Sheet1'].slice(1).filter(function (r) { return r && (r[dirIdx.studentId] || '').toString().trim(); });
   var parsed = dirBody.map(function (r) { return FactsLogic.parseRow(r, dirIdx); });
   var entries = FactsLogic.consolidateStudents(parsed);
+  // MPSSAA physical form: each student's birthdate (FACTS_Directory col 14) and the two page-4 contacts.
+  // A tab missing from an older export just leaves those blank; the parent can type them.
+  var birthTab = sheets['Student Birthdates'] || [];
+  var births = FactsLogic.birthdateMap(birthTab.slice(1), FactsLogic.colIndex(birthTab[0], 'birthdates'));
+  entries.forEach(function (e) { e.birthdate = births[e.studentId] || ''; });
   var dirRows = FactsLogic.toDirectoryRows(entries);
   writeSysTab_(SYS.TABS.DIRECTORY, SYS_HEADERS.FACTS_Directory, dirRows);
+
+  var emTab = sheets['Emergency Contacts'] || [];
+  var emIdx = FactsLogic.colIndex(emTab[0], 'emergency');
+  var emParsed = emTab.slice(1).map(function (r) { return FactsLogic.parseEmergencyRow(r, emIdx); });
+  var contactRows = FactsLogic.buildContactRows(entries, emParsed);
+  sysGetOrCreateTab_(getSystemSpreadsheet_(), SYS.TABS.EMERGENCY, SYS_HEADERS.FACTS_Emergency);
+  writeSysTab_(SYS.TABS.EMERGENCY, SYS_HEADERS.FACTS_Emergency, contactRows);
 
   var schedBody = (sheets['Student Schedules'] || []).slice(1).filter(function (r) { return r && (r[schedIdx.studentId] || '').toString().trim(); });
   var schedParsed = schedBody.map(function (r) { return FactsLogic.parseScheduleRow(r, schedIdx); });
@@ -3447,9 +3757,12 @@ function syncFactsDirectory_() {
   var staffDirRows = FactsLogic.toStaffDirectoryRows(staffEntries);
   writeSysTab_(SYS.TABS.FACTS_STAFF, SYS_HEADERS.FACTS_Staff, staffDirRows);
 
+  var withBirthdate = entries.filter(function (e) { return e.birthdate; }).length;
   Logger.log('syncFactsDirectory: ' + entries.length + ' students, ' + dirRows.length +
-    ' directory rows, ' + classRows.length + ' class rows, ' + staffDirRows.length + ' teacher emails');
-  return { students: entries.length, rows: dirRows.length, classRows: classRows.length, teacherRows: staffDirRows.length };
+    ' directory rows, ' + classRows.length + ' class rows, ' + staffDirRows.length + ' teacher emails, ' +
+    withBirthdate + ' birthdates, ' + contactRows.length + ' physical-form contacts');
+  return { students: entries.length, rows: dirRows.length, classRows: classRows.length, teacherRows: staffDirRows.length,
+    birthdates: withBirthdate, contactRows: contactRows.length };
 }
 
 /** Clear a _System tab and rewrite its header + data rows. */
@@ -3518,7 +3831,7 @@ function factsResolveExportFile_() {
 /** Locate + read named sheets from the FACTS export (native Sheet or .xlsx) as
  *  2D values arrays, keyed by sheet name. Converts .xlsx/.csv to a temp Google
  *  Sheet ONCE (so multiple named sheets cost one conversion, not one each). */
-function factsReadExportSheets_(sheetNames) {
+function factsReadExportSheets_(sheetNames, displayNames) {
   var file = factsResolveExportFile_();
   var mime = file.getMimeType();
   var ss, tempFileId = null;
@@ -3541,7 +3854,8 @@ function factsReadExportSheets_(sheetNames) {
     var out = {};
     sheetNames.forEach(function (name) {
       var sh = ss.getSheetByName(name);
-      out[name] = sh ? sh.getDataRange().getValues() : [];
+      var asText = (displayNames || []).indexOf(name) > -1;
+      out[name] = sh ? (asText ? sh.getDataRange().getDisplayValues() : sh.getDataRange().getValues()) : [];
     });
     return out;
   } finally {
@@ -3578,6 +3892,19 @@ function factsDirectoryRows_() {
 
 function guardianshipOf_(email) {
   return FactsLogic.studentsForGuardian(factsDirectoryRows_(), email);
+}
+
+/** FACTS_Emergency rows (the physical form's page-4 contacts) — memoized per execution. */
+var _EMERGENCY_ROWS = null;
+function factsEmergencyRows_() {
+  if (!_EMERGENCY_ROWS) _EMERGENCY_ROWS = factsTabRows_(SYS.TABS.EMERGENCY);
+  return _EMERGENCY_ROWS;
+}
+
+/** One student's physical-form auto-fill ({dob, sex, age, contacts}); age as of today, school time. */
+function studentPrefillExtras_(studentId) {
+  var today = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+  return FactsLogic.studentPrefillExtras(factsDirectoryRows_(), factsEmergencyRows_(), studentId, today);
 }
 
 /** The guardian's own name/email (for identity prefill). Returns null if unknown. */
@@ -4368,7 +4695,7 @@ function settingsSummaryFromRow_(v) {
     approvalEnabled: !!ap.enabled, approvalMode: ap.mode || 'any', approvalCount: (ap.approvers || []).length,
     pdfTemplateCount: (s.pdfTemplates || []).filter(function (t) { return t && t.enabled; }).length,
     maxResponses: s.maxResponses || 0, openDate: s.openDate || '',
-    multiStudent: !!s.multiStudent, onePerEmail: !!s.onePerEmail, allowEdit: !!s.allowEdit
+    multiStudent: !!s.multiStudent, childByChild: !!s.childByChild, onePerEmail: !!s.onePerEmail, allowEdit: !!s.allowEdit
   };
 }
 
@@ -6959,6 +7286,177 @@ function pageSizeCompatible_(widthPt, heightPt, seedWidthPt, seedHeightPt) {
   return Math.abs(widthPt - seedWidthPt) <= TOL && Math.abs(heightPt - seedHeightPt) <= TOL;
 }
 
+// --------------- new: draw on the original PDF ("stamp" renderer) ---------------
+//
+// A template whose `renderer` is 'stamp' is filled by drawing each box's value straight onto the
+// ORIGINAL uploaded PDF with the vendored pdf-lib, instead of the Slides path above (a ~1024 px
+// picture of each page with padded text boxes). Sharp at any print size, exact to the point, no
+// Slides copy or export, so it suits a dense official form — the MPSSAA physical has 137 boxes,
+// most of them tiny yes/no squares (docs/MPSSAA_PHYSICAL_FORM.md, R1). Opt-in per document; every
+// other template keeps the Slides path. Needs no Build: only the source PDF.
+//
+// Per-box options this renderer reads (the Builder sets them in the box bar):
+//   mark: 'x' | 'circle' — an option box (box.optionValue) that is chosen draws an X inside the box
+//         (the form's own square) or a circle around it (the form's printed YES/NO);
+//   lines: N — the box covers N ruled rows of the paper form; text goes one line per row, level
+//         with the row's own bullet (2–3 lines a row only when the answer needs more).
+// Text sits on its printed line (the box's bottom edge) in a one-line box, and runs from the top
+// down in a box with room for several lines; it shrinks to fit (largest 10 pt, 9 pt on ruled rows,
+// never below 4 pt) and wraps. Characters Helvetica can't draw (an emoji) print as '?'.
+
+var STAMP_MIN_FONT_PT = 4;
+var STAMP_MAX_FONT_PT = 10;
+var STAMP_MAX_ROW_FONT_PT = 9;
+var STAMP_LEADING = 1.18;     // line pitch / font size
+var STAMP_DESCENT = 0.22;     // Helvetica's descender, as a share of the font size
+
+/** A template that can produce a PDF: enabled, and built (Slides) or holding its source PDF (stamp). */
+function pdfTemplateReady_(t) {
+  return !!(t && t.enabled && (t.renderer === 'stamp' ? t.sourcePdfFileId : t.slidesTemplateId));
+}
+
+/** Pure. Splits text into rows that fit `width` at `size` (explicit newlines always break); a word
+ *  wider than the box is broken by characters. widthOf(text, size) measures in points. */
+function stampWrap_(text, width, size, widthOf) {
+  var rows = [];
+  String(text).split('\n').forEach(function (para) {
+    var row = '';
+    para.split(/ +/).forEach(function (w) {
+      var next = row ? row + ' ' + w : w;
+      if (!row || widthOf(next, size) <= width) { row = next; return; }
+      rows.push(row); row = w;
+    });
+    rows.push(row);
+  });
+  var out = [];
+  rows.forEach(function (r) {
+    if (widthOf(r, size) <= width) { out.push(r); return; }
+    var cur = '';
+    for (var i = 0; i < r.length; i++) {
+      if (cur && widthOf(cur + r[i], size) > width) { out.push(cur); cur = ''; }
+      cur += r[i];
+    }
+    out.push(cur);
+  });
+  return out;
+}
+
+/** Pure. The layout for one box: { size, rows, pitch, per, truncated? } — the largest size at which
+ *  the text fits (see the section note), cut with an ellipsis only past every fallback. */
+function stampLayout_(text, box, widthOf) {
+  if (box.lines) {
+    // more text than ruled rows: 2, then 3 lines inside each row, so text never crosses a row's rule
+    for (var per = 1; per <= 3; per++) {
+      var fixed = stampFit_(text, box, widthOf, box.h / box.lines / per, per);
+      if (fixed) return fixed;
+    }
+  }
+  return stampFit_(text, box, widthOf, 0, 0) || stampTruncate_(text, box, widthOf);
+}
+
+/** Pure. The largest size that fits, or null. fixedPitch 0 = natural line spacing; `per` = lines per
+ *  ruled row when the pitch is fixed (1 = one line on each row, level with its bullet). */
+function stampFit_(text, box, widthOf, fixedPitch, per) {
+  var cap = !fixedPitch ? Math.min(STAMP_MAX_FONT_PT, box.h * 0.78)
+    : Math.min(STAMP_MAX_ROW_FONT_PT, fixedPitch * (per === 1 ? 0.62 : 0.85));
+  for (var size = cap; size >= STAMP_MIN_FONT_PT; size -= 0.25) {
+    var pitch = fixedPitch || size * STAMP_LEADING;
+    var rows = stampWrap_(text, box.w - 2, size, widthOf);
+    var maxRows = Math.max(1, Math.floor((box.h + 0.01) / pitch));
+    if (rows.length <= maxRows) return { size: size, rows: rows, pitch: pitch, per: per || 0 };
+  }
+  return null;
+}
+
+/** Pure. Last resort (an answer past its field's limit): the smallest size, cut with an ellipsis. */
+function stampTruncate_(text, box, widthOf) {
+  var size = STAMP_MIN_FONT_PT, pitch = size * STAMP_LEADING;
+  var rows = stampWrap_(text, box.w - 2, size, widthOf);
+  var maxRows = Math.max(1, Math.floor((box.h + 0.01) / pitch));
+  if (rows.length > maxRows) { rows = rows.slice(0, maxRows); rows[maxRows - 1] = rows[maxRows - 1].replace(/.?$/, '…'); }
+  return { size: size, rows: rows, pitch: pitch, per: 0, truncated: true };
+}
+
+/** Pure. One '?' per character (code point) Helvetica's WinAnsi set can't draw — so an emoji's two
+ *  UTF-16 halves don't print as '??' — and newlines/tabs normalized. charset: {codePoint: true}. */
+function stampSafeText_(text, charset) {
+  return Array.from(String(text == null ? '' : text).replace(/\r\n?/g, '\n').replace(/\t/g, ' ')).map(function (ch) {
+    return ch === '\n' || charset[ch.codePointAt(0)] ? ch : '?';
+  }).join('');
+}
+
+/** Pure (given PDFLib). Baseline y (pdf-lib, from the page bottom) of row r of a layout in a box. */
+function stampBaseline_(lay, box, top, r) {
+  if (!lay.per && box.h < 2 * lay.size * STAMP_LEADING) return top - box.h + lay.size * STAMP_DESCENT; // on the printed line
+  if (lay.per === 1) return top - r * lay.pitch - lay.size * (1 - STAMP_DESCENT) - 1;                // level with the row's bullet
+  if (lay.per) return top - (r + 1) * lay.pitch + Math.max((lay.pitch - 0.72 * lay.size) / 2, lay.size * 0.25 + 0.6);
+  return top - r * lay.pitch - lay.size * (1 - STAMP_DESCENT) - (lay.pitch - lay.size) / 2;           // an answer area, top down
+}
+
+/**
+ * Draws every box's value onto a copy of the source PDF and returns the new PDF's bytes.
+ * dataMap is buildPdfTemplateDataMap_'s {fieldId#i: value}; images (optional) = {fieldId: PNG bytes}
+ * for signature boxes. Box coordinates are PDF points from the page's top-left, as the mapper saves them.
+ */
+async function stampPdfTemplate_(srcBytes, fieldBoxes, dataMap, images) {
+  var doc = await PDFLib.PDFDocument.load(srcBytes);
+  var font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+  var charset = {};
+  font.getCharacterSet().forEach(function (c) { charset[c] = true; });
+  var widthOf = function (s, size) { return font.widthOfTextAtSize(s, size); };
+  var black = PDFLib.rgb(0, 0, 0);
+  var pages = doc.getPages();
+  var boxes = normalizePdfFieldBoxes_(fieldBoxes);
+  var embedded = {};
+  var fids = Object.keys(boxes);
+  for (var f = 0; f < fids.length; f++) {
+    var fid = fids[f];
+    for (var i = 0; i < boxes[fid].length; i++) {
+      var box = boxes[fid][i], page = pages[box.page];
+      if (!page) continue;
+      var top = page.getHeight() - box.y;
+      if (images && images[fid]) {
+        if (!embedded[fid]) embedded[fid] = await doc.embedPng(images[fid]);
+        var img = embedded[fid], k = Math.min(box.w / img.width, box.h / img.height);
+        page.drawImage(img, { x: box.x, y: top - img.height * k, width: img.width * k, height: img.height * k });
+        continue;
+      }
+      var value = dataMap[fid + '#' + i];
+      if (value === undefined || value === null || value === '') continue;
+      if (box.mark && box.optionValue != null) {
+        if (value !== 'X') continue;
+        if (box.mark === 'circle') {
+          page.drawEllipse({ x: box.x + box.w / 2, y: top - box.h / 2, xScale: box.w / 2 + 1, yScale: box.h / 2 + 1.2,
+            borderColor: black, borderWidth: 0.9 });
+        } else {
+          var m = 1.2;
+          page.drawLine({ start: { x: box.x + m, y: top - m }, end: { x: box.x + box.w - m, y: top - box.h + m }, thickness: 0.9, color: black });
+          page.drawLine({ start: { x: box.x + m, y: top - box.h + m }, end: { x: box.x + box.w - m, y: top - m }, thickness: 0.9, color: black });
+        }
+        continue;
+      }
+      var lay = stampLayout_(stampSafeText_(value, charset), box, widthOf);
+      for (var r = 0; r < lay.rows.length; r++) {
+        page.drawText(lay.rows[r], { x: box.x + 1, y: stampBaseline_(lay, box, top, r), size: lay.size, font: font, color: black });
+      }
+    }
+  }
+  return await doc.save();
+}
+
+/** Staff-guarded. Switches one document between the Slides path ('slides', the default) and drawing
+ *  on the original PDF ('stamp'). The boxes are kept either way; a Slides document still needs Export. */
+function setPdfTemplateRenderer(contextId, formId, templateId, renderer) {
+  setActiveContext_(getContext_(contextId));
+  requireStaff_();
+  if (renderer !== 'stamp' && renderer !== 'slides') throw new Error('Unknown PDF renderer: ' + renderer);
+  var schema = loadSchemaObj_(formId);
+  var tpl = findPdfTemplate_(schema, templateId);
+  tpl.renderer = renderer;
+  saveSchemaObj_(formId, schema);
+  return { ok: true, pdfTemplates: schema.settings.pdfTemplates };
+}
+
 // --------------- new: submission-time fill ---------------
 
 /** Tolerates the OLD fieldBoxes shape ({fieldId: box}) alongside the new one
@@ -7068,19 +7566,30 @@ function formatMoney_(n) {
  *  several can share the same submission's field values. Returns [{name, blob}, ...]; a single
  *  template failing (bad mapping, a Slides API hiccup) is logged and skipped, not thrown, so one
  *  broken template can't take the others down with it. */
-function fillPdfTemplatesForSubmission_(schema, fields, normalized, submissionId, visible, signatureFileIds, driveFolderName) {
-  var templates = (schema.settings.pdfTemplates || []).filter(function (t) { return t.enabled && t.slidesTemplateId; });
+async function fillPdfTemplatesForSubmission_(schema, fields, normalized, submissionId, visible, signatureFileIds, driveFolderName) {
+  var templates = (schema.settings.pdfTemplates || []).filter(pdfTemplateReady_);
   var results = [];
-  templates.forEach(function (tpl) {
+  for (var t = 0; t < templates.length; t++) {
+    var tpl = templates[t];
     try {
       var dataMap = buildPdfTemplateDataMap_(fields, normalized, visible, tpl.fieldBoxes || {}, tpl.calcFields || {});
       var name = (schema.title || 'submission').replace(/[^a-z0-9]+/gi, '_') + '-' +
         (tpl.name || 'form').replace(/[^a-z0-9]+/gi, '_') + '-' + (driveFolderName || submissionId);
-      results.push({ name: tpl.name, blob: fillAndExportPdf_(tpl.slidesTemplateId, dataMap, name, signatureFileIds) });
+      if (tpl.renderer === 'stamp') {
+        var images = {};
+        Object.keys(signatureFileIds || {}).forEach(function (fid) {
+          images[fid] = new Uint8Array(DriveApp.getFileById(signatureFileIds[fid]).getBlob().getBytes());
+        });
+        var src = new Uint8Array(DriveApp.getFileById(tpl.sourcePdfFileId).getBlob().getBytes());
+        var out = await stampPdfTemplate_(src, tpl.fieldBoxes || {}, dataMap, images);
+        results.push({ name: tpl.name, blob: Utilities.newBlob(out, 'application/pdf', name + '.pdf') });
+      } else {
+        results.push({ name: tpl.name, blob: fillAndExportPdf_(tpl.slidesTemplateId, dataMap, name, signatureFileIds) });
+      }
     } catch (e) {
-      try { Logger.log('PDF template "' + tpl.name + '" (slidesTemplateId=' + tpl.slidesTemplateId + ') fill failed for ' + submissionId + ': ' + (e && e.stack || e)); } catch (e2) {}
+      try { Logger.log('PDF template "' + tpl.name + '" (' + (tpl.renderer === 'stamp' ? 'stamp, source=' + tpl.sourcePdfFileId : 'slidesTemplateId=' + tpl.slidesTemplateId) + ') fill failed for ' + submissionId + ': ' + (e && e.stack || e)); } catch (e2) {}
     }
-  });
+  }
   return results;
 }
 
@@ -7108,7 +7617,7 @@ function answerToCell_(field, v) { return RespSheetLogic.packV2Cell(field, v); }
  * adminDeleteLastPdfRebuild can find and remove exactly that run's files by matching the tag in
  * the filename — never an older rebuild's files, never a submission's original PDF.
  */
-function buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName, rebuildTag) {
+async function buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName, rebuildTag) {
   driveFolderName = driveFolderName || submissionId;
   // Per-form PDF templates (schema.settings.pdfTemplates, see above) take priority when any are
   // enabled and built — several can share this submission's field values (e.g. a "Physical Form"
@@ -7119,9 +7628,9 @@ function buildSubmissionPdfs_(formId, schema, settings, fields, normalized, subm
   // already tolerates its own failures.
   var pdfBlobs = [];
   var pdfTemplates = settings.pdfTemplates || [];
-  if (pdfTemplates.some(function (t) { return t.enabled && t.slidesTemplateId; })) {
+  if (pdfTemplates.some(pdfTemplateReady_)) {
     try {
-      pdfBlobs = fillPdfTemplatesForSubmission_(schema, fields, normalized, submissionId, visible, signatureFileIds, driveFolderName).map(function (r) { return r.blob; });
+      pdfBlobs = (await fillPdfTemplatesForSubmission_(schema, fields, normalized, submissionId, visible, signatureFileIds, driveFolderName)).map(function (r) { return r.blob; });
     } catch (e) {
       try { Logger.log('PDF template fill failed for ' + submissionId + ': ' + (e && e.stack || e)); } catch (e2) {}
       pdfBlobs = [];
@@ -7130,7 +7639,7 @@ function buildSubmissionPdfs_(formId, schema, settings, fields, normalized, subm
     try {
       Logger.log('PDF templates skipped for ' + submissionId + ' — none enabled+built: ' +
         pdfTemplates.map(function (t) {
-          return (t.name || t.id) + ' (enabled=' + !!t.enabled + ', slidesTemplateId=' + (t.slidesTemplateId || 'none') + ')';
+          return (t.name || t.id) + ' (enabled=' + !!t.enabled + ', renderer=' + (t.renderer || 'slides') + ', slidesTemplateId=' + (t.slidesTemplateId || 'none') + ')';
         }).join('; '));
     } catch (e2) {}
   }
@@ -7211,7 +7720,7 @@ function buildSubmissionPdf_(schema, fields, normalized, submissionId, responden
  * existing file as usual; a non-empty tag keeps it and saves the rebuilt copy alongside it,
  * tagged, instead.
  */
-function rebuildSubmissionPdfCore_(formId, schema, settings, fields, loc, submissionId, rebuildTag) {
+async function rebuildSubmissionPdfCore_(formId, schema, settings, fields, loc, submissionId, rebuildTag) {
   var normalized = {};
   fields.forEach(function (f) { normalized[f.id] = RespSheetLogic.readField(loc.ix, loc.row, f); });
   var visible = {};
@@ -7235,7 +7744,7 @@ function rebuildSubmissionPdfCore_(formId, schema, settings, fields, loc, submis
     if (m) signatureFileIds[f.id] = m[1];
   });
 
-  return buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName_, rebuildTag);
+  return await buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName_, rebuildTag);
 }
 
 /**
@@ -7250,7 +7759,7 @@ function rebuildSubmissionPdfCore_(formId, schema, settings, fields, loc, submis
  * the on-file typed name — there's no fresh drawn signature to re-render from a stored row.
  * Lives here (not RunnerApi.js) so apps/builder — which never gets RunnerApi.js — can call it.
  */
-function adminRebuildSubmissionPdf(contextId, formId, submissionId) {
+async function adminRebuildSubmissionPdf(contextId, formId, submissionId) {
   setActiveContext_(getContext_(contextId));
   requireAdmin_();
   var r = regFind_(formId);
@@ -7260,7 +7769,7 @@ function adminRebuildSubmissionPdf(contextId, formId, submissionId) {
   var loc = findResponseRow_(formId, submissionId);
   if (!loc) throw new Error('Submission not found');
   var fields = inputFields_(schema);
-  var pdfResult = rebuildSubmissionPdfCore_(formId, schema, settings, fields, loc, submissionId, '');
+  var pdfResult = await rebuildSubmissionPdfCore_(formId, schema, settings, fields, loc, submissionId, '');
   return { ok: true, pdfCopies: pdfResult.pdfCopies, pdfCopiesOverCap: pdfResult.pdfCopiesOverCap };
 }
 
@@ -7280,7 +7789,7 @@ function adminRebuildSubmissionPdf(contextId, formId, submissionId) {
  * adminDeleteLastPdfRebuild can find and remove exactly this round's files later, and nothing
  * from an earlier round.
  */
-function adminRebuildAllSubmissionPdfs(contextId, formId) {
+async function adminRebuildAllSubmissionPdfs(contextId, formId) {
   setActiveContext_(getContext_(contextId));
   requireAdmin_();
   var r = regFind_(formId);
@@ -7304,7 +7813,7 @@ function adminRebuildAllSubmissionPdfs(contextId, formId) {
     var submissionId = String(row[ix.idx.SubmissionID] || '');
     if (!submissionId) continue;
     try {
-      var pdfResult = rebuildSubmissionPdfCore_(formId, schema, settings, fields, { ix: ix, row: row }, submissionId, rebuildTag);
+      var pdfResult = await rebuildSubmissionPdfCore_(formId, schema, settings, fields, { ix: ix, row: row }, submissionId, rebuildTag);
       if (pdfResult.pdfCopies && pdfResult.pdfCopies.length) rebuilt++; else skipped++;
     } catch (e) {
       failed++;
@@ -7362,6 +7871,12 @@ if (typeof module !== 'undefined') module.exports = {
   nextEnabledAfterBuild_: nextEnabledAfterBuild_,
   fontSizeForBox_: fontSizeForBox_,
   autoFitFontSize_: autoFitFontSize_,
+  pdfTemplateReady_: pdfTemplateReady_,
+  stampWrap_: stampWrap_,
+  stampLayout_: stampLayout_,
+  stampSafeText_: stampSafeText_,
+  stampBaseline_: stampBaseline_,
+  stampPdfTemplate_: stampPdfTemplate_,
   renderCalcOverlayValue_: renderCalcOverlayValue_
 };
 
@@ -8279,6 +8794,7 @@ function getPublicForm(formId, token) {
       locked: false,
       reviewMode: settings.reviewMode === true,
       multiStudent: settings.multiStudent === true,
+      childByChild: settings.childByChild === true,
       pages: pages
     },
     verifiedVia: authed.verifiedVia,
@@ -8286,7 +8802,7 @@ function getPublicForm(formId, token) {
     portalUrl: meta.portalUrl,
     supportContact: meta.supportContact,
     chooserUrl: meta.chooserUrl,
-    prefill: buildPrefill_(authed)
+    prefill: buildPrefill_(authed, schema)
   };
 }
 
@@ -8307,23 +8823,46 @@ function getFormPreview(formId) {
     form: {
       id: formId, title: schema.title || '', description: schema.description || '',
       confirmationMessage: settings.confirmationMessage || 'Thank you — your response was recorded.',
-      locked: false, reviewMode: settings.reviewMode === true, multiStudent: settings.multiStudent === true, pages: sanitizePages_(schema.pages || [])
+      locked: false, reviewMode: settings.reviewMode === true, multiStudent: settings.multiStudent === true,
+      childByChild: settings.childByChild === true, pages: sanitizePages_(schema.pages || [])
     },
     prefill: {
       parent: { first: 'Jordan', last: 'Sample', email: 'preview@example.com' },
+      org: brandTokens_().orgName,
       students: [
         { key: 's1', displayName: 'Alex Sample', first: 'Alex', last: 'Sample', grade: '9' },
         { key: 's2', displayName: 'Bailey Sample', first: 'Bailey', last: 'Sample', grade: '11', homeschool: true }
-      ]
+      ].map(function (s, i) {
+        if (!formUsesStudentExtras_(schema)) return s;
+        // invented sample values, so the designer sees the physical form's FACTS auto-fill too
+        return Object.assign(s, { dob: i ? '2010-04-12' : '2012-09-30', sex: i ? 'Female' : 'Male', age: i ? '16' : '14',
+          contacts: [{ name: 'Jordan Sample', relationship: 'Mother', day: '410-555-0101', evening: '410-555-0102', cell: '410-555-0101' },
+            { name: 'Casey Sample', relationship: 'Father', day: '410-555-0111', evening: '410-555-0102', cell: '410-555-0111' }] });
+      })
     }
   };
 }
 
+/** Auto-fill options that carry a student's date of birth, sex, age or emergency contacts (the
+ *  pre-filled MPSSAA physical form, docs/MPSSAA_PHYSICAL_FORM.md). A page gets that data ONLY when
+ *  its form uses one of them — never on every parent form (R7). */
+var STUDENT_EXTRA_PREFILL_RE_ = /^(studentDob|studentSex|studentAge|ec[12](Name|Relationship|DayPhone|EveningPhone|CellPhone))$/;
+function formUsesStudentExtras_(schema) {
+  return inputFields_(schema || {}).some(function (f) { return STUDENT_EXTRA_PREFILL_RE_.test(String(f.prefillFrom || '')); });
+}
+
 /** Data a verified parent's form is auto-filled from (never trusts the client). */
-function buildPrefill_(authed) {
+function buildPrefill_(authed, schema) {
   if (authed.verifiedVia !== 'otp' || !authed.who) return null;
   var parent = guardianIdentity_(authed.who) || { first: '', last: '', email: authed.who };
-  return { parent: parent, students: guardianshipOf_(authed.who) };
+  var students = guardianshipOf_(authed.who);
+  if (formUsesStudentExtras_(schema)) {
+    students = students.map(function (s) {
+      var x = studentPrefillExtras_(s.studentId);
+      return Object.assign({}, s, { dob: x.dob, sex: x.sex, age: x.age, contacts: x.contacts });
+    });
+  }
+  return { parent: parent, students: students, org: brandTokens_().orgName };
 }
 
 /**
@@ -8503,7 +9042,7 @@ function processAnswers_(fields, answers, attachments, authed, existing) {
  *   answers     = { fieldId: value|array }
  *   attachments = { fieldId: [{ name, mimeType, b64 }] }  (file uploads + signature PNGs)
  */
-function submitForm(formId, answers, token, attachments, hp) {
+async function submitForm(formId, answers, token, attachments, hp) {
   var r = regFind_(formId);
   if (!r) return { ok: false, reason: 'not-found' };
   var schema = loadSchemaObj_(formId);
@@ -8604,7 +9143,7 @@ function submitForm(formId, answers, token, attachments, hp) {
 
   // optional PDF copy — see buildSubmissionPdfs_ (P23: shared with updateSubmission, so an
   // edited submission gets a current PDF, not a stale one).
-  var pdfResult = buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName_);
+  var pdfResult = await buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName_);
   var pdfBlobs = pdfResult.pdfBlobs, pdfCopies = pdfResult.pdfCopies, pdfCopiesOverCap_ = pdfResult.pdfCopiesOverCap;
   // optional per-submission edit/withdraw link
   var editLink = (settings.allowEdit && respondentEmail) ? editLinkFor_(formId, submissionId, access) : '';
@@ -8863,7 +9402,7 @@ function getSubmissionForEdit(formId, submissionId, t) {
 }
 
 /** Save edits to an existing submission (edit-token authorized). */
-function updateSubmission(formId, submissionId, t, answers, attachments) {
+async function updateSubmission(formId, submissionId, t, answers, attachments) {
   var r = regFind_(formId);
   if (!r) return { ok: false, reason: 'not-found' };
   var schema = loadSchemaObj_(formId);
@@ -8934,7 +9473,7 @@ function updateSubmission(formId, submissionId, t, answers, attachments) {
 
   // P23: regenerate the PDF(s) from the corrected answers — updateSubmission used to send none,
   // leaving the stored Uploads/<sub>/ file (and any future re-send) stuck on pre-edit answers.
-  var pdfResult = buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName_);
+  var pdfResult = await buildSubmissionPdfs_(formId, schema, settings, fields, normalized, submissionId, visible, signatureFileIds, respondentEmail, driveFolderName_);
 
   try {
     sendSubmissionEmails_(schema, settings, submissionId, respondentEmail, fields, normalized,
@@ -9028,7 +9567,9 @@ if (typeof module !== 'undefined') module.exports = {
   computeCalc: computeCalc, acceptOk_: acceptOk_, answerToCell_: answerToCell_,
   editToken_: editToken_, editTokenOk_: editTokenOk_, // GAS deps (authHmacBytes_/authSecret_/authEpoch_) stubbed by the test
   editLinkFor_: editLinkFor_, // GAS deps (cfGetConfig_/ScriptApp/contextRunnerUrl_) stubbed by the test
-  sanitizePages_: sanitizePages_ // the Runner's field allowlist (tests/homeschool.test.js)
+  sanitizePages_: sanitizePages_, // the Runner's field allowlist (tests/homeschool.test.js)
+  // the physical form's FACTS extras reach a page only when its form uses them (tests/mpssaa_physical.test.js)
+  formUsesStudentExtras_: formUsesStudentExtras_, buildPrefill_: buildPrefill_
 };
 
 /* ===================== Seeds.js ===================== */
@@ -10308,6 +10849,12 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     SETTINGS_STRINGS: typeof SETTINGS_STRINGS === 'undefined' ? undefined : SETTINGS_STRINGS,
     SITE_SETTING_KEYS_: typeof SITE_SETTING_KEYS_ === 'undefined' ? undefined : SITE_SETTING_KEYS_,
     STAFF_LEVELS_: typeof STAFF_LEVELS_ === 'undefined' ? undefined : STAFF_LEVELS_,
+    STAMP_DESCENT: typeof STAMP_DESCENT === 'undefined' ? undefined : STAMP_DESCENT,
+    STAMP_LEADING: typeof STAMP_LEADING === 'undefined' ? undefined : STAMP_LEADING,
+    STAMP_MAX_FONT_PT: typeof STAMP_MAX_FONT_PT === 'undefined' ? undefined : STAMP_MAX_FONT_PT,
+    STAMP_MAX_ROW_FONT_PT: typeof STAMP_MAX_ROW_FONT_PT === 'undefined' ? undefined : STAMP_MAX_ROW_FONT_PT,
+    STAMP_MIN_FONT_PT: typeof STAMP_MIN_FONT_PT === 'undefined' ? undefined : STAMP_MIN_FONT_PT,
+    STUDENT_EXTRA_PREFILL_RE_: typeof STUDENT_EXTRA_PREFILL_RE_ === 'undefined' ? undefined : STUDENT_EXTRA_PREFILL_RE_,
     SYS: typeof SYS === 'undefined' ? undefined : SYS,
     SYS_HEADERS: typeof SYS_HEADERS === 'undefined' ? undefined : SYS_HEADERS,
     THUMBNAIL_POLL_INITIAL_DELAY_MS: typeof THUMBNAIL_POLL_INITIAL_DELAY_MS === 'undefined' ? undefined : THUMBNAIL_POLL_INITIAL_DELAY_MS,
@@ -10318,6 +10865,7 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     _ACTIVE_CTX: typeof _ACTIVE_CTX === 'undefined' ? undefined : _ACTIVE_CTX,
     _CLASS_ROWS: typeof _CLASS_ROWS === 'undefined' ? undefined : _CLASS_ROWS,
     _DIR_ROWS: typeof _DIR_ROWS === 'undefined' ? undefined : _DIR_ROWS,
+    _EMERGENCY_ROWS: typeof _EMERGENCY_ROWS === 'undefined' ? undefined : _EMERGENCY_ROWS,
     _STAFF_DIR_ROWS: typeof _STAFF_DIR_ROWS === 'undefined' ? undefined : _STAFF_DIR_ROWS,
     _SYS_SS: typeof _SYS_SS === 'undefined' ? undefined : _SYS_SS,
     acceptOk_: typeof acceptOk_ === 'undefined' ? undefined : acceptOk_,
@@ -10455,6 +11003,7 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     exportResponsesCsv: typeof exportResponsesCsv === 'undefined' ? undefined : exportResponsesCsv,
     factsClassRows_: typeof factsClassRows_ === 'undefined' ? undefined : factsClassRows_,
     factsDirectoryRows_: typeof factsDirectoryRows_ === 'undefined' ? undefined : factsDirectoryRows_,
+    factsEmergencyRows_: typeof factsEmergencyRows_ === 'undefined' ? undefined : factsEmergencyRows_,
     factsIsSpreadsheetLike_: typeof factsIsSpreadsheetLike_ === 'undefined' ? undefined : factsIsSpreadsheetLike_,
     factsLastSyncedMtime_: typeof factsLastSyncedMtime_ === 'undefined' ? undefined : factsLastSyncedMtime_,
     factsPollIfNewer_: typeof factsPollIfNewer_ === 'undefined' ? undefined : factsPollIfNewer_,
@@ -10480,6 +11029,7 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     formAvailability_: typeof formAvailability_ === 'undefined' ? undefined : formAvailability_,
     formDataFolder_: typeof formDataFolder_ === 'undefined' ? undefined : formDataFolder_,
     formMetaFromRow_: typeof formMetaFromRow_ === 'undefined' ? undefined : formMetaFromRow_,
+    formUsesStudentExtras_: typeof formUsesStudentExtras_ === 'undefined' ? undefined : formUsesStudentExtras_,
     formatBytes: typeof formatBytes === 'undefined' ? undefined : formatBytes,
     formatMoney_: typeof formatMoney_ === 'undefined' ? undefined : formatMoney_,
     friendlyError: typeof friendlyError === 'undefined' ? undefined : friendlyError,
@@ -10565,6 +11115,7 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     parseMacsSchools_: typeof parseMacsSchools_ === 'undefined' ? undefined : parseMacsSchools_,
     parseMultiAnswerCell_: typeof parseMultiAnswerCell_ === 'undefined' ? undefined : parseMultiAnswerCell_,
     pdfTemplateFolder_: typeof pdfTemplateFolder_ === 'undefined' ? undefined : pdfTemplateFolder_,
+    pdfTemplateReady_: typeof pdfTemplateReady_ === 'undefined' ? undefined : pdfTemplateReady_,
     physIsoDate_: typeof physIsoDate_ === 'undefined' ? undefined : physIsoDate_,
     physIsoToDate_: typeof physIsoToDate_ === 'undefined' ? undefined : physIsoToDate_,
     physMirrorSheet_: typeof physMirrorSheet_ === 'undefined' ? undefined : physMirrorSheet_,
@@ -10633,6 +11184,7 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     setFormClassTag: typeof setFormClassTag === 'undefined' ? undefined : setFormClassTag,
     setFormMeta: typeof setFormMeta === 'undefined' ? undefined : setFormMeta,
     setFormState: typeof setFormState === 'undefined' ? undefined : setFormState,
+    setPdfTemplateRenderer: typeof setPdfTemplateRenderer === 'undefined' ? undefined : setPdfTemplateRenderer,
     setSlideBackgroundImage_: typeof setSlideBackgroundImage_ === 'undefined' ? undefined : setSlideBackgroundImage_,
     setSubmissionStatus_: typeof setSubmissionStatus_ === 'undefined' ? undefined : setSubmissionStatus_,
     setTemplateScope: typeof setTemplateScope === 'undefined' ? undefined : setTemplateScope,
@@ -10649,8 +11201,16 @@ if (typeof module !== 'undefined') module.exports = { doGet: doGet, doPost: doPo
     staffDisplayName_: typeof staffDisplayName_ === 'undefined' ? undefined : staffDisplayName_,
     staffKey_: typeof staffKey_ === 'undefined' ? undefined : staffKey_,
     staffTab_: typeof staffTab_ === 'undefined' ? undefined : staffTab_,
+    stampBaseline_: typeof stampBaseline_ === 'undefined' ? undefined : stampBaseline_,
+    stampFit_: typeof stampFit_ === 'undefined' ? undefined : stampFit_,
+    stampLayout_: typeof stampLayout_ === 'undefined' ? undefined : stampLayout_,
+    stampPdfTemplate_: typeof stampPdfTemplate_ === 'undefined' ? undefined : stampPdfTemplate_,
+    stampSafeText_: typeof stampSafeText_ === 'undefined' ? undefined : stampSafeText_,
+    stampTruncate_: typeof stampTruncate_ === 'undefined' ? undefined : stampTruncate_,
+    stampWrap_: typeof stampWrap_ === 'undefined' ? undefined : stampWrap_,
     storeFieldBoxMetadata_: typeof storeFieldBoxMetadata_ === 'undefined' ? undefined : storeFieldBoxMetadata_,
     structureSig_: typeof structureSig_ === 'undefined' ? undefined : structureSig_,
+    studentPrefillExtras_: typeof studentPrefillExtras_ === 'undefined' ? undefined : studentPrefillExtras_,
     submissionCount_: typeof submissionCount_ === 'undefined' ? undefined : submissionCount_,
     submissionCounts_: typeof submissionCounts_ === 'undefined' ? undefined : submissionCounts_,
     submissionsTotalCount_: typeof submissionsTotalCount_ === 'undefined' ? undefined : submissionsTotalCount_,

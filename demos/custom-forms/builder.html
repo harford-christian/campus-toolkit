@@ -743,7 +743,7 @@ function isContentType(type) {
  * access + approval (use-as-is lock guard), locked (registry column), maxResponses (number),
  * notifyEmails (domain filter).
  */
-var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames'];
+var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames', 'childByChild'];
 var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage', 'humanDriveNameField'];
 
 /**
@@ -1394,7 +1394,7 @@ function schoolPrefillNotice(state) {
     adminListApps: 1, adminAddApp: 1, adminUpdateApp: 1, adminUploadAppLogo: 1, adminDeleteApp: 1,
     adminMoveApp: 1, adminCheckAppStatus: 1, adminCheckAllAppsStatus: 1,
     addPdfTemplate: 1, replacePdfTemplateSource: 1, buildPdfTemplate: 1, deletePdfTemplate: 1,
-    savePdfTemplateMapping: 1, renamePdfTemplate: 1, adminRebuildSubmissionPdf: 1, adminRebuildAllSubmissionPdfs: 1,
+    savePdfTemplateMapping: 1, renamePdfTemplate: 1, setPdfTemplateRenderer: 1, adminRebuildSubmissionPdf: 1, adminRebuildAllSubmissionPdfs: 1,
     adminDeleteLastPdfRebuild: 1,
     adminGetEditLink: 1, adminRenameSubmissionFolders: 1
   };
@@ -1904,7 +1904,7 @@ function schoolPrefillNotice(state) {
       ledgerRow_('PDF templates', s.pdfTemplateCount > 0, s.pdfTemplateCount > 0 ? s.pdfTemplateCount + ' built' : 'None') +
       ledgerRow_('Response cap', capOn, capOn ? m.submissions + ' of ' + s.maxResponses : 'No cap') +
       ledgerRow_('Window', windowOn, windowVal) +
-      ledgerRow_('Multi-child', !!s.multiStudent, s.multiStudent ? 'Allowed' : 'Off') +
+      ledgerRow_('Multi-child', !!(s.multiStudent || s.childByChild), s.childByChild ? 'One at a time' : s.multiStudent ? 'Allowed' : 'Off') +
       ledgerRow_('One per email', !!s.onePerEmail, s.onePerEmail ? 'Enforced' : 'Off') +
       ledgerRow_('Editable after', !!s.allowEdit, s.allowEdit ? 'Yes, via link' : 'Locked') +
     '</div>';
@@ -4318,8 +4318,20 @@ function schoolPrefillNotice(state) {
   }
   function prefillOpts(sel, openPicker, type) {
     var opts = [['', '— none —'], ['parentFirst', 'Parent first name'], ['parentLast', 'Parent last name'],
+      ['parentName', 'Parent full name'],
       ['parentEmail', 'Parent email (locked)'], ['studentGrade', 'Student grade'],
-      ['studentGradeNextYear', 'Next year’s grade (editable)'], ['studentName', 'Student name']];
+      ['studentGradeNextYear', 'Next year’s grade (editable)'], ['studentName', 'Student name'],
+      ['orgName', 'School name (locked)'],
+      // FACTS details for one student (built for the MPSSAA physical form). The page gets a child's
+      // DOB, sex and contacts only on a form that uses one of these.
+      ['studentDob', 'Student date of birth (FACTS, locked)'], ['studentSex', 'Student sex (FACTS, locked)'],
+      ['studentAge', 'Student age today (from FACTS birthdate, locked)']];
+    [1, 2].forEach(function (n) {
+      var who = 'Emergency contact ' + n + ' (FACTS) — ';
+      opts.push(['ec' + n + 'Name', who + 'name'], ['ec' + n + 'Relationship', who + 'relationship'],
+        ['ec' + n + 'DayPhone', who + 'daytime phone (work, else cell, else home)'],
+        ['ec' + n + 'EveningPhone', who + 'evening phone (home)'], ['ec' + n + 'CellPhone', who + 'cell phone']);
+    });
     if (openPicker) opts.push(['schoolPicker', 'School (sign-in, locked)']);
     // Yes/No only: pre-answers "Yes" when FACTS marks the family's student as homeschool (still editable).
     if (type === 'yesno') opts.push(['studentHomeschool', 'Yes if the student is homeschool (FACTS)']);
@@ -4468,6 +4480,7 @@ function schoolPrefillNotice(state) {
         '<label class="switchrow"><span>Review mode' + info('The email the submitter enters gets BOTH the confirmation (as the requester) and a copy of the owner notification (as the reviewer). Useful when one person builds and submits the form.') + '</span><span class="toggle"><input type="checkbox" id="sReview"' + (s.reviewMode ? ' checked' : '') + '><span class="sl"></span></span></label>' +
         '<label class="switchrow"><span>One response per person' + info('Blocks a second submission from the same email address (verified email for parent/staff forms, or the entered email on open forms).') + '</span><span class="toggle"><input type="checkbox" id="sOnce"' + (s.onePerEmail ? ' checked' : '') + '><span class="sl"></span></span></label>' +
         '<label class="switchrow"><span>Save &amp; add another child' + info('After submitting, a parent can keep their entered info and quickly submit again for another of their children (one response per child). Best for per-student forms with a student picker.') + '</span><span class="toggle"><input type="checkbox" id="sMulti"' + (s.multiStudent ? ' checked' : '') + '><span class="sl"></span></span></label>' +
+        '<label class="switchrow"><span>One child at a time' + info('A parent first ticks which of their children the form is for, then fills, saves and downloads it for each in turn (Next / Finish). Each child starts from a clean form with that child’s own auto-fill and last time’s answers — nothing carries over from the child before. One response per child. Needs a student picker; replaces “Save & add another child”.') + '</span><span class="toggle"><input type="checkbox" id="sChildByChild"' + (s.childByChild ? ' checked' : '') + '><span class="sl"></span></span></label>' +
         '<label class="switchrow"><span>PDF copy with receipt' + info('The submitter’s receipt email includes a branded PDF of their answers. Great for signed permission slips, physicals, and KI forms. A copy is also saved in the form’s Uploads folder.') + '</span><span class="toggle"><input type="checkbox" id="sPdf"' + (s.pdfCopy ? ' checked' : '') + '><span class="sl"></span></span></label>' +
         '<label class="switchrow"><span>Allow edit &amp; withdraw' + info('Adds a secure “Edit or withdraw” link to the receipt email. They can change answers or cancel while the response is still Submitted or Pending Approval — no login needed.') + '</span><span class="toggle"><input type="checkbox" id="sEdit"' + (s.allowEdit ? ' checked' : '') + '><span class="sl"></span></span></label>' +
         '<label class="switchrow"><span>Name Drive folders/files by respondent' + info('Names each submission’s Uploads folder and PDF using a name and school year (e.g. “Bel Air Elementary - 2026 - a1b2c3”) instead of the raw submission ID, so staff can find a submission in Drive by browsing instead of searching.') + '</span><span class="toggle"><input type="checkbox" id="sHumanDrive"' + (s.humanDriveNames ? ' checked' : '') + '><span class="sl"></span></span></label>' +
@@ -4598,6 +4611,7 @@ function schoolPrefillNotice(state) {
     document.getElementById('sReview').onchange = function () { s.reviewMode = this.checked; FormsUI.toast(this.checked ? 'Review mode on — submitters get both emails' : 'Review mode off'); };
     document.getElementById('sOnce').onchange = function () { s.onePerEmail = this.checked; };
     document.getElementById('sMulti').onchange = function () { s.multiStudent = this.checked; };
+    document.getElementById('sChildByChild').onchange = function () { s.childByChild = this.checked; };
     document.getElementById('sPdf').onchange = function () { s.pdfCopy = this.checked; };
     document.getElementById('sEdit').onchange = function () { s.allowEdit = this.checked; };
     document.getElementById('sHumanDrive').onchange = function () {
@@ -4719,6 +4733,8 @@ function schoolPrefillNotice(state) {
         '<span class="pdftpl-doc-name">' + esc(t.name) + '</span>' +
         '<span class="pdftpl-doc-status' + (t.enabled ? ' on' : '') + '">' + (t.enabled ? 'Active' : 'Paused') + '</span>' +
         '<button class="btn ghost sm" data-pause="' + esc(t.id) + '">' + (t.enabled ? 'Pause' : 'Resume') + '</button>' +
+        '<button class="btn ghost sm" data-renderer="' + esc(t.id) + '" title="Draw the answers straight onto the original PDF: sharp at any size, exact placement, no Export step. Best for dense official forms.">' +
+          (t.renderer === 'stamp' ? 'Sharp PDF: on' : 'Sharp PDF: off') + '</button>' +
         '<button class="btn ghost sm" data-rename="' + esc(t.id) + '">Rename</button>' +
         '<button class="btn ghost sm" data-replace="' + esc(t.id) + '">Replace document…</button>' +
         '<input class="pdftpl-replace-file" data-replace-file="' + esc(t.id) + '" type="file" accept="' + PDFTPL_ACCEPT + '" style="display:none">' +
@@ -4784,7 +4800,7 @@ function schoolPrefillNotice(state) {
     }).join('') || '<p class="help">This form has no fields yet — add some on the Build tab first.</p>';
     return '<div class="setcard" style="margin-bottom:16px">' +
         '<p class="help">Click a field on the left, then click on the page to place it. Drag a placed box to move it, or its corner to resize.' +
-          (tpl.fieldBoxes && Object.keys(tpl.fieldBoxes).some(function (fid) {
+          (tpl.renderer !== 'stamp' && tpl.fieldBoxes && Object.keys(tpl.fieldBoxes).some(function (fid) {
             var f = pdfInputFields_().filter(function (x) { return x.id === fid; })[0];
             return f && (f.type === 'file' || f.type === 'signature');
           }) ? ' Signature/file fields render as blank on the PDF (same as the branded receipt) — no image is composited.' : '') + '</p>' +
@@ -4839,12 +4855,23 @@ function schoolPrefillNotice(state) {
     var isCalc = !!(tpl.calcFields && tpl.calcFields[last.fid]);
     var showCond = PDFTPL_SELECTED.length === 1 && !isCalc;
     var cond = b.condition || {};
+    // Sharp PDF only: how a chosen option box is marked, and how many ruled rows a text box covers
+    var stampOpts = PDFTPL_SELECTED.length === 1 && !isCalc && tpl.renderer === 'stamp';
+    var stampHtml = !stampOpts ? '' : (b.optionValue != null
+      ? '<label class="lbl" style="margin:0">Mark' + info('X draws a cross inside the box (put the box over the form’s own square). Circle rings the box (put it over a printed word such as YES or NO).') +
+          '<select class="control" id="_pdfSelMark" style="width:auto;display:inline-block">' +
+          '<option value=""' + (!b.mark ? ' selected' : '') + '>Text “X”</option>' +
+          '<option value="x"' + (b.mark === 'x' ? ' selected' : '') + '>Cross in the box</option>' +
+          '<option value="circle"' + (b.mark === 'circle' ? ' selected' : '') + '>Circle around it</option></select></label>'
+      : '<label class="lbl" style="margin:0">Printed rows' + info('When this box covers several ruled lines of the form, enter how many: the answer then goes one line per row, level with each row. Blank = wrap freely.') +
+          '<input class="control" type="number" min="0" max="40" id="_pdfSelLines" value="' + (b.lines || '') + '" style="width:70px;display:inline-block"></label>');
     return '<div class="pdftpl-selbar">' +
       '<span class="help">' + PDFTPL_SELECTED.length + ' box' + (PDFTPL_SELECTED.length === 1 ? '' : 'es') + ' selected</span>' +
       '<label class="lbl" style="margin:0">W<input class="control" type="number" min="4" id="_pdfSelW" value="' + Math.round(b.w) + '" style="width:70px;display:inline-block"></label>' +
       '<label class="lbl" style="margin:0">H<input class="control" type="number" min="4" id="_pdfSelH" value="' + Math.round(b.h) + '" style="width:70px;display:inline-block"></label>' +
       (PDFTPL_SELECTED.length > 1 ? '<button class="btn ghost sm" id="_pdfSelMatch">Match size to last-selected</button>' : '') +
       '<button class="btn ghost sm" id="_pdfSelClear">Clear selection</button>' +
+      stampHtml +
       (showCond ?
         '<div class="frow" style="gap:6px;margin-top:8px;width:100%;flex-basis:100%">' +
           '<label class="lbl" style="margin:0 6px 0 0;white-space:nowrap;align-self:center">Only show this box when' +
@@ -4881,6 +4908,16 @@ function schoolPrefillNotice(state) {
       renderEditorPane();
     };
     if (clearBtn) clearBtn.onclick = function () { PDFTPL_SELECTED = []; renderEditorPane(); };
+    var markEl = document.getElementById('_pdfSelMark'), linesEl = document.getElementById('_pdfSelLines');
+    function applyBoxOpt(key, v) {
+      var next = Object.assign({}, tpl.fieldBoxes[last.fid][last.idx]);
+      if (v) next[key] = v; else delete next[key];
+      tpl.fieldBoxes[last.fid][last.idx] = next;
+      schedulePdfTplSave_(tpl);
+      renderEditorPane();
+    }
+    if (markEl) markEl.onchange = function () { applyBoxOpt('mark', markEl.value); };
+    if (linesEl) linesEl.onchange = function () { applyBoxOpt('lines', Math.max(0, Math.min(40, Math.round(Number(linesEl.value) || 0)))); };
     var condFieldEl = document.getElementById('_pdfBoxCondField');
     var condOpEl = document.getElementById('_pdfBoxCondOp');
     var condValEl = document.getElementById('_pdfBoxCondVal');
@@ -4943,6 +4980,22 @@ function schoolPrefillNotice(state) {
         cancelPdfTplSave_(tid); // we're about to send fresher data for this id ourselves
         call('savePdfTemplateMapping', [CURRENT_CONTEXT_ID, EDITING.meta.id, tid, t.fieldBoxes, !t.enabled, t.calcFields || {}]).then(function (r) {
           EDITING.schema.settings.pdfTemplates = r.pdfTemplates;
+          renderEditorPane();
+        }).catch(alertErr);
+      };
+    });
+
+    document.querySelectorAll('[data-renderer]').forEach(function (b) {
+      b.onclick = function () {
+        var tid = b.getAttribute('data-renderer');
+        var t = templates.filter(function (x) { return x.id === tid; })[0];
+        cancelPdfTplSave_(tid);
+        // save the latest box edits first, then switch — so nothing placed since the last autosave is lost
+        call('savePdfTemplateMapping', [CURRENT_CONTEXT_ID, EDITING.meta.id, tid, t.fieldBoxes, t.enabled, t.calcFields || {}]).then(function () {
+          return call('setPdfTemplateRenderer', [CURRENT_CONTEXT_ID, EDITING.meta.id, tid, t.renderer === 'stamp' ? 'slides' : 'stamp']);
+        }).then(function (r) {
+          EDITING.schema.settings.pdfTemplates = r.pdfTemplates;
+          FormsUI.toast(t.renderer === 'stamp' ? 'Sharp PDF off — Export this document before it’s used' : 'Sharp PDF on — no Export needed');
           renderEditorPane();
         }).catch(alertErr);
       };
@@ -5062,6 +5115,7 @@ function schoolPrefillNotice(state) {
           var built = 0, failed = [];
           var chain = Promise.resolve();
           list.forEach(function (t, i) {
+            if (t.renderer === 'stamp') return; // drawn on the original PDF at submit time — nothing to build
             chain = chain.then(function () {
               status.textContent = 'Building ' + (i + 1) + ' of ' + list.length + '… (' + t.name + ')';
               return call('buildPdfTemplate', [CURRENT_CONTEXT_ID, EDITING.meta.id, t.id]).then(function (r) {

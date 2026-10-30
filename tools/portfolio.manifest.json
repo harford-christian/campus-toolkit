@@ -150,7 +150,14 @@
         "custom-forms/apps/chooser/pages/Index.html",
         "custom-forms/apps/runner-public/pages/Index.html",
         "custom-forms/apps/runner-staff/pages/Index.html",
-        "custom-forms/apps/runner-macs/pages/Index.html"
+        "custom-forms/apps/runner-macs/pages/Index.html",
+        "custom-forms/apps/builder/pages/Builder.html",
+        "custom-forms/apps/runner-public/pages/Portal.html",
+        "custom-forms/apps/runner-public/pages/Runner.html",
+        "custom-forms/apps/runner-staff/pages/Portal.html",
+        "custom-forms/apps/runner-staff/pages/Runner.html",
+        "custom-forms/apps/runner-macs/pages/Portal.html",
+        "custom-forms/apps/runner-macs/pages/Runner.html"
       ],
       "vendoredBy": [
         "demos/custom-forms/build-logic.mjs"

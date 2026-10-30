@@ -177,9 +177,9 @@ const R = boot('parent-form', '?form=' + created.formId, tab);
 check('the parent page\'s doGet hands the runner the form id from the URL', R.DEMO_DOGET.mode === 'runner' && R.DEMO_DOGET.formId === created.formId && R.location.replaced === null);
 const pf = R.MOCK_BACKEND.getPublicForm(created.formId, null);
 check('the runner renders the published schema (fields, conditional rule)', pf.ok && pf.form.title === 'Robotics Club Sign-up' && pf.form.pages[0].fields.length === 4 && pf.form.pages[0].fields[2].showIf.value === 'Thursday');
-const bad = R.MOCK_BACKEND.submitForm(created.formId, { fld_name: '', fld_night: 'Friday', fld_email: 'nope' }, null, {}, '');
+const bad = await R.MOCK_BACKEND.submitForm(created.formId, { fld_name: '', fld_night: 'Friday', fld_email: 'nope' }, null, {}, '');
 check('server-side validation rejects a required blank, an option not offered and a bad email', !bad.ok && bad.reason === 'validation' && Object.keys(bad.errors).sort().join() === 'fld_email,fld_name,fld_night');
-const sub = R.MOCK_BACKEND.submitForm(created.formId, { fld_name: 'Kai Ortiz', fld_night: 'Tuesday', fld_bring: ['Snacks'], fld_email: 'jamie.ortiz@example.com' }, null, {}, '');
+const sub = await R.MOCK_BACKEND.submitForm(created.formId, { fld_name: 'Kai Ortiz', fld_night: 'Tuesday', fld_bring: ['Snacks'], fld_email: 'jamie.ortiz@example.com' }, null, {}, '');
 check('the parent\'s submission is recorded', sub.ok && /^SUB-\d{14}-\d{3}$/.test(sub.submissionId) && sub.status === 'Submitted');
 const resp = boot('builder', '', tab).MOCK_BACKEND.getResponses('hcs', created.formId);
 const row = resp.rows && resp.rows[0];
@@ -196,7 +196,7 @@ if (editHref) {
   const q = editHref.slice(editHref.indexOf('?'));
   const E = boot('parent-form', q.replace(/&amp;/g, '&'), tab);
   const ef = E.MOCK_BACKEND.getSubmissionForEdit(E.DEMO_DOGET.formId, E.DEMO_DOGET.editSub, E.DEMO_DOGET.editToken);
-  const up = E.MOCK_BACKEND.updateSubmission(E.DEMO_DOGET.formId, E.DEMO_DOGET.editSub, E.DEMO_DOGET.editToken, { fld_name: 'Kai Ortiz', fld_night: 'Thursday', fld_bring: ['Laptop'], fld_email: 'jamie.ortiz@example.com' }, {});
+  const up = await E.MOCK_BACKEND.updateSubmission(E.DEMO_DOGET.formId, E.DEMO_DOGET.editSub, E.DEMO_DOGET.editToken, { fld_name: 'Kai Ortiz', fld_night: 'Thursday', fld_bring: ['Laptop'], fld_email: 'jamie.ortiz@example.com' }, {});
   const forged = E.MOCK_BACKEND.getSubmissionForEdit(E.DEMO_DOGET.formId, E.DEMO_DOGET.editSub, 'x' + E.DEMO_DOGET.editToken.slice(1));
   const r2 = boot('builder', '', tab).MOCK_BACKEND.getResponses('hcs', created.formId);
   check('the edit link re-opens the answers, saves an edit, and a forged token is refused',
@@ -208,7 +208,7 @@ P.authRequestOtp('dana.whitfield@example.com');
 const tok = P.authVerifyOtp('dana.whitfield@example.com', '482193').token;
 const F = boot('parent-form', '?form=FRM-ATHOME-LEARNING', tab).MOCK_BACKEND;
 const pngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-const ah = F.submitForm('FRM-ATHOME-LEARNING', { pFirst: 'Dana', pLast: 'Whitfield', pEmail: 'dana.whitfield@example.com', students: ['Ellie Whitfield'], reason: 'Extended travel',
+const ah = await F.submitForm('FRM-ATHOME-LEARNING', { pFirst: 'Dana', pLast: 'Whitfield', pEmail: 'dana.whitfield@example.com', students: ['Ellie Whitfield'], reason: 'Extended travel',
   startDate: '2026-11-02', returnDate: '2026-11-13', plan: 'Daily packets.', sign: 'Dana Whitfield' }, tok, { sign: [{ name: 'signature.png', mimeType: 'image/png', b64: pngB64 }] }, '');
 const B2 = boot('builder', '', tab).MOCK_BACKEND;
 const queue = B2.listMyApprovalQueue('hcs');
@@ -216,7 +216,7 @@ check('an approval-routed parent submission (drawn signature uploaded to Drive) 
   ah.ok && ah.status === 'Pending Approval' && queue.items.some((i) => i.submissionId === ah.submissionId), JSON.stringify(ah).slice(0, 200));
 const pdf = ah.pdfCopies && ah.pdfCopies[0] && Buffer.from(ah.pdfCopies[0].b64, 'base64').toString('latin1');
 check('the form\'s "PDF copy" setting hands back a downloadable PDF of the receipt (the demo\'s text rendering of the app\'s HTML)',
-  !!pdf && /^%PDF-1\.4/.test(pdf) && /%%EOF\n$/.test(pdf) && /Extended travel/.test(pdf), JSON.stringify(ah.pdfCopies).slice(0, 200));
+  !!pdf && /^%PDF-1\.4/.test(pdf) && /%%EOF\n$/.test(pdf) && /Extended travel/.test(pdf), String(JSON.stringify(ah.pdfCopies)).slice(0, 200));
 const before = outbox().length;
 const dec = B2.decideApproval('hcs', 'FRM-ATHOME-LEARNING', ah.submissionId, 'Approved', 'Enjoy the trip.');
 const after = boot('builder', '', tab).MOCK_BACKEND.getResponses('hcs', 'FRM-ATHOME-LEARNING');

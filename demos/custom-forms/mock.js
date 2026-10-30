@@ -657,8 +657,19 @@
     var st = state();
     var S = window.FORMS_SERVER(APP, makeGoogle(st, APP, PAGE_CACHE));
     if (typeof S[name] !== 'function') throw new Error('Script function not found: ' + name);
-    try { return clone(S[name].apply(null, clone(args || []))); }
-    finally { saveState(st); setTimeout(renderInbox, 0); }
+    var done = function () { saveState(st); setTimeout(renderInbox, 0); };
+    var res;
+    try { res = S[name].apply(null, clone(args || [])); }
+    catch (e) { done(); throw e; }
+    // submitForm / updateSubmission are async upstream (2026-10-28: the submit chain awaits the PDF
+    // build). Apps Script settles the Promise before the execution ends, so this does too: the state
+    // is saved only once the body past the await has run, and the caller gets the settled value
+    // (gsr-shim already flattens a returned Promise into the success handler).
+    if (res && typeof res.then === 'function') {
+      return res.then(function (v) { done(); return clone(v); }, function (e) { done(); throw e; });
+    }
+    done();
+    return clone(res);
   }
 
   // Builder calls that need Google Slides / Drive thumbnails / pdf-lib to do anything at all.
@@ -676,7 +687,7 @@
     'adminUploadAppLogo', 'buildPdfTemplate', 'createForm', 'createFromTemplate', 'decideApproval', 'decideTemplateRequest', 'deleteForm', 'deletePdfTemplate',
     'duplicateForm', 'exportResponsesCsv', 'getMyClassOptions', 'getResponses', 'getShareUrl', 'getTemplatePreview', 'getTemplateRequests', 'listAdmins',
     'listAllForms', 'listLibrary', 'listMyApprovalQueue', 'listMyForms', 'loadFormForEdit', 'removeAdmin', 'renamePdfTemplate', 'replacePdfTemplateSource',
-    'requestPublishTemplate', 'saveAsTemplate', 'saveForm', 'savePdfTemplateMapping', 'setFormClassTag', 'setFormMeta', 'setFormState', 'setTemplateScope',
+    'requestPublishTemplate', 'saveAsTemplate', 'saveForm', 'savePdfTemplateMapping', 'setFormClassTag', 'setFormMeta', 'setFormState', 'setPdfTemplateRenderer', 'setTemplateScope',
     'uploadFormIcon', 'whoAmI'];
   var METHODS = { builder: BUILDER_METHODS, chooser: [], parent: PORTAL_METHODS, staff: PORTAL_METHODS, 'macs-portal': PORTAL_METHODS,
     'parent-form': RUNNER_METHODS, 'staff-form': RUNNER_METHODS, 'macs-form': RUNNER_METHODS, macs: [] }[SURFACE] || [];

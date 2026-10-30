@@ -744,7 +744,7 @@ function isContentType(type) {
  * access + approval (use-as-is lock guard), locked (registry column), maxResponses (number),
  * notifyEmails (domain filter).
  */
-var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames'];
+var SETTINGS_BOOLS = ['reviewMode', 'onePerEmail', 'multiStudent', 'pdfCopy', 'allowEdit', 'humanDriveNames', 'childByChild'];
 var SETTINGS_STRINGS = ['openDate', 'closeDate', 'confirmationMessage', 'humanDriveNameField'];
 
 /**
@@ -917,6 +917,9 @@ function schoolPrefillNotice(state) {
   var LOCKED = false;
   var FORM = null;      // the current form object (for "save & add another child")
   var LAST_ANSWERS = null; // answers of the just-submitted response (to carry over between children)
+  // One child at a time (form setting childByChild): the children the parent ticked, which one is
+  // on screen, and what each saved (name, reference, PDF copies) for the Finish screen.
+  var CHILD_QUEUE = null, CHILD_IDX = 0, CHILDREN_DONE = [];
   var REVIEW_SHOWN = false; // show the review-mode "two emails" notice only once per session
   // Optional Config keys (SUPPORT_CONTACT / CHOOSER_URL) delivered on the auth-required
   // response. Blank when unset — FormsUI.otpHelpHtml degrades to generic wording.
@@ -972,6 +975,7 @@ function schoolPrefillNotice(state) {
       }); });
       PREFILL = { parent: {}, students: studs };
     }
+    if (needsChildPicker_(res.form)) return renderChildPicker_(res.form);
     renderForm(res.form);
   }
 
@@ -1302,6 +1306,9 @@ function schoolPrefillNotice(state) {
     body += '<div><h1 class="form-title">' + FormsUI.esc(form.title) + '</h1>' +
             (form.description ? '<p class="form-desc">' + FormsUI.esc(form.description) + '</p>' : '') + '</div>';
     if (form.locked) body += '<div class="notice err">This form is not currently accepting responses.</div>';
+    if (childQueueActive_()) body += '<div class="notice info" id="childNotice">Child ' + (CHILD_IDX + 1) + ' of ' + CHILD_QUEUE.length +
+      ': <strong>' + FormsUI.esc(CHILD_QUEUE[CHILD_IDX]) + '</strong>' +
+      (CHILD_QUEUE.length > 1 ? ' · <a href="#" id="skipChild">Skip this child</a>' : '') + '</div>';
     // Exactly ONE thing can stand here: the offer to reuse last year's answers, and only until
     // it's used or dismissed. The draft is a modal question answered before this, and its
     // outcome is a toast; per-field marks are the record of what was carried over. Nothing
@@ -1313,6 +1320,7 @@ function schoolPrefillNotice(state) {
     body += '<div id="pageNav"></div>';
     body += '</div>';
     shell(body);
+    wireChildSkip_();
 
     LOCKED = !!form.locked;
     var flat = [];
@@ -1558,7 +1566,9 @@ function schoolPrefillNotice(state) {
    * email (or picked school, for MACS) keeps that from crossing between people on one device.
    */
   function draftScope_() {
-    if (VIA === 'otp' && PREFILL && PREFILL.parent && PREFILL.parent.email) return String(PREFILL.parent.email).toLowerCase();
+    // one child at a time keeps a separate draft per child, so child 1's answers never reappear on child 2's form
+    if (VIA === 'otp' && PREFILL && PREFILL.parent && PREFILL.parent.email) return String(PREFILL.parent.email).toLowerCase() +
+      (childQueueActive_() ? ':child:' + CHILD_QUEUE[CHILD_IDX] : '');
     var school = (typeof URL_PREFILL === 'object' && URL_PREFILL && URL_PREFILL.School) || '';
     if (school) return 'school:' + String(school).toLowerCase();
     return 'anon';
@@ -2330,7 +2340,11 @@ function schoolPrefillNotice(state) {
 
     // auto-select when the picker lists exactly one student (after its homeschool filter, if any)
     var listed = picker ? pickerStudents(picker) : [];
-    if (picker && listed.length === 1) {
+    if (picker && !picker.multiple && childQueueActive_()) {
+      // one child at a time: this form is for the child whose turn it is — shown, not changeable
+      setVal(picker.id, CHILD_QUEUE[CHILD_IDX]);
+      var qp = document.getElementById('f_' + picker.id); if (qp) qp.disabled = true;
+    } else if (picker && listed.length === 1) {
       if (picker.multiple) {
         var cb = document.querySelector('input[name="f_' + picker.id + '"]');
         if (cb) { cb.checked = true; cb.closest('.choice').classList.add('selected'); }
@@ -2341,6 +2355,8 @@ function schoolPrefillNotice(state) {
       switch (f.prefillFrom) {
         case 'parentFirst': setVal(f.id, p.first); break;
         case 'parentLast':  setVal(f.id, p.last); break;
+        case 'parentName':  setVal(f.id, [p.first, p.last].filter(function (x) { return x; }).join(' ')); break;
+        case 'orgName':     setVal(f.id, PREFILL.org || ''); lockField(f.id, !!PREFILL.org); break;
         case 'parentEmail':
           setVal(f.id, p.email);
           var el = document.getElementById('f_' + f.id);
@@ -2366,7 +2382,7 @@ function schoolPrefillNotice(state) {
   // left with nothing visible under it. "Update my info" reveals them for corrections.
   function collapseIdentityBlock() {
     if (VIA !== 'otp') return;
-    var IDENTITY = { parentFirst: 1, parentLast: 1, parentEmail: 1 };
+    var IDENTITY = { parentFirst: 1, parentLast: 1, parentName: 1, parentEmail: 1 };
     var collapsed = 0;
     FIELDS.forEach(function (f) {
       if (!IDENTITY[f.prefillFrom]) return;
@@ -2398,12 +2414,27 @@ function schoolPrefillNotice(state) {
   }
 
   function refreshStudentDerived() {
-    var s = selectedStudent();
+    var s = selectedStudent(), extras = false;
     FIELDS.forEach(function (f) {
       if (f.prefillFrom === 'studentGradeNextYear') {
         // seed the next grade up (current+1) but leave EDITABLE so a parent can override
         var ng = s && typeof nextGrade === 'function' ? nextGrade(s.grade) : '';
         if (ng) setVal(f.id, ng);
+        return;
+      }
+      // MPSSAA physical form (docs/MPSSAA_PHYSICAL_FORM.md): DOB, sex and age are FACTS's and locked
+      // like grade; the two emergency contacts are FACTS's too but stay editable (a fix here changes
+      // only this form). The server sends these only to a form that uses them.
+      if (STUDENT_FACT_KEY_[f.prefillFrom]) {
+        var fv = s ? (s[STUDENT_FACT_KEY_[f.prefillFrom]] || '') : '';
+        setVal(f.id, fv); lockField(f.id, !!fv); extras = true;
+        return;
+      }
+      var ec = /^ec([12])(Name|Relationship|DayPhone|EveningPhone|CellPhone)$/.exec(f.prefillFrom || '');
+      if (ec) {
+        var c = s && s.contacts ? s.contacts[Number(ec[1]) - 1] : null;
+        var cv = c ? (c[CONTACT_KEY_[ec[2]]] || '') : '';
+        setVal(f.id, f.type === 'phone' ? phoneOut_(cv) : cv); extras = true;
         return;
       }
       if (f.prefillFrom !== 'studentGrade' && f.prefillFrom !== 'studentName') return;
@@ -2413,8 +2444,16 @@ function schoolPrefillNotice(state) {
       // with 0 or >1 students selected can still complete a required field (no dead-end).
       if (v) lockField(f.id, true); else lockField(f.id, false);
     });
-    if (applyHomeschoolPrefill_()) { recomputeCalc(); applyVisibility(); }
+    if (applyHomeschoolPrefill_() || extras) { recomputeCalc(); applyVisibility(); }
     maybePriorYear();
+  }
+  var STUDENT_FACT_KEY_ = { studentDob: 'dob', studentSex: 'sex', studentAge: 'age' };
+  var CONTACT_KEY_ = { Name: 'name', Relationship: 'relationship', DayPhone: 'day', EveningPhone: 'evening', CellPhone: 'cell' };
+  /** A FACTS phone in the phone field's own 410-555-0101 shape when it is a plain 10-digit number;
+   *  anything else (an extension, a country code) is kept exactly as FACTS has it. */
+  function phoneOut_(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    return d.length === 10 ? formatPhone(d) : String(v || '');
   }
   // Pre-fill "remembered" fields (priorYear) from this student's most recent prior submission to
   // this same form. Server-guarded to the OTP parent's own students; applied as editable defaults.
@@ -2686,7 +2725,7 @@ function schoolPrefillNotice(state) {
       return;
     }
     if (!IS_EDIT) clearDraft();
-    var canAddChild = !IS_PREVIEW && !IS_EDIT && FORM && FORM.multiStudent && VIA === 'otp' &&
+    var canAddChild = !childQueueActive_() && !IS_PREVIEW && !IS_EDIT && FORM && FORM.multiStudent && VIA === 'otp' &&
       FIELDS.some(function (f) { return f.type === 'studentPicker'; });
     var nextStep = res.status === 'Pending Approval'
       ? '<div class="notice info" style="text-align:left">Your submission will be reviewed. You’ll get an email with the decision.</div>' : '';
@@ -2703,28 +2742,23 @@ function schoolPrefillNotice(state) {
         }).join('')
       : (res.pdfCopiesOverCap ? '<p class="help">Your copy is attached to the confirmation email.</p>' : '');
     var doneTitle = IS_EDIT ? 'Changes saved' : 'Submitted';
+    if (childQueueActive_()) {
+      doneTitle = 'Submitted: ' + CHILD_QUEUE[CHILD_IDX];
+      CHILDREN_DONE.push({ name: CHILD_QUEUE[CHILD_IDX], ref: res.displayLabel || res.submissionId || '', pdfCopies: pdfCopies });
+    }
     shell('<div class="card flush-top card-pad center stack">' +
       '<div style="color:var(--hcs-red)">' + FormsUI.icon('check', { cls: 'hcsi-lg' }) + '</div>' +
-      '<h1 class="form-title">' + doneTitle + '</h1>' +
+      '<h1 class="form-title">' + FormsUI.esc(doneTitle) + '</h1>' +
       '<p class="form-desc">' + FormsUI.esc(res.message) + '</p>' +
       nextStep +
       pdfLinks +
       '<p class="help">Reference: ' + FormsUI.esc(res.displayLabel || res.submissionId) + '</p>' +
-      (canAddChild ? '<button class="btn block" id="addChildBtn" type="button">' + FormsUI.icon('plus') + ' Save &amp; add another child</button>' : '') +
-      (IS_PREVIEW || IS_EDIT ? '' : '<button class="btn ghost" id="anotherBtn" type="button">' + (canAddChild ? 'I’m done' : 'Submit another response') + '</button>') +
+      (childQueueActive_() ? childDoneButtonsHtml_() :
+        (canAddChild ? '<button class="btn block" id="addChildBtn" type="button">' + FormsUI.icon('plus') + ' Save &amp; add another child</button>' : '') +
+        (IS_PREVIEW || IS_EDIT ? '' : '<button class="btn ghost" id="anotherBtn" type="button">' + (canAddChild ? 'I’m done' : 'Submit another response') + '</button>')) +
       '</div>');
-    document.querySelectorAll('[data-pdfcopy]').forEach(function (b) {
-      b.onclick = function () {
-        var d = pdfCopies[Number(b.getAttribute('data-pdfcopy'))];
-        if (!d) return;
-        var bin = atob(d.b64), bytes = new Uint8Array(bin.length);
-        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-        var blob = new Blob([bytes], { type: 'application/pdf' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a'); a.href = url; a.download = d.name; a.click();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-      };
-    });
+    wirePdfCopies_(pdfCopies);
+    wireChildDone_();
     var acb = document.getElementById('addChildBtn'); if (acb) acb.onclick = addAnotherChild;
     var anb = document.getElementById('anotherBtn'); if (anb) anb.onclick = restartForm_;
     FormsUI.announce(doneTitle + '. ' + (res.message || '') + ' Reference ' + (res.displayLabel || res.submissionId || ''));
@@ -2759,6 +2793,127 @@ function schoolPrefillNotice(state) {
         resetNames.map(function (n) { return '<li>' + FormsUI.esc(n) + '</li>'; }).join('') + '</ul>';
     }
     FormsUI.modal('Next child', body, 'Got it');
+  }
+
+  // Offer the submitter's copies as real downloads (Blob -> a.download), never a new-tab link —
+  // the googleusercontent sandbox can block those (round-2 audit P20).
+  function wirePdfCopies_(copies) {
+    document.querySelectorAll('[data-pdfcopy]').forEach(function (b) {
+      b.onclick = function () {
+        var d = copies[Number(b.getAttribute('data-pdfcopy'))];
+        if (!d) return;
+        var bin = atob(d.b64), bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        var blob = new Blob([bytes], { type: 'application/pdf' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href = url; a.download = d.name; a.click();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      };
+    });
+  }
+
+  // ---------- one child at a time (form setting childByChild; docs/MPSSAA_PHYSICAL_FORM.md) ----------
+  // The parent ticks which children first, then fills, saves and prints the form for each in turn.
+  // Next starts the next child on a clean form — that child's own FACTS details and last time's
+  // answers, nothing carried over from the child before — and Finish lists everyone's copies again.
+  function childQueueActive_() { return !!(CHILD_QUEUE && CHILD_QUEUE.length && FORM && FORM.childByChild && !IS_EDIT); }
+
+  function childPickerFor_(form) {
+    var picker = null;
+    (form.pages || []).forEach(function (pg) {
+      (pg.fields || []).forEach(function (f) { if (!picker && f.type === 'studentPicker' && !f.multiple) picker = f; });
+    });
+    return picker;
+  }
+
+  /** True when this load should first ask which children. With one child (or none) there is
+   *  nothing to ask: the queue is set straight away and the form opens as usual. */
+  function needsChildPicker_(form) {
+    if (!form || !form.childByChild || IS_EDIT || CHILD_QUEUE || !(VIA === 'otp' || IS_PREVIEW)) return false;
+    var picker = childPickerFor_(form);
+    if (!picker) return false;
+    var studs = pickerStudents(picker);
+    if (studs.length <= 1) { CHILD_QUEUE = studs.map(function (s) { return s.displayName; }); CHILD_IDX = 0; return false; }
+    return true;
+  }
+
+  function renderChildPicker_(form) {
+    FORM = form;
+    var studs = pickerStudents(childPickerFor_(form));
+    shell('<div class="card flush-top card-pad stack">' +
+      (IS_PREVIEW ? '<div class="notice info">' + FormsUI.icon('eye') + ' <strong>Preview</strong> — sample children. Nothing is saved.</div>' : '') +
+      '<div><h1 class="form-title">' + FormsUI.esc(form.title) + '</h1>' +
+      (form.description ? '<p class="form-desc">' + FormsUI.esc(form.description) + '</p>' : '') + '</div>' +
+      '<div role="group" aria-labelledby="childPickLabel" class="stack">' +
+      '<p id="childPickLabel" style="margin:0"><strong>Which children are you filling this out for?</strong></p>' +
+      '<p class="help" style="margin:0">You’ll fill it out for one child at a time and save a copy for each.</p>' +
+      '<div class="choices">' + studs.map(function (s, i) {
+        return '<label class="choice"><input type="checkbox" name="childPick" value="' + i + '"><span>' +
+          FormsUI.esc(s.displayName) + (s.grade ? ' (Grade ' + FormsUI.esc(s.grade) + ')' : '') + '</span></label>';
+      }).join('') + '</div></div>' +
+      '<div id="childPickErr" class="notice err" role="alert" style="display:none">Choose at least one child.</div>' +
+      '<button class="btn block" id="childPickGo" type="button">Continue</button></div>');
+    document.querySelectorAll('input[name="childPick"]').forEach(function (cb) {
+      cb.addEventListener('change', function () { cb.closest('.choice').classList.toggle('selected', cb.checked); });
+    });
+    document.getElementById('childPickGo').onclick = function () {
+      var picked = [];
+      document.querySelectorAll('input[name="childPick"]').forEach(function (cb) { if (cb.checked) picked.push(studs[Number(cb.value)].displayName); });
+      if (!picked.length) { document.getElementById('childPickErr').style.display = 'block'; return; }
+      CHILD_QUEUE = picked; CHILD_IDX = 0; CHILDREN_DONE = [];
+      renderForm(form);
+    };
+    FormsUI.focusView(document.querySelector('#app .card'));
+  }
+
+  function wireChildSkip_() {
+    var a = document.getElementById('skipChild');
+    if (a) a.onclick = function (e) { e.preventDefault(); nextChild_(); };
+  }
+
+  /** The next child's form, from clean — or the Finish screen after the last one. */
+  function nextChild_() {
+    if (CHILD_IDX + 1 >= CHILD_QUEUE.length) { renderChildFinish_(); return; }
+    CHILD_IDX++;
+    ATTACH = {}; SIG_DRAWN = {}; ATTACH_DRAFT_SKIPPED = false;
+    LAST_ANSWERS = null; PRIOR_WROTE = []; PF_OFFER_HIDDEN = false;
+    renderForm(FORM);
+    try { window.scrollTo(0, 0); } catch (e) {}
+  }
+
+  function childDoneButtonsHtml_() {
+    return CHILD_IDX + 1 >= CHILD_QUEUE.length
+      ? '<button class="btn block" id="childFinish" type="button">Finish</button>'
+      : '<button class="btn block" id="childNext" type="button">Next: ' + FormsUI.esc(CHILD_QUEUE[CHILD_IDX + 1]) + '</button>';
+  }
+
+  function wireChildDone_() {
+    var n = document.getElementById('childNext'); if (n) n.onclick = nextChild_;
+    var f = document.getElementById('childFinish'); if (f) f.onclick = renderChildFinish_;
+  }
+
+  function renderChildFinish_() {
+    var copies = [];
+    var list = CHILDREN_DONE.map(function (c) {
+      return '<li class="stack"><div><strong>' + FormsUI.esc(c.name) + '</strong>' +
+        (c.ref ? ' <span class="help">· Reference ' + FormsUI.esc(c.ref) + '</span>' : '') + '</div>' +
+        c.pdfCopies.map(function (d) {
+          copies.push(d);
+          return '<button type="button" class="btn ghost block" data-pdfcopy="' + (copies.length - 1) + '">' +
+            FormsUI.icon('download') + ' Download again (' + FormsUI.esc(d.name) + ')</button>';
+        }).join('') + '</li>';
+    }).join('');
+    shell('<div class="card flush-top card-pad center stack">' +
+      '<div style="color:var(--hcs-red)">' + FormsUI.icon('check', { cls: 'hcsi-lg' }) + '</div>' +
+      '<h1 class="form-title">All done</h1>' +
+      (CHILDREN_DONE.length
+        ? '<ul class="stack" style="text-align:left;list-style:none;padding:0;margin:0">' + list + '</ul>'
+        : '<p class="form-desc">Nothing was submitted.</p>') +
+      '<button class="btn ghost" id="childAgain" type="button">Start over</button></div>');
+    wirePdfCopies_(copies);
+    document.getElementById('childAgain').onclick = function () { CHILD_QUEUE = null; CHILD_IDX = 0; CHILDREN_DONE = []; restartForm_(); };
+    FormsUI.announce('All done.');
+    FormsUI.focusView(document.querySelector('#app .card'));
   }
 })();
 </script>
