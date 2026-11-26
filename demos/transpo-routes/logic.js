@@ -376,8 +376,15 @@ function headerFor(tabName) {
  * stops.js — the stop sequence and the student→stop link. PURE.
  *
  * This is the only genuinely new data in the project. Transportation Director 2's master transportation list carries
- * NO stops (it is Name / Grade / Route / Bus # / Notes, sorted by surname), FACTS has nowhere to
- * put them (/People/PickUpPoint returns 0 rows here), and the dismissal app never needed them.
+ * NO stops (it is Name / Grade / Route / Bus # / Notes, sorted by surname), and the dismissal app
+ * never needed them.
+ *
+ * FACTS CAN now hold them (corrected 2026-11-26; this used to say it had nowhere to put them). Its
+ * native Transportation module has Pick-Up Points (/People/PickUpPoint) and a per-student route,
+ * AM/PM time frame, weekdays and pickup point (/People/StudentTransportation). Every bus rider was
+ * loaded there on 2026-11-25 with NO pickup points yet, waiting on Transportation Director 2's stop list. The apps move
+ * to that module in January 2027 (FACTS-backend-refresh/REFRESH-PLAN.md); after that, stops should
+ * come from FACTS rather than a separate Stops tab. Until then this file is unchanged.
  *
  * DESIGNED TO BE EMPTY. Phase 1 ships before a single stop exists: with no Stops rows every rider
  * resolves to the null stop and the driver gets a flat route list, which is already better than a
